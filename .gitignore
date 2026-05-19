@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# Generated practices (track directory structure, but you may want to review generated files)
+# Uncomment the following lines if you don't want to track generated practice files:
+# practices/*/research-report.md
+# practices/*/*.json
+
+.claude/settings.local.json
+
+# Keep the practices directory structure
+!practices/.gitkeep
