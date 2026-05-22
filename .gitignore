@@ -7,6 +7,7 @@
 # practices/*/*.json
 
 .claude/settings.local.json
+.claude/settings.json
 
 # Keep the practices directory structure
 !practices/.gitkeep

@@ -1,3 +1,9 @@
+# Phase 1: Research Analysis and Methodology Translation
+
+**Execution Context:** This prompt is designed for use within the `/translate-methodology` skill in the `keleo-pgen-llm` repository. All required resources are available as local files.
+
+---
+
 # Role and Objective
 
 You are an expert Practice Research Analyst and Methodology Translator. Your objective is to create a comprehensive, human-readable research report that analyzes a source methodology and maps it to the Platform Adoption Essentials baseline framework.
@@ -18,18 +24,41 @@ You are an expert Practice Research Analyst and Methodology Translator. Your obj
 
 ---
 
-# Inputs
+# Required Resources
 
-1. **The Baseline (platform-adoption-kernel.json):** The core framework defining:
+Before beginning analysis, read the following files from the repository:
+
+1. **The Baseline Framework** - `deps/platform-adoption-kernel.json`
    - **Focuses:** Three Areas of Concern (Value, Solution, Endeavor)
-   - **Alphas:** Core concepts with progressive states
-   - **ActivitySpaces:** Types of work organized by focus
-   - **Competencies:** Skills with proficiency levels
-   - **NarrativeTypes:** Story frameworks (STAR, StoryBrand, ABT, Epic, Lifecycle, etc.)
+   - **Alphas:** Core concepts with progressive states and exact state names
+   - **ActivitySpaces:** Types of work organized by focus (exact names required for mapping)
+   - **Competencies:** Skills with proficiency levels (exact names: Analysis, Engineering, Leadership, Management, Test, Usage)
+   - **NarrativeTypes:** Story frameworks with their narrative elements (STAR, StoryBrand, ABT, Epic, Lifecycle, etc.)
+   - **Citations:** Bibliographic reference structure for authoritative sources
 
-2. **The User Sources:** Primary content describing the methodology you're analyzing
+2. **Framework Guidance** - `references/domain-framework.md`
+   - Four-perspective analysis framework (Business, Technology, People, Process)
+   - Resource assessment methodology combining Open Agile, SAFe, Gartner CEA, Zachman, TOGAF
 
-3. **Practice Dependencies (Optional):** Existing practices that provide foundational concepts
+3. **Semantic Guidance** - `references/semantics.md`
+   - Comprehensive operational architecture for the Practice Language
+   - Ontological principles and semantic integration
+   - Detailed explanations of Alphas, States, Work Products, Activities, Patterns
+
+4. **Maturity Rubric** - `references/workproduct-assessment-rubric.csv`
+   - 5-level maturity model for assessing source content
+   - Level 0 (Non-Existent) through Level 4 (Comprehensive/Automated)
+   - Use to inform State progressions and Level of Detail definitions
+
+5. **JSON Schema** - `deps/language.schema.json`
+   - Technical schema specification (for reference, not direct use in Phase 1)
+   - Helps understand required vs optional fields
+
+6. **User-Provided Sources:** The methodology documentation being analyzed
+   - Files, URLs, or other materials provided by the user
+   - Primary content to research and map to baseline framework
+
+7. **Practice Dependencies (Optional):** If user references existing practice JSON files that this work builds upon
 
 ---
 
@@ -39,21 +68,21 @@ Before generating your report, apply these analytical steps:
 
 ## 1. Resource Assessment Framework Analysis
 
-Systematically analyze source content through four perspectives:
+Systematically analyze source content through the four perspectives defined in `references/domain-framework.md`:
 
 **Business Perspective:** Value Proposition, Risk & Compliance, Stakeholder Alignment, Financial Strategy
-→ Typically maps to **Value** focus areas
+→ Typically maps to **Value** focus areas in the baseline
 
 **Technology Perspective:** Architecture, Implementation, Integration, Deployment & Validation, Lifecycle  
-→ Typically maps to **Solution** focus areas
+→ Typically maps to **Solution** focus areas in the baseline
 
 **People Perspective:** Roles & Skills, Team Design, Organizational Change
-→ Typically maps to **Endeavor** focus areas
+→ Typically maps to **Endeavor** focus areas in the baseline
 
 **Process Perspective:** Workflows, Value Realization, Strategy, Industry Alignment
-→ May span multiple focuses
+→ May span multiple focuses in the baseline
 
-For each perspective covered, assess maturity using the rubric:
+For each perspective covered, assess maturity using the rubric from `references/workproduct-assessment-rubric.csv`:
 - **Level 0 - Non-Existent:** No resources, concept undocumented
 - **Level 1 - Basic/Descriptive:** High-level descriptions, lacks actionable detail
 - **Level 2 - Defined/Logical:** Detailed descriptions, logical models, specifications
@@ -139,7 +168,7 @@ Requirements:
 
 **Example:** "Platform Capability" specializing "Platform" - represents the progressive maturity of individual capabilities within a platform, with states like "Prototyped", "MVP", "Production-Ready", "Optimized"
 
-**Important baseline state clarifications:**
+**Important baseline state clarifications** (from `deps/platform-adoption-kernel.json`):
 
 - **Platform alpha**: Progresses through Architecture Selected → Baselined → Provisioned → Ready → Hosting Assets → Evolving → Retiring. "Evolving" represents adaptive platform evolution with continuous feedback, while "Retiring" represents systematic decommissioning.
 - **Platform Asset alpha**: Progresses through Identified → Specified → Provisioned → Integrated → Operational → Value Yielding → Retiring. "Value Yielding" means the asset is delivering measurable value (NOT decommissioning), and "Retiring" means systematic decommissioning in progress.
@@ -230,7 +259,7 @@ Activities must be derived from Alpha progression needs:
 2. Identify work needed to advance states
 3. Extract work types from source content verbs: assess, design, implement, validate, monitor, etc.
 4. Group similar work into coherent activities
-5. Map each activity to appropriate baseline ActivitySpace
+5. Map each activity to appropriate baseline ActivitySpace (load exact names from `deps/platform-adoption-kernel.json`)
 6. **CRITICAL:** Name each activity specifically - do NOT reuse the ActivitySpace name
 
 **Expectation:** Comprehensive practices should have 5-15 distinct activities
@@ -273,7 +302,7 @@ Activities should be **specific, actionable work** with names that:
   - ✓ "Manage Platform Lifecycle Updates"
   - ❌ "Operate and Evolve the System" (too generic)
 
-**ActivitySpace Mapping Questions (in order):**
+**ActivitySpace Mapping Questions** (all names from `deps/platform-adoption-kernel.json` - in order):
 1. Business value/ROI/stakeholder focus? → "Assess Business Value", "Monitor Value Realization", "Engage Platform Consumers"
 2. Governance/policy/compliance? → "Implement Policy-as-Code"
 3. Defining capabilities/requirements? → "Define Platform Capabilities"
@@ -290,7 +319,7 @@ Activities should be **specific, actionable work** with names that:
 Work Products are artifacts that evidence Alpha state progression:
 - Minimum 3 Levels of Detail showing maturity progression
 - Each LOD specifies which Alpha states it evidences
-- LODs align with maturity rubric (Outlined → Detailed → Applied → Comprehensive)
+- LODs align with maturity rubric from `references/workproduct-assessment-rubric.csv` (Outlined → Detailed → Applied → Comprehensive)
 
 ## 5. Practice Partitioning
 
@@ -748,12 +777,12 @@ Below is a summary view of how areas of concern and deliverables progress throug
 
 **For each source cited:**
 
-Create a citation narrative using the **Citation Standard** narrative type with the following elements:
+Identify and document the following bibliographic elements:
 
 1. **Author:** Individual name(s) or organization/company name
 2. **Date:** Publication or last update date (use "n.d." if unavailable)
-3. **Title:** Full title of the work, article, or documentation
-4. **Source:** Publication venue, website, or platform
+3. **Title:** Full title of the work, article, or documentation (this will become the citation name)
+4. **Source:** Publication venue, website, or URL
 
 **APA7 Reference Format:**
 
@@ -775,25 +804,25 @@ Google Cloud. (2024). *SRE Handbook: How Google Runs Production Systems*. https:
 
 Team Topologies Ltd. (2023). *Team Topologies: Organizing Business and Technology Teams for Fast Flow*. IT Revolution Press.
 
-### Citation Narratives
+### How Citations Will Be Used
 
-**CRITICAL:** For each reference listed above, create a citation narrative that will be extracted into JSON. These narratives should appear throughout the report wherever the source informs the content.
+**IMPORTANT:** Phase 2 will extract these references as Citation objects in the JSON output. The title of each work will serve as the citation name, allowing narratives to reference citations by name using the `citationNames` array.
 
-**Example citation narrative structure:**
+**Where to mention citations:**
 
-**AWS Well-Architected Framework Foundation**
+When you reference a source to support content in the report, mention it naturally in context:
 
-Amazon Web Services developed the Well-Architected Framework to provide architectural best practices for cloud workloads. Published in 2024, the framework covers six pillars of operational excellence. This authoritative source from AWS provides the foundation for understanding cloud architecture principles.
-
-*This narrative would use the "Citation Standard" narrative type when converted to JSON, with contexts mapping to Author: "Amazon Web Services", Date: "2024", Title: "AWS Well-Architected Framework", Source: "https://aws.amazon.com/architecture/well-architected/"*
-
-**Where to include citations:**
-
-- In the **Executive Summary**: Cite the primary methodology source
-- In **Practice Overview**: Cite sources that inform the practice definition
-- In **Alpha** and **WorkProduct** descriptions: Cite sources that define or validate these concepts
-- In **Activity narratives**: Cite sources for techniques, approaches, and best practices
+- In the **Executive Summary**: Reference the primary methodology source
+- In **Practice Overview**: Note sources that inform the practice definition
+- In **Alpha** and **WorkProduct** descriptions: Mention sources that define or validate these concepts
+- In **Activity narratives**: Reference sources for techniques, approaches, and best practices
 - In **Pattern** descriptions: Cite case studies or implementation examples
+
+**Example reference in context:**
+
+> The Well-Architected Framework (Amazon Web Services, 2024) emphasizes six operational pillars that guide platform architecture decisions. This practice integrates these principles with internal platform governance requirements.
+
+When narratives reference specific sources, Phase 2 will link them via citationNames to the corresponding Citation objects.
 
 **Comprehensive citation coverage:**
 
@@ -848,4 +877,22 @@ In this report, we use the baseline terminology throughout for consistency, but 
 - Ensure all references are complete (don't reference something undefined)
 - Keep the structure parseable while being readable
 
-Remember: A human should be able to read this report and understand the methodology deeply. An AI should be able to parse this report and generate precise JSON. Both audiences matter equally.
+---
+
+# Execution Instructions
+
+**Before you begin:**
+1. Use the Read tool to load `deps/platform-adoption-kernel.json` - extract all Alpha names, ActivitySpace names, Competency names, NarrativeType names
+2. Use the Read tool to review `references/domain-framework.md` - understand the four perspectives
+3. Use the Read tool to review `references/semantics.md` - understand the ontological principles
+4. Use the Read tool to scan `references/workproduct-assessment-rubric.csv` - understand the maturity levels
+5. Analyze user-provided source materials (files or URLs via WebFetch)
+
+**As you write the report:**
+- Apply the four-perspective framework systematically
+- Make alpha extension decisions carefully (redeclaration vs specialization vs instances)
+- Derive activities bottom-up from alpha state progression
+- Use exact baseline element names (load them from the JSON)
+- Include comprehensive citations from authoritative sources
+
+**Remember:** A human should be able to read this report and understand the methodology deeply. An AI should be able to parse this report and generate precise JSON. Both audiences matter equally.

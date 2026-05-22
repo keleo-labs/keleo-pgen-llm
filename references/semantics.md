@@ -113,6 +113,18 @@ The following are examples of NarrativeTypes that could be described in the base
 * **The Three-Act Structure & StoryBrand**: Positions the consumer as the Hero and the Platform Engineering team as the Guide utilizing the defined approach.  
 * **Micro-Narratives (ABT and PAS)**: Shorter frameworks (And/But/Therefore) designed for rapid, highly persuasive daily execution updates.
 
+7.3 Bibliographic Citations and Reference Management
+
+The schema provides native support for bibliographic references through the Citation type, enabling practices and methods to establish authoritative provenance and intellectual lineage. Citations are first-class objects within the Practice Language, ensuring proper attribution and enabling knowledge graph integration.
+
+**Citation Structure**: Each Citation must define a unique name (serving as the citation identifier), a description, an authors array (minimum one author), a publication date, and a source (publisher, journal, or retrieval URL). The name property acts as the symbolic key for cross-referencing within narratives and other elements.
+
+**Citation Scope and Aggregation**: Citations can be defined at multiple levels of the methodology hierarchy. PracticeBaseline documents may declare foundational citations for core concepts. Practice documents can add domain-specific citations relevant to the practice domain. Method documents aggregate citations from their baseline and constituent practices, providing a unified bibliography for the complete methodology composition.
+
+**Narrative Integration**: The Narrative object supports an optional citationNames array, enabling authors to explicitly link narrative contexts to their supporting literature. Each entry in citationNames must match the name property of a Citation object within the same practice or method scope. This symbolic linking allows operational tooling to generate properly formatted reference lists, validate citation integrity, and support advanced knowledge retrieval patterns.
+
+**Operational Guidance**: When authoring practices, citations should be declared for all external frameworks, research papers, standards documents, and authoritative sources that inform the practice definition. Citation names should use a consistent convention (e.g., author-year format or descriptive titles) to facilitate human comprehension. Tooling implementations must resolve citation references across the practice composition hierarchy, ensuring that narratives can reference citations from dependent practices or the baseline without duplication.
+
 8\. Lifecycle Orchestration: Patterns and Phase Models
 
 Methodologies are orchestrated into overarching temporal models using Pattern elements.
