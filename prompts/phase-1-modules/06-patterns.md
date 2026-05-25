@@ -215,9 +215,15 @@ Specific activities being performed:
 
 **Phase Context:**
 
-[2-4 paragraphs providing narrative context for this phase]
+**Narrative Context Guidelines:**
 
-What's happening during this phase. Why these particular states/deliverables matter. Challenges teams typically face. Success factors. Dependencies or sequencing considerations.
+Each context element should be **1-2 sentences maximum**, conveying specific insights about this phase. Avoid multi-paragraph exposition.
+
+[Provide focused context points:]
+- What's happening during this phase (1-2 sentences)
+- Why these particular states/deliverables matter (1-2 sentences)
+- Key challenges or success factors (1-2 sentences)
+- Dependencies or sequencing considerations if critical (1-2 sentences)
 
 **Citations Referenced:** [List citation names from Module 02 supporting this phase guidance, or omit if based on general practice]
 
@@ -227,7 +233,7 @@ What's happening during this phase. Why these particular states/deliverables mat
 
 **[Narrative Element Name from Pattern's NarrativeType]:**
 
-[Prose content mapping this phase to the narrative element - 2-4 sentences]
+[Prose content mapping this phase to the narrative element - 1-2 sentences conveying the specific point]
 
 **Citations Referenced:** [List citation names if this narrative element references specific sources]
 
@@ -305,31 +311,21 @@ Below is a summary view of how areas of concern and deliverables progress throug
 
 ---
 
-## Critical Writing Principle: Descriptive Discipline
+## Writing Standards
 
-**ALL descriptions across all elements must follow this pattern:**
+This module follows the centralized writing standards defined in the skill documentation:
 
-1. **Descriptions = Essence Only**
-   - Single SHORT sentence (8-15 words typical, max 20 words)
-   - Captures WHAT the element is or orchestrates, not HOW, WHY, or comprehensive details
-   - No lists, no "and also", no feature enumeration
-   - Direct, declarative language
+**Key Standards for This Module:**
+- **Descriptions:** Single-sentence essence only (max 20 words for patterns, max 12 words for pattern views/phases)
+- **Phase context:** 1-2 sentences per context point (focused insights, not paragraphs)
+- **Narrative contexts:** 1-2 sentences per element (concise, actionable)
+- **Element references:** Exact name matching with Modules 03-05
+- **Citations:** Reference via citationNames
 
-2. **Elaboration = Narratives + Citations**
-   - Additional context, rationale, guidance → narratives
-   - Industry research, standards, best practices → narratives with citations
-   - Application scenarios, challenges, patterns → narratives with citations
-   - Users access detailed information through narratives and external citations
-
-3. **Quality Check Before Writing**
-   - Can I remove words without losing the essence? → Remove them
-   - Am I explaining HOW or WHY? → Move to narrative
-   - Is this over 20 words? → Too long, cut to essence
-   - Does this list multiple concepts? → Choose the core concept
-
-**This applies to:**
-- Pattern descriptions (max 20 words)
-- PatternView/Phase descriptions (max 12 words - even shorter!)
+**For complete guidelines**, see the skill's "Centralized Writing Standards" section, including:
+- Descriptive Discipline (essence vs. elaboration)
+- Narrative Context Guidelines (concise phase context)
+- Pattern-specific conventions (instance tracking, progression)
 
 **Use Pattern-Level Narratives and Phase Context sections for elaboration.**
 

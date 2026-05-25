@@ -183,56 +183,58 @@ This activity is typically performed by the **[PersonaGroup Name]** team.
 
 [CRITICAL: This section contains rich technique narratives extracted from source material]
 
+**Narrative Context Guidelines:**
+
+Each narrative element should be **1-3 sentences maximum**, conveying a specific step, principle, or technique. Avoid multi-paragraph exposition. Use citationNames to point readers to comprehensive source material.
+
 **[Technique/Approach Title 1]**
 
 **Narrative Type:** [The STAR Format | Lifecycle | Essay Narrative | User story | etc.]
 
-[Write 3-6 paragraphs using the narrative framework to describe HOW to perform this technique]
-
-**For STAR Format:**
+**For STAR Format (Concise Example):**
 
 **Situation:**
-[Paragraph describing the context or problem this technique addresses]
+Platform teams struggle to balance rapid feature delivery against infrastructure stability and security requirements, often defaulting to overly restrictive processes that slow consumer teams.
 
 **Task:**
-[Paragraph describing what needs to be accomplished]
+Establish clear platform capability boundaries and service-level commitments that enable consumer team autonomy while maintaining operational reliability and security compliance.
 
 **Action:**
-[Paragraph(s) describing the specific steps, approaches, or methods to use]
+Define platform capabilities as self-service APIs with documented SLOs. Implement automated policy enforcement at API boundaries rather than manual approval processes. Provide observability hooks enabling consumer teams to debug their usage independently.
 
 **Result:**
-[Paragraph describing expected outcomes and success indicators]
+Consumer teams gain autonomous platform access with clear reliability expectations, while platform team maintains security and operational control through automated enforcement and comprehensive observability.
 
-**For Lifecycle Format:**
+**For Lifecycle Format (Concise Example):**
 
 **Prerequisites:**
-[What must be in place before starting]
+Team members identified, team scope defined (domains owned, technologies used), and team charter exists documenting responsibilities.
 
-**Step 1: [Action]**
-[Detailed guidance for this step]
+**Step 1: Assess Intrinsic Load**
+Evaluate inherent domain complexity: number of business capabilities owned, complexity of business rules, breadth of stakeholder groups served. Document quantitatively where possible.
 
-**Step 2: [Action]**
-[Detailed guidance for this step]
+**Step 2: Assess Extraneous Load**
+Identify unnecessary complexity: poor tooling, manual processes, unclear documentation, frequent context switches. Prioritize elimination opportunities.
 
-**Step 3: [Action]**
-[Detailed guidance for this step]
+**Step 3: Optimize Germane Load**
+Ensure team cognitive capacity focuses on valuable work: domain mastery, solution design, customer empathy. Remove obstacles preventing this focus.
 
 **Completion Criteria:**
-[How to know this technique has been successfully applied]
+Team can reason about their domain without chronic overload symptoms (context-switching, backlog growth, incident rates, quality degradation).
 
-**For Essay Format:**
+**For Essay Format (Concise Example):**
 
 **Introduction:**
-[Set up the concept or principle]
+Platform teams operating as cognitive load reducers for stream-aligned teams represent a fundamental shift from infrastructure providers to developer experience enablers.
 
 **Key Principles:**
-[Describe the core ideas]
+Successful platforms reduce stream-aligned team cognitive load through self-service capabilities, clear abstractions, and comprehensive documentation. Each platform service eliminates decisions and complexity from consuming teams.
 
 **Application:**
-[How to apply in practice]
+Measure platform success by consumer team metrics: deployment frequency, lead time, change failure rate. Platform improvements should correlate with consumer team acceleration.
 
 **Conclusion:**
-[Summary and success factors]
+Platform teams justify their existence through measurable cognitive load reduction and demonstrable acceleration of stream-aligned teams delivering customer value.
 
 **Citations Referenced:** [List citation names from Module 02 supporting this technique - e.g., "Ansible Best Practices", "Infrastructure as Code Principles"]
 
@@ -349,34 +351,24 @@ This team consists of:
 
 ---
 
-## Critical Writing Principle: Descriptive Discipline
+## Writing Standards
 
-**ALL descriptions across all elements must follow this pattern:**
+This module follows the centralized writing standards defined in the skill documentation:
 
-1. **Descriptions = Essence Only**
-   - Single SHORT sentence (8-15 words typical, max 20 words)
-   - Captures WHAT the element is or does, not HOW, WHY, or comprehensive details
-   - No lists, no "and also", no feature enumeration
-   - Direct, declarative language
+**Key Standards for This Module:**
+- **Descriptions:** Single-sentence essence only (max 20 words for activities/personas/teams)
+- **Technique narratives:** 1-3 sentences per context element (focused, actionable guidance)
+- **Activity names:** Specific (verb + subject), never duplicate ActivitySpace name
+- **Competency references:** Exact baseline names and levels
+- **Citations:** Reference via citationNames in technique narratives
 
-2. **Elaboration = Narratives + Citations**
-   - Additional context, rationale, guidance → narratives
-   - Industry research, standards, best practices → narratives with citations
-   - Application scenarios, challenges, patterns → narratives with citations
-   - Users access detailed information through narratives and external citations
+**For complete guidelines**, see the skill's "Centralized Writing Standards" section, including:
+- Descriptive Discipline (essence vs. elaboration)
+- Narrative Context Guidelines (concise technique narratives)
+- Activity Naming Conventions
+- Competency Level Mapping
 
-3. **Quality Check Before Writing**
-   - Can I remove words without losing the essence? → Remove them
-   - Am I explaining HOW or WHY? → Move to narrative
-   - Is this over 20 words? → Too long, cut to essence
-   - Does this list multiple concepts? → Choose the core concept
-
-**This applies to:**
-- Activity descriptions (max 20 words)
-- Persona descriptions (max 20 words)
-- PersonaGroup/Team descriptions (max 20 words)
-
-**Exception:** Technique narratives should be comprehensive and detailed - they are the primary mechanism for capturing HOW to perform work.
+**Exception:** Technique narratives are the primary mechanism for capturing HOW to perform work, so they should be comprehensive while remaining focused (1-3 sentences per element).
 
 ---
 

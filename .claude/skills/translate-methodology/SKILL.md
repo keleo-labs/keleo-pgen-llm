@@ -318,6 +318,7 @@ For each practice, generate 9 JSON segments (one per module):
    - Array of Citation objects
    - ~3KB output
    - **Schema:** {name, description, authors[], date, source, url}
+   - **CRITICAL:** Citations do NOT have narratives (metadata only)
 
 3. **03-alphas.json** (from 03-alphas.md)
    - Array of Alpha objects with states, checklists, narratives
@@ -905,6 +906,100 @@ The schema is the authoritative contract for Practice Language JSON. All other v
 
 ---
 
+## Centralized Writing Standards (Referenced by All Module Prompts)
+
+All Phase 1 module prompts reference these centralized standards to avoid duplication.
+
+### Conciseness Standards
+
+**Golden Rule: All descriptions MUST be single grammatically correct sentences. Use narratives for additional context.**
+
+#### Descriptions: Single Sentence Rule
+
+Every description field (alpha, state, activity, work product, pattern, persona, team, etc.) MUST be:
+
+- **One sentence** - period at the end, no continuation
+- **Grammatically complete** - subject, verb, object structure
+- **Essence only** - the core purpose or concept, nothing more
+- **Self-contained** - understandable without reading other text
+
+**Examples:**
+
+- ✅ Good: "Ensures infrastructure components are secure, compliant, and meet organizational standards."
+- ❌ Bad: "This activity ensures that infrastructure components are secure and compliant with organizational standards by implementing security controls, conducting audits, and ensuring that all systems meet the required compliance frameworks and policies."
+- ✅ Good: "The team responsible for building and maintaining the platform infrastructure."
+- ❌ Bad: "This team is responsible for designing, implementing, and maintaining the platform infrastructure, including cloud resources, networking, storage, and compute capabilities, working closely with security and operations teams."
+
+**Word Count Limits:**
+- Practice/Alpha/Work Product/Activity/Persona/Pattern descriptions: **Maximum 20 words**
+- State/LOD/PatternView descriptions: **Maximum 12 words**
+- Checklist criteria: No limit (detail needed for verification)
+
+### Citation Standards
+
+- Citations are bibliographic references: name, description, authors, date, source, url
+- **NO narratives on Citation objects** (narratives reference citations, not vice versa)
+- Citation names use exact source titles for readability (e.g., "Team topologies: Organizing business and technology teams for fast flow")
+- 5-15 authoritative sources per practice
+- Additional context about sources belongs in practice/alpha/activity narratives that cite them
+
+### Narrative Standards
+
+- **Narrative contexts:** 1-3 sentences per element (not multi-paragraph blocks)
+- Each context conveys ONE specific point, observation, or step
+- **Bullet-point mentality:** Key insights, not comprehensive essays
+- Use citationNames for further reading (direct readers to comprehensive source material)
+- Multiple focused narratives better than one bloated narrative
+
+**Anti-patterns to avoid:**
+- ❌ Multi-paragraph context elements (3+ sentences per element)
+- ❌ Comprehensive background exposition
+- ❌ Repeating source material verbatim
+- ❌ Generic statements without specific claims
+
+**Good pattern:**
+- ✅ Specific research finding or principle (1-2 sentences)
+- ✅ Practical observation or pattern (1-2 sentences)
+- ✅ Clear connection to practice domain (1-2 sentences)
+- ✅ Citation for deeper reading
+
+**Remember:** Contexts are signposts pointing to insights. Citations provide the full journey.
+
+### Checklist Standards
+
+- Alpha state checklists: 5-7 criteria per state (not 10+)
+- Work product LOD checklists: 3-5 criteria per level
+- Each criterion: **One sentence** explaining what must be verified
+- Avoid multi-sentence or paragraph-length criteria
+
+### Naming Standards
+
+- **Activity names:** Specific (verb + specific subject), never duplicate ActivitySpace name
+- **Work product LOD names:** Descriptive only, **NO "Level X:" prefix** (e.g., "Basic" not "Level 1: Basic")
+- **Alpha instance names:** Specific qualifier + base alpha name
+- **Persona names:** Role-descriptive, clear differentiation
+- **Citation names:** Exact source titles (readable, not code-like)
+
+### Alpha Decision: Redeclaration vs. Specialization
+
+When enriching baseline alphas, test if additions are generally applicable or practice-specific:
+
+**Generally Applicable → Redeclaration:**
+- Universal verification criteria
+- Industry-standard checklists
+- Widely-recognized best practices
+- Any practice in domain would benefit
+
+**Practice-Specific → Specialization:**
+- Methodology-specific concepts
+- Practice-specific techniques
+- Specialized patterns unique to this approach
+- Create new alpha with contributesTo
+
+**When in doubt:** Default to specialization to preserve baseline reusability.
+
+---
+
 ## Key Principles
 
 ### Modular Benefits
@@ -928,71 +1023,22 @@ The schema is the authoritative contract for Practice Language JSON. All other v
 
 ### Writing Conciseness Guidelines
 
-**CRITICAL: Capture the ESSENCE, not exhaustive detail.**
+**See "Centralized Writing Standards" section above for complete guidelines.**
 
-**Golden Rule: All descriptions MUST be single grammatically correct sentences. Use narratives for additional context.**
+All Phase 1 modules reference the centralized standards for:
+- Description conciseness (single sentence, max 20 words)
+- Narrative context length (1-3 sentences per element)
+- Checklist criteria (5-7 per state, 3-5 per LOD, one sentence each)
+- Citation standards (metadata only, no narratives)
+- Naming conventions (LODs, activities, alphas, citations)
+- Alpha decision tree (redeclaration vs. specialization)
 
-#### Descriptions: Single Sentence Rule
-
-Every description field (alpha, state, activity, work product, pattern, persona, team, etc.) MUST be:
-
-- **One sentence** - period at the end, no continuation
-- **Grammatically complete** - subject, verb, object structure
-- **Essence only** - the core purpose or concept, nothing more
-- **Self-contained** - understandable without reading other text
-
-**Examples:**
-
-- ✅ Good: "Ensures infrastructure components are secure, compliant, and meet organizational standards."
-- ❌ Bad: "This activity ensures that infrastructure components are secure and compliant with organizational standards by implementing security controls, conducting audits, and ensuring that all systems meet the required compliance frameworks and policies."
-- ✅ Good: "The team responsible for building and maintaining the platform infrastructure."
-- ❌ Bad: "This team is responsible for designing, implementing, and maintaining the platform infrastructure, including cloud resources, networking, storage, and compute capabilities, working closely with security and operations teams."
-
-#### Use Narratives for Additional Context
-
-When you have more to say beyond the one-sentence essence:
-
-- **Move it to a narrative** - Context, Rationale, Usage, How-To, or custom narrative types
-- **Keep narratives focused** - Make salient points, not exhaustive documentation
-- **Be specific** - Each narrative paragraph should convey one clear idea
-
-**Structure for Rich Content:**
-
-1. **Description field:** One-sentence essence
-2. **Narrative(s):** Additional salient points in 2-5 focused paragraphs
-
-#### Content Length Guidelines
-
-1. **Focus on Essence:** Extract the core concepts, principles, and practices from the methodology without reproducing every detail from source materials
-
-2. **Avoid Large Wordy Blocks:** Summarize to key essential points. Each sentence should add value. Avoid repetitive explanations or overly elaborate descriptions
-
-3. **Trust the Citations:** Readers can refer to source materials via citations for deeper detail. You don't need to reproduce source content verbatim
-
-4. **Checklist Criteria Balance:** 
-   - Alpha state checklists: 5-7 criteria per state (not 10+)
-   - Each criterion: **One sentence** explaining what must be true
-   - Avoid multi-sentence or paragraph-length criterion descriptions
-
-5. **Narrative Length Targets:**
-   - Context and Rationale narratives: 2-4 paragraphs, each making one salient point
-   - Usage and How-To narratives: 3-5 paragraphs with essential steps/guidance
-   - Individual narratives: Clear and focused, not exhaustive essays
-   - Each paragraph: 2-4 sentences maximum
-
-6. **Work Product LODs:** 
-   - Characteristics: 3-5 criteria per level (not 7+)
-   - Each criterion: **One sentence** describing what's verifiable at this level
-   - Focus on verification, not comprehensive explanation
-
-7. **Activity Technique Narratives:**
-   - Use structured narrative types (STAR, How-To, etc.)
-   - Each context/element: 1-3 sentences
-   - Total narrative: 5-10 sentences, not 20+ sentence essays
+**Key Principles:**
+- **Essence → Descriptions** (single sentence)
+- **Context → Narratives** (1-3 sentences per element)
+- **Citations → Further Reading** (reference via citationNames)
 
 **The goal is high-quality, readable, focused content that captures the methodology's unique value proposition—not a reproduction of the source materials.**
-
-**Remember: If it's the ESSENCE → description (one sentence). If it's ADDITIONAL CONTEXT → narrative (focused paragraphs).**
 
 ### Maturity Progression Discovery
 
@@ -1029,7 +1075,10 @@ The `references/workproduct-assessment-rubric.csv` is **GUIDANCE for recognizing
 - **Multi-sentence descriptions:** All descriptions must be single grammatically correct sentences
 - **Bloated descriptions:** Move additional context to narratives, not description fields
 - **Paragraph-length checklist criteria:** Each criterion should be one sentence
-- **Overly wordy narratives:** Focus on salient points in 2-5 paragraphs, not exhaustive essays
+- **Multi-paragraph narrative contexts:** Each context element should be 1-3 sentences maximum
+- **"Level X:" in LOD names:** Use descriptive names only (e.g., "Basic" not "Level 1: Basic")
+- **Narratives on Citations:** Citations are metadata only (no narratives property)
+- **Wrong alpha approach:** Test redeclaration vs. specialization (practice-specific → specialization)
 - **Markdown in JSON:** Remove all markdown syntax from text before inserting into JSON
 - **Practice metadata in JSON:** Descriptions should focus on subject matter, not the practice's documentation of it
 - **Not splitting large modules:** Monitor estimated sizes, split if needed

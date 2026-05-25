@@ -434,6 +434,8 @@ For each citation in the **Citation Details** section (not the References sectio
 
 **Generate Citation objects:**
 
+**CRITICAL:** Citations do NOT have narratives. Extract only: name, description, authors, date, source, url.
+
 ```json
 {
   "citations": [
@@ -456,7 +458,9 @@ For each citation in the **Citation Details** section (not the References sectio
 }
 ```
 
-**Note:** The `url` property is **optional** and should only be included if:
+**Notes:** 
+- Citations are metadata only (no narratives property)
+- The `url` property is **optional** and should only be included if:
 - A URL is present in the citation
 - The URL is not "N/A" or "Not available"
 
@@ -657,6 +661,7 @@ For each work product section:
 1. Extract name, description
 2. For each Level of Detail:
    - Extract name, description, seq
+   - **CRITICAL - Name Cleaning:** If name contains "Level X:" prefix, strip it. Use only the descriptive name (e.g., "Level 1: Basic" → "Basic", "Level 2: Policy-Driven Segmentation" → "Policy-Driven Segmentation")
    - **CRITICAL:** Parse ALL criteria into Checklist objects - LODs without checklists are INCOMPLETE
    - Parse "provides evidence for" into AlphaContribution objects
 3. **CRITICAL:** Extract ALL narratives if present (Context, Rationale, Usage guidance)
@@ -713,6 +718,7 @@ Generate WorkProduct objects:
 **Validation:**
 - All work product names match index
 - All LOD names match index (for each work product)
+- LOD names do NOT contain "Level X:" prefix (cleaned during extraction)
 - All alphaName references in contributesTo are valid
 - All stateName references match valid states
 - All work product instance workProductName values reference valid work products

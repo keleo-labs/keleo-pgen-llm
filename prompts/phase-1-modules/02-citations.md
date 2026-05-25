@@ -56,6 +56,25 @@ You are a **Research Librarian** extracting bibliographic references from source
 - For methodologies owned by companies (AWS, Google, Microsoft), prioritize that company's documentation
 - Always prefer the company most directly associated with the subject matter
 
+### Critical: Citations Are Bibliographic References Only
+
+**Citations do NOT have narratives.** Citations are pure bibliographic metadata:
+- name (the source title)
+- description (relevance to practice)
+- authors (array)
+- date (publication year)
+- source (publisher or venue)
+- url (if available online)
+
+**Do NOT create "Citation Standard" or any other narratives for Citation objects.** Narratives that reference citations belong on practice elements (alphas, activities, work products), not on the citations themselves.
+
+**Additional context about sources** should be expressed in:
+- Practice-level narratives that cite these sources
+- Alpha narratives that reference the research
+- Activity technique narratives that apply the source guidance
+
+The Citation object provides the bibliographic metadata; other elements provide the context and application of that source material.
+
 ### Citation Quantity
 
 - **Minimum:** 5 citations
@@ -143,6 +162,8 @@ Beyer, B., Jones, C., Petoff, J., & Murphy, N. R. (2016). *Site Reliability Engi
 ### Citation Details
 
 [For each citation, provide detailed metadata that will be converted to Citation objects in Phase 2]
+
+**IMPORTANT:** Citations are metadata-only. Do NOT create narratives for citations. Each citation has exactly these fields: name, description, authors, date, source, url (no narratives).
 
 **1. [Title of Work - This becomes Citation.name]**
 
@@ -260,5 +281,6 @@ Newman, S. (2020). Monolith to microservices. *IEEE Software*, 37(3), 20-23. htt
 - [ ] Each citation has description and relevance notes
 - [ ] Usage plan maps citations to practice elements
 - [ ] No social media or low-quality sources
+- [ ] NO narratives on Citation objects (citations are metadata only)
 
 **Output:** Save complete citations document to be consumed by Phase 2.

@@ -140,7 +140,9 @@ Write a single SHORT sentence (8-15 words, max 20 words) that captures ONLY what
 
 [Minimum 2 levels, recommend 3-5 levels showing maturity progression]
 
-**Level 1: [Level Name]** (seq: 1)
+**[Level Name]** (seq: 1)
+
+**IMPORTANT:** Do NOT include "Level 1:" prefix. Use descriptive name only (e.g., "Basic", "Outlined", "Initiated").
 
 **Description:**
 
@@ -181,7 +183,7 @@ Single SHORT sentence (8-12 words) characterizing this maturity level.
 
 ---
 
-**Level 2: [Level Name]** (seq: 2)
+**[Level Name]** (seq: 2)
 
 [Description of this maturity level]
 
@@ -201,6 +203,10 @@ Single SHORT sentence (8-12 words) characterizing this maturity level.
 
 [Create 1-3 narratives providing context on how this work product is used, created, and evolved]
 
+**Narrative Context Guidelines:**
+
+Each narrative element should be **1-2 sentences maximum**, conveying a specific insight, pattern, or practice. Avoid multi-paragraph exposition. Use citationNames to point readers to comprehensive source material.
+
 **Narrative 1: Creation and Evolution**
 
 **Narrative Type:** [The STAR Format | How-To Guide | Essay Narrative | etc.]
@@ -209,15 +215,15 @@ Single SHORT sentence (8-12 words) characterizing this maturity level.
 
 **[Framework Element 1]:**
 
-[2-3 sentences: When this work product is first created, how it evolves, what triggers updates]
+[1-2 sentences: When this work product is first created, how it evolves, what triggers updates]
 
 **[Framework Element 2]:**
 
-[2-3 sentences: Lifecycle management, versioning, ownership]
+[1-2 sentences: Lifecycle management, versioning, ownership]
 
 **[Continue framework elements]:**
 
-[Complete the narrative structure according to chosen framework]
+[Complete the narrative structure according to chosen framework - each element 1-2 sentences]
 
 **Citations Referenced:** [List citation names from Module 02, or omit if based on general practice]
 
@@ -231,15 +237,15 @@ Single SHORT sentence (8-12 words) characterizing this maturity level.
 
 **Overview:**
 
-[2-3 sentences: Guidance on effective formats, templates, tools, or approaches for this work product]
+[1-2 sentences: Guidance on effective formats, templates, tools, or approaches for this work product]
 
 **Steps or Key Points:**
 
-[3-5 sentences: Typical formats, templates, or structures used in practice. Common tools and integration patterns.]
+[1-2 sentences per point: Typical formats, templates, or structures used in practice. Common tools and integration patterns.]
 
 **Common Pitfalls:**
 
-[2-3 sentences: What to avoid, anti-patterns]
+[1-2 sentences: What to avoid, anti-patterns]
 
 **Citations Referenced:** [List citation names if authoritative sources provide guidance - e.g., "C4 Model Documentation", "ADR Templates"]
 
@@ -265,34 +271,22 @@ This practice tracks several specific instances of **[Work Product Name]**:
 
 ---
 
-## Critical Writing Principle: Descriptive Discipline
+## Writing Standards
 
-**ALL descriptions across all elements must follow this pattern:**
+This module follows the centralized writing standards defined in the skill documentation:
 
-1. **Descriptions = Essence Only**
-   - Single SHORT sentence (8-15 words typical, max 20 words)
-   - Captures WHAT the element is, not HOW, WHY, or comprehensive details
-   - No lists, no "and also", no feature enumeration
-   - Direct, declarative language
+**Key Standards for This Module:**
+- **Descriptions:** Single-sentence essence only (max 20 words for work products, max 12 words for LODs)
+- **LOD names:** Descriptive only, NO "Level X:" prefix (e.g., "Basic" not "Level 1: Basic")
+- **Narrative contexts:** 1-2 sentences per element (concise, focused points)
+- **Checklist criteria:** 3-5 criteria per LOD, one sentence each (detailed enough for verification)
+- **Citations:** Reference via citationNames; no narratives on Citation objects
 
-2. **Elaboration = Narratives + Citations**
-   - Additional context, rationale, guidance → narratives
-   - Industry research, standards, best practices → narratives with citations
-   - Application scenarios, challenges, patterns → narratives with citations
-   - Users access detailed information through narratives and external citations
-
-3. **Quality Check Before Writing**
-   - Can I remove words without losing the essence? → Remove them
-   - Am I explaining HOW or WHY? → Move to narrative
-   - Is this over 20 words? → Too long, cut to essence
-   - Does this list multiple concepts? → Choose the core concept
-
-**This applies to:**
-- Work product descriptions (max 20 words)
-- Level of Detail descriptions (max 12 words - even shorter!)
-- Work product instance descriptions (max 20 words)
-
-**Exception:** Checklist criteria descriptions should remain detailed enough for verification.
+**For complete guidelines**, see the skill's "Centralized Writing Standards" section, including:
+- Descriptive Discipline (essence vs. elaboration)
+- Narrative Context Guidelines (signposts, not essays)
+- Checklist Standards
+- LOD Naming Conventions
 
 ---
 
@@ -308,18 +302,34 @@ This practice tracks several specific instances of **[Work Product Name]**:
 
 ## Level of Detail Naming Conventions
 
-Use names that clearly indicate maturity:
+**CRITICAL:** Do NOT include "Level X:" prefix in level names. The level number is captured in the seq field.
+
+**Format:** Use descriptive names only
+
+**Examples:**
+
+❌ **Bad:**
+- "Level 1: Basic"
+- "Level 2: Policy-Driven Segmentation"  
+- "Level 3: Automated Enforcement"
+
+✅ **Good:**
+- "Basic"
+- "Policy-Driven Segmentation"
+- "Automated Enforcement"
 
 **Common Level Names:**
-- Outlined, Defined, Detailed, Comprehensive
-- Initiated, Developed, Applied, Optimized
-- Basic, Intermediate, Advanced, Expert
-- Drafted, Reviewed, Approved, Maintained
+- Basic, Intermediate, Advanced, Comprehensive
+- Outlined, Defined, Detailed, Applied
+- Initiated, Developed, Operational, Optimized
 - Conceptual, Logical, Physical, Automated
+- Drafted, Reviewed, Approved, Maintained
+
+**The seq field indicates order (1, 2, 3, 4), the name indicates maturity characteristics.**
 
 **Anti-Patterns:**
-- Avoid "Level 1", "Level 2" (not descriptive)
-- Avoid overlapping terms (don't use both "Detailed" and "Defined" if they mean the same thing)
+- ❌ Avoid "Level 1", "Level 2", "Level X:" prefixes
+- ❌ Avoid overlapping terms (don't use both "Detailed" and "Defined" if they mean the same thing)
 
 ## Checklist Criteria Guidelines
 

@@ -69,9 +69,60 @@ The skill will monitor output size and recommend splits if needed. After generat
 
 ## Alpha Types and Rules
 
+## Decision: Redeclaration vs. Specialization
+
+When source material describes enhancements to a baseline alpha concept, determine the correct approach:
+
+### Test: Is this generally applicable or practice-specific?
+
+**Ask:** "Do these additions apply broadly across the domain, or are they specific to this practice's approach?"
+
+**Generally Applicable → Redeclaration**
+
+The additions represent universal verification criteria, industry-standard checklists, or widely-recognized best practices that any practice in this domain would benefit from.
+
+**Examples:**
+- Adding NIST security framework checklists to "Platform Governance" states
+- Adding financial ROI calculation criteria to "Platform Value And Economics" states  
+- Adding team psychological safety checklists to "Team" states
+
+**In these cases:** Redeclare the baseline alpha, preserving exact baseline structure, and add the generally-applicable checklists/narratives.
+
+**Practice-Specific → Specialization**
+
+The additions represent this practice's particular approach, methodology-specific concepts, or specialized techniques that wouldn't necessarily apply to other practices in the domain.
+
+**Examples:**
+- Adding "Stream-Aligned Team" vs "Platform Team" distinction to Team → Create "Team Topology" alpha that contributesTo "Team"
+- Adding practice-specific automation patterns to "Way of Working" → Create "Automation-First Way of Working" alpha that contributesTo "Way of Working"
+- Adding methodology-specific governance workflows → Create specialized governance alpha that contributesTo baseline governance alpha
+
+**In these cases:** Create a new specialized alpha with contributesTo pointing to the baseline alpha. This keeps the baseline alpha reusable across practices.
+
+### Decision Criteria
+
+| Factor | Redeclaration | Specialization |
+|:-------|:-------------|:---------------|
+| Scope | Universal, industry-standard | Practice-specific, methodology-specific |
+| Applicability | Any practice would benefit | Only this practice/methodology |
+| Terminology | Uses general domain terms | Uses practice-specific terms |
+| Checklist criteria | Widely-recognized best practices | Methodology-specific techniques |
+| Reusability | Other practices could adopt verbatim | Meaningful only in this practice context |
+
+### When in Doubt
+
+If uncertain whether additions are generally applicable:
+1. Check if other methodologies use similar concepts → Generally applicable
+2. Check if terminology is practice-specific → Practice-specific
+3. **Default to specialization** to preserve baseline reusability
+
+---
+
 ### Redeclarations (Baseline Enrichment)
 
-**When:** Source enhances baseline alpha with additional verification criteria
+**When:** Source enhances baseline alpha with additional verification criteria that are generally applicable across the domain
+
+**Before creating a redeclaration:** Apply the Decision Tree above to verify additions are generally applicable, not practice-specific.
 
 **Rules:**
 - Name: EXACTLY matches baseline Alpha.name
@@ -221,6 +272,32 @@ Refer to baseline framework for complete list of narrative types and their eleme
 
 ---
 
+## Narrative Context Writing Guidelines
+
+**CRITICAL:** Narrative contexts are focused points, not comprehensive essays.
+
+**Each context element should be:**
+- **1-2 sentences maximum** - Make your point concisely
+- **Specific claim or observation** - Not general background
+- **Supported by citations** - Reference authoritative sources
+- **Bullet-point mentality** - Key insights, not full exposition
+
+**Anti-patterns to avoid:**
+- ❌ Multi-paragraph context elements (3+ sentences per element)
+- ❌ Comprehensive background exposition
+- ❌ Repeating source material verbatim
+- ❌ Generic statements without specific claims
+
+**Good pattern:**
+- ✅ Specific research finding or principle (1-2 sentences)
+- ✅ Practical observation or pattern (1-2 sentences)
+- ✅ Clear connection to practice domain (1-2 sentences)
+- ✅ Citation for deeper reading
+
+**Remember:** Contexts are signposts pointing to insights. Citations provide the full journey.
+
+---
+
 **Narrative 1: Research and Standards**
 
 **Narrative Type:** Essay Narrative
@@ -229,17 +306,17 @@ Refer to baseline framework for complete list of narrative types and their eleme
 
 **Introduction:**
 
-[What industry research, authoritative sources, or standards support this alpha concept. 2-4 sentences establishing the foundation.]
+Industry research emphasizes cognitive load management as a key factor in platform team effectiveness, with studies showing teams managing more than 2-3 major domains experience significant productivity degradation.
 
 **Body:**
 
-[How this alpha fits into broader practice frameworks, alignment with industry patterns. 3-5 sentences expanding on the evidence and connections.]
+DORA research correlates team cognitive load reduction with deployment frequency and change failure rate improvements. Teams with well-scoped domains deploy 2-3x more frequently with 50% fewer incidents.
 
 **Conclusion:**
 
-[Why this alpha is essential for practice success. 2-3 sentences summarizing the imperative.]
+Platform teams operating as cognitive load reducers for stream-aligned teams deliver measurable organizational value through improved delivery metrics and reduced coordination overhead.
 
-**Citations Referenced:** [List citation names from Module 02 - e.g., "AWS Well-Architected Framework", "TOGAF 9.2"]
+**Citations Referenced:** [List citation names from Module 02 - e.g., "Accelerate: Building and scaling high performing technology organizations", "Team topologies: Organizing business and technology teams for fast flow"]
 
 ---
 
@@ -251,19 +328,19 @@ Refer to baseline framework for complete list of narrative types and their eleme
 
 **Situation:**
 
-[Context where teams encounter this alpha in practice. 2-3 sentences describing the typical scenario.]
+Platform teams struggle to balance rapid feature delivery against infrastructure stability and security requirements, often defaulting to overly restrictive processes that slow consumer teams.
 
 **Task:**
 
-[What teams need to accomplish related to this alpha. 2-3 sentences defining the objectives.]
+Establish clear platform capability boundaries and service-level commitments that enable consumer team autonomy while maintaining operational reliability and security compliance.
 
 **Action:**
 
-[Common approaches, patterns, success factors. 3-5 sentences describing effective practices.]
+Define platform capabilities as self-service APIs with documented SLOs. Implement automated policy enforcement at API boundaries rather than manual approval processes.
 
 **Result:**
 
-[Expected outcomes when alpha is well-managed. 2-3 sentences showing the benefits.]
+Consumer teams gain autonomous platform access with clear reliability expectations, while platform team maintains security and operational control through automated enforcement and comprehensive observability.
 
 **Citations Referenced:** [List citation names if applicable, or omit if based on general practice]
 
@@ -277,19 +354,19 @@ Refer to baseline framework for complete list of narrative types and their eleme
 
 **Background:**
 
-[Typical obstacles or anti-patterns related to this alpha. 2-3 sentences setting up the challenge context.]
+Organizations often create platforms without clear ownership models, leading to shared responsibility dilution where "everyone owns it" means no one takes accountability for platform health.
 
 **Challenge:**
 
-[Specific problem that commonly arises. 2-4 sentences describing the issue in detail.]
+Without dedicated platform teams, infrastructure becomes a coordination burden distributed across application teams. Each team makes local optimization decisions that create global complexity.
 
 **Resolution:**
 
-[How successful teams address this challenge. 3-5 sentences explaining effective solutions.]
+Establish a dedicated platform team with product ownership mindset, treating consuming teams as customers. This team owns platform architecture decisions, performance SLOs, and developer experience outcomes.
 
 **Lessons Learned:**
 
-[Key takeaways and preventive measures. 2-3 sentences distilling the wisdom.]
+Platform success requires dedicated ownership. Shared infrastructure cannot be a side responsibility of application teams without degrading both platform quality and application delivery velocity.
 
 **Citations Referenced:** [List citation names if applicable]
 
@@ -377,35 +454,21 @@ This practice enriches the baseline Platform alpha with additional verification 
 
 ---
 
-## Critical Writing Principle: Descriptive Discipline
+## Writing Standards
 
-**ALL descriptions across all elements must follow this pattern:**
+This module follows the centralized writing standards defined in the skill documentation:
 
-1. **Descriptions = Essence Only**
-   - Single SHORT sentence (8-15 words typical, max 20 words)
-   - Captures WHAT the element is, not HOW, WHY, or comprehensive details
-   - No lists, no "and also", no feature enumeration
-   - Direct, declarative language
+**Key Standards for This Module:**
+- **Descriptions:** Single-sentence essence only (max 20 words for alphas, max 12 words for states)
+- **Narrative contexts:** 1-2 sentences per element (concise, focused points)
+- **Checklist criteria:** One sentence per criterion (detailed enough for verification)
+- **Citations:** Reference via citationNames; no narratives on Citation objects
 
-2. **Elaboration = Narratives + Citations**
-   - Additional context, rationale, guidance → narratives
-   - Industry research, standards, best practices → narratives with citations
-   - Application scenarios, challenges, patterns → narratives with citations
-   - Users access detailed information through narratives and external citations
-
-3. **Quality Check Before Writing**
-   - Can I remove words without losing the essence? → Remove them
-   - Am I explaining HOW or WHY? → Move to narrative
-   - Is this over 20 words? → Too long, cut to essence
-   - Does this list multiple concepts? → Choose the core concept
-
-**This applies to:**
-- Alpha descriptions (max 20 words)
-- State descriptions (max 12 words - even shorter!)
-- Checklist criteria descriptions (NO limit - detail needed for verification)
-- Alpha instance descriptions (max 20 words)
-
-**Exception:** Checklist criteria descriptions should remain detailed enough for verification.
+**For complete guidelines**, see the skill's "Centralized Writing Standards" section, including:
+- Descriptive Discipline (essence vs. elaboration)
+- Narrative Context Guidelines (signposts, not essays)
+- Checklist Standards (5-7 criteria per state)
+- Alpha decision tree (redeclaration vs. specialization)
 
 ---
 
