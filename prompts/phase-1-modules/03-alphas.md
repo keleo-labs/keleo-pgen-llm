@@ -69,7 +69,93 @@ The skill will monitor output size and recommend splits if needed. After generat
 
 ## Alpha Types and Rules
 
+## ⚠️ CRITICAL FIRST STEP: Baseline Alpha Check
+
+**BEFORE classifying ANY alpha as NEW or REDECLARATION, you MUST perform this check:**
+
+### Step 1: Read Baseline Practice Completely
+
+Use the Read tool to read `deps/platform-adoption-kernel.json` (or user-specified baseline file) completely. Extract ALL baseline alpha names.
+
+**Baseline alphas typically include:**
+- Platform
+- Platform Consumption Interface
+- Platform Asset
+- Platform Capability
+- Requirements
+- Stakeholders
+- Work
+- Team
+- Way Of Working
+- Platform Governance
+- Platform Risk And Compliance
+- Platform Value And Economics
+- Organizational Change
+
+(The exact list depends on the baseline file - ALWAYS read it completely.)
+
+### Step 2: For EACH Alpha Identified from Source
+
+For every alpha concept you identified in Module 00 or from source materials:
+
+1. **Check exact name match (case-sensitive):**
+   - Does `alpha.name` EXACTLY match a baseline alpha name?
+   - Even one character difference (case, space, punctuation) = NO match
+
+2. **Read baseline alpha description:**
+   - Understand the FULL scope of the baseline alpha
+   - Baseline descriptions define semantic boundaries
+
+3. **Read baseline alpha states:**
+   - Understand the baseline progression model
+   - State names reveal what the alpha tracks
+
+### Step 3: Apply Classification Rules
+
+**IF exact name match in baseline:**
+- → MUST be **REDECLARATION** (enrichment)
+- Use baseline name, description, state names EXACTLY
+- Only add practice-specific checklists to existing states
+- **NO contributesTo property** (baseline alphas don't contribute to anything)
+- **NO state modifications** (state names, descriptions, seq must match baseline exactly)
+
+**IF no exact name match in baseline:**
+- → NEW alpha (specialization)
+- Create new name describing the specialized concept
+- Define custom states for specialized progression
+- **MUST have contributesTo** pointing to a baseline alpha
+- MUST provide justification for contributesTo choice (see below)
+
+### Step 4: Common Mistakes to Avoid
+
+**DANGER:** Do NOT assume governance/risk/compliance/organizational concepts are "new" without checking baseline first.
+
+**Baseline often includes these concepts:**
+- Platform Governance ← governance concepts usually REDECLARE this
+- Platform Risk And Compliance ← risk/compliance usually REDECLARE this
+- Organizational Change ← change management usually REDECLARES this
+- Team ← team structures usually REDECLARE this
+- Way Of Working ← process/practice usually REDECLARES this
+- Stakeholders ← stakeholder management usually REDECLARES this
+
+**Example Error:**
+- Source mentions "platform governance policies and procedures"
+- ❌ WRONG: Create new alpha "Platform Governance" with contributesTo "Platform"
+- ✅ RIGHT: REDECLARE baseline alpha "Platform Governance" with policy/procedure checklists
+
+**Why This Matters:**
+
+Treating a baseline alpha as "new" causes:
+1. Duplicate concept definitions (one in baseline, one in practice)
+2. Invalid contributesTo relationship (baseline alphas don't contribute to anything)
+3. Schema validation errors (baseline alpha appears twice with different structures)
+4. Semantic confusion (which "Platform Governance" should consumers use?)
+
+---
+
 ## Decision: Redeclaration vs. Specialization
+
+**ONLY applies AFTER you've confirmed the alpha name does NOT match baseline.**
 
 When source material describes enhancements to a baseline alpha concept, determine the correct approach:
 
@@ -149,12 +235,18 @@ All new alphas introduced in a Practice MUST logically refine a parent concept b
 - MUST represent reusable specialization, not a specific instance
 
 **Examples of Valid contributesTo Mappings:**
-- Technology/infrastructure alphas (e.g., "Automation Platform", "CI/CD Pipeline") → contribute to "Platform"
-- Content/artifacts alphas (e.g., "Automation Content", "Playbook", "Model") → contribute to "Platform Asset"
-- Process/workflow alphas (e.g., "Job Template", "Workflow") → contribute to "Work"
-- Governance alphas (e.g., "Policy Enforcement") → contribute to "Platform Governance"
-- Risk/compliance alphas → contribute to "Platform Risk And Compliance"
-- Value/economics alphas → contribute to "Platform Value And Economics"
+- Infrastructure/substrate alphas (e.g., "Container Platform", "Multi-Cluster Environment", "Storage System", "Network Fabric") → contribute to "Platform"
+- Consumption interface alphas (e.g., "Developer Portal", "Service Catalog", "Internal Developer Platform", "Golden Path System", "Self-Service API", "CLI Tool") → contribute to "Platform Consumption Interface"
+- Workload/application alphas (e.g., "Application", "Microservice", "Data Pipeline", "ML Model") → contribute to "Platform Asset"
+- Process/workflow alphas (e.g., "Job Template", "Workflow", "Sprint") → contribute to "Work"
+- Governance alphas (e.g., "Policy Enforcement", "Compliance Framework") → contribute to "Platform Governance"
+- Risk/compliance alphas (e.g., "Security Controls", "Audit Trail") → contribute to "Platform Risk And Compliance"
+- Value/economics alphas (e.g., "Cost Allocation", "Chargeback Model") → contribute to "Platform Value And Economics"
+
+**Critical Distinctions:**
+- **Platform** = Infrastructure substrate (clusters, VMs, storage, networking)
+- **Platform Consumption Interface** = How users access platform (portals, catalogs, CLI, API, templates, docs)
+- **Platform Asset** = Workloads running on platform (applications, services, databases)
 
 ### Alpha Instances
 
@@ -180,9 +272,28 @@ Organize by focus, following Module 00 decisions:
 
 ### Alpha: [Alpha Name]
 
-**Type:** Redeclaration | New Alpha (Specialization) | [If New: Contributes To: [Parent Alpha Name]]
+**Type:** Redeclaration | New Alpha (Specialization)
 
-**Focus:** Value
+**Focus:** Value | Solution | Endeavor
+
+**Contributes To:** [Parent Alpha Name] (REQUIRED for new alphas, omit for redeclarations)
+
+**Justification for contributesTo:** (REQUIRED for new alphas)
+- **Description alignment:** [Explain how this alpha fits within parent alpha's scope as described in baseline]
+- **State alignment:** [List which states align with parent alpha states - aim for ≥50% alignment]
+- **Alternative considered:** [Other baseline alpha considered as parent and why rejected]
+- **Decision rationale:** [Why this parent alpha is semantically most appropriate]
+
+**Example Justification:**
+```
+Contributes To: Platform Consumption Interface
+
+Justification:
+- Description alignment: IDP (developer portal, catalog, templates) provides the consumption interface through which developers access platform capabilities. Fits Platform Consumption Interface scope: "means by which consumers interact with and consume the platform"
+- State alignment: 4/5 states align - "Scoped"="Scoped" (exact), "Catalog Available"~"Available", "Self-Service Functional"~"Self Service", "Optimized"="Optimized" (exact) = 80% alignment
+- Alternative considered: Platform (infrastructure) - rejected because Platform focuses on substrate (clusters, VMs, storage) not consumption layer. 0% state alignment with Platform states.
+- Decision rationale: IDP abstracts platform complexity and provides developer-friendly consumption experience, which is the definition of Platform Consumption Interface
+```
 
 **Description:**
 

@@ -152,9 +152,48 @@ Plan how activities will be derived:
 Identify what will reference what:
 
 **Alphas:**
-- Which alphas will be redeclared?
-- Which new alphas will be created?
-- What contributesTo relationships?
+
+⚠️ **CRITICAL FIRST STEP - Baseline Alpha Check:**
+
+Before classifying ANY alpha as NEW or REDECLARATION, you MUST:
+
+1. **Read the baseline practice JSON completely** (use Read tool on baseline file)
+2. **For EACH alpha you identified from source material:**
+   - Check if `alpha.name` EXACTLY matches a baseline alpha name (case-sensitive)
+   - Read baseline alpha description to understand its full scope
+   - Read baseline alpha states to understand its progression model
+
+3. **Classification Decision Rules:**
+   
+   **IF alpha name EXACTLY matches baseline alpha name:**
+   - → MUST be **REDECLARATION** (enrichment)
+   - Use baseline name, description, state names EXACTLY as defined
+   - Only add practice-specific checklists to existing states
+   - **NO contributesTo property** (baseline alphas don't contribute to anything)
+   
+   **IF no exact name match in baseline:**
+   - → NEW alpha (specialization)
+   - Create new name describing the specialized concept
+   - Define custom states for specialized progression
+   - **MUST have contributesTo** pointing to a baseline alpha
+   - MUST provide justification for contributesTo choice (see Section 9.2.5 in semantics.md)
+
+**Common Mistake to Avoid:**
+
+Do NOT assume governance/risk/compliance/organizational concepts are "new" without checking baseline first. The baseline practice often includes:
+- Platform Governance
+- Platform Risk And Compliance
+- Organizational Change
+- Team
+- Way Of Working
+- Stakeholders
+
+These are REDECLARATIONS, not new alphas. ALWAYS verify against baseline before deciding.
+
+**After Baseline Check, Document:**
+- Which alphas will be redeclared? (List exact baseline names)
+- Which new alphas will be created? (List new specialized names)
+- What contributesTo relationships? (For new alphas only)
 - What supportingAlphas relationships?
 
 **Work Products:**

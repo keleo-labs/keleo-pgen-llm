@@ -1,6 +1,6 @@
 ## **Resource Assessment Framework**
 
-By synthesizing Open Agile Architecture, SAFe, Gartner CEA, Zachman, and TOGAF 10, we can extract the DNA of a modern, adaptable enterprise architecture practice. When combined, these frameworks reveal a massive industry shift: EA is no longer about governing IT infrastructure; it is about orchestrating business value in a complex, changing environment. The following rubric was developed to provide a way to classify a specific resource against this modernized Resource Assessment Framework, combining traditional resource assessment with a continuous, co-creative mindset.
+The following rubric was developed to provide a way to classify a specific resource against this modernized Resource Assessment Framework, combining traditional resource assessment with a continuous, co-creative mindset.
 
 ### **The 4 Perspectives of Modern Enterprise Architecture**
 
