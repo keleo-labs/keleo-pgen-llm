@@ -128,29 +128,54 @@ Examples: Enterprise, Startup, Regulated Industry, Global Organization, Product 
 
 ### Practice Overview
 
+**CRITICAL:** This overview must clearly articulate the practice's VALUE PROPOSITION, OBJECTIVES, and OUTCOMES. Answer: What problem does this solve? What capability does it enable? What's different when successfully adopted?
+
 [Write 3-5 paragraphs of flowing prose providing comprehensive overview]
 
-**First Paragraph:** Describe this practice's scope and purpose. What problem does it solve? What outcomes does it enable?
+**First Paragraph (VALUE PROPOSITION - MANDATORY):** 
 
-**Second Paragraph:** Explain how it extends the Platform Adoption Essentials baseline. What baseline concepts does it build upon? What new specialized guidance does it provide?
+Start with the problem or need this practice addresses. What challenge do organizations face? What gap exists? Then describe what this practice enables or achieves. What transformation occurs? What capability is unlocked?
 
-**Third Paragraph:** Describe the specific scenarios, contexts, or domains where this practice applies. Who should use it? When is it most valuable?
+**Example:**
+> Organizations struggle to deliver platform capabilities consistently while balancing autonomy for development teams with necessary governance controls. Traditional infrastructure approaches create bottlenecks through manual provisioning and approval processes, while completely open environments introduce security and compliance risks. This practice enables platform teams to establish reliable, self-service infrastructure with automated guardrails, reducing deployment time from weeks to hours while maintaining security and compliance standards.
 
-**Fourth Paragraph:** Highlight key characteristics and distinguishing features. What makes this practice unique? What are its organizing principles?
+**Second Paragraph (BASELINE EXTENSION):** 
 
-**Fifth Paragraph (if needed):** Note any important constraints, prerequisites, or considerations for adopting this practice.
+Explain how it extends the Platform Adoption Essentials baseline. What baseline concepts does it build upon? What new specialized guidance does it provide?
+
+**Third Paragraph (CONTEXT AND APPLICABILITY):** 
+
+Describe the specific scenarios, contexts, or domains where this practice applies. Who should use it? When is it most valuable? What organizational maturity level or context is assumed?
+
+**Fourth Paragraph (KEY CHARACTERISTICS):** 
+
+Highlight key characteristics and distinguishing features. What makes this practice unique? What are its organizing principles? What methodologies or frameworks does it draw from?
+
+**Fifth Paragraph (CONSTRAINTS/PREREQUISITES - if applicable):** 
+
+Note any important constraints, prerequisites, or considerations for adopting this practice. What should exist before starting? What trade-offs are involved?
 
 ### Context and Background
 
-**MANDATORY REQUIREMENT:** Create at least ONE narrative section summarizing the practice's intent and objective using a baseline narrative template. This narrative is REQUIRED for every practice and method.
+**MANDATORY REQUIREMENT:** Create at least ONE narrative section that clearly articulates the practice's VALUE, OBJECTIVES, and OUTCOMES using a baseline narrative template. This narrative is REQUIRED for every practice and method.
+
+**CRITICAL FOCUS:** The narrative must answer:
+1. **What problem does this practice solve?** (value proposition)
+2. **What are the objectives?** (what it aims to achieve)
+3. **What are the outcomes?** (measurable results, transformation achieved)
+
+**Recommended Framework:** The Three-Act Structure & StoryBrand is ideal for value articulation because it positions the organization as Hero and the practice as Guide.
 
 [Create 1-3 narrative sections providing context using appropriate narrative frameworks]
 
-**[Narrative 1 Title - MUST summarize practice intent/objective using STAR, Hero's Journey, StoryBrand, ABT, Essay, Epic, or Report framework]**
+**[Narrative 1 Title - MUST articulate practice value, objectives, and outcomes]**
 
-**Narrative Type:** [The STAR Format | The Hero's Journey | The Three-Act Structure & StoryBrand | Micro-Narratives (ABT) | Essay Narrative | Epic | Report Narrative]
+**Narrative Type:** [The Three-Act Structure & StoryBrand | The STAR Format | The Hero's Journey | Micro-Narratives (ABT) | Essay Narrative | Epic | Report Narrative]
 
-**Purpose:** This narrative MUST clearly communicate the practice's intent and objective to practitioners.
+**Purpose:** This narrative MUST clearly communicate:
+- The PROBLEM this practice solves (why it exists)
+- The OBJECTIVES it pursues (what it aims to achieve)
+- The OUTCOMES it delivers (transformation/results when successfully adopted)
 
 **Narrative Contexts:**
 
@@ -242,21 +267,61 @@ If Module 00 determined this is a Method with multiple practices, generate:
 
 **Name:** [Method Name]
 
-**Description:** [2-3 sentence method description explaining how multiple practices work together]
+**Description:**
+
+Write a single SHORT sentence (8-15 words, max 20 words) that captures the essence of what this method is.
+
+**Guidelines:** Same as practice description—essence only, no elaboration.
+
+**Example:**
+- ✅ GOOD: "Comprehensive approach integrating platform engineering, application development, and operations practices."
 
 **Baseline Practice:** Platform Adoption Essentials
 
 ### Method Overview
 
+**CRITICAL:** This overview must clearly articulate the method's VALUE PROPOSITION, OBJECTIVES, and OUTCOMES. Answer: What comprehensive problem does this method solve? What integrated capability does it enable? What's different when successfully adopted?
+
 [2-4 paragraphs explaining:]
 
-**First Paragraph:** Overall method scope and purpose. What comprehensive capability does the method provide?
+**First Paragraph (VALUE PROPOSITION - MANDATORY):**
 
-**Second Paragraph:** Why multiple practices are necessary. What distinct value streams, use cases, or stakeholder journeys do they address?
+Start with the problem or need this method addresses. What complex challenge requires multiple integrated practices? What gap exists that a single practice cannot address? Then describe what this method enables or achieves. What holistic transformation occurs? What comprehensive capability is unlocked?
 
-**Third Paragraph:** How practices relate and integrate. What are the dependencies? Is there a recommended adoption sequence?
+**Example:**
+> Organizations attempting platform adoption often struggle with fragmentation across technical implementation, application delivery, and operational processes. Platform teams build infrastructure without understanding application needs, development teams face unfamiliar operational responsibilities, and operations teams inherit platforms they didn't design. This method provides an integrated approach to platform engineering, application development operations, and platform operations, ensuring alignment across the entire platform lifecycle from conception through evolution.
 
-**Fourth Paragraph (if needed):** Coordinating principles or overarching frameworks that tie practices together.
+**Second Paragraph (WHY MULTIPLE PRACTICES):**
+
+Explain why multiple practices are necessary. What distinct value streams, use cases, or stakeholder journeys do they address? How do they complement each other?
+
+**Third Paragraph (INTEGRATION AND DEPENDENCIES):**
+
+Describe how practices relate and integrate. What are the dependencies? Is there a recommended adoption sequence? How do they work together to deliver the comprehensive outcome?
+
+**Fourth Paragraph (COORDINATING PRINCIPLES - if applicable):**
+
+Note any coordinating principles or overarching frameworks that tie practices together. What unifying methodology or philosophy guides the method?
+
+### Method Context and Background
+
+**MANDATORY REQUIREMENT:** Create at least ONE narrative section that clearly articulates the method's VALUE, OBJECTIVES, and OUTCOMES using a baseline narrative template.
+
+**CRITICAL FOCUS:** The narrative must answer:
+
+1. **What comprehensive problem does this method solve?** (value proposition)
+2. **What are the method's objectives?** (what the integrated approach aims to achieve)
+3. **What are the outcomes?** (measurable results, holistic transformation achieved)
+
+[Create method-level narrative using same structure as practice narratives]
+
+**[Method Narrative Title - MUST articulate method value, objectives, and outcomes]**
+
+**Narrative Type:** [The Three-Act Structure & StoryBrand | The STAR Format | etc.]
+
+[Follow same narrative structure as practice narratives, but focus on method-level integration]
+
+**Citations Referenced:** [List citations supporting the method approach]
 
 ### Constituent Practices
 

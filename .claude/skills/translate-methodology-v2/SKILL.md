@@ -18,6 +18,7 @@ This skill transforms enterprise methodology documentation into schema-compliant
 **Phase 3: JSON** → Generate schema-compliant JSON with programmatic validation
 
 **Key Differences from v1:**
+
 - ✓ Simpler 3-phase structure (vs 8-phase pipeline)
 - ✓ Reference-driven (reads semantics.md, not embedded rules)
 - ✓ User-provided baseline (not hardcoded)
@@ -46,7 +47,7 @@ This skill transforms enterprise methodology documentation into schema-compliant
 
 All generated outputs for a practice go in `practices/<practice-name>/`:
 
-```
+```text
 practices/
 └── <practice-name>/
     ├── 01-analysis-report.md      (Phase 1 output, ~30-50K words)
@@ -56,7 +57,7 @@ practices/
 
 For methods with multiple practices:
 
-```
+```text
 practices/
 └── <method-name>/
     ├── 01-analysis-report.md       (Covers all practices)
@@ -71,12 +72,14 @@ practices/
 This skill relies on reference documents (READ via Read tool, NOT embedded):
 
 ### Required References
+
 1. **references/domain-framework.md** - Four-perspective analysis framework
 2. **references/semantics.md** - Practice Language semantic guidance
 3. **deps/language.schema.json** - JSON Schema definition
 4. **Baseline Practice JSON** - User-provided (e.g., `deps/platform-adoption-kernel.json`)
 
 ### Phase Prompts
+
 - **prompts/phase-1-analysis.md** - Analysis phase instructions
 - **prompts/phase-2-mapping.md** - Mapping phase instructions
 - **prompts/phase-3-json.md** - JSON generation instructions
@@ -112,9 +115,141 @@ In plan mode:
 
 5. **Exit plan mode** with clear execution roadmap
 
+---
+
+## Token Budget Management: Phase Compaction Pattern
+
+**CRITICAL:** To avoid token budget exhaustion during long translations, use conversation compaction between phases.
+
+### When to Compact
+
+**Inter-phase compaction** (between major phases):
+
+1. **After Planning (before Phase 1):** Compact to clear planning discussion
+2. **After Phase 1 (before Phase 2):** Compact to clear analysis generation
+3. **After Phase 2 (before Phase 3):** Compact to clear mapping generation
+
+**Multi-agent approach** (for multi-practice methods - RECOMMENDED):
+
+4. **Use Agent tool for parallelism** (for methods with 2+ practices):
+   - **Phase 2**: Launch one agent per practice (parallel execution)
+     - Each agent reads: analysis report, baseline JSON, semantics.md
+     - Each agent generates: complete practice mapping (alphas + work products + activities)
+     - Write to separate files or sections
+     - Agents run concurrently (no token budget sharing)
+   - **Phase 3**: Launch one agent per practice (parallel execution)
+     - Each agent reads: practice mapping section, baseline JSON, schema
+     - Each agent generates: practice JSON (standalone, not method JSON)
+     - Agents run concurrently
+   - **Phase 3.5**: Assembly and validation
+     - Combine practice JSONs into method structure
+     - Validate method JSON against schema
+     - Fix any cross-practice reference issues
+   - **Benefits**: No token limits, no degeneration, concurrent execution, quality consistency
+
+### How to Implement Multi-Agent Approach
+
+**For Single-Practice translations:**
+- User can manually compact between phases
+- Tell user: "Phase N complete. [Optional: Compact before Phase N+1 for optimal token budget]"
+- Don't wait - continue working
+
+**For Multi-Practice methods (2+ practices):**
+- **Always use Agent tool** (don't ask user to compact)
+- Launch agents in parallel using single message with multiple Agent tool calls
+- Each agent is self-contained with complete prompt and file paths
+
+**Example: Phase 2 with 4 practices**
+```
+Send single message with 4 Agent tool calls:
+- Agent 1: Generate Practice 1 mapping
+- Agent 2: Generate Practice 2 mapping  
+- Agent 3: Generate Practice 3 mapping
+- Agent 4: Generate Practice 4 mapping
+All run concurrently, no shared token budget
+```
+
+**Example: Phase 3 with 4 practices**
+```
+Send single message with 4 Agent tool calls:
+- Agent 1: Generate Practice 1 JSON
+- Agent 2: Generate Practice 2 JSON
+- Agent 3: Generate Practice 3 JSON
+- Agent 4: Generate Practice 4 JSON
+Then combine into method JSON and validate
+```
+
+### Why This Works
+
+Each phase is designed to be **stateless** and **file-driven**:
+
+- Phase 1 reads: source materials, domain-framework.md
+- Phase 2 reads: 01-analysis-report.md, baseline JSON, semantics.md
+- Phase 3 reads: 02-mapping-guide.md, baseline JSON, language.schema.json
+
+No conversational context is required - only file contents.
+
+### Example Flow: Single Practice
+
+```text
+[Planning complete]
+→ Compact conversation
+→ Phase 1: Read prompts/phase-1-analysis.md, generate 01-analysis-report.md
+[Phase 1 complete]
+→ Compact conversation  
+→ Phase 2: Read prompts/phase-2-mapping.md + 01-analysis-report.md, generate 02-mapping-guide.md
+[Phase 2 complete]
+→ Compact conversation
+→ Phase 3: Read prompts/phase-3-json.md + 02-mapping-guide.md, generate JSON
+[Phase 3 complete]
+```
+
+### Example Flow: Multi-Practice Method (4 practices) - Multi-Agent Approach
+
+```text
+[Planning complete]
+→ Phase 1: Generate 01-analysis-report.md (covers all 4 practices)
+[Phase 1 complete]
+
+→ Phase 2: Launch 4 parallel agents in single message
+  - Agent 1: Generate Practice 1 mapping (alphas + work products + activities)
+  - Agent 2: Generate Practice 2 mapping (alphas + work products + activities)
+  - Agent 3: Generate Practice 3 mapping (alphas + work products + activities)
+  - Agent 4: Generate Practice 4 mapping (alphas + work products + activities)
+  [All agents run concurrently]
+→ Combine practice mappings into 02-mapping-guide.md
+[Phase 2 complete]
+
+→ Phase 3A: Launch 4 parallel agents in single message
+  - Agent 1: Generate practice-1.json
+  - Agent 2: Generate practice-2.json
+  - Agent 3: Generate practice-3.json
+  - Agent 4: Generate practice-4.json
+  [All agents run concurrently]
+→ Phase 3B: Assemble method JSON
+  - Combine 4 practice JSONs into method structure
+  - Merge citations
+  - Write method-name.json
+→ Phase 3C: Validate and fix
+  - Run validation script
+  - Fix errors until 0 errors
+[Phase 3 complete]
+```
+
+**Benefits of Multi-Agent Approach:**
+- ✅ **No token budget issues** (each agent has independent budget)
+- ✅ **No quality degeneration** (Practice 4 gets same quality as Practice 1)
+- ✅ **4x faster** (concurrent execution vs sequential)
+- ✅ **Simpler prompts** (each agent focuses on one practice)
+- ✅ **No manual compaction needed** (agents handle it automatically)
+
+---
+
 ### Step 1: Phase 1 - Analysis
 
 **Objective:** Extract and organize methodology into structured analysis
+
+**BEFORE STARTING:** Consider compacting conversation if context is large (see Token Budget Management above).
 
 **Process:**
 
@@ -144,6 +279,7 @@ In plan mode:
 - ✓ Clear practice boundaries justified
 
 **User Feedback:** Brief progress updates
+
 - "Analyzing source materials using four-perspective framework..."
 - "Extracted N concerns across M perspectives..."
 - "Phase 1 complete: Analysis report generated at practices/<name>/01-analysis-report.md"
@@ -152,49 +288,43 @@ In plan mode:
 
 **Objective:** Map Phase 1 analysis to baseline practice framework
 
-**Process:**
+**APPROACH DECISION:**
 
-1. **Read prompt:** `prompts/phase-2-mapping.md`
-   - This prompt contains complete mapping instructions
-   - Follow all steps exactly as specified
+- **Single Practice**: Generate mapping guide directly (one step)
+- **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach
 
-2. **Request baseline practice:**
+**Process for Single Practice:**
+
+1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
+2. Generate complete `02-mapping-guide.md` with all alphas, work products, activities, patterns
+
+**Process for Multi-Practice Method:**
+
+1. **Launch parallel agents** (one per practice) in single message:
    
-   **Ask user:**
    ```
-   I need the baseline practice file to proceed with mapping. Please provide:
-   - File path to your baseline practice JSON
-   - OR: Confirm use of the example at deps/platform-adoption-kernel.json
-   
-   The baseline practice defines the standardized framework (alphas, activity spaces, 
-   competencies) that your source methodology will be mapped to.
+   Agent(description="Map Practice 1", prompt="...")
+   Agent(description="Map Practice 2", prompt="...")  
+   Agent(description="Map Practice 3", prompt="...")
+   Agent(description="Map Practice 4", prompt="...")
    ```
 
-   **Store:** baseline_practice_path  
-   **Validate:** File exists, is valid JSON
+2. **Each agent prompt must include:**
+   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `deps/platform-adoption-kernel.json`, `references/semantics.md`
+   - What to generate: Complete practice mapping with metadata, alphas, work products, activities, patterns
+   - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
+   - Explicit instruction: "Generate COMPLETE mapping including alphas (if any), work products, activities, AND PATTERNS. CRITICAL: Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1). Patterns are REQUIRED for multi-alpha practices."
 
-3. **Load resources:**
-   - Read `practices/<practice-name>/01-analysis-report.md`
-   - Read baseline practice JSON (user-provided path)
-     - **CRITICAL:** Read element DESCRIPTIONS, not just names
-     - Understand semantic scope: alpha descriptions reveal full scope, state descriptions show progression
-     - Competency descriptions clarify expertise range, activity space descriptions define boundaries
-     - Description-level understanding is essential for accurate redeclaration vs specialization decisions
-   - Read `references/semantics.md` (comprehensive semantic guidance)
+3. **After all agents complete:**
+   - Combine practice mapping files into single `02-mapping-guide.md` (if using separate files)
+   - Add method-level metadata (citations, method narrative)
+   - Validate completeness: every practice has alphas + work products + activities
 
-4. **Map elements:**
-   - Concerns → Alphas (redeclaration vs specialization decision)
-   - Work Products → WorkProducts with LODs
-   - Competencies → Exact baseline competency names
-   - Personas → Personas with competency references
-   - Teams → PersonaGroups
-   - Activities → Activities with complete references
-   - Workflows → Patterns with PatternViews
-   - Terminology → Aliases (if needed)
-
-5. **Generate output:** Write to `practices/<practice-name>/02-mapping-guide.md`
-   - Follow exact format from phase-2-mapping.md prompt
-   - ~40-60K words structured markdown
+**Critical: Multi-Agent Benefits**
+- ✅ No token budget sharing between agents
+- ✅ Concurrent execution (4 practices finish in time of 1)
+- ✅ No quality degeneration (Practice 4 gets same quality as Practice 1)
+- ✅ Each agent focuses on single practice (cleaner, more focused)
    - Complete mapping specification
    - Validation checklist satisfied
 
@@ -203,11 +333,96 @@ In plan mode:
 From `references/semantics.md`:
 
 - **NO FLOATING ALPHAS:** All new alphas MUST have `contributesTo` (Section 4.1)
+  - Valid targets: baseline alphas, practice-local alphas (internal hierarchy), or external practice alphas (creates dependency)
+  - Practice-local references create multi-level specialization chains (Alpha C → B → A → Baseline)
+  - External practice references require explicit practice dependency declaration
+- **SEMANTIC RELATIONSHIPS:** Use baseline `relatesTo` for analysis; define new relationships for new alphas (Section 4.1 - Semantic Relationships)
+  - **For baseline alpha analysis**: Read existing `relatesTo` relationships from baseline and dependent practices to understand how the alpha functions within the framework
+  - **For new alphas ONLY**: Define domain-specific `relatesTo` relationships using appropriate relationship verbs
+  - **Do NOT** add `relatesTo` to redeclarations - these inherit baseline relationships
+  - Relationship types: dependency ("depends on", "requires"), production ("produces", "built by"), guidance ("guides", "constrains"), information flow ("provides", "validates"), enabling ("enables", "supports"), impact ("influences", "justifies"), consumption ("consumes", "hosts")
 - **Exact name matching:** All baseline references are case-sensitive (Section 3)
 - **Orthogonal tags:** Use {domainTags, lifecycleTags, organizationalTags} (Section 3.1.2)
 - **Redeclaration vs Specialization:** Follow decision framework (Section 9.2.5)
 - **Competency names:** Use EXACT baseline names, not descriptions (Section 6.2)
 - **Single sentences:** Descriptions max 20 words, states/LODs max 12 (Section 3.1)
+
+**CRITICAL: Narrative Structure Requirements**
+
+**ALL narratives MUST be structured objects with narrativeTypeName and narrativeContexts arrays. NEVER use prose paragraphs.**
+
+From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
+
+1. **Practice/Method Narratives** - REQUIRED structured format:
+   ```
+   Practice Narrative:
+   - Narrative Type Name: STAR | Hero's Journey | Three-Act Structure | Essay
+   - Narrative Contexts:
+     - Seq: 1, Narrative Element Name: [Situation], Context: [1-3 sentences]
+     - Seq: 2, Narrative Element Name: [Task], Context: [1-3 sentences]
+     - Seq: 3, Narrative Element Name: [Action], Context: [1-3 sentences]
+     - Seq: 4, Narrative Element Name: [Result], Context: [1-3 sentences]
+   ```
+
+2. **Alpha Narratives** - REQUIRED for new alphas, RECOMMENDED for redeclarations:
+   ```
+   Narrative:
+   - Narrative Type Name: Essay
+   - Narrative Contexts:
+     - Seq: 1, Narrative Element Name: Introduction, Context: Why this alpha matters
+     - Seq: 2, Narrative Element Name: Body, Context: Key considerations and relationships
+     - Seq: 3, Narrative Element Name: Conclusion, Context: Success factors
+   - Citation Names: [citation references]
+   ```
+
+3. **Activity Narratives** - REQUIRED for all activities:
+   ```
+   Narrative:
+   - Narrative Type Name: Technique
+   - Narrative Contexts:
+     - Seq: 1, Narrative Element Name: Overview, Context: What this activity accomplishes
+     - Seq: 2, Narrative Element Name: Technique, Context: Step-by-step how-to guidance
+     - Seq: 3, Narrative Element Name: Common Pitfalls, Context: What to avoid
+   - Citation Names: [authoritative source references]
+   ```
+
+4. **Pattern Narratives** - Already structured in pattern views (keep as-is)
+
+5. **Work Product Narratives** - OPTIONAL but recommended for complex work products
+
+**WRONG (Prose Paragraph):**
+```
+Practice Narrative:
+OpenShift Administration addresses the foundational infrastructure and operational 
+concerns for enterprise container platforms. Organizations adopting OpenShift must...
+```
+
+**CORRECT (Structured Object):**
+```
+Practice Narrative:
+- Narrative Type Name: STAR
+- Narrative Contexts:
+  - Seq: 1
+    Narrative Element Name: Situation
+    Context: Organizations face infrastructure challenges requiring enterprise container platforms.
+  - Seq: 2
+    Narrative Element Name: Task
+    Context: Platform teams must establish secure, resilient OpenShift infrastructure.
+  - Seq: 3
+    Narrative Element Name: Action
+    Context: Implement progressive maturity states from architecture to automated compliance.
+  - Seq: 4
+    Narrative Element Name: Result
+    Context: Secure self-service container infrastructure delivered to development teams.
+```
+
+**Quality Check During Mapping:**
+- [ ] Practice narrative uses structured format (NOT prose)
+- [ ] Method narrative uses structured format (NOT prose)
+- [ ] All new alphas have narrative objects with narrativeTypeName
+- [ ] All activities have Technique narrative objects
+- [ ] All narrative contexts are 1-3 sentences (NOT paragraphs)
+- [ ] Citations referenced in citationNames arrays
 
 **Quality Gates:**
 - ✓ All Phase 1 concerns mapped to alphas
@@ -225,64 +440,86 @@ From `references/semantics.md`:
 
 **Objective:** Generate schema-compliant Practice or Method JSON
 
-**Process:**
+**APPROACH DECISION:**
 
-1. **Read prompt:** `prompts/phase-3-json.md`
-   - This prompt contains complete JSON generation instructions
-   - Follow all steps exactly as specified
+- **Single Practice**: Generate JSON directly (one step)
+- **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach + assembly
 
-2. **Load resources:**
-   - Read `practices/<practice-name>/02-mapping-guide.md`
-   - Read `deps/language.schema.json` (schema structure)
-   - Read `references/semantics.md` (JSON structure examples)
-   - Read baseline practice JSON (same as Phase 2)
+**Process for Single Practice:**
 
-3. **Generate JSON incrementally:**
-   - Practice/Method skeleton (metadata, tags, keywords)
-   - Citations (metadata only, NO narratives property)
-   - Narratives (practice/method level)
-   - Alphas (with states, checklists, narratives)
-   - Alpha Instances
-   - Work Products (with LODs, checklists, contributesTo)
-   - Work Product Instances
-   - Personas (competencies property, NOT requiredCompetencies)
-   - Persona Groups (personaNames array)
-   - Activities (BOTH requiredCompetencies AND recommendedCompetencyLevels)
-   - Patterns (patternViews, alphaStates properties)
-   - Practice Element Aliases (if applicable)
+1. Read `prompts/phase-3-json.md`, mapping guide, schema, baseline JSON
+2. Generate complete practice JSON
+3. Validate and fix until 0 errors
 
-4. **Validate JSON syntax:**
-   ```bash
-   jq empty practices/<name>/<name>.json
+**Process for Multi-Practice Method:**
+
+**Step 3A: Parallel Practice JSON Generation**
+
+1. **Launch parallel agents** (one per practice) in single message:
+   
+   ```
+   Agent(description="Generate Practice 1 JSON", prompt="...")
+   Agent(description="Generate Practice 2 JSON", prompt="...")
+   Agent(description="Generate Practice 3 JSON", prompt="...")
+   Agent(description="Generate Practice 4 JSON", prompt="...")
    ```
 
-5. **Run validation script:**
+2. **Each agent prompt must include:**
+   - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `deps/platform-adoption-kernel.json`
+   - What to generate: **Practice JSON** (NOT method JSON) - single practice object with kind="practice"
+   - Output location: `practices/<method-name>/<practice-name>.json`
+   - Schema compliance: all required properties (alphas, activities, work products, **patterns**, etc.)
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL: MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression."
+
+3. **Agents run concurrently**, each producing one practice JSON file
+
+**Step 3B: Method Assembly**
+
+4. **After all practice JSONs complete:**
+   - Read all 4 practice JSON files
+   - Create method structure:
+     ```json
+     {
+       "kind": "method",
+       "name": "Method Name",
+       "description": "...",
+       "baselinePracticeName": "Platform Adoption Essentials",
+       "tags": {...},
+       "narratives": [...],
+       "citations": [...],
+       "practices": [
+         <practice-1-json-content>,
+         <practice-2-json-content>,
+         <practice-3-json-content>,
+         <practice-4-json-content>
+       ]
+     }
+     ```
+   - Merge citations from all practices (deduplicate)
+   - Ensure each embedded practice has `kind: "practice"`
+
+**Step 3C: Validation and Fixes**
+
+5. **Validate method JSON:**
    ```bash
    python3 utils/validate-practice-json.py \
-     practices/<name>/<name>.json \
-     <baseline-practice-path> \
+     practices/<method-name>/<method-name>.json \
+     deps/platform-adoption-kernel.json \
      deps/language.schema.json
    ```
 
-6. **Interpret validation results:**
-   - Read JSON output from validation script
-   - Categorize errors: schema / baseline / integrity
-   - Determine fix strategy for each error category
+6. **Fix errors:**
+   - Schema violations (property names, types)
+   - Cross-practice references (if any)
+   - Missing properties
+   - Iterate until 0 errors
 
-7. **Apply fixes:**
-   - **Schema violations:** Edit JSON to correct property names, types, structure
-   - **Baseline mismatches:** Use exact baseline names, add contributesTo
-   - **Integrity errors:** Create missing elements or fix references
-
-8. **Iterate until clean:**
-   - Re-run validation after each fix batch
-   - Continue until 0 errors
-
-9. **Final quality check:**
-   - All Phase 2 mappings present in JSON
-   - No content omissions
-   - All narratives and checklists complete
-   - JSON well-formatted and readable
+**Critical: Multi-Agent Benefits for Phase 3**
+- ✅ Each practice generated independently (no shared token budget)
+- ✅ Concurrent execution (4x faster)
+- ✅ Simpler prompts (each agent focuses on one practice)
+- ✅ Easier debugging (one practice per file initially)
+- ✅ Clean assembly step combines everything
 
 **Critical JSON Rules:**
 
@@ -462,30 +699,164 @@ Single validation script replaces multiple utilities:
 
 ## Common Pitfalls to Avoid
 
+### General Workflow Pitfalls
+
+- ❌ **Not compacting between phases** (leads to token budget exhaustion and incomplete content)
+- ❌ **Generating "example" or partial content** (all activities, alphas, patterns must be complete)
+- ❌ Skipping phases or combining them (each phase has distinct purpose)
+
 ### Phase 1 Pitfalls
 - ❌ Skipping EnterPlanMode
 - ❌ Not reading domain-framework.md before analyzing
 - ❌ Forcing template patterns instead of discovering source's natural progression
 - ❌ Multi-sentence descriptions (violates conciseness standards)
 - ❌ Insufficient citations (need 5-15 authoritative sources)
+- ❌ **Incomplete activity coverage** (must include ALL activities identified, not just 1-2 examples)
 
 ### Phase 2 Pitfalls
+
 - ❌ Not reading semantics.md before mapping
 - ❌ Creating floating alphas (missing contributesTo)
+- ❌ **CRITICAL: contributesTo only references baseline** - Forgetting that contributesTo can reference practice-local alphas (internal hierarchy) or external practice alphas (cross-practice dependency)
+  - **Fix:** Consider all three contributesTo options: baseline, practice-local, external practice
+  - Use State Alignment Heuristic to find best parent across all three sources
+  - Document practice dependencies when using external practice references
+- ❌ **Not using baseline relatesTo for alpha analysis** - Ignoring existing semantic relationships when analyzing baseline alphas
+  - **Fix:** Read baseline alpha's `relatesTo` array to understand dependencies, production, governance patterns
+  - Use relationships to inform how the alpha fits in the practice's value stream
+  - Example: "Platform" is "governed by" Platform Governance → include governance activities in practice
+- ❌ **Adding relatesTo to redeclarations** - Enriching baseline alphas should NOT add new relationships
+  - **Fix:** Only define `relatesTo` on NEW alphas (specializations), not redeclarations
+  - Redeclarations inherit baseline relationships automatically
+- ❌ **Missing relatesTo on new alphas** - New specialized alphas lack semantic relationships to peer alphas
+  - **Fix:** Define domain-specific relationships using appropriate verbs from semantics.md Section 4.1
+  - Example: New alpha "Platform Capability" should relate to "Platform Asset" (produces), "Requirements" (validates), etc.
+- ❌ **Using vague relationship verbs** - Generic "relates to" instead of specific relationship types
+  - **Fix:** Use domain-appropriate verbs: "depends on", "produces", "guides", "validates", "enables", "constrains"
 - ❌ Using competency descriptions instead of exact baseline names
 - ❌ Using alias names in structural references (use canonical names)
 - ❌ Wrong alpha approach (should use redeclaration vs specialization framework)
 - ❌ Flat tags array instead of orthogonal structure
+- ❌ **CRITICAL: Writing prose paragraphs instead of structured narrative objects**
+- ❌ **Missing narrativeTypeName and narrativeContexts in narratives**
+- ❌ **Omitting alpha narratives (required for new alphas)**
+- ❌ **Omitting activity narratives (required for all activities)**
+- ❌ **CRITICAL: Degeneration in multi-practice methods** - Practice 1 gets full alpha/work product/activity coverage, but later practices only get activities (missing alphas and work products)
+  - **Fix:** Use multi-agent approach (Phase 2 and Phase 3)
+  - Each practice MUST have: metadata, alphas (if any), work products, activities, **patterns**
+  - Don't skip alpha/work product/pattern sections just because you're on Practice 3 or 4
+- ❌ **Missing patterns** - Practices have 2+ alphas but no pattern coordinating them
+  - **Fix:** Every multi-alpha practice MUST have at least one pattern
+  - Pattern should have 3-5 PatternViews showing how alphas progress together
+  - Use external lifecycle narratives (SDLC, PDCA, etc.) when appropriate
 
 ### Phase 3 Pitfalls
+
 - ❌ Not reading language.schema.json before generating
 - ❌ Checklist items as strings instead of objects
 - ❌ Wrong competency reference format ({competencyName, level} instead of {competencyName, competencyLevelName})
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities
+- ❌ **Missing `activitySpaceName` property on activities** (required for flat Practice.activities)
+- ❌ **Missing `kind` property** (required on Method, Practice, and all PracticeElements for type discrimination)
 - ❌ Wrong PatternView property names (`alphas` instead of `alphaStates`, `views` instead of `patternViews`)
 - ❌ Missing contributesTo on LODs
+- ❌ **Adding relatesTo to redeclarations** - JSON includes relatesTo on baseline alpha redeclarations
+  - **Fix:** Remove relatesTo from any alpha that is a redeclaration (same name as baseline alpha)
+  - Only include relatesTo on NEW alphas (those with contributesTo to baseline)
+- ❌ **Invalid alphaName in relatesTo** - Relationship references non-existent alpha
+  - **Fix:** Validate every relatesTo.alphaName against defined alphas in baseline and practice
+  - Use exact, case-sensitive alpha names
+- ❌ **Missing relatesTo on new alphas from mapping guide** - Mapping specifies relationships but JSON omits them
+  - **Fix:** Copy relatesTo array from mapping guide to JSON for all new alphas
 - ❌ Markdown or metadata in JSON strings
+- ❌ **Generating only 1-2 example activities** (must generate ALL activities from mapping guide)
+- ❌ **Empty patterns array** when mapping guide has patterns
+  - **Fix:** Verify patterns array populated with minimum 1 pattern per practice
+  - Each pattern must have 2+ PatternViews with alphaStates showing progression
+
+---
+
+## Cross-Practice Dependencies and Alpha Hierarchies
+
+### Internal Alpha Hierarchies (Practice-Local)
+
+Practices can create multi-level alpha specialization chains where new alphas contribute to other new alphas within the same practice:
+
+**Example:**
+
+```text
+Platform Service → Platform Capability → Platform (baseline)
+```
+
+**Requirements:**
+
+- Referenced alpha must be defined EARLIER in the mapping guide
+- Referenced alpha must have its own valid contributesTo chain
+- Creates hierarchical rollup: child states influence parent progression
+
+**Use When:**
+
+- Building domain-specific maturity models with multiple specialization levels
+- Source methodology has nested concern hierarchies
+- Need fine-grained tracking at multiple abstraction levels
+
+### External Practice Dependencies (Cross-Practice)
+
+Practices can reference alphas from other practices, creating explicit dependencies:
+
+**Example:**
+```json
+{
+  "name": "Platform Team Topology",
+  "contributesTo": "Team Interaction",  // from Team Topologies practice
+  "dependencies": [
+    {
+      "practiceName": "Team Topologies",
+      "reason": "Extends team interaction patterns for platform context"
+    }
+  ]
+}
+```
+
+**Requirements:**
+
+- **Phase 2:** Document dependency in practice metadata section of mapping guide
+- **Phase 3:** Add to JSON `dependencies` array with practiceName and reason
+- External practice must be available for validation (or validation must skip external references)
+- Reference must use exact, case-sensitive alpha name from external practice
+
+**Use When:**
+
+- Source methodology builds on concepts from another well-known practice
+- Avoiding duplication of alphas already defined elsewhere
+- Creating practice compositions (e.g., Platform Engineering practice depends on Team Topologies)
+
+**Validation Considerations:**
+
+1. **During Phase 2 Mapping:**
+   - Identify external practice references
+   - Read external practice JSON if available to verify alpha exists
+   - Document dependency rationale in mapping guide
+   - Use State Alignment Heuristic to validate semantic fit
+
+2. **During Phase 3 JSON Generation:**
+   - Populate dependencies array with all external practices referenced
+   - Ensure contributesTo references are exact matches (case-sensitive)
+   - Document in practice description or narrative that it extends another practice
+
+3. **During Validation:**
+   - If external practice JSON is available: validate alpha name exists
+   - If external practice JSON is NOT available: document assumption that reference will be resolved at runtime
+   - Check for circular dependencies (Practice A → Practice B → Practice A)
+
+**Multi-Practice Method Considerations:**
+
+When generating a method with multiple practices:
+
+- Practices within the method can reference each other's alphas
+- These are still "external" references requiring dependency declarations
+- Method assembly (Phase 3B) should validate cross-practice references across embedded practices
 
 ---
 
@@ -611,18 +982,132 @@ For successful translation, user receives:
 2. **`practices/<name>/02-mapping-guide.md`**
    - Complete mapping specification (~40-60K words)
    - Human-readable, ready for review
+   - Includes assets section identifying visual artifacts
 
 3. **`practices/<name>/<name>.json`**
    - Schema-compliant Practice or Method JSON
    - Validated against schema, baseline, internal integrity
    - Ready for consumption by Practice Language tools
+   - Includes `assets` array if visual artifacts identified
+
+4. **`practices/<name>/assets/`** (optional, if visual artifacts present)
+   - Diagrams, templates, charts extracted from source materials
+   - Organized by type: diagrams/, templates/, icons/
+   - Referenced by JSON via relative paths
+
+### Asset Bundling and Distribution
+
+**Practices with Visual Artifacts:**
+
+When Phase 2 identifies visual artifacts in source materials (diagrams, architecture visualizations, templates), the practice should be distributed as a bundle:
+
+**Bundle Structure:**
+
+```text
+practice-name.bundle/
+├── practice-name.json          # Main JSON with assets array
+├── assets/
+│   ├── diagrams/
+│   │   ├── pattern-lifecycle.svg
+│   │   ├── alpha-platform-states.png
+│   │   └── architecture-reference.svg
+│   ├── templates/
+│   │   └── architecture-doc-template.pdf
+│   └── icons/
+│       └── practice-icon.svg
+└── manifest.json               # Bundle metadata (optional)
+```
+
+**Manifest Format (Optional):**
+
+```json
+{
+  "practiceName": "Practice Name",
+  "version": "1.0.0",
+  "created": "2026-06-10",
+  "files": [
+    {"path": "practice-name.json", "checksum": "sha256:..."},
+    {"path": "assets/diagrams/pattern-lifecycle.svg", "checksum": "sha256:..."}
+  ]
+}
+```
+
+**Asset Workflow:**
+
+1. **Phase 2 (Mapping)**: Identify and document visual artifacts in mapping guide
+   - List asset name, description, proposed path, MIME type
+   - Note which elements should reference each asset
+
+2. **Phase 3 (JSON Generation)**: Populate `assets` array and `assetNames` properties
+   - Add assets array to practice/method JSON
+   - Link elements to assets via `assetNames` property
+   - Use placeholder checksums (`sha256:tbd`)
+
+3. **Post-Generation (Manual)**: Extract and organize asset files
+   - Create `assets/` directory structure
+   - Extract diagrams from source PDFs/docs
+   - Save to paths specified in JSON
+   - Compute real SHA-256 checksums
+   - Update JSON with actual checksums
+
+4. **Distribution**: Package as archive
+   - Zip or tar the practice directory
+   - Distribute as `.bundle.zip` or `.bundle.tar.gz`
+
+**Asset Extraction Tools:**
+
+Common tools for extracting assets from source materials:
+
+- **PDFs**: `pdfimages`, Adobe Acrobat export
+- **Web pages**: Browser "Save image as"
+- **Screenshots**: Manual capture, annotation tools
+- **Diagrams**: Export from source tools (draw.io, PlantUML, Visio)
+
+**Asset Format Recommendations:**
+
+- **Diagrams/Charts**: SVG (preferred - scalable, editable, text-based)
+- **Screenshots**: PNG (lossless compression)
+- **Photos**: JPEG (efficient for photos)
+- **Documents**: PDF
+- **Icons**: SVG (preferred for UI rendering)
+
+**Checksum Generation:**
+
+```bash
+# Compute SHA-256 for an asset
+sha256sum assets/diagrams/pattern-lifecycle.svg
+# Output: abc123... assets/diagrams/pattern-lifecycle.svg
+
+# Update JSON with sha256:abc123...
+```
+
+**Single-File Distribution (Alternative):**
+
+For practices requiring single-file portability, small assets (icons, simple diagrams) can be embedded using data URIs:
+
+```json
+{
+  "name": "practice-icon",
+  "path": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0i...",
+  "mimeType": "image/svg+xml",
+  "checksum": "sha256:abc123..."
+}
+```
+
+Recommended for assets <10KB; use external files for larger assets.
+
+### Using Delivered Artifacts
 
 Users can:
+
 - Review and edit phase outputs
 - Regenerate specific phases if source changes
 - Use analysis and mapping as methodology documentation
 - Use JSON in tooling that consumes Practice Language
 - Share JSON with teams and tools
+- Distribute as bundles (with assets) or standalone JSON (without assets)
+- Edit assets separately and update checksums
+- Host assets on CDN and use URLs in path field (future enhancement)
 
 ---
 

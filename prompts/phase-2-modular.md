@@ -359,7 +359,10 @@ Extract exact names (case-sensitive):
 
 ### Step 3: Create Practice Skeleton
 
-Read `01-practice-details.md`:
+**Source Files (check in order):**
+
+1. **Modular structure**: `report-elements/01-practice-details.md`
+2. **Legacy structure**: `01-analysis-report.md` or `02-mapping-guide.md`
 
 Extract:
 - Practice name, description
@@ -367,8 +370,53 @@ Extract:
 - Keywords
 - Tags (domainTags, lifecycleTags, organizationalTags)
 - Baseline practice name (always "Platform Adoption Essentials")
-- Practice dependencies (if any)
+- **Practice dependencies (if any)** - See extraction strategy below
 - Focuses addressed
+
+**Practice Dependencies Extraction:**
+
+Look for dependency information in:
+- **Module 01**: "Dependencies:" field in practice metadata
+- **Module 00**: Practice Structure Decision → Dependencies noted for each practice
+- **Mapping Guide**: "Practice Dependencies" section documenting prerequisite flow
+- **Analysis Report**: "Integration Patterns" or "Practice Structure" sections
+
+**Extraction Rules:**
+
+1. **Dependencies are practice NAMES (strings)**, not descriptions
+2. **Only include DIRECT dependencies** (prerequisites this practice requires)
+3. **For Methods with multiple practices**:
+   - Check "Practice Dependencies" or "Prerequisite Flow" sections
+   - Example from OpenShift: Platform Operations → Application Development means Application Development has dependency on "Platform Operations"
+   - Format: `"practiceDependencyNames": ["Platform Operations"]`
+
+4. **Common dependency patterns**:
+   - Platform/infrastructure practices often have NO dependencies (they're foundational)
+   - Application/workload practices typically depend on platform practices
+   - Security practices may depend on platform practices
+   - Observability practices may depend on platform practices
+
+5. **Validation**:
+   - Referenced practice names must match EXACT practice names in the method
+   - Circular dependencies are invalid (A depends on B, B depends on A)
+   - If no dependencies exist, use empty array: `"practiceDependencyNames": []`
+
+**Example Extraction from OpenShift Mapping Guide:**
+
+```markdown
+### Practice Dependencies
+
+**Prerequisite Flow**:
+1. Platform Operations must establish cluster infrastructure before other practices
+2. Application Development depends on Platform Operations providing stable infrastructure
+3. Observability can be implemented incrementally
+```
+
+**Extracted Dependencies:**
+- Platform Operations: `"practiceDependencyNames": []` (foundational, no prereqs)
+- Application Development: `"practiceDependencyNames": ["Platform Operations"]`
+- Security & Compliance: `"practiceDependencyNames": []` (can be implemented early)
+- Observability: `"practiceDependencyNames": []` (incremental, not strictly dependent)
 
 Create initial JSON structure:
 
@@ -984,15 +1032,88 @@ Generate PracticeElementAlias objects:
 
 ### Step 10: Extract Practice-Level Narratives
 
-Read `01-practice-details.md`:
+**CRITICAL:** Practices and Methods MUST have narratives. Empty narratives arrays indicate translation failure.
 
-From "Context and Background" section, extract narrative sections:
+**Source Files (check in order):**
 
-For each narrative:
+1. **Modular structure:** Read `report-elements/01-practice-details.md` → "Context and Background" section
+2. **Legacy structure:** Read `01-analysis-report.md` → Look for narrative sections under practice overview, executive summary, or embedded in element descriptions
+
+**Extraction Strategy:**
+
+**A. From Dedicated Narrative Sections:**
+
+Look for sections titled:
+- "Context and Background"
+- "Practice Overview"
+- "Method Overview"
+- "Executive Summary"
+- "Value Proposition"
+
+For each narrative found:
 - Extract title
-- Identify narrative type from structure
-- Parse prose into NarrativeContext objects
-- Extract citationNames if present
+- Identify narrative type (STAR, StoryBrand, Hero's Journey, Essay, etc.)
+- Parse prose into NarrativeContext objects (map paragraphs to narrative elements)
+- Extract citationNames if "Citations Referenced:" section present
+- **Required content**: Problem, Objectives, Outcomes
+
+**B. From Embedded Content (if no dedicated sections):**
+
+If no dedicated narrative sections exist, CREATE practice-level narrative from:
+
+1. **Extract Problem/Value Proposition:**
+   - Look for problem statements in executive summary
+   - Look for "Organizations struggle with..." or "challenges include..."
+   - Look for benefit/outcome descriptions
+
+2. **Create Narrative Using Essay or Report Type:**
+   
+   ```json
+   {
+     "name": "Practice Value and Objectives",
+     "description": "Overview of practice value proposition and outcomes",
+     "narrativeTypeName": "Essay Narrative",
+     "narrativeContexts": [
+       {
+         "seq": 1,
+         "narrativeElementName": "Introduction",
+         "context": "[Extract problem statement and practice purpose]"
+       },
+       {
+         "seq": 2,
+         "narrativeElementName": "Defining Key Concepts",
+         "context": "[Extract core concepts and approach]"
+       },
+       {
+         "seq": 3,
+         "narrativeElementName": "Presenting Evidence",
+         "context": "[Extract capabilities enabled, outcomes achieved]"
+       },
+       {
+         "seq": 4,
+         "narrativeElementName": "Conclusion",
+         "context": "[Extract success criteria and measurable outcomes]"
+       }
+     ],
+     "citationNames": ["[Primary methodology citation]"]
+   }
+   ```
+
+**C. Minimum Requirement:**
+
+Every Practice and Method MUST have AT LEAST ONE narrative that articulates:
+- **Problem**: What challenge does this address?
+- **Objectives**: What does it aim to achieve?
+- **Outcomes**: What transformation/results occur?
+
+If no narrative content exists in source files, the translation is INCOMPLETE and must be flagged.
+
+**Validation:**
+- [ ] At least one narrative exists
+- [ ] Narrative addresses problem/objectives/outcomes
+- [ ] NarrativeContexts array is not empty
+- [ ] Each context has seq, narrativeElementName, context fields
+- [ ] CitationNames reference valid citations (if present)
 
 Add to practice-level narratives array.
 
@@ -1068,11 +1189,72 @@ Store in memory as part of Method's practices array.
 
 ### Step 4: Generate Method-Level Elements
 
-Read `08-method-assembly.md`:
+**CRITICAL:** Methods MUST have narratives. Empty narratives arrays indicate translation failure.
 
-Extract:
-- Method-level narratives (if any)
+Read `08-method-assembly.md` or `01-analysis-report.md`:
+
+**A. Extract Method-Level Narratives:**
+
+Look for sections titled:
+- "Method Overview"
+- "Method Context and Background"
+- "Executive Summary"
+- "Integration and Approach"
+
+For each narrative found:
+- Extract title
+- Identify narrative type
+- Parse prose into NarrativeContext objects
+- Extract citationNames if present
+- **Required content**: Comprehensive problem, Integration rationale, Holistic outcomes
+
+**B. If No Dedicated Narrative Sections:**
+
+CREATE method-level narrative from method overview content:
+
+```json
+{
+  "name": "Method Value and Integration",
+  "description": "Overview of method value proposition and practice integration",
+  "narrativeTypeName": "Essay Narrative",
+  "narrativeContexts": [
+    {
+      "seq": 1,
+      "narrativeElementName": "Introduction",
+      "context": "[Extract comprehensive problem requiring multiple practices]"
+    },
+    {
+      "seq": 2,
+      "narrativeElementName": "Defining Key Concepts",
+      "context": "[Extract how practices integrate and complement each other]"
+    },
+    {
+      "seq": 3,
+      "narrativeElementName": "Presenting Evidence",
+      "context": "[Extract holistic outcomes when method is adopted]"
+    },
+    {
+      "seq": 4,
+      "narrativeElementName": "Conclusion",
+      "context": "[Extract success criteria across all practices]"
+    }
+  ],
+  "citationNames": ["[Primary methodology citations]"]
+}
+```
+
+**C. Minimum Requirement:**
+
+Every Method MUST have AT LEAST ONE narrative that articulates:
+- **Comprehensive Problem**: What complex challenge requires multiple practices?
+- **Integration Rationale**: Why are multiple practices necessary? How do they work together?
+- **Holistic Outcomes**: What complete transformation occurs?
+
+**D. Extract Method-Level Citations:**
+
 - Method-level citations (if any beyond what's in practices)
+- Can aggregate all practice citations OR maintain method-specific citations
+- Schema allows both approaches
 
 ### Step 5: Assemble Method JSON
 
@@ -1291,6 +1473,9 @@ JSON output:
 ### Completeness
 
 - [ ] No empty required arrays
+- [ ] **CRITICAL:** Practice/Method narratives array is NOT EMPTY (must have at least one narrative)
+- [ ] **CRITICAL:** Each narrative has at least one NarrativeContext (empty narrativeContexts = incomplete)
+- [ ] Practice-level narrative articulates problem/objectives/outcomes
 - [ ] All narrativeContexts arrays complete for the narrative type
 - [ ] Every PersonaGroup referenced in Activity.involves is defined
 - [ ] Every Persona in PersonaGroup.personaNames is defined

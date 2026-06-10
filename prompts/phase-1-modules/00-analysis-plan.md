@@ -229,7 +229,21 @@ Write your analysis following this exact structure:
 
 ## Executive Summary
 
-**[2-3 paragraphs summarizing the methodology, its scope, and the translation approach]**
+**CRITICAL:** The executive summary must clearly articulate the methodology's VALUE PROPOSITION, OBJECTIVES, and OUTCOMES. This establishes the foundation for all subsequent modules.
+
+**[Write 2-3 paragraphs covering:]**
+
+**First Paragraph (VALUE PROPOSITION - MANDATORY):**
+
+What problem does this methodology solve? What challenge or need does it address? What capability or transformation does it enable? Be specific about the value delivered.
+
+**Second Paragraph (SCOPE AND APPROACH):**
+
+What is the scope of this methodology? What does it cover? Is this a single cohesive practice or a method with multiple practices? What is the overall translation approach (redeclaration, specialization, instances)?
+
+**Third Paragraph (KEY OUTCOMES):**
+
+What are the key outcomes when this methodology is successfully adopted? What will be different? How is success measured (which alpha states, work product maturity levels indicate achievement)?
 
 ## Four-Perspective Analysis
 
@@ -277,18 +291,42 @@ Write your analysis following this exact structure:
 
 **Type:** Single Practice | Method
 
+**Value Articulation (MANDATORY for ALL practices/methods):**
+
+[For each practice or the overall method, clearly state:]
+
+**Problem:** [What specific problem does this practice/method solve? What challenge or need does it address?]
+
+**Capability Enabled:** [What capability or transformation does it enable? What becomes possible?]
+
+**Success Criteria:** [How is success measured? Which key alpha states or work product maturity levels indicate the objective has been achieved?]
+
+[If Single Practice:]
+
+**Practice: [Name]**
+- **Value Proposition:** [Problem → Solution → Outcome in 2-3 sentences]
+- **Primary Perspectives:** [Business/Technology/People/Process]
+- **Success Indicators:** [Key alpha states and work product LODs that demonstrate achievement]
+
 [If Method:]
+
+**Method-Level Value Proposition:**
+[What comprehensive problem requires multiple integrated practices? What holistic outcome does the method deliver?]
 
 **Practice 1: [Name]**
 - **Scope:** [What it covers]
+- **Value Proposition:** [Problem this practice specifically solves → Outcome delivered]
 - **Primary Perspectives:** [Business/Technology/People/Process]
 - **Use Case:** [When to use this practice]
+- **Success Indicators:** [Key alpha states and work product LODs]
 
 **Practice 2: [Name]**
 - **Scope:** [What it covers]
+- **Value Proposition:** [Problem this practice specifically solves → Outcome delivered]
 - **Primary Perspectives:** [Business/Technology/People/Process]
 - **Use Case:** [When to use this practice]
 - **Dependencies:** [Which practices it depends on]
+- **Success Indicators:** [Key alpha states and work product LODs]
 
 [Repeat for each practice]
 
@@ -346,6 +384,16 @@ Every new alpha MUST have a `contributesTo` relationship pointing to a baseline 
 
 ## Activity Derivation Plan
 
+**Activity Identification Strategy:**
+
+Activities should be derived from:
+
+1. **Explicit activities in source material:** Work described directly by the methodology
+2. **New (specialized) alpha states:** For each new alpha defined above, consider what activities the source suggests are needed to progress through each state
+3. **Redeclared alpha states:** For redeclared alphas, only add NEW activities if source material clearly and explicitly implies them for state progression
+
+**CRITICAL:** Module 05 will derive additional activities by analyzing new alpha states. The activities listed below are the primary/obvious activities; Module 05 will supplement with state-progression activities.
+
 ### Value Focus Activities
 
 **Activity: [Name]**
@@ -366,14 +414,25 @@ Every new alpha MUST have a `contributesTo` relationship pointing to a baseline 
 
 ## Pattern Plan
 
+**CRITICAL:** Each practice should have a clear **value-based objective or outcome**. Patterns articulate the journey from current state to that desired outcome. Infer and describe what value the practice delivers and how it gets there.
+
 **Pattern: [Name]**
+- **Value Objective:** [What outcome/transformation does this practice achieve? What problem does it solve or capability does it enable?]
 - **Type:** Lifecycle | Problem-Solution | Feature Delivery | Other
-- **Narrative Framework:** [NarrativeType if applicable]
+- **Narrative Framework:** [NarrativeType if applicable - recommend StoryBrand for value articulation]
 - **Phases:** [Number of phases/views]
-- **Tracked Alphas:** [Which alphas progress through pattern]
+- **Tracked Alphas:** [Which alphas progress through pattern - focus on those critical to the value objective]
 - **Tracked Instances:** [Which alpha/workproduct instances are tracked]
+- **Success Criteria:** [How do you know the value objective has been achieved? Which alpha states or work product levels indicate success?]
 
 [Repeat for each pattern - typically 1-3 patterns]
+
+**Pattern Planning Guidance:**
+
+- **Value-First:** Start with "What problem does this practice solve?" or "What capability does it enable?"
+- **Outcome-Focused:** Define the end state - what's different when this practice is successfully adopted?
+- **Journey-Oriented:** Pattern views show progression toward the value objective
+- **Evidence-Based:** Success is measured by specific alpha states and work product maturity levels
 
 ## Cross-Reference Index Plan
 

@@ -99,6 +99,8 @@ You have access to the following resources via the Read tool:
 }
 ```
 
+**NOTE:** The schema uses structural discrimination (presence of `practices` array) to identify Methods vs Practices, not an explicit "kind" property.
+
 #### 3.2 Citations
 
 Add citations array (for both Practice and Method):
@@ -117,7 +119,58 @@ Add citations array (for both Practice and Method):
 
 **CRITICAL:** Citations have NO narratives property
 
-#### 3.3 Narratives (Practice/Method Level)
+#### 3.3 Assets (Optional)
+
+If the mapping guide identifies visual artifacts (diagrams, templates, charts), add assets array:
+
+```json
+"assets": [
+  {
+    "name": "asset-identifier",
+    "description": "1-2 sentences describing what this depicts",
+    "path": "assets/diagrams/filename.svg",
+    "mimeType": "image/svg+xml",
+    "checksum": "sha256:abc123..."
+  }
+]
+```
+
+**Asset Properties:**
+
+- **name**: Unique identifier (kebab-case, used in assetNames references)
+- **description**: Human-readable explanation (serves as alt text)
+- **path**: Relative path within practice bundle (e.g., `assets/diagrams/pattern-lifecycle.svg`)
+- **mimeType**: MIME type (`image/svg+xml`, `image/png`, `image/jpeg`, `application/pdf`)
+- **checksum**: SHA-256 checksum for integrity validation (use placeholder `sha256:tbd` during generation)
+
+**Common Asset Patterns:**
+
+- Pattern diagrams: `assets/diagrams/pattern-[name].svg`
+- Alpha state diagrams: `assets/diagrams/alpha-[name]-states.svg`
+- Work product templates: `assets/templates/[workproduct-name]-template.[ext]`
+- Activity flowcharts: `assets/diagrams/activity-[name]-flow.svg`
+- Architecture diagrams: `assets/diagrams/architecture-[description].svg`
+- Practice icons: `assets/icons/practice-icon.svg`
+
+**Note:**
+
+- Asset files themselves are NOT embedded in JSON (external files)
+- Checksums can be placeholder values during JSON generation (`sha256:tbd`)
+- Bundle assembly step will add actual asset files and compute real checksums
+
+**Linking Assets to Elements:**
+
+Individual elements reference assets via optional `assetNames` property (added in subsequent steps):
+
+```json
+{
+  "name": "Platform",
+  "description": "...",
+  "assetNames": ["platform-architecture-diagram", "deployment-topology"]
+}
+```
+
+#### 3.4 Narratives (Practice/Method Level)
 
 Add practice-level or method-level narratives:
 ```json
@@ -153,7 +206,16 @@ Add alphas array:
     "description": "Single sentence",
     "focusName": "Value | Solution | Endeavor",
     "contributesTo": "baseline-alpha-name",  // REQUIRED for new alphas
-    "supportingAlphas": [],  // Optional
+    "relatesTo": [  // ONLY for new alphas (NOT redeclarations)
+      {
+        "relationship": "produces",
+        "alphaName": "Platform Asset"
+      },
+      {
+        "relationship": "depends on",
+        "alphaName": "Requirements"
+      }
+    ],
     "tags": {
       "domainTags": [...],
       "lifecycleTags": [...],
@@ -195,9 +257,28 @@ Add alphas array:
 ```
 
 **CRITICAL:**
+
 - New alphas MUST have `contributesTo` (NO FLOATING ALPHAS)
+- **relatesTo ONLY on new alphas**: Do NOT add relatesTo to baseline alpha redeclarations
+  - Redeclarations inherit baseline relationships automatically
+  - Only new alphas (with contributesTo) should define relatesTo
+  - Copy relatesTo array exactly from mapping guide for new alphas
+  - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
 - Checklist items are objects {name, description, seq}, NOT strings
 - evidencedBy is optional array of WorkProductContribution
+
+**Asset Linking:**
+
+- If mapping guide identifies diagrams for this alpha (e.g., state transition diagrams, architecture diagrams), add `assetNames` property:
+
+  ```json
+  {
+    "name": "Platform",
+    "assetNames": ["platform-architecture-diagram", "platform-states-diagram"]
+  }
+  ```
+
+- Asset names must match entries in the practice-level `assets` array
 
 #### 3.5 Alpha Instances
 
@@ -251,9 +332,23 @@ Add workProducts array:
 ```
 
 **CRITICAL:**
+
 - LOD names have NO "Level X:" prefix
 - checklist items are objects, NOT strings
 - contributesTo is REQUIRED on every LOD
+
+**Asset Linking:**
+
+- If mapping guide identifies templates or examples for this work product, add `assetNames`:
+
+  ```json
+  {
+    "name": "Architecture",
+    "assetNames": ["architecture-template", "architecture-example"]
+  }
+  ```
+
+- Can also link at LOD level if different assets for different maturity levels
 
 #### 3.7 Work Product Instances
 
@@ -361,10 +456,22 @@ Add activities array:
 ```
 
 **CRITICAL:**
+
 - Activity name MUST differ from activitySpaceName
 - BOTH requiredCompetencies (strings) AND recommendedCompetencyLevels (objects) are required
 - Use exact baseline competency names
 - involves references PersonaGroup names
+
+**Asset Linking:**
+
+- If mapping guide identifies flowcharts or diagrams for this activity, add `assetNames`:
+
+  ```json
+  {
+    "name": "Design Platform Architecture",
+    "assetNames": ["architecture-design-flowchart", "reference-architecture-diagram"]
+  }
+  ```
 
 #### 3.11 Patterns
 
@@ -423,11 +530,23 @@ Add patterns array:
 ```
 
 **CRITICAL:**
+
 - Use `patternViews` NOT `views`
 - Use `alphaStates` NOT `alphas`
 - PatternView.seq is REQUIRED
 - NO `workProducts` property on PatternView (not in schema)
 - activities are string names, not objects
+
+**Asset Linking:**
+
+- If mapping guide identifies workflow diagrams or lifecycle visualizations for this pattern, add `assetNames`:
+
+  ```json
+  {
+    "name": "Platform Adoption Lifecycle",
+    "assetNames": ["platform-adoption-workflow-diagram", "maturity-progression-chart"]
+  }
+  ```
 
 #### 3.12 Practice Element Aliases
 
@@ -471,6 +590,38 @@ If generating Method JSON:
   "narratives": [...]  // Method-level narratives
 }
 ```
+
+#### 3.14 Verify Complete Structure
+
+Before proceeding to validation, verify ALL sections from 3.1-3.13 are complete:
+
+**Required Arrays Checklist (For Practice JSON):**
+
+- [ ] 3.1: Practice skeleton (metadata, tags, keywords)
+- [ ] 3.2: citations array populated
+- [ ] 3.3: narratives array (practice-level)
+- [ ] 3.4: alphas array populated
+- [ ] 3.5: alphaInstances array (if applicable)
+- [ ] 3.6: workProducts array populated
+- [ ] 3.7: workProductInstances array (if applicable)
+- [ ] 3.8: personas array populated
+- [ ] 3.9: **personaGroups array populated** ← Often missed!
+- [ ] 3.10: activities array populated
+- [ ] 3.11: patterns array populated (REQUIRED: minimum 1 pattern per practice)
+- [ ] 3.12: practiceElementAliases array (if applicable)
+
+**For Method JSON, verify EACH practice has:**
+
+- [ ] All arrays from 3.4-3.12 above
+- [ ] Method-level: citations, narratives (3.2-3.3)
+- [ ] Method-level: practices array with complete Practice objects
+
+**CRITICAL:** Do NOT skip sections even if they seem minor. Empty arrays `[]` are valid if Phase 2 has no content, EXCEPT:
+
+- **patterns array MUST have minimum 1 pattern** for multi-alpha practices
+- Verify each practice has at least one pattern with 2+ pattern views
+
+If any section is incomplete, return to that step and complete it before validation.
 
 ### Step 4: Validate JSON Syntax
 
@@ -545,8 +696,10 @@ After applying fixes:
 ### Step 9: Final Quality Check
 
 Once validation passes, verify:
+
 - [ ] All Phase 2 mappings translated to JSON
-- [ ] No content omissions
+- [ ] Verify ALL arrays present: citations, narratives, alphas, alphaInstances, workProducts, workProductInstances, personas, **personaGroups**, activities, patterns, practiceElementAliases
+- [ ] No content omissions from Phase 2 mapping guide
 - [ ] All narratives present (alpha, activity, practice/method level)
 - [ ] All checklists present (alpha states, work product LODs)
 - [ ] All citations referenced in citationNames exist

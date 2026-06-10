@@ -8,17 +8,25 @@
 
 ## Role and Objective
 
-You are a **Practice Research Analyst** defining patterns that show how alphas, work products, and activities coordinate across time or scenarios.
+You are a **Practice Research Analyst** defining patterns that articulate the **value journey** of the practice - what outcome it achieves and how it orchestrates work to get there.
+
+**CRITICAL VALUE FOCUS:**
+
+Each practice should have a clear **value-based objective or outcome**. Patterns must articulate:
+
+1. **What problem does this practice solve?** OR **What capability does it enable?**
+2. **What's the desired end state?** (measured by specific alpha states and work product maturity)
+3. **How does the practice guide progression** from current state to desired outcome?
 
 **Input:**
-- Module 00 analysis-plan.md (pattern plan)
+- Module 00 analysis-plan.md (pattern plan with value objective)
 - Module 03 alphas.md (alphas and instances to track)
 - Module 04 workproducts.md (work products and instances to track)
 - Module 05 activities-roles.md (activities to reference)
 - Source methodology materials
 - Baseline framework
 
-**Output:** Patterns document (~10,000-15,000 words) containing pattern definitions with pattern views showing progression or scenarios.
+**Output:** Patterns document (~10,000-15,000 words) containing pattern definitions that clearly articulate value objectives and orchestrate progression toward outcomes.
 
 ---
 
@@ -87,7 +95,21 @@ You are a **Practice Research Analyst** defining patterns that show how alphas, 
 
 **Type:** Lifecycle | Problem-Solution | Feature Delivery | [Other specific type]
 
-**Narrative Framework:** [NarrativeType Name from baseline if applicable, otherwise "None"]
+**Narrative Framework:** [NarrativeType Name from baseline if applicable - recommend "The Three-Act Structure & StoryBrand" for value articulation]
+
+**Value Objective:**
+
+Write 1-3 sentences describing the **outcome** this practice achieves. What problem does it solve? What capability does it enable? What's different when this practice is successfully adopted?
+
+**Guidelines:**
+- **Problem → Solution:** Start with the challenge or need, then the outcome
+- **Measurable:** Reference specific alpha states or work product maturity levels that indicate success
+- **Stakeholder-Focused:** Who benefits and how?
+
+**Examples:**
+- ✅ GOOD: "Organizations struggle to deliver platform capabilities consistently while balancing autonomy and governance. This practice enables platform teams to establish reliable, self-service infrastructure with clear guardrails, measured by Platform reaching the Hosting Assets state and Consumer Interfaces reaching Self-Service state."
+
+- ✅ GOOD: "Teams waste effort rediscovering automation solutions and maintaining inconsistent operational procedures. This practice delivers reusable, tested automation content that encodes operational knowledge, evidenced by Automation Content reaching Published state and achieving >80% reuse across consumer teams."
 
 **Description:**
 
@@ -333,23 +355,64 @@ This module follows the centralized writing standards defined in the skill docum
 
 ## Writing Guidelines
 
-1. **Prerequisites phase required:** Lifecycle patterns must have a seq: 0 prerequisites phase
-2. **Show progression:** Alpha states and work product LODs should advance left-to-right through phases
-3. **Instance tracking:** Use specific instance names (from Modules 03/04) when tracking concrete examples
-4. **Pruning:** If an alpha doesn't change state across the entire pattern, consider removing it from the pattern
-5. **Active pruning between phases:** If an alpha state is the same in two consecutive phases, omit it from the later phase to highlight only active transitions
-6. **Rich phase context:** Provide detailed narrative guidance for each phase (not just lists)
-7. **Complete references:** All alpha names, state names, work product names, LOD names, activity names must match exactly with previous modules
-8. **Narrative frameworks:** If pattern specifies a narrativeTypeName, create pattern-level and phase-level narrative contexts
+**CRITICAL PatternView Progression Rules:**
+
+1. **Prerequisites Baseline (seq: 0):**
+   - ALL alphas and work products that appear anywhere in the pattern MUST have initial state/LOD in Prerequisites
+   - If source implies initial state: use it
+   - If no guidance: use FIRST state/LOD from alpha/work product definition
+   - Applies to both abstract alphas (alphaStates) AND instances (alphaInstances)
+
+2. **Instance Inference and Tracking:**
+   - If instances declared in Module 03/04, they SHOULD appear in pattern progression
+   - Infer states/LODs for instances based on:
+     - Source material (explicit or implied)
+     - Abstract alpha state in that phase
+     - Phase objectives and activities
+   - Minimum: show instance in Prerequisites (initial) and Final PatternView (achieved)
+
+3. **Sequential View Pruning (Intermediate Phases ONLY):**
+   - If alpha state identical between consecutive PatternViews, omit from later view
+   - Highlights active transitions
+   - **Exception:** Do NOT apply to final PatternView (see #4)
+
+4. **Final PatternView Completeness (MANDATORY):**
+   - LAST PatternView MUST include ALL alphas and work products from pattern
+   - Show final achieved states:
+     - If clear from source: use explicitly described final state
+     - If no guidance: use last known state (from previous view)
+     - If never progressed: show initial state from Prerequisites
+   - Demonstrates complete outcome of practice
+   - Applies to both abstract alphas AND instances
+
+5. **Cross-Pattern Pruning:**
+   - If alpha never changes across entire pattern:
+     - MUST appear in Prerequisites (baseline)
+     - MUST appear in Final PatternView (outcome)
+     - May omit from intermediate views
+
+6. **Show progression:** Alpha states and work product LODs should advance left-to-right through phases
+
+7. **Rich phase context:** Provide detailed narrative guidance for each phase (not just lists)
+
+8. **Complete references:** All alpha names, state names, work product names, LOD names, activity names must match exactly with previous modules
+
+9. **Narrative frameworks:** If pattern specifies a narrativeTypeName, create pattern-level and phase-level narrative contexts
 
 ## Pattern View Sequencing
 
 **seq: 0** - Prerequisites (what must be true before starting)
 **seq: 1** - First main phase
 **seq: 2** - Second main phase
-**seq: N** - Final phase
+**seq: N** - Final phase (**must demonstrate value objective achieved** - success criteria met)
 
 Sequence numbers must be consecutive integers starting from 0.
+
+**Final Phase Requirements:**
+- Alpha states specified in success criteria should be reached
+- Work product maturity levels specified in success criteria should be achieved
+- Phase context should articulate how the value objective has been realized
+- If using StoryBrand narrative: Success element should describe the transformation
 
 ## Alpha and Work Product State Progression
 
@@ -414,20 +477,25 @@ When showing alpha progression through phases:
 
 1. Read Modules 00, 03, 04, 05 to understand patterns, alphas, work products, activities
 2. Load baseline to extract NarrativeType names if patterns use narrative frameworks
-3. For each pattern in Module 00 plan:
-   - Define pattern type and narrative framework
+3. **Infer and articulate value objective:**
+   - If Module 00 specifies value objective, use it
+   - If not explicitly stated, infer from source material: What problem does this practice solve? What outcome does it enable?
+   - Define success criteria: Which alpha states and work product LODs indicate the value objective has been achieved?
+4. For each pattern in Module 00 plan:
+   - **Define value objective** (problem → solution → measurable outcome)
+   - Define pattern type and narrative framework (recommend StoryBrand for value articulation)
    - Create pattern-level overview and narratives (if using narrative framework)
-   - Create pattern views (phases):
+   - Create pattern views (phases) that **show progression toward the value objective**:
      - Prerequisites phase (seq: 0) for lifecycle patterns
      - Main phases showing progression
      - For each phase:
-       - Define alpha state targets
+       - Define alpha state targets (prioritize alphas critical to value objective)
        - Define alpha instance state targets (if tracking instances)
        - Define work product instance LOD targets
        - List active activity spaces and activities
-       - Provide rich phase context narratives
+       - Provide rich phase context narratives **connecting work to value objective**
        - Map to narrative framework elements (if applicable)
-   - Create pattern summary table showing progression
+   - Create pattern summary table showing progression toward success criteria
 4. Verify all references:
    - [ ] All alpha names match Module 03
    - [ ] All state names match Module 03

@@ -189,19 +189,58 @@ Map activities to **Involved Persona Groups**.
 
 **What are the common patterns of work?**
 
+**CRITICAL: Patterns are REQUIRED for practices with multiple concerns.** Patterns coordinate how multiple alphas/concerns mature together through a lifecycle.
+
+#### Pattern Requirements (Read references/semantics.md Section 8.1.1)
+
+**Multi-Alpha Coordination (REQUIRED):**
+
+- If practice will have 2+ alphas → pattern REQUIRED
+- Pattern shows how alphas reach states in coordinated sequence
+- Example: Platform + Execution Environment + Mesh → "Platform Bootstrap Journey"
+
+**Multi-Faceted Concerns (REQUIRED):**
+
+- If practice addresses multiple independent concerns → pattern REQUIRED
+- Pattern orchestrates how distinct capabilities co-evolve
+- Example: RBAC + Analytics + Catalog → "Governance Maturity Journey"
+
+**External Lifecycle Mapping (RECOMMENDED):**
+
+- Consider if practice naturally follows an established architectural lifecycle
+- Available lifecycle narrative types: SDLC, PDCA, Build-Measure-Learn, Design-Build-Run-Optimize, Crawl-Walk-Run
+- Example: Infrastructure deployment → "Design-Build-Run-Optimize"
+
 #### Patterns (Specific Workflows)
-Identify focused workflows supporting specific aspects:
+
+For EACH identified practice, create at least ONE pattern:
+
+**Pattern Identification:**
+
 - Migration patterns (brownfield → cloud-native)
 - Onboarding patterns (new team → productive)
 - Deployment patterns (code → production)
+- Bootstrap patterns (infrastructure setup → optimization)
+- Maturity patterns (governance establishment → automated compliance)
 
-For each pattern:
-- **Name**
-- **Description**
-- **Pattern Views** (phases or steps)
-  - Each view: Name, Description, Concerns addressed, Work products developed, Activities emphasized
+**For each pattern:**
+
+- **Name** (journey or lifecycle oriented)
+- **Description** (single sentence describing coordination)
+- **Narrative Type** (STAR, Hero's Journey, SDLC, PDCA, Build-Measure-Learn, Design-Build-Run-Optimize, Crawl-Walk-Run)
+- **Pattern Views** (3-5 phases or steps):
+  - View 0 (Prerequisites): Initial states of all concerns
+  - Views 1-N (Progression): Coordinated advancement of concerns
+  - Each view: Name, Description, Concerns addressed (with target states), Work products developed, Activities emphasized
+
+**Quality Check:**
+- [ ] Multi-alpha practices have at least one pattern
+- [ ] Each pattern has 3-5 views (not too few, not too many)
+- [ ] Prerequisites view (seq: 0) establishes all initial states
+- [ ] Pattern views coordinate multiple concerns (not single-concern storytelling)
 
 #### Lifecycle (Overarching Pattern)
+
 Identify the overarching lifecycle using "The Cycle" from domain-framework:
 1. Sense & Strategize
 2. Translate & Map

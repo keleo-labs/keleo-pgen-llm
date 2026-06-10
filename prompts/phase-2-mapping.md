@@ -109,6 +109,84 @@ For each citation from Phase 1:
 
 **CRITICAL:** Citations have NO narratives property (metadata only)
 
+### Step 3.5: Identify Visual Assets
+
+For each visual artifact in Phase 1 source materials (diagrams, charts, architecture visualizations, templates):
+
+**Asset Identification:**
+```
+Asset Name: [unique identifier, kebab-case]
+Description: [1-2 sentences: what does this depict?]
+Proposed Path: assets/[category]/[filename].[ext]
+  Categories: diagrams, templates, icons, charts
+MIME Type: [image/svg+xml | image/png | image/jpeg | application/pdf]
+Referenced By: [element type and name that should link to this asset]
+  Examples: 
+  - Pattern "Platform Adoption Lifecycle" (workflow diagram)
+  - Alpha "Platform" (state transition diagram)
+  - WorkProduct "Architecture" at level "Comprehensive" (template)
+  - Activity "Design Platform Architecture" (reference architecture)
+```
+
+**Common Asset Types:**
+
+1. **Pattern Diagrams**: Workflow visualizations showing alpha progression
+   - Path pattern: `assets/diagrams/pattern-[pattern-name].svg`
+   - Referenced by: Pattern elements via assetNames
+
+2. **Alpha State Diagrams**: State machine visualizations
+   - Path pattern: `assets/diagrams/alpha-[alpha-name]-states.svg`
+   - Referenced by: Alpha elements via assetNames
+
+3. **Work Product Templates**: Example documents, forms, spreadsheets
+   - Path pattern: `assets/templates/[workproduct-name]-template.[ext]`
+   - Referenced by: WorkProduct or LevelOfDetail elements via assetNames
+
+4. **Activity Flowcharts**: Process flows for complex activities
+   - Path pattern: `assets/diagrams/activity-[activity-name]-flow.svg`
+   - Referenced by: Activity elements via assetNames
+
+5. **Architecture Diagrams**: Reference architectures
+   - Path pattern: `assets/diagrams/architecture-[description].svg`
+   - Referenced by: Alpha, WorkProduct, or Pattern elements via assetNames
+
+6. **Practice Icons**: Visual identity for practices
+   - Path pattern: `assets/icons/practice-icon.svg`
+   - Referenced by: Practice metadata via assetNames
+
+**Asset Extraction from Source Materials:**
+
+- Scan PDFs, web pages, documentation for diagrams and charts
+- Note figure numbers and captions from source
+- Preserve original filenames when possible
+- Identify which practice elements each asset illustrates
+- Prefer SVG format for diagrams (scalable, editable, git-friendly)
+- Document asset sources (if diagrams use specific tools like draw.io, PlantUML)
+
+**Output Format in Mapping Guide:**
+
+Create "Assets" section listing all identified visual artifacts:
+
+```markdown
+## Assets
+
+### Asset: platform-adoption-lifecycle-diagram
+- Description: Visual workflow showing Platform alpha progression through adoption phases
+- Proposed Path: assets/diagrams/pattern-platform-adoption-lifecycle.svg
+- MIME Type: image/svg+xml
+- Referenced By: Pattern "Platform Adoption Lifecycle"
+- Source: Figure 3 in methodology documentation, page 15
+
+### Asset: architecture-template
+- Description: Example architecture document template with standard sections
+- Proposed Path: assets/templates/architecture-document-template.pdf
+- MIME Type: application/pdf
+- Referenced By: WorkProduct "Architecture" at level "Comprehensive"
+- Source: Appendix B of methodology guide
+```
+
+**Note:** Actual asset files will be created/extracted during practice bundle assembly. Phase 2 mapping identifies and documents what assets should be included.
+
 ### Step 4: Map Concerns to Alphas
 
 For EACH concern from Phase 1, apply the **Redeclaration vs Specialization Decision Framework** (semantics.md Section 9.2.5):
@@ -176,7 +254,7 @@ Narrative: [NEW practice-specific context]
 Alpha Name: [NEW descriptive name from Phase 1 concern]
 Description: [From Phase 1 concern description]
 Focus Name: [Value | Solution | Endeavor based on perspective]
-contributesTo: [baseline alpha name this extends - REQUIRED!]
+contributesTo: [parent alpha name this extends - REQUIRED!]
 States: [NEW states from Phase 1 progressive states]
   State 1:
     Name: [from Phase 1]
@@ -186,24 +264,81 @@ States: [NEW states from Phase 1 progressive states]
 Narrative: [from Phase 1 narrative]
 ```
 
-**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` pointing to a baseline alpha (NO FLOATING ALPHAS)
+**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` pointing to a valid parent alpha (NO FLOATING ALPHAS)
+
+**Valid contributesTo Targets:**
+
+1. **Baseline Practice Alpha** (most common):
+   - Reference: Alpha name from the baseline practice JSON
+   - Example: `"contributesTo": "Platform"` (where Platform is in baseline)
+   - Use when: Specializing a universally applicable baseline concept
+
+2. **Practice-Local Alpha** (internal hierarchy):
+   - Reference: Another new alpha defined earlier in THIS practice
+   - Example: Alpha "Platform Service" → `"contributesTo": "Platform Capability"` (where Platform Capability is another new alpha in this practice)
+   - Use when: Building multi-level specialization (Alpha C → Alpha B → Alpha A → Baseline)
+   - **REQUIREMENT**: The referenced alpha must be defined EARLIER in the mapping guide and must itself have valid contributesTo
+
+3. **External Practice Alpha** (cross-practice dependency):
+   - Reference: Alpha from another practice (e.g., Team Topologies, AWS Well-Architected)
+   - Example: `"contributesTo": "Team Interaction"` (where Team Interaction is from the Team Topologies practice)
+   - Use when: This practice depends on concepts from another practice
+   - **REQUIREMENT**: Add practice dependency to metadata (see below)
+
+**When Using External Practice References:**
+
+If any alpha uses contributesTo referencing an external practice, you MUST:
+
+1. **Document the dependency** in practice metadata:
+
+   ```text
+   Practice Dependencies:
+   - Practice Name: Team Topologies
+     Reason: Extends team interaction patterns for platform engineering context
+     Referenced Alphas: [Team Interaction, Team Type]
+   ```
+
+2. **Validate the reference** exists in the external practice:
+   - Read the external practice JSON if available
+   - Verify the alpha name matches exactly (case-sensitive)
+   - Document the reference in the mapping guide
+
+3. **Add to JSON dependencies array** (Phase 3):
+
+   ```json
+   "dependencies": [
+     {
+       "practiceName": "Team Topologies",
+       "reason": "Extends team interaction patterns"
+     }
+   ]
+   ```
 
 **Semantic Validation for contributesTo Decisions:**
 
 For EACH new alpha (specialization), validate the contributesTo choice using the **State Alignment Heuristic** (semantics.md Section 9.2.5):
 
-1. **List candidate parent alphas** from baseline that could semantically relate to this new alpha
+1. **List candidate parent alphas** that could semantically relate to this new alpha:
+   - **Baseline alphas** (from baseline practice JSON)
+   - **Practice-local alphas** (other new alphas defined in THIS practice)
+   - **External practice alphas** (from other practices, if applicable)
+
 2. **For EACH candidate parent:**
    - List the parent's state names
    - Compare to your new alpha's state names
    - Count semantic matches (exact names, conceptual synonyms, maturity parallels)
    - Calculate alignment score: matches / total states
+
 3. **Apply decision rule:**
    - ≥70% alignment → Strong match, use this parent (high confidence)
    - 50-69% alignment → Moderate match, likely correct (verify with description fit)
    - 30-49% alignment → Weak match, review decision carefully
    - <30% alignment → No meaningful alignment, try different parent or reconsider as redeclaration
+
 4. **Choose parent with highest alignment score**
+   - If highest score is from baseline alpha → use baseline reference
+   - If highest score is from practice-local alpha → use practice-local reference (creates internal hierarchy)
+   - If highest score is from external practice alpha → use external reference (creates practice dependency)
 
 **Document validation in mapping guide:**
 ```
@@ -240,12 +375,158 @@ Alternative considered: Platform - rejected due to 0% state alignment (Platform 
 ```
 
 **Validation Checklist for New Alphas:**
-- [ ] contributesTo field present and references valid baseline alpha name
+
+- [ ] contributesTo field present and references valid parent alpha (baseline, practice-local, or external)
 - [ ] State alignment calculated and ≥50%
 - [ ] If alignment <70%, description alignment also verified
 - [ ] If alignment <50%, decision justified or alpha reconsidered as redeclaration
-- [ ] Alternative parents considered and documented
+- [ ] Alternative parents considered and documented (baseline, practice-local, external options)
 - [ ] Decision rationale provided explaining semantic fit
+- [ ] **If external practice reference:** Practice dependency documented in metadata
+- [ ] **If practice-local reference:** Parent alpha is defined earlier in mapping guide with valid contributesTo chain
+
+**Semantic Relationships (relatesTo):**
+
+The `relatesTo` property captures non-hierarchical relationships between alphas. Follow these rules from semantics.md Section 4.1:
+
+**CRITICAL DISTINCTION:**
+
+- **For baseline alpha redeclarations**: DO NOT add relatesTo (inherit baseline relationships automatically)
+- **For new alphas ONLY**: Define domain-specific relatesTo relationships
+
+**Using Baseline relatesTo for Analysis:**
+
+1. **Read baseline alpha relationships** (if alpha is a redeclaration or related to baseline alphas):
+   - Check baseline JSON for existing relatesTo array on related alphas
+   - Understand how baseline alphas interact (dependencies, production, governance)
+   - Use these relationships to inform practice design
+
+   **Example:**
+
+   ```text
+   Baseline Alpha: Platform
+   relatesTo:
+   - { relationship: "built by", alphaName: "Team" }
+   - { relationship: "hosts", alphaName: "Platform Asset" }
+   - { relationship: "governed by", alphaName: "Platform Governance" }
+   
+   Analysis Impact:
+   - Practice must include Team activities that build/maintain platform
+   - Practice must address asset hosting capabilities and patterns
+   - Practice must incorporate governance controls and guardrails
+   ```
+
+2. **Trace relationship chains** to understand value flows:
+   - "Opportunity" → "drives" → "Requirements" → "guides design of" → "Platform"
+   - This chain shows how business needs flow into technical implementation
+   - Use to validate your practice covers the full value stream
+
+**Defining relatesTo for New Alphas:**
+
+Only for NEW alphas (specializations with contributesTo), define semantic relationships:
+
+**Relationship Type Selection** (from semantics.md Section 4.1):
+
+1. **Dependency Patterns** - "depends on", "requires", "validated by", "evidenced by"
+   - Use when: New alpha needs another alpha's output or state
+   - Example: New alpha "Platform Capability" depends on "Requirements"
+
+2. **Production Patterns** - "produces", "delivers", "creates", "built by", "performed by"
+   - Use when: New alpha creates or is created by another alpha
+   - Example: New alpha "Platform Service" produces "Platform Asset"
+
+3. **Guidance/Control Patterns** - "guides", "drives", "directs", "constrains", "governs", "enforces policies on"
+   - Use when: New alpha influences or controls another alpha
+   - Example: New alpha "Platform Standards" constrains "Platform Capability"
+
+4. **Information Flow Patterns** - "provides", "communicates value to", "provides feedback to"
+   - Use when: New alpha transfers information or knowledge
+   - Example: New alpha "Platform Metrics" provides feedback to "Team"
+
+5. **Enabling Patterns** - "enables", "facilitates", "supports", "enables access to", "exposes"
+   - Use when: New alpha makes another alpha possible or easier
+   - Example: New alpha "Developer Portal" enables access to "Platform"
+
+6. **Impact Patterns** - "influences", "impacts", "justifies", "demonstrates ROI for"
+   - Use when: New alpha affects another alpha indirectly
+   - Example: New alpha "Platform Cost Management" justifies "Platform Value And Economics"
+
+7. **Consumption Patterns** - "consumes", "hosts", "runs on", "realizes"
+   - Use when: New alpha uses or is hosted by another alpha
+   - Example: New alpha "Application Workload" consumes "Platform Capability"
+
+**Relationship Discovery Process:**
+
+For each new alpha, ask:
+
+1. **What does this alpha depend on?** → "depends on" relationships
+2. **What does this alpha produce?** → "produces" relationships
+3. **What does this alpha guide or control?** → "guides" or "constrains" relationships
+4. **What information does this alpha provide?** → "provides" relationships
+5. **What does this alpha enable?** → "enables" relationships
+6. **What does this alpha influence indirectly?** → "influences" relationships
+7. **What does this alpha consume or use?** → "consumes" relationships
+
+**Relationship Validation Rules:**
+
+- Every alphaName in relatesTo MUST reference a valid alpha (baseline or practice-defined)
+- Use domain-specific verbs (NOT generic "relates to")
+- Relationships are unidirectional (if bidirectional intent, both alphas declare reciprocal relationships)
+- Typically 2-5 relationships per new alpha (avoid relationship bloat)
+- Prioritize relationships that inform practice activities and patterns
+
+**Example: New Alpha with relatesTo:**
+
+```
+Alpha: Platform Capability
+Description: Individual platform service or capability providing value to consumers
+Focus Name: Solution
+contributesTo: Platform
+relatesTo:
+- relationship: "depends on"
+  alphaName: "Requirements"
+  rationale: Capabilities are scoped based on stakeholder requirements
+  
+- relationship: "produces"
+  alphaName: "Platform Asset"
+  rationale: Each capability produces consumable services/assets
+  
+- relationship: "validated by"
+  alphaName: "Platform Consumption Interface"
+  rationale: Capability usability proven through consumption interface adoption
+  
+- relationship: "constrained by"
+  alphaName: "Platform Governance"
+  rationale: Capabilities must comply with governance policies and guardrails
+
+States: [...]
+```
+
+**Documentation Format in Mapping Guide:**
+
+```markdown
+### Alpha: [New Alpha Name]
+- Description: [...]
+- Focus Name: [Value | Solution | Endeavor]
+- contributesTo: [Parent Alpha]
+- relatesTo:
+  - relationship: "[verb phrase]"
+    alphaName: "[Alpha Name]"
+    rationale: [Why this relationship exists and how it informs the practice]
+  - relationship: "[verb phrase]"
+    alphaName: "[Alpha Name]"
+    rationale: [...]
+```
+
+**Validation Checklist for relatesTo:**
+
+- [ ] **Redeclarations have NO relatesTo** (inherit from baseline)
+- [ ] **New alphas define 2-5 relationships** (if semantically meaningful)
+- [ ] All alphaName references are valid (baseline or practice alphas)
+- [ ] Relationship verbs are domain-specific (not generic)
+- [ ] Rationale provided for each relationship
+- [ ] Relationships inform practice activities and patterns
+- [ ] No circular dependencies (A → B → A)
 
 **Alpha Instances:**
 If Phase 1 identified multiple concurrent instances of a concern (e.g., different team types):
@@ -357,7 +638,36 @@ Narrative: [from Phase 1 "How to Perform" section]
 
 **CRITICAL:** Activity names must be specific and different from Activity Space names
 
-### Step 8: Map Patterns
+### Step 8: Map Patterns (REQUIRED)
+
+**CRITICAL: Every practice MUST have at least one pattern.** Patterns coordinate multiple alphas/concerns through a lifecycle.
+
+#### Pattern Candidacy Evaluation
+
+For EACH practice, evaluate pattern requirements:
+
+**1. Count alphas in practice:**
+
+- 2+ alphas → PATTERN REQUIRED (coordinates multiple concerns)
+- 1 alpha → Evaluate if external lifecycle applies
+
+**2. If pattern required or beneficial:**
+
+- Identify coordination story: How do alphas/concerns mature together?
+- Choose narrative type:
+  - STAR, Hero's Journey, Three-Act (for user journeys)
+  - SDLC, PDCA, Build-Measure-Learn, Design-Build-Run-Optimize, Crawl-Walk-Run (for architectural lifecycles)
+- Define 3-5 views showing coordinated progression
+
+**3. Pattern quality check:**
+
+- Do pattern views coordinate multiple alphas? (not just one)
+- Can views be narrated coherently?
+- Do alphas reach meaningful states in each view?
+
+**Key Principle:** Patterns coordinate multi-alpha/multi-concern practices. Single-alpha state progression is self-documenting and typically doesn't need a pattern unless following external lifecycle.
+
+#### Pattern Mapping
 
 For EACH pattern from Phase 1 (including lifecycle):
 

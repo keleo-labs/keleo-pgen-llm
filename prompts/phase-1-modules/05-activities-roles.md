@@ -28,19 +28,19 @@ You are a **Practice Research Analyst** defining the WHO and HOW of the practice
 
 1. **Read Module 00** - `report-elements/00-analysis-plan.md`
    - Review activity derivation plan
-   
+
 2. **Read Module 03** - `report-elements/03-alphas.md`
    - Extract alpha names and states for contributesTo
-   
+
 3. **Read Module 04** - `report-elements/04-workproducts.md`
    - Extract work product names and LODs for worksOn
-   
+
 4. **Read Module 02** - `report-elements/02-citations.md`
    - Reference citations in technique narratives
-   
+
 5. **Baseline Framework** - `deps/platform-adoption-kernel.json`
    - Extract exact ActivitySpace names, Competency names, CompetencyLevel names
-   
+
 6. **Source Materials** - User-provided methodology documentation
 
 ---
@@ -436,23 +436,65 @@ When extracting competency requirements from source materials:
 
 1. Read Modules 00, 02, 03, 04 to understand context, alphas, work products, citations
 2. Load baseline to extract exact ActivitySpace, Competency, and CompetencyLevel names
-3. For each activity in Module 00 plan:
+3. **Identify activities from alpha states (COMPREHENSIVE COVERAGE REQUIRED):**
+
+   **Critical:** Every non-initial alpha state (seq > 1) MUST have at least one activity that progresses it. Use the following systematic approach:
+
+   a. **For each new (specialized) alpha** defined in Module 03:
+      - Review EVERY state (seq 2+) and ask: "What activities does the source suggest are needed to progress to this state?"
+      - Extract specific activities from source material where explicitly described
+      - If source material is silent on a particular state transition, but the state exists, you MUST still identify work that would logically progress that state
+
+   b. **For each redeclared alpha** in Module 03:
+      - Check if source material clearly implies NEW activities for state progression
+      - Only create new activities if explicitly implied by source material
+      - Otherwise, the baseline ActivitySpaces already cover these states
+
+   c. **Gap Analysis - MANDATORY:**
+      - Create a checklist: List EVERY alpha state (seq 2+) from Module 03
+      - For each state, identify which activities progress it (from steps a & b above)
+      - **For any state WITHOUT an activity:** Make a deliberate choice:
+
+        **Option 1 (PREFERRED):** Search source material more thoroughly for implied activities
+        - Re-read relevant sections looking for work that would advance this concern
+        - Look for indirect references (tools mentioned, outcomes described, processes hinted at)
+        - Infer activities from state checklist items if source provides them
+
+        **Option 2:** Redeclare a baseline ActivitySpace to contribute to this state
+        - Review baseline ActivitySpaces that contribute to related alphas
+        - If a baseline ActivitySpace logically would also advance this state, note it for Phase 2
+        - Example: If baseline "Monitor Value Realization" tracks platform ROI, it could also track specialized asset value
+        - Document the redeclaration rationale: "While source doesn't explicitly describe [activity], the baseline ActivitySpace '[Name]' logically contributes to this state because [reason]"
+
+        **NEVER:** Leave a non-initial state without activity coverage
+
+   d. **Document your coverage:**
+      - In a "Coverage Notes" section, list any states where you used Option 2 (redeclared baseline ActivitySpace)
+      - This helps Phase 2 understand which ActivitySpaces to redeclare with additional contributesTo mappings
+
+4. For each activity (from Module 00 plan + activities derived from alpha states):
    - Define activity with specific name (not duplicating ActivitySpace)
    - Map to baseline ActivitySpace exactly
-   - Identify alpha state progressions (from Module 03)
+   - Identify alpha state progressions (from Module 03) - MUST have at least one
    - Identify work product contributions (from Module 04)
    - Determine required competencies and levels
    - Identify performing persona group
    - **CRITICAL:** Extract rich technique narratives from source materials (this is the most important and time-consuming part)
-4. For each persona:
+
+5. For each persona:
    - Describe role responsibilities and context
    - Weave competency requirements into narrative
    - Explicitly list competencies for extraction
-5. For each persona group:
+
+6. For each persona group:
    - Describe team composition (list constituent personas)
    - Explain team purpose and dynamics
    - Explicitly list persona members for extraction
-6. Review for completeness:
+
+7. Review for completeness:
+   - [ ] **CRITICAL: Every non-initial alpha state (seq 2+) has at least one activity progressing it**
+   - [ ] Coverage gaps resolved via Option 1 (source-derived) or Option 2 (baseline redeclaration)
+   - [ ] Coverage Notes section documents any baseline ActivitySpace redeclarations
    - [ ] Every activity has at least one technique narrative
    - [ ] Technique narratives are detailed and actionable (not vague)
    - [ ] All ActivitySpace, Competency, and CompetencyLevel references are exact matches

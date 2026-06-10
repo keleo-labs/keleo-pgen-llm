@@ -421,11 +421,37 @@ class PracticeValidator:
         return has_errors
 
     def _validate_activity_spaces(self, practice: Dict, prefix: str) -> bool:
-        """Validate activity space references"""
+        """Validate activity space references and required activity properties"""
         has_errors = False
 
         # Check activity references to activity spaces
         for idx, activity in enumerate(practice.get('activities', [])):
+            # Required properties for Activity (per schema)
+            required_activity_props = {
+                'activitySpaceName': 'string (references ActivitySpace.name)',
+                'focusName': 'string (references Focus.name)',
+                'contributesTo': 'array of AlphaContribution',
+                'worksOn': 'array of WorkProductContribution',
+                'requiredCompetencies': 'array of Competency.name strings',
+                'recommendedCompetencyLevels': 'array of CompetencyLevelReference'
+            }
+
+            # Check for missing required properties
+            for prop, prop_type in required_activity_props.items():
+                if prop not in activity:
+                    path = f"{prefix}.activities[{idx}]" if prefix else f"activities[{idx}]"
+                    self.errors.append({
+                        "category": "schema",
+                        "severity": "error",
+                        "path": path,
+                        "issue": f"Missing required Activity property: '{prop}'",
+                        "expected": f"Activity must have '{prop}' ({prop_type})",
+                        "actual": f"Activity '{activity.get('name', 'unnamed')}' missing '{prop}'",
+                        "suggestion": f"Add '{prop}' property to activity. According to schema, Activity extends ActivitySpaceCore which requires: activitySpaceName (for flat Practice.activities), focusName, contributesTo, requiredCompetencies. Activity also requires: worksOn, recommendedCompetencyLevels."
+                    })
+                    has_errors = True
+
+            # Validate activitySpaceName reference if present
             asp_name = activity.get('activitySpaceName')
             if asp_name and asp_name not in self.baseline_activity_spaces:
                 path = f"{prefix}.activities[{idx}].activitySpaceName" if prefix else f"activities[{idx}].activitySpaceName"
