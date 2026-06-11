@@ -121,54 +121,128 @@ Add citations array (for both Practice and Method):
 
 #### 3.3 Assets (Optional)
 
-If the mapping guide identifies visual artifacts (diagrams, templates, charts), add assets array:
+If the mapping guide identifies visual assets, add assets array. **PRIORITIZE externally-referenceable assets:**
+
+**Priority 1 - Font Character Icons (for all icons):**
 
 ```json
 "assets": [
   {
-    "name": "asset-identifier",
-    "description": "1-2 sentences describing what this depicts",
-    "path": "assets/diagrams/filename.svg",
-    "mimeType": "image/svg+xml",
-    "checksum": "sha256:abc123..."
+    "name": "platform-icon",
+    "description": "Platform infrastructure icon",
+    "type": "font-character",
+    "fontFamily": "Font Awesome 6 Free",
+    "fontCharacter": "fa-cubes",
+    "fontWeight": "900"
+  },
+  {
+    "name": "team-icon",
+    "description": "Team collaboration icon",
+    "type": "font-character",
+    "fontFamily": "Font Awesome 6 Free",
+    "fontCharacter": "fa-users",
+    "fontWeight": "900"
   }
 ]
 ```
 
-**Asset Properties:**
+**Priority 2 - External URLs (for diagrams, templates, reference architectures):**
 
-- **name**: Unique identifier (kebab-case, used in assetNames references)
-- **description**: Human-readable explanation (serves as alt text)
-- **path**: Relative path within practice bundle (e.g., `assets/diagrams/pattern-lifecycle.svg`)
-- **mimeType**: MIME type (`image/svg+xml`, `image/png`, `image/jpeg`, `application/pdf`)
-- **checksum**: SHA-256 checksum for integrity validation (use placeholder `sha256:tbd` during generation)
+```json
+"assets": [
+  {
+    "name": "aws-reference-architecture",
+    "description": "AWS Well-Architected multi-region reference architecture",
+    "type": "diagram",
+    "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/images/multi-region.png"
+  },
+  {
+    "name": "adr-template",
+    "description": "Architecture Decision Record template by Michael Nygard",
+    "type": "template",
+    "url": "https://github.com/joelparkerhenderson/architecture-decision-record/blob/main/templates/decision-record-template-by-michael-nygard/index.md"
+  }
+]
+```
 
-**Common Asset Patterns:**
+**Priority 3 - Bundled Files (only when no external alternative exists):**
 
-- Pattern diagrams: `assets/diagrams/pattern-[name].svg`
-- Alpha state diagrams: `assets/diagrams/alpha-[name]-states.svg`
-- Work product templates: `assets/templates/[workproduct-name]-template.[ext]`
-- Activity flowcharts: `assets/diagrams/activity-[name]-flow.svg`
-- Architecture diagrams: `assets/diagrams/architecture-[description].svg`
-- Practice icons: `assets/icons/practice-icon.svg`
+```json
+"assets": [
+  {
+    "name": "custom-pattern-diagram",
+    "description": "Practice-specific pattern orchestration workflow",
+    "type": "diagram",
+    "path": "assets/diagrams/pattern-lifecycle.svg",
+    "mimeType": "image/svg+xml"
+  }
+]
+```
 
-**Note:**
+**Asset Properties by Type:**
 
-- Asset files themselves are NOT embedded in JSON (external files)
-- Checksums can be placeholder values during JSON generation (`sha256:tbd`)
-- Bundle assembly step will add actual asset files and compute real checksums
+**All assets require:**
+- **name**: Unique identifier (kebab-case)
+- **description**: Human-readable explanation (1-2 sentences)
+- **type**: `icon | diagram | template | image | font-character`
+
+**Font character assets (Priority 1):**
+- **fontFamily**: `"Font Awesome 6 Free"` | `"Material Icons"`
+- **fontCharacter**: Icon identifier (e.g., `"fa-cubes"`, `"fa-users"`, `"settings"`)
+- **fontWeight**: `"400"` | `"900"` | `"bold"` (optional, defaults to regular)
+
+**External URL assets (Priority 2):**
+- **url**: Direct link to external resource (methodology sites, GitHub, official docs)
+
+**Bundled file assets (Priority 3):**
+- **path**: Relative path (e.g., `"assets/diagrams/custom.svg"`)
+- **mimeType**: `"image/svg+xml"` | `"image/png"` | `"application/pdf"`
+- **checksum**: `"sha256:..."` (optional, for integrity verification)
 
 **Linking Assets to Elements:**
 
-Individual elements reference assets via optional `assetNames` property (added in subsequent steps):
+Individual elements reference assets via optional `assetName` property (singular, not array):
 
 ```json
 {
   "name": "Platform",
-  "description": "...",
-  "assetNames": ["platform-architecture-diagram", "deployment-topology"]
+  "description": "Platform infrastructure capability",
+  "assetName": "platform-icon",
+  "focusName": "Solution",
+  "states": [...]
 }
 ```
+
+```json
+{
+  "name": "Design Reference Architecture",
+  "description": "Create multi-region platform architecture",
+  "assetName": "aws-reference-architecture",
+  "activitySpaceName": "Architecture Design",
+  "focusName": "Solution",
+  "worksOn": [...],
+  "requiredCompetencies": [...]
+}
+```
+
+**Asset Assignment Guidelines:**
+
+- **Practice/Method**: Main icon (font character)
+- **Alphas**: Icon for UI representation (font character)
+- **Activities**: Icon for activity type (font character) OR reference diagram (URL)
+- **Competencies**: Skill area icon (font character)
+- **Work Products**: Template reference (URL) if applicable
+- **Patterns**: Workflow diagram (URL or bundled if custom)
+
+**Common Font Awesome Icons:**
+
+- Platform/Infrastructure: `fa-cubes`, `fa-server`, `fa-cloud`
+- Team/People: `fa-users`, `fa-user-group`
+- Security: `fa-shield-halved`, `fa-lock`
+- Architecture: `fa-sitemap`, `fa-diagram-project`
+- Development: `fa-code`, `fa-laptop-code`
+- Operations: `fa-gears`, `fa-wrench`
+- Strategy: `fa-compass`, `fa-lightbulb`
 
 #### 3.4 Narratives (Practice/Method Level)
 

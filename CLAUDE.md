@@ -154,6 +154,62 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 ### Citations
 Every practice must include comprehensive citations using the "Citation Standard" narrative type with Author/Date/Title/Source elements. Prioritize authoritative sources (primary methodology creators).
 
+### Assets
+Visual assets (diagrams, templates, icons) can be referenced in practices and methods using the AssetReference structure:
+
+- **Top-level `assets` array**: Defines available assets with metadata
+- **Element-level `assetNames` property**: Array of AssetReference objects linking practice elements to assets with semantic type classification
+- **AssetReference structure**: Each reference includes:
+  - `assetName`: Symbolic reference to Asset.name in top-level assets array
+  - `type`: Semantic classification (`icon`, `illustrative`, `template`, `diagram`)
+- **Asset types in top-level assets array**:
+  - **File-based**: `image`, `diagram`, `template`, `icon` with `path`, `mimeType`, optional `checksum`
+  - **Font characters**: `font-character` with `fontFamily`, `fontCharacter`, `fontWeight` (e.g., Font Awesome icons)
+  - **Remote**: Assets can use `url` for external hosting or `dataUri` for embedded data
+
+**AssetReference Type Semantics**:
+
+- **icon**: UI markers, visual identity (alpha icons, competency badges, activity type indicators)
+- **illustrative**: Documentation diagrams, architecture visualizations, workflow charts
+- **template**: Reusable documents, forms, decision records, ADR templates
+- **diagram**: Technical architecture, state progression, pattern orchestration
+
+**Example**:
+```json
+{
+  "alphas": [
+    {
+      "name": "Platform",
+      "assetNames": [
+        {
+          "assetName": "platform-icon",
+          "type": "icon"
+        },
+        {
+          "assetName": "platform-states-diagram",
+          "type": "diagram"
+        }
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "name": "platform-icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-cubes",
+      "fontWeight": "900"
+    },
+    {
+      "name": "platform-states-diagram",
+      "type": "diagram",
+      "path": "assets/diagrams/platform.svg",
+      "mimeType": "image/svg+xml"
+    }
+  ]
+}
+```
+
 ## Dependencies
 
 This project requires the **keleo-studio** repository to be present at `../../keleo-studio/`. The schema and example files are accessed via symlinks in the `deps/` directory.

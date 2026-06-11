@@ -111,57 +111,111 @@ For each citation from Phase 1:
 
 ### Step 3.5: Identify Visual Assets
 
-For each visual artifact in Phase 1 source materials (diagrams, charts, architecture visualizations, templates):
+Visual assets enhance practice comprehension. **PRIORITIZE externally-referenceable assets (URLs, font characters) over bundled files.**
 
-**Asset Identification:**
+**Asset Type Priority (Descending):**
+
+1. **Font Character Icons** - Use for all icons, visual markers, UI elements
+2. **External URLs** - Use for official diagrams, templates, reference architectures
+3. **Bundled Files** - Only when no external alternative exists
+
+**Asset Identification Template:**
+
 ```
 Asset Name: [unique identifier, kebab-case]
-Description: [1-2 sentences: what does this depict?]
-Proposed Path: assets/[category]/[filename].[ext]
-  Categories: diagrams, templates, icons, charts
-MIME Type: [image/svg+xml | image/png | image/jpeg | application/pdf]
-Referenced By: [element type and name that should link to this asset]
-  Examples: 
-  - Pattern "Platform Adoption Lifecycle" (workflow diagram)
-  - Alpha "Platform" (state transition diagram)
-  - WorkProduct "Architecture" at level "Comprehensive" (template)
-  - Activity "Design Platform Architecture" (reference architecture)
+Description: [1-2 sentences: what does this depict and how is it used?]
+Type: [icon | diagram | template | image | font-character]
+
+[Choose ONE of the following based on priority:]
+
+PRIORITY 1 - Font Character (for icons):
+Font Family: Font Awesome 6 Free | Material Icons
+Font Character: fa-icon-name | unicode | css-class
+Font Weight: 400 | 900 | bold
+
+PRIORITY 2 - External URL (for diagrams/templates):
+URL: [https://methodology-site.com/diagram.png]
+Source: [Official docs | GitHub | Methodology website]
+
+PRIORITY 3 - Bundled File (only if needed):
+Path: assets/[category]/[filename].[ext]
+MIME Type: [image/svg+xml | image/png | application/pdf]
+
+Referenced By: [element type and name]
+  Examples:
+  - Alpha "Platform" (icon: fa-cubes)
+  - Activity "Design Architecture" (AWS reference architecture URL)
+  - WorkProduct "ADR" (GitHub template URL)
 ```
 
-**Common Asset Types:**
+**Common Font Awesome Icons by Element Type:**
 
-1. **Pattern Diagrams**: Workflow visualizations showing alpha progression
-   - Path pattern: `assets/diagrams/pattern-[pattern-name].svg`
-   - Referenced by: Pattern elements via assetNames
+**Alphas:**
+- Platform/Infrastructure: `fa-cubes`, `fa-server`, `fa-cloud`, `fa-database`
+- Team/People: `fa-users`, `fa-user-group`, `fa-people-group`
+- Security/Risk: `fa-shield-halved`, `fa-lock`, `fa-key`, `fa-user-shield`
+- Architecture: `fa-sitemap`, `fa-diagram-project`, `fa-network-wired`
+- Requirements: `fa-list-check`, `fa-clipboard-list`, `fa-file-lines`
+- Value/Outcome: `fa-dollar-sign`, `fa-chart-line`, `fa-rocket`, `fa-bullseye`
+- Work/Workflow: `fa-tasks`, `fa-project-diagram`, `fa-stream`
+- Stakeholder: `fa-users-viewfinder`, `fa-handshake`, `fa-comments`
 
-2. **Alpha State Diagrams**: State machine visualizations
-   - Path pattern: `assets/diagrams/alpha-[alpha-name]-states.svg`
-   - Referenced by: Alpha elements via assetNames
+**Activities:**
+- Development: `fa-code`, `fa-laptop-code`, `fa-terminal`, `fa-file-code`
+- Operations: `fa-gears`, `fa-wrench`, `fa-screwdriver-wrench`, `fa-gauge`
+- Strategy/Planning: `fa-compass`, `fa-map`, `fa-lightbulb`, `fa-chart-gantt`
+- Testing: `fa-vial`, `fa-flask`, `fa-microscope`
+- Deployment: `fa-rocket`, `fa-upload`, `fa-paper-plane`
+- Monitoring: `fa-chart-line`, `fa-display`, `fa-heartbeat`
 
-3. **Work Product Templates**: Example documents, forms, spreadsheets
-   - Path pattern: `assets/templates/[workproduct-name]-template.[ext]`
-   - Referenced by: WorkProduct or LevelOfDetail elements via assetNames
+**Competencies:**
+- Technical Skills: `fa-laptop-code`, `fa-microchip`, `fa-terminal`
+- Leadership: `fa-users-gear`, `fa-crown`, `fa-person-chalkboard`
+- Architecture: `fa-sitemap`, `fa-diagram-project`, `fa-drafting-compass`
+- Security: `fa-shield-halved`, `fa-lock`, `fa-fingerprint`
 
-4. **Activity Flowcharts**: Process flows for complex activities
-   - Path pattern: `assets/diagrams/activity-[activity-name]-flow.svg`
-   - Referenced by: Activity elements via assetNames
+**External URL Sources (Priority 2):**
 
-5. **Architecture Diagrams**: Reference architectures
-   - Path pattern: `assets/diagrams/architecture-[description].svg`
-   - Referenced by: Alpha, WorkProduct, or Pattern elements via assetNames
+**When to use External URLs:**
+- Official methodology diagrams (AWS Well-Architected, SAFe, TOGAF reference architectures)
+- GitHub templates (ADRs, RFC templates, runbooks)
+- Vendor documentation (cloud provider diagrams, platform architectures)
+- Public methodology websites (diagrams from official sources)
+- Standards bodies (IEEE, ISO, NIST frameworks)
 
-6. **Practice Icons**: Visual identity for practices
-   - Path pattern: `assets/icons/practice-icon.svg`
-   - Referenced by: Practice metadata via assetNames
+**Examples:**
+```
+Asset Name: aws-well-architected-pillars
+Description: AWS Well-Architected Framework five pillars diagram
+Type: diagram
+URL: https://docs.aws.amazon.com/wellarchitected/latest/framework/images/pillars.png
+Referenced By: Alpha "Platform Architecture" (reference diagram)
 
-**Asset Extraction from Source Materials:**
+Asset Name: adr-template-nygard
+Description: Architecture Decision Record template by Michael Nygard
+Type: template
+URL: https://github.com/joelparkerhenderson/architecture-decision-record/blob/main/templates/decision-record-template-by-michael-nygard/index.md
+Referenced By: WorkProduct "Architecture Decision" at level "Documented" (template)
 
-- Scan PDFs, web pages, documentation for diagrams and charts
-- Note figure numbers and captions from source
-- Preserve original filenames when possible
-- Identify which practice elements each asset illustrates
-- Prefer SVG format for diagrams (scalable, editable, git-friendly)
-- Document asset sources (if diagrams use specific tools like draw.io, PlantUML)
+Asset Name: safe-big-picture
+Description: SAFe 6.0 Big Picture framework diagram
+Type: diagram
+URL: https://scaledagileframework.com/wp-content/uploads/2023/01/SAFe-6-Big-Picture.png
+Referenced By: Pattern "Value Stream Delivery" (reference workflow)
+```
+
+**Bundled Files (Priority 3 - Only When Necessary):**
+
+Use bundled files ONLY when:
+- Creating custom practice-specific diagrams
+- Source material has no external URL
+- Proprietary/internal methodology content
+
+**Guidelines:**
+- Prefer SVG for diagrams (scalable, editable, git-friendly)
+- PNG for screenshots, photos
+- PDF for document templates
+- Path pattern: `assets/diagrams/[name].svg`, `assets/templates/[name].pdf`
 
 **Output Format in Mapping Guide:**
 

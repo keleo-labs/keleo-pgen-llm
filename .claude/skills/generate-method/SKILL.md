@@ -776,6 +776,16 @@ Single validation script replaces multiple utilities:
 - ❌ **Empty patterns array** when mapping guide has patterns
   - **Fix:** Verify patterns array populated with minimum 1 pattern per practice
   - Each pattern must have 2+ PatternViews with alphaStates showing progression
+- ❌ **Using `assetName` (singular string) instead of `assetNames` (array of AssetReference objects)**
+  - **Fix:** Replace `"assetName": "icon-name"` with `"assetNames": [{"assetName": "icon-name", "type": "icon"}]`
+- ❌ **Missing AssetReference `type` property**
+  - **Fix:** Every AssetReference object must have both `assetName` and `type` properties
+  - Valid types: "icon", "illustrative", "template", "diagram"
+- ❌ **Alphas/activities without icon AssetReferences**
+  - **Fix:** Every alpha and activity MUST have at least one icon-type AssetReference
+  - Use Font Awesome 6 Free icons for zero distribution overhead
+- ❌ **Referenced assetName not in top-level assets array**
+  - **Fix:** Every assetName in AssetReference objects must match an Asset.name in the assets array
 
 ---
 
@@ -997,106 +1007,374 @@ For successful translation, user receives:
    - Organized by type: diagrams/, templates/, icons/
    - Referenced by JSON via relative paths
 
-### Asset Bundling and Distribution
+### Asset References and Visual Enhancement
 
-**Practices with Visual Artifacts:**
+**Asset Strategy:**
 
-When Phase 2 identifies visual artifacts in source materials (diagrams, architecture visualizations, templates), the practice should be distributed as a bundle:
+Visual assets enhance practice comprehension and adoption. The Practice Language supports flexible asset references prioritizing externally-referenceable assets (URLs, font characters) over bundled files.
 
-**Bundle Structure:**
+**Asset Type Priority (Descending):**
 
-```text
-practice-name.bundle/
-├── practice-name.json          # Main JSON with assets array
-├── assets/
-│   ├── diagrams/
-│   │   ├── pattern-lifecycle.svg
-│   │   ├── alpha-platform-states.png
-│   │   └── architecture-reference.svg
-│   ├── templates/
-│   │   └── architecture-doc-template.pdf
-│   └── icons/
-│       └── practice-icon.svg
-└── manifest.json               # Bundle metadata (optional)
+1. **Font Characters** - Icon fonts (Font Awesome, Material Icons, etc.)
+   - Zero distribution overhead
+   - Universally accessible
+   - Scalable and accessible
+   - USE FOR: Icons, simple visual markers, UI elements
+
+2. **External URLs** - Direct links to hosted resources
+   - No bundling required
+   - Single source of truth
+   - Easy updates
+   - USE FOR: Official diagrams, methodology documentation, templates, reference architectures
+
+3. **Bundled Files** - Assets included with practice
+   - Full control over content
+   - Offline availability
+   - Requires file management
+   - USE FOR: Custom diagrams, practice-specific visualizations when no external URL available
+
+**Asset Workflow:**
+
+**Phase 2 (Mapping)**: Identify and catalog visual artifacts
+
+Document in a dedicated "Assets" section of the mapping guide using the new AssetReference structure:
+
+```markdown
+## Assets
+
+### Icons and Visual Markers (REQUIRED - Minimum Coverage)
+
+**CRITICAL: All alphas, activities, and pattern views MUST have icon asset references.**
+
+Icons use web fonts (Font Awesome 6 Free, Material Icons) for zero distribution overhead and universal accessibility.
+
+#### Practice-Level Icons
+
+- **practice-icon**: Main practice icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-server (or fa-cloud, fa-network-wired, etc.)
+  - Usage: Practice visual identity
+
+#### Alpha Icons (REQUIRED for ALL alphas)
+
+- **platform-icon**: Platform alpha icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-cubes
+  - Usage: Platform alpha UI marker
+
+- **team-icon**: Team alpha icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-users
+  - Usage: Team alpha UI marker
+
+[Additional alpha icons for each alpha in practice...]
+
+#### Activity Icons (REQUIRED for ALL activities)
+
+- **design-activity-icon**: Design activity type icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-pencil-ruler
+  - Usage: Design activities UI marker
+
+- **implement-activity-icon**: Implementation activity type icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-code
+  - Usage: Implementation activities UI marker
+
+[Additional activity type icons for each activity space/type...]
+
+#### Pattern View Icons (RECOMMENDED)
+
+- **pattern-view-1-icon**: First pattern view icon
+  - Asset Type (top-level): font-character
+  - Reference Type: icon
+  - Font: Font Awesome 6 Free
+  - Character: fa-1
+  - Usage: Pattern view 1 visual marker
+
+[Additional pattern view icons...]
+
+### Diagrams and Architecture (OPTIONAL - Illustrative)
+
+- **reference-architecture**: Official AWS/Azure/GCP reference architecture
+  - Asset Type (top-level): diagram
+  - Reference Type: illustrative
+  - URL: https://docs.aws.amazon.com/wellarchitected/latest/framework/images/architecture.png
+  - Description: Multi-region reference architecture
+  - Usage: Architecture alpha, Design activities
+
+- **state-progression-diagram**: Alpha state progression visualization
+  - Asset Type (top-level): diagram
+  - Reference Type: diagram
+  - URL: https://methodology-site.com/diagrams/states.svg
+  - Description: Visual representation of Platform alpha states
+  - Usage: Platform alpha
+
+### Templates and Documents (OPTIONAL)
+
+- **adr-template**: Architecture Decision Record template
+  - Asset Type (top-level): template
+  - Reference Type: template
+  - URL: https://github.com/joelparkerhenderson/architecture-decision-record/blob/main/templates/decision-record-template-by-michael-nygard/index.md
+  - Description: Standard ADR template
+  - Usage: Architecture Design activity
 ```
 
-**Manifest Format (Optional):**
+**Guidelines for Asset Identification:**
+
+**REQUIRED - Icon Coverage (Phase 2 Mandatory):**
+
+1. **All Alphas** - Every alpha MUST have at least one icon-type AssetReference
+   - Choose semantic Font Awesome or Material Icons icons
+   - Use domain-appropriate icons (see Common Font Awesome Icons table below)
+   - Icons provide visual identity in UI/tooling
+
+2. **All Activities** - Every activity MUST have at least one icon-type AssetReference
+   - Group activities by type and assign consistent icons
+   - Common patterns: design (fa-pencil-ruler), implementation (fa-code), operations (fa-gears), governance (fa-shield-halved)
+
+3. **Pattern Views** - RECOMMENDED to have icon-type AssetReferences
+   - Sequential icons (fa-1, fa-2, fa-3) or lifecycle stage icons
+   - Helps distinguish views in pattern matrices
+
+**OPTIONAL - Illustrative/Diagram/Template Coverage:**
+
+- **Official Resources**: Link directly to authoritative methodology diagrams, templates, reference architectures
+- **Source Materials**: Reference diagrams/images from methodology websites using direct URLs
+- **Custom Diagrams**: Only create bundled assets when no suitable external resource exists
+
+**Phase 3 (JSON Generation)**: Populate assets array and assetNames properties with AssetReference objects
+
+**CRITICAL: Use assetNames (plural) array, NOT assetName (singular) string.**
+
+**Priority 1 - Font Character Icons (REQUIRED for all alphas/activities):**
 
 ```json
 {
-  "practiceName": "Practice Name",
-  "version": "1.0.0",
-  "created": "2026-06-10",
-  "files": [
-    {"path": "practice-name.json", "checksum": "sha256:..."},
-    {"path": "assets/diagrams/pattern-lifecycle.svg", "checksum": "sha256:..."}
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "Platform infrastructure capability",
+      "assetNames": [
+        {
+          "assetName": "platform-icon",
+          "type": "icon"
+        }
+      ],
+      "states": [...]
+    }
+  ],
+  "activities": [
+    {
+      "name": "Design Platform Architecture",
+      "description": "Create technical architecture",
+      "assetNames": [
+        {
+          "assetName": "design-activity-icon",
+          "type": "icon"
+        }
+      ],
+      "activitySpaceName": "Architecture Design",
+      "focusName": "Solution",
+      "worksOn": [...],
+      "requiredCompetencies": [...]
+    }
+  ],
+  "assets": [
+    {
+      "name": "platform-icon",
+      "description": "Platform infrastructure icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-cubes",
+      "fontWeight": "900"
+    },
+    {
+      "name": "design-activity-icon",
+      "description": "Design activity type icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-pencil-ruler",
+      "fontWeight": "900"
+    }
   ]
 }
 ```
 
-**Asset Workflow:**
+**Common Font Awesome Icons for Practice Elements:**
 
-1. **Phase 2 (Mapping)**: Identify and document visual artifacts in mapping guide
-   - List asset name, description, proposed path, MIME type
-   - Note which elements should reference each asset
+- Platform/Infrastructure: `fa-cubes`, `fa-server`, `fa-cloud`
+- Team/People: `fa-users`, `fa-user-group`, `fa-people-group`
+- Security: `fa-shield-halved`, `fa-lock`, `fa-key`
+- Architecture: `fa-sitemap`, `fa-diagram-project`, `fa-network-wired`
+- Development: `fa-code`, `fa-laptop-code`, `fa-terminal`
+- Operations: `fa-gears`, `fa-wrench`, `fa-gauge`
+- Strategy: `fa-compass`, `fa-map`, `fa-lightbulb`
+- Requirements: `fa-list-check`, `fa-clipboard-list`, `fa-file-lines`
+- Value: `fa-dollar-sign`, `fa-chart-line`, `fa-rocket`
 
-2. **Phase 3 (JSON Generation)**: Populate `assets` array and `assetNames` properties
-   - Add assets array to practice/method JSON
-   - Link elements to assets via `assetNames` property
-   - Use placeholder checksums (`sha256:tbd`)
-
-3. **Post-Generation (Manual)**: Extract and organize asset files
-   - Create `assets/` directory structure
-   - Extract diagrams from source PDFs/docs
-   - Save to paths specified in JSON
-   - Compute real SHA-256 checksums
-   - Update JSON with actual checksums
-
-4. **Distribution**: Package as archive
-   - Zip or tar the practice directory
-   - Distribute as `.bundle.zip` or `.bundle.tar.gz`
-
-**Asset Extraction Tools:**
-
-Common tools for extracting assets from source materials:
-
-- **PDFs**: `pdfimages`, Adobe Acrobat export
-- **Web pages**: Browser "Save image as"
-- **Screenshots**: Manual capture, annotation tools
-- **Diagrams**: Export from source tools (draw.io, PlantUML, Visio)
-
-**Asset Format Recommendations:**
-
-- **Diagrams/Charts**: SVG (preferred - scalable, editable, text-based)
-- **Screenshots**: PNG (lossless compression)
-- **Photos**: JPEG (efficient for photos)
-- **Documents**: PDF
-- **Icons**: SVG (preferred for UI rendering)
-
-**Checksum Generation:**
-
-```bash
-# Compute SHA-256 for an asset
-sha256sum assets/diagrams/pattern-lifecycle.svg
-# Output: abc123... assets/diagrams/pattern-lifecycle.svg
-
-# Update JSON with sha256:abc123...
-```
-
-**Single-File Distribution (Alternative):**
-
-For practices requiring single-file portability, small assets (icons, simple diagrams) can be embedded using data URIs:
+**Priority 2 - External URL References (OPTIONAL - illustrative/diagram/template types):**
 
 ```json
 {
-  "name": "practice-icon",
-  "path": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0i...",
-  "mimeType": "image/svg+xml",
-  "checksum": "sha256:abc123..."
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "Platform infrastructure capability",
+      "assetNames": [
+        {
+          "assetName": "platform-icon",
+          "type": "icon"
+        },
+        {
+          "assetName": "platform-states-diagram",
+          "type": "diagram"
+        }
+      ],
+      "states": [...]
+    }
+  ],
+  "activities": [
+    {
+      "name": "Design Reference Architecture",
+      "description": "Create multi-region architecture",
+      "assetNames": [
+        {
+          "assetName": "design-activity-icon",
+          "type": "icon"
+        },
+        {
+          "assetName": "aws-ref-arch",
+          "type": "illustrative"
+        },
+        {
+          "assetName": "adr-template",
+          "type": "template"
+        }
+      ],
+      "activitySpaceName": "Architecture Design",
+      "focusName": "Solution",
+      "worksOn": [...],
+      "requiredCompetencies": [...]
+    }
+  ],
+  "assets": [
+    {
+      "name": "platform-icon",
+      "description": "Platform infrastructure icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-cubes",
+      "fontWeight": "900"
+    },
+    {
+      "name": "design-activity-icon",
+      "description": "Design activity type icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-pencil-ruler",
+      "fontWeight": "900"
+    },
+    {
+      "name": "platform-states-diagram",
+      "description": "Platform alpha state progression diagram",
+      "type": "diagram",
+      "url": "https://example.com/methodology/platform-states.svg"
+    },
+    {
+      "name": "aws-ref-arch",
+      "description": "AWS Well-Architected multi-region reference architecture",
+      "type": "diagram",
+      "url": "https://docs.aws.amazon.com/wellarchitected/latest/framework/images/multi-region-arch.png"
+    },
+    {
+      "name": "adr-template",
+      "description": "Architecture Decision Record template by Michael Nygard",
+      "type": "template",
+      "url": "https://github.com/joelparkerhenderson/architecture-decision-record/blob/main/templates/decision-record-template-by-michael-nygard/index.md"
+    }
+  ]
 }
 ```
 
-Recommended for assets <10KB; use external files for larger assets.
+**Priority 3 - Bundled Files (Only When Necessary):**
+
+```json
+{
+  "assets": [
+    {
+      "name": "custom-pattern-diagram",
+      "description": "Practice-specific pattern orchestration diagram",
+      "type": "diagram",
+      "path": "assets/diagrams/pattern-lifecycle.svg",
+      "mimeType": "image/svg+xml"
+    }
+  ]
+}
+```
+
+**Asset Assignment Guidelines:**
+
+- **Practice**: Main practice icon (font character preferred)
+- **Method**: Method-level icon or logo (font character or URL)
+- **Alphas**: 
+  - Icons for UI representation (font characters)
+  - State diagrams for documentation (URLs to methodology sites)
+- **Activities**: 
+  - Activity type icons (font characters: fa-code, fa-gears, fa-clipboard)
+  - Reference diagrams (URLs to official docs)
+  - Templates (URLs to GitHub, official sites)
+- **Competencies**: Skill area icons (font characters)
+- **Patterns**: Workflow diagrams (URLs or bundled if custom)
+
+**Asset Schema Properties:**
+
+```json
+{
+  "name": "unique-asset-identifier",
+  "description": "Human-readable description of asset purpose",
+  "type": "icon | diagram | template | image | font-character",
+  
+  // Font character assets (Priority 1)
+  "fontFamily": "Font Awesome 6 Free | Material Icons",
+  "fontCharacter": "fa-icon-name | unicode-char | css-class",
+  "fontWeight": "400 | 900 | bold",
+  
+  // External URL assets (Priority 2)
+  "url": "https://example.com/diagram.png",
+  
+  // Bundled file assets (Priority 3)
+  "path": "assets/diagrams/custom.svg",
+  "mimeType": "image/svg+xml | image/png | application/pdf",
+  "checksum": "sha256:abc123..." // Optional, for integrity verification
+}
+```
+
+**Validation During Phase 3:**
+
+- [ ] **CRITICAL**: Using `assetNames` (plural array), NOT `assetName` (singular string)
+- [ ] **CRITICAL**: Each AssetReference has both `assetName` and `type` properties
+- [ ] **CRITICAL**: Every alpha has at least one icon-type AssetReference
+- [ ] **CRITICAL**: Every activity has at least one icon-type AssetReference
+- [ ] All icon assets use font-character type (Font Awesome/Material Icons)
+- [ ] Icon AssetReferences have `type: "icon"`
+- [ ] Diagram AssetReferences have `type: "diagram"` or `type: "illustrative"`
+- [ ] Template AssetReferences have `type: "template"`
+- [ ] External diagrams/templates use direct URLs to authoritative sources
+- [ ] Bundled assets only used when no external alternative exists
+- [ ] Asset descriptions clearly explain purpose and context
+- [ ] URLs point to stable, long-lived resources (official docs, GitHub, methodology sites)
+- [ ] All referenced assetName values exist in top-level assets array
 
 ### Using Delivered Artifacts
 
@@ -1106,10 +1384,10 @@ Users can:
 - Regenerate specific phases if source changes
 - Use analysis and mapping as methodology documentation
 - Use JSON in tooling that consumes Practice Language
-- Share JSON with teams and tools
-- Distribute as bundles (with assets) or standalone JSON (without assets)
-- Edit assets separately and update checksums
-- Host assets on CDN and use URLs in path field (future enhancement)
+- Share JSON with teams and tools without bundling assets
+- Font character icons render automatically with icon font libraries
+- External URLs fetch latest versions from authoritative sources
+- Bundled assets only needed for custom/proprietary visualizations
 
 ---
 

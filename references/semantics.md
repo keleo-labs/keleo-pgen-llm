@@ -1522,6 +1522,97 @@ When extending existing elements:
 
 When composing extension practices, authors must avoid "functional decomposition" (e.g., creating a generic "Testing Practice" or "Coding Practice" consisting only of flat task lists). Instead, a Practice must be scoped as a Value-Additive Unit addressing a discrete, cohesive area of concern (e.g., "Product Discovery" or "Zero-Trust Networking"). Authors should evaluate their methodology across four distinct perspectives: Business (commercial logic), Technology (system design), People (team RACI), and Process (operational workflows). If source material blends multiple distinct value-streams, it must be partitioned into separate, cohesive Practice documents, resolving cross-dependencies via the practiceDependencyNames array.
 
-## 10 Conclusion
+## 10 Visual Assets and Practice Elements
+
+Visual assets (diagrams, templates, icons) enhance practice comprehension and adoption. The Practice Language supports declarative asset references at both the practice/method level and individual element level.
+
+### 10.1 Asset Declaration
+
+Assets are declared in a top-level `assets` array on Practice or Method objects. Each asset has:
+
+- **`name`** (required): Unique identifier for symbolic referencing
+- **`type`** (required): Asset category - `image`, `diagram`, `template`, `icon`, or `font-character`
+- **`description`** (optional): Human-readable explanation of what the asset depicts
+
+**File-based assets** use:
+- `path`: Relative path (e.g., `assets/diagrams/platform-evolution.svg`)
+- `mimeType`: MIME type (e.g., `image/svg+xml`, `image/png`, `application/pdf`)
+- `checksum`: SHA-256 hash for integrity verification (format: `sha256:...`)
+- `url`: External URL for remote hosting
+- `dataUri`: Base64-encoded data URI for embedded small assets (<10KB)
+
+**Font character assets** use:
+- `fontFamily`: Font library name (e.g., `Font Awesome 6 Free`, `Material Icons`)
+- `fontCharacter`: Character identifier (e.g., `fa-cog`, `settings`, ``)
+- `fontWeight`: Font weight (e.g., `400`, `900`, `bold`)
+
+### 10.2 Element-Level Asset References
+
+Any practice element (Alpha, Activity, WorkProduct, Persona, Pattern, etc.) can reference an asset via the `assetName` property. This creates a symbolic link to an asset in the top-level `assets` array.
+
+**Example**:
+```json
+{
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "Platform infrastructure capability",
+      "assetName": "platform-state-diagram",
+      "states": [...]
+    }
+  ],
+  "activities": [
+    {
+      "name": "Design Architecture",
+      "description": "Create platform architecture",
+      "assetName": "architecture-template"
+    }
+  ],
+  "assets": [
+    {
+      "name": "platform-state-diagram",
+      "description": "State progression for Platform alpha",
+      "type": "diagram",
+      "path": "assets/diagrams/platform-states.svg",
+      "mimeType": "image/svg+xml",
+      "checksum": "sha256:abc123..."
+    },
+    {
+      "name": "architecture-template",
+      "description": "Architecture decision record template",
+      "type": "template",
+      "url": "https://example.com/templates/adr.pdf"
+    },
+    {
+      "name": "team-icon",
+      "description": "Team collaboration icon",
+      "type": "font-character",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "fa-users",
+      "fontWeight": "900"
+    }
+  ]
+}
+```
+
+### 10.3 Distribution Strategies
+
+Assets support multiple distribution models:
+
+1. **Bundle Distribution**: Practice JSON + `assets/` directory packaged together
+2. **Single-File Distribution**: Small assets embedded as data URIs within JSON
+3. **Remote Hosting**: Assets hosted externally, referenced by URL
+4. **Font Characters**: Icon fonts loaded separately, referenced by family/character
+
+### 10.4 Semantic Guidance
+
+- **One asset per element**: Each element can reference one primary visual asset via `assetName`
+- **Asset names must be unique**: Within a practice or method, asset names are unique identifiers
+- **Optional integrity verification**: `checksum` enables validation that downloaded/extracted assets match expected content
+- **Accessibility**: Include meaningful `description` fields to support alternative text for visual assets
+
+Assets are **optional metadata** that enhance practices but are never required for core functionality. Practices without assets remain fully valid.
+
+## 11 Conclusion
 
 The transformation of organizational endeavors from static, document-driven processes to dynamic, state-driven ecosystems requires a highly rigorous operational architecture. The Practice Language JSON Schema provides the structural capacity to model extreme complexity across any domain. Maximizing its efficacy, however, demands profound semantic guidance. By enforcing strict ontological tagging taxonomies, embedding blocking failure logic and quantitative thresholds into validation checklists, and defining automated mathematical triggers for Alpha state transitions, enterprise architects eliminate process ambiguity. Furthermore, operationalizing the schema through strict physical Work Product URI linking, explicitly linked organizational Persona Groups, and programmatic root-level methodology discrimination ensures that the methodology aligns precisely with operational reality. By orchestrating these elements through conditional Pattern Views tethered to specific cognitive narrative frameworks, this semantic guidance framework transforms the JSON Schema from a mere structural validator into a prescriptive, highly actionable operational engine capable of driving modern hyperscale transformations.
