@@ -32,7 +32,7 @@ python3 fix-property-names.py practice-1.json practice-2.json
 | PatternView | `alphaStateProgressions` | `alphaStates` |
 
 **When to use:**
-- Automatically run by `/translate-methodology` skill after Phase 2
+- Automatically run by `/generate-method` skill after Phase 2
 - After manual edits to JSON files that may have introduced naming issues
 - Before schema validation
 
@@ -81,7 +81,7 @@ python3 validate-baseline-references.py
 - Example: "In Use" → "Performing" for Team, "Available" for Inference Endpoint
 
 **When to use:**
-- Automatically run by `/translate-methodology` skill after Phase 2.5
+- Automatically run by `/generate-method` skill after Phase 2.5
 - After manual edits to JSON files
 - Before schema validation
 - When adding new personas or activities
@@ -127,7 +127,7 @@ python3 validate-internal-integrity.py
 - Ensures pattern views correctly reference activities from all practices
 
 **When to use:**
-- Automatically run by `/translate-methodology` skill after Phase 2.6
+- Automatically run by `/generate-method` skill after Phase 2.6
 - After manually modifying a method JSON
 - Before publishing or sharing a method
 - To diagnose broken references
@@ -248,7 +248,7 @@ All cross-practice references are valid!
 **Typical Workflow:**
 ```bash
 # 1. Generate method via skill
-/translate-methodology [sources]
+/generate-method [sources]
 
 # 2. If you have separate practice files (not typical), validate cross-practice integrity
 cd practices/my-method/
@@ -259,7 +259,7 @@ python3 ../../utils/validate-cross-practice-integrity.py
 python3 ../../utils/rebuild-method-json.py
 ```
 
-**Note:** This utility is primarily for development scenarios where practices are maintained as separate files. The `/translate-methodology` skill typically produces a single unified method JSON, which is validated by `validate-internal-integrity.py` instead.
+**Note:** This utility is primarily for development scenarios where practices are maintained as separate files. The `/generate-method` skill typically produces a single unified method JSON, which is validated by `validate-internal-integrity.py` instead.
 
 ---
 
@@ -378,7 +378,7 @@ python3 rebuild-method-json.py method-name.json practice-1.json practice-2.json
 For a Method with multiple practices:
 
 ```bash
-# 1. Generate JSON via /translate-methodology skill
+# 1. Generate JSON via /generate-method skill
 # (Phases 1, 1.5, 2, 2.5, 2.6, and 2.7 complete - all automatic)
 
 # 2. If manual edits are needed, re-run validation:
@@ -397,7 +397,7 @@ ajv validate -s ../../deps/language.schema.json -d my-method.json
 For a single Practice:
 
 ```bash
-# 1. Generate JSON via /translate-methodology skill
+# 1. Generate JSON via /generate-method skill
 # (Phases 1, 1.5, 2, 2.5, 2.6, and 2.7 complete - all automatic)
 
 # 2. If manual edits are needed, re-run validation:
@@ -414,9 +414,9 @@ ajv validate -s ../../deps/language.schema.json -d my-practice.json
 
 ---
 
-## Integration with /translate-methodology Skill
+## Integration with /generate-method Skill
 
-These utilities are automatically integrated into the `/translate-methodology` skill:
+These utilities are automatically integrated into the `/generate-method` skill:
 
 **Phase 2.5 (Schema Compliance):**
 1. The skill copies utility scripts to the practice directory

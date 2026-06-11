@@ -1,13 +1,15 @@
 ---
-name: translate-methodology-v2
-description: Transform methodology documentation into Practice Language JSON using clean 3-phase workflow (Analysis → Mapping → JSON)
+name: generate-method
+description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
-  - "translate.*methodology.*v2"
+  - "generate.*method"
+  - "generate.*practice"
+  - "create.*method"
   - "analyze.*methodology"
   - "map.*methodology"
 ---
 
-# Methodology Translation Skill (3-Phase)
+# Method Generation Skill (3-Phase)
 
 This skill transforms enterprise methodology documentation into schema-compliant Practice Language JSON using a clean three-phase workflow that delegates to reference documents rather than embedding knowledge.
 

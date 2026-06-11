@@ -1,14 +1,11 @@
 """
 Practice Language Translation Utilities
 
-This package provides utilities for the translate-methodology skill:
+This package provides utilities for the generate-method skill:
 - Resource management (baseline/schema loading)
-- Module validation (size checking, splitting)
-- Practice building (incremental JSON construction)
-- Integrity validation (cross-practice, schema compliance)
-- Session management (checkpoints, resume)
+- Practice validation (validate-practice-json.py)
 - Citation parsing (URL extraction)
-- Subagent coordination (parallel processing)
+- Practice building and extraction (legacy)
 """
 
 __version__ = "1.0.0"

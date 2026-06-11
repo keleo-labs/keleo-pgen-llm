@@ -1,171 +1,95 @@
-# Practice Language Translation Prompts
+# Prompts for generate-method
 
-This directory contains all LLM prompts used by the `/translate-methodology` skill to transform enterprise methodology documentation into schema-compliant Practice Language JSON.
+This directory contains the three-phase prompt system for the `generate-method` skill.
 
-## Directory Structure
+## Architecture
+
+The v2 workflow uses a simplified 3-phase pipeline:
 
 ```
-prompts/
-├── README.md                      # This file
-├── phase-1-modules/               # Phase 1: Modular research analysis
-│   ├── 00-analysis-plan.md
-│   ├── 00-method-plan.md
-│   ├── 01-practice-details.md
-│   ├── 02-citations.md
-│   ├── 03-alphas.md
-│   ├── 04-workproducts.md
-│   ├── 05-activities-roles.md
-│   ├── 06-patterns.md
-│   ├── 07-aliases.md
-│   └── 08-method-assembly.md
-├── phase-1-assembly.md            # Phase 1.5: Assemble modules and validate
-├── phase-2-modular.md             # Phase 2: Incremental JSON translation
-├── phase-2-segments/              # Phase 2: Segment generation rules
-│   └── segment-generation-rules.md
-├── reference/                     # Reference documentation
-│   ├── improvements-history.md
-│   ├── schema-violations-complete.md
-│   └── schema-violations-found.md
-└── archive/                       # Deprecated prompts (historical reference)
-    ├── phase-1-monolithic.md
-    └── phase-2-monolithic.md
+Phase 1: Analysis → Phase 2: Mapping → Phase 3: JSON
 ```
 
-## Active Prompts
+## Phase Prompts
 
-### Phase 1: Research Analysis (Modular)
+### Phase 1: Analysis
+**File:** `phase-1-analysis.md`
 
-**Directory:** [phase-1-modules/](phase-1-modules/)
+Analyzes source methodology documentation and structures it into:
+- Outcomes and concerns
+- Activities and workflows
+- Practices and value streams
+- Four-perspective analysis (Business, Technology, People, Process)
 
-Generates focused research modules (3K-20K words each) that analyze source methodologies using the four-perspective framework.
+**Output:** `01-analysis-report.md` (~30-50K words)
 
-**Modules:**
-- **00-analysis-plan.md** - Strategic analysis and planning (for single practices)
-- **00-method-plan.md** - Method composition planning (for multi-practice methods)
-- **01-practice-details.md** - Practice metadata, tags, context
-- **02-citations.md** - Bibliographic references (5-15 authoritative sources)
-- **03-alphas.md** - Alpha definitions with states and checklists
-- **04-workproducts.md** - Work product definitions with LODs
-- **05-activities-roles.md** - Activities with technique narratives, personas, teams
-- **06-patterns.md** - Pattern orchestrations and views
-- **07-aliases.md** - Terminology mappings (if source uses different terms)
-- **08-method-assembly.md** - Method integration layer (for multi-practice methods)
+### Phase 2: Mapping
+**File:** `phase-2-mapping.md`
 
-**Output:** 7-9 markdown files per practice (~50-80K words total)
+Maps analyzed elements to the baseline practice using Practice Language semantics:
+- Reads `references/semantics.md` for semantic guidance
+- Maps to baseline alphas, states, activities, work products
+- Creates citation mappings
+- Defines personas and teams
 
-### Phase 1.5: Assembly
+**Output:** `02-mapping-guide.md` (~40-60K words)
 
-**File:** [phase-1-assembly.md](phase-1-assembly.md)
+### Phase 3: JSON Generation
+**File:** `phase-3-json.md`
 
-Concatenates Phase 1 modules into complete research report and generates cross-reference validation index.
+Generates schema-compliant JSON from the mapping guide:
+- Reads mapping guide and baseline practice
+- Builds JSON incrementally
+- Validates with `utils/validate-practice-json.py`
 
-**Output:**
-- `research-report.md` - Assembled documentation
-- `cross-reference-index.json` - Validation index
+**Output:** `<practice-name>.json` (schema-compliant)
 
-### Phase 2: JSON Translation
+## Reference Documents
 
-**File:** [phase-2-modular.md](phase-2-modular.md)
+All prompts reference these documents (loaded via Read tool):
 
-Translates Phase 1 modules into schema-compliant JSON using incremental approach (reads modules directly, not the 80K report).
+- `references/domain-framework.md` - Four-perspective analysis framework
+- `references/semantics.md` - Practice Language semantic guidance
+- `references/workproduct-assessment-rubric.csv` - Maturity rubric
+- `deps/language.schema.json` - JSON Schema definition
+- `deps/platform-adoption-kernel.json` - Baseline framework
 
-**Segment Rules:** [phase-2-segments/segment-generation-rules.md](phase-2-segments/segment-generation-rules.md)
+## Key Differences from v1
 
-**Output:** Schema-compliant Practice or Method JSON
+**v1 (Archived):**
+- 8-phase pipeline with 9+ modular markdown files
+- Embedded knowledge in skill orchestration
+- Multiple validation utilities (4+)
+- Complex assembly and segmentation
 
-## Reference Documentation
+**v2 (Current):**
+- Simple 3-phase workflow
+- Reference-driven (reads semantics.md, schema.json)
+- Single validation script
+- Direct generation without assembly steps
 
-**Directory:** [reference/](reference/)
+## Usage
 
-Documentation of schema issues, validation patterns, and historical improvements:
+These prompts are orchestrated by the `/generate-method` skill. They can also be used manually:
 
-- **improvements-history.md** - Historical requirements and improvements checklist
-- **schema-violations-complete.md** - Complete catalog of schema violations found during development
-- **schema-violations-found.md** - Specific validation results from practice translations
-
-These documents inform prompt development and provide troubleshooting guidance.
-
-## Archived Prompts
-
-**Directory:** [archive/](archive/)
-
-Deprecated prompts kept for historical reference:
-
-- **phase-1-monolithic.md** - Original single-pass Phase 1 approach (replaced by modular)
-- **phase-2-monolithic.md** - Original single-pass Phase 2 approach (replaced by modular)
-
-These prompts are **not used** by the current skill but are preserved to document the evolution of the translation approach.
-
-## Prompt Development Guidelines
-
-### When to Update Prompts
-
-**Phase 1 prompts** should be updated when:
-- Source methodology analysis needs improvement
-- Four-perspective framework application changes
-- Narrative quality or conciseness rules evolve
-- New semantic patterns discovered in `references/semantics.md`
-
-**Phase 2 prompts** should be updated when:
-- Schema changes (`deps/language.schema.json`)
-- Semantic rules change (`references/semantics.md`)
-- Common validation errors discovered
-- JSON structure or property names change
-
-### Prompt Optimization Principles
-
-1. **Self-Contained:** Each prompt includes all context needed (no external dependencies)
-2. **Resource References:** Explicitly list all files to read (schema, baseline, reference docs)
-3. **Execution Instructions:** Clear step-by-step process for the LLM to follow
-4. **Quality Standards:** Specific rules for conciseness, completeness, accuracy
-5. **Examples:** Show correct vs incorrect patterns where helpful
-
-### Testing Prompt Changes
-
-After modifying a prompt:
-1. **Test on existing practice** - Regenerate specific module and compare to previous version
-2. **Validate quality** - Ensure descriptions are single sentences, narratives are focused
-3. **Check schema compliance** - Verify JSON output passes all validation steps
-4. **Document changes** - Note what was changed and why in commit message
-
-## Integration with Skill
-
-The `/translate-methodology` skill references these prompts at specific execution steps:
-
-**Phase 1 Module Generation:**
 ```bash
-# Skill reads and applies each module prompt sequentially
-prompts/phase-1-modules/00-analysis-plan.md
-prompts/phase-1-modules/01-practice-details.md
-prompts/phase-1-modules/02-citations.md
-# ... etc
+# Phase 1: Analysis
+# Read prompts/phase-1-analysis.md and apply to source materials
+
+# Phase 2: Mapping
+# Read prompts/phase-2-mapping.md and apply to analysis report
+
+# Phase 3: JSON
+# Read prompts/phase-3-json.md and apply to mapping guide
+# Validate: python3 utils/validate-practice-json.py <practice-name>.json
 ```
 
-**Phase 1.5 Assembly:**
-```bash
-prompts/phase-1-assembly.md
-```
+## Modifying Prompts
 
-**Phase 2 Translation:**
-```bash
-prompts/phase-2-modular.md
-```
+When modifying prompts:
 
-## Related Documentation
+- **Phase 1:** Changes affect analysis structure, perspective analysis, content extraction
+- **Phase 2:** Changes affect mapping strategy, semantic interpretation, baseline alignment
+- **Phase 3:** Changes affect JSON structure, validation rules, schema compliance
 
-- **Skill Documentation:** `.claude/skills/translate-methodology/SKILL.md`
-- **Workflow Optimization:** `.claude/skills/translate-methodology/WORKFLOW-OPTIMIZATION.md`
-- **Parallel Execution:** `.claude/skills/translate-methodology/PARALLEL-EXECUTION-GUIDE.md`
-- **Schema Reference:** `deps/language.schema.json`
-- **Semantic Guidance:** `references/semantics.md`
-- **Project Instructions:** `CLAUDE.md`
-
-## Version History
-
-**Current Version:** Modular two-phase pipeline (Phase 1 modules + Phase 2 incremental)
-
-**Previous Versions:**
-- Monolithic single-pass approach (archived)
-- Early Gemini-specific prompts (removed, replaced with model-agnostic versions)
-
-See `reference/improvements-history.md` for detailed evolution of prompt requirements.
+Always test changes with a complete end-to-end workflow to verify they don't break downstream phases.
