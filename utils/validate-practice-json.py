@@ -155,6 +155,7 @@ class PracticeValidator:
         practice_alphas = {}
         practice_alpha_states = defaultdict(set)
 
+        # Index alphas from ALL practices in method (for cross-practice references)
         for practice in practices:
             # Index practice-defined alphas and merge states
             for alpha in practice.get('alphas', []):
@@ -175,11 +176,28 @@ class PracticeValidator:
         for practice_idx, practice in enumerate(practices):
             prefix = f"practices[{practice_idx}]" if is_method else ""
 
+            # Build allowed alphas for THIS practice
+            # Includes: baseline + practice-defined + cross-practice dependencies
+            allowed_alphas = set(self.baseline_alphas.keys())
+            allowed_alphas.update(practice_alphas.keys())
+
+            # For cross-practice dependencies (via practiceDependencyNames),
+            # allow alpha references without validation since dependency practices
+            # may not be available at validation time
+            practice_deps = practice.get('practiceDependencyNames', [])
+            has_cross_practice_deps = len(practice_deps) > 0
+
             # Validate competency references
             has_errors |= self._validate_competencies(practice, prefix)
 
             # Validate alpha and state references
-            has_errors |= self._validate_alphas(practice, merged_alpha_states, prefix)
+            has_errors |= self._validate_alphas(
+                practice,
+                merged_alpha_states,
+                prefix,
+                allowed_alphas,
+                has_cross_practice_deps
+            )
 
             # Validate focus references
             has_errors |= self._validate_focuses(practice, prefix)
@@ -270,44 +288,47 @@ class PracticeValidator:
         else:
             return f"Check baseline competencies: {sorted(self.baseline_competencies)}"
 
-    def _validate_alphas(self, practice: Dict, merged_alpha_states: Dict, prefix: str) -> bool:
+    def _validate_alphas(self, practice: Dict, merged_alpha_states: Dict, prefix: str,
+                         allowed_alphas: set, has_cross_practice_deps: bool) -> bool:
         """Validate alpha and state references"""
         has_errors = False
 
-        # Collect all valid alpha names (baseline + practice-defined)
-        valid_alphas = set(self.baseline_alphas.keys())
-        for alpha in practice.get('alphas', []):
-            valid_alphas.add(alpha['name'])
+        # Use provided allowed_alphas set (includes baseline + practice-defined)
+        valid_alphas = allowed_alphas
 
-        # Check new alphas have contributesTo
+        # Check new alphas have contributesTo (or are from practice dependencies)
         for idx, alpha in enumerate(practice.get('alphas', [])):
             alpha_name = alpha['name']
             path = f"{prefix}.alphas[{idx}]" if prefix else f"alphas[{idx}]"
+            contributes_to = alpha.get('contributesTo')
 
             # If not a baseline alpha, must have contributesTo
             if alpha_name not in self.baseline_alphas:
-                if not alpha.get('contributesTo'):
+                if not contributes_to:
                     self.errors.append({
                         "category": "baseline",
                         "severity": "error",
                         "path": f"{path}.contributesTo",
                         "issue": f"New alpha '{alpha_name}' missing contributesTo (floating alpha)",
-                        "expected": "Name of baseline alpha this extends",
+                        "expected": "Name of baseline alpha this extends (or practice-local alpha)",
                         "actual": None,
-                        "suggestion": f"Add contributesTo pointing to one of: {sorted(self.baseline_alphas.keys())}"
+                        "suggestion": f"Add contributesTo pointing to one of: {sorted(self.baseline_alphas.keys())} or practice-local alpha defined earlier"
                     })
                     has_errors = True
-                elif alpha['contributesTo'] not in self.baseline_alphas:
-                    self.errors.append({
-                        "category": "baseline",
-                        "severity": "error",
-                        "path": f"{path}.contributesTo",
-                        "issue": f"contributesTo references unknown baseline alpha: '{alpha['contributesTo']}'",
-                        "expected": f"One of: {sorted(self.baseline_alphas.keys())}",
-                        "actual": alpha['contributesTo'],
-                        "suggestion": f"Use exact baseline alpha name (case-sensitive)"
-                    })
-                    has_errors = True
+                elif contributes_to not in self.baseline_alphas and contributes_to not in valid_alphas:
+                    # contributesTo references unknown alpha (not baseline, not in this practice/method)
+                    # If practice has dependencies, allow reference (may be from external practice)
+                    if not has_cross_practice_deps:
+                        self.errors.append({
+                            "category": "baseline",
+                            "severity": "error",
+                            "path": f"{path}.contributesTo",
+                            "issue": f"contributesTo references unknown alpha: '{contributes_to}'",
+                            "expected": f"One of: {sorted(self.baseline_alphas.keys())} or practice-local alpha",
+                            "actual": contributes_to,
+                            "suggestion": f"Use exact baseline alpha name (case-sensitive) or add to practiceDependencyNames if from external practice"
+                        })
+                        has_errors = True
 
         # Validate AlphaContribution references in activities
         for idx, activity in enumerate(practice.get('activities', [])):
@@ -319,27 +340,43 @@ class PracticeValidator:
                 contrib_path = f"{path}.contributesTo[{contrib_idx}]"
 
                 if alpha_name and alpha_name not in valid_alphas:
-                    self.errors.append({
-                        "category": "baseline",
-                        "severity": "error",
-                        "path": f"{contrib_path}.alphaName",
-                        "issue": f"Unknown alpha: '{alpha_name}'",
-                        "expected": f"One of: {sorted(valid_alphas)}",
-                        "actual": alpha_name,
-                        "suggestion": "Use exact alpha name (case-sensitive)"
-                    })
-                    has_errors = True
-
-                if alpha_name and state_name:
-                    if state_name not in merged_alpha_states.get(alpha_name, set()):
+                    # If practice has cross-practice dependencies, allow reference (may be from external practice)
+                    if not has_cross_practice_deps:
                         self.errors.append({
                             "category": "baseline",
                             "severity": "error",
-                            "path": f"{contrib_path}.stateName",
-                            "issue": f"Unknown state '{state_name}' for alpha '{alpha_name}'",
-                            "expected": f"One of: {sorted(merged_alpha_states.get(alpha_name, set()))}",
-                            "actual": state_name,
-                            "suggestion": f"Check state names defined in {alpha_name} alpha"
+                            "path": f"{contrib_path}.alphaName",
+                            "issue": f"Unknown alpha: '{alpha_name}'",
+                            "expected": f"One of: {sorted(valid_alphas)}",
+                            "actual": alpha_name,
+                            "suggestion": "Use exact alpha name (case-sensitive) or add to practiceDependencyNames if from external practice"
+                        })
+                        has_errors = True
+
+                if alpha_name and state_name:
+                    # Only validate state if alpha is known (in merged_alpha_states)
+                    if alpha_name in merged_alpha_states:
+                        if state_name not in merged_alpha_states.get(alpha_name, set()):
+                            self.errors.append({
+                                "category": "baseline",
+                                "severity": "error",
+                                "path": f"{contrib_path}.stateName",
+                                "issue": f"Unknown state '{state_name}' for alpha '{alpha_name}'",
+                                "expected": f"One of: {sorted(merged_alpha_states.get(alpha_name, set()))}",
+                                "actual": state_name,
+                                "suggestion": f"Check state names defined in {alpha_name} alpha"
+                            })
+                            has_errors = True
+                    elif not has_cross_practice_deps:
+                        # Alpha unknown and no cross-practice deps - error
+                        self.errors.append({
+                            "category": "baseline",
+                            "severity": "error",
+                            "path": f"{contrib_path}.alphaName",
+                            "issue": f"Cannot validate state for unknown alpha: '{alpha_name}'",
+                            "expected": f"Define alpha in practice or add to practiceDependencyNames",
+                            "actual": alpha_name,
+                            "suggestion": "Add alpha definition or declare practice dependency"
                         })
                         has_errors = True
 
@@ -356,27 +393,43 @@ class PracticeValidator:
                     contrib_path = f"{lod_path}.contributesTo[{contrib_idx}]"
 
                     if alpha_name and alpha_name not in valid_alphas:
-                        self.errors.append({
-                            "category": "baseline",
-                            "severity": "error",
-                            "path": f"{contrib_path}.alphaName",
-                            "issue": f"Unknown alpha: '{alpha_name}'",
-                            "expected": f"One of: {sorted(valid_alphas)}",
-                            "actual": alpha_name,
-                            "suggestion": "Use exact alpha name (case-sensitive)"
-                        })
-                        has_errors = True
-
-                    if alpha_name and state_name:
-                        if state_name not in merged_alpha_states.get(alpha_name, set()):
+                        # If practice has cross-practice dependencies, allow reference (may be from external practice)
+                        if not has_cross_practice_deps:
                             self.errors.append({
                                 "category": "baseline",
                                 "severity": "error",
-                                "path": f"{contrib_path}.stateName",
-                                "issue": f"Unknown state '{state_name}' for alpha '{alpha_name}'",
-                                "expected": f"One of: {sorted(merged_alpha_states.get(alpha_name, set()))}",
-                                "actual": state_name,
-                                "suggestion": f"Check state names defined in {alpha_name} alpha"
+                                "path": f"{contrib_path}.alphaName",
+                                "issue": f"Unknown alpha: '{alpha_name}'",
+                                "expected": f"One of: {sorted(valid_alphas)}",
+                                "actual": alpha_name,
+                                "suggestion": "Use exact alpha name (case-sensitive) or add to practiceDependencyNames if from external practice"
+                            })
+                            has_errors = True
+
+                    if alpha_name and state_name:
+                        # Only validate state if alpha is known (in merged_alpha_states)
+                        if alpha_name in merged_alpha_states:
+                            if state_name not in merged_alpha_states.get(alpha_name, set()):
+                                self.errors.append({
+                                    "category": "baseline",
+                                    "severity": "error",
+                                    "path": f"{contrib_path}.stateName",
+                                    "issue": f"Unknown state '{state_name}' for alpha '{alpha_name}'",
+                                    "expected": f"One of: {sorted(merged_alpha_states.get(alpha_name, set()))}",
+                                    "actual": state_name,
+                                    "suggestion": f"Check state names defined in {alpha_name} alpha"
+                                })
+                                has_errors = True
+                        elif not has_cross_practice_deps:
+                            # Alpha unknown and no cross-practice deps - error
+                            self.errors.append({
+                                "category": "baseline",
+                                "severity": "error",
+                                "path": f"{contrib_path}.alphaName",
+                                "issue": f"Cannot validate state for unknown alpha: '{alpha_name}'",
+                                "expected": f"Define alpha in practice or add to practiceDependencyNames",
+                                "actual": alpha_name,
+                                "suggestion": "Add alpha definition or declare practice dependency"
                             })
                             has_errors = True
 
@@ -486,6 +539,14 @@ class PracticeValidator:
         all_work_products = set()
         all_activities = set()
 
+        # Track which practices have cross-practice dependencies
+        practices_with_deps = {}
+        for practice in practices:
+            practice_name = practice.get('name')
+            practice_deps = practice.get('practiceDependencyNames', [])
+            if practice_deps:
+                practices_with_deps[practice_name] = practice_deps
+
         # Index baseline elements
         for alpha in self.baseline.get('alphas', []):
             all_alphas.add(alpha['name'])
@@ -509,6 +570,8 @@ class PracticeValidator:
         # Validate each practice
         for practice_idx, practice in enumerate(practices):
             prefix = f"practices[{practice_idx}]" if is_method else ""
+            practice_name = practice.get('name')
+            has_cross_practice_deps = practice_name in practices_with_deps
 
             # Validate activity -> work product references
             for act_idx, activity in enumerate(practice.get('activities', [])):
@@ -556,28 +619,45 @@ class PracticeValidator:
                             state_name = alpha_state.get('stateName')
 
                             if alpha_name and alpha_name not in all_alphas:
-                                self.errors.append({
-                                    "category": "integrity",
-                                    "severity": "error",
-                                    "path": f"{view_path}.alphaStates[{as_idx}].alphaName",
-                                    "issue": f"Pattern view references undefined alpha: '{alpha_name}'",
-                                    "expected": f"One of: {sorted(all_alphas)}",
-                                    "actual": alpha_name,
-                                    "suggestion": "Define alpha or correct reference"
-                                })
-                                has_errors = True
+                                # If practice has cross-practice deps, allow reference (may be from dependency)
+                                if not has_cross_practice_deps:
+                                    self.errors.append({
+                                        "category": "integrity",
+                                        "severity": "error",
+                                        "path": f"{view_path}.alphaStates[{as_idx}].alphaName",
+                                        "issue": f"Pattern view references undefined alpha: '{alpha_name}'",
+                                        "expected": f"One of: {sorted(all_alphas)}",
+                                        "actual": alpha_name,
+                                        "suggestion": "Define alpha or add to practiceDependencyNames if from external practice"
+                                    })
+                                    has_errors = True
 
-                            if alpha_name and state_name and state_name not in all_alpha_states.get(alpha_name, set()):
-                                self.errors.append({
-                                    "category": "integrity",
-                                    "severity": "error",
-                                    "path": f"{view_path}.alphaStates[{as_idx}].stateName",
-                                    "issue": f"Pattern view references undefined state: '{state_name}' for alpha '{alpha_name}'",
-                                    "expected": f"One of: {sorted(all_alpha_states.get(alpha_name, set()))}",
-                                    "actual": state_name,
-                                    "suggestion": "Define state or correct reference"
-                                })
-                                has_errors = True
+                            if alpha_name and state_name:
+                                # Only validate state if alpha is known
+                                if alpha_name in all_alpha_states:
+                                    if state_name not in all_alpha_states.get(alpha_name, set()):
+                                        self.errors.append({
+                                            "category": "integrity",
+                                            "severity": "error",
+                                            "path": f"{view_path}.alphaStates[{as_idx}].stateName",
+                                            "issue": f"Pattern view references undefined state: '{state_name}' for alpha '{alpha_name}'",
+                                            "expected": f"One of: {sorted(all_alpha_states.get(alpha_name, set()))}",
+                                            "actual": state_name,
+                                            "suggestion": "Define state or correct reference"
+                                        })
+                                        has_errors = True
+                                elif not has_cross_practice_deps:
+                                    # Alpha unknown and no cross-practice deps
+                                    self.errors.append({
+                                        "category": "integrity",
+                                        "severity": "error",
+                                        "path": f"{view_path}.alphaStates[{as_idx}].alphaName",
+                                        "issue": f"Cannot validate state for unknown alpha: '{alpha_name}'",
+                                        "expected": f"Define alpha in practice or add to practiceDependencyNames",
+                                        "actual": alpha_name,
+                                        "suggestion": "Add alpha definition or declare practice dependency"
+                                    })
+                                    has_errors = True
 
         return not has_errors
 

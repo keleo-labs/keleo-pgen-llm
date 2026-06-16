@@ -692,6 +692,261 @@ Narrative: [from Phase 1 "How to Perform" section]
 
 **CRITICAL:** Activity names must be specific and different from Activity Space names
 
+### Step 7.5: Alpha-State-Activity Gap Analysis (REQUIRED)
+
+**CRITICAL: Every alpha state beyond the initial state MUST have at least one activity supporting that progression.**
+
+After completing initial activity mapping, systematically identify missing activities:
+
+**For EACH alpha in the practice (redeclarations and specializations):**
+
+1. **Evaluate the initial state** (State 1) to determine if it needs bootstrap activities:
+   
+   **Null Point Initial State** (no activity needed):
+   - State represents absence/non-existence of the concern
+   - Examples: "Not Identified", "Not Started", "Unknown", "Nonexistent"
+   - No work required - this is the default/empty state
+   - **Action**: Skip - no activity needed
+   
+   **Prepared Initial State** (bootstrap activity needed):
+   - State represents an actual achievement or prepared starting position
+   - State description includes verbs suggesting work was done
+   - Examples: "Identified", "Initiated", "Conceived", "Scoped", "Architecture Selected"
+   - Work is required to reach this state from nothing
+   - **Action**: Add bootstrap activity supporting this initial state
+   
+   **Heuristics for Prepared Initial States:**
+   - State name contains achievement verbs: Identified, Initiated, Scoped, Selected, Established, Recognized
+   - State checklist has substantive items (not just "concern exists")
+   - State description says what has been accomplished, not what is absent
+   
+   **Real Baseline Examples:**
+   
+   **Prepared Initial States (need bootstrap activities):**
+   - **Opportunity: "Initiated"** - "The desire to adopt a platform is identified"
+     - Bootstrap activity needed: "Initiate Platform Opportunity" or "Recognize Platform Need"
+     - Work required: Someone must identify/recognize the opportunity
+   
+   - **Platform: "Architecture Selected"** - "The platform architecture has been selected"
+     - Bootstrap activity needed: "Select Platform Architecture"
+     - Work required: Architecture evaluation and selection process
+   
+   - **Requirements: "Conceived"** - "The need for requirements is agreed"
+     - Bootstrap activity needed: "Conceive Requirement Needs"
+     - Work required: Stakeholders must agree on need for requirements
+   
+   **Null Point Initial States (no activity needed):**
+   - **Team: "Seeded"** - "The team is needed and its mission is clear"
+     - This is typically the starting state - team doesn't exist yet
+     - However, if checklist has items like "mission defined", "charter created", then it's actually prepared
+     - **Evaluation needed**: Read state checklist to determine
+   
+   **Ambiguous Cases (read checklist to decide):**
+   - If state name suggests preparedness BUT checklist is empty → likely null point
+   - If state name is passive BUT checklist has achievements → likely prepared
+   - When in doubt: if reaching the state from nothing requires deliberate action → prepared (needs bootstrap)
+   
+2. **List all subsequent alpha states** (State 2+)
+   - State 2: [requires activities to achieve]
+   - State 3: [requires activities to achieve]
+   - ...
+
+2. **For EACH state requiring coverage (prepared initial + all subsequent states), check if activities exist that:**
+   - Have `contributesTo` pointing to this {alphaName, stateName}
+   - If YES: Activity coverage exists ✓
+   - If NO: Activity gap identified → infer missing activity
+
+3. **Infer missing activities using these sources:**
+   
+   **Source 1 - Methodology Content:**
+   - Review Phase 1 analysis for activities/workflows related to this alpha
+   - Look for verbs and actions associated with state progression
+   - Example: "Platform must be provisioned" → Activity: "Provision Platform Infrastructure"
+   
+   **Source 2 - Parent Alpha Patterns (for new alphas with contributesTo):**
+   - Read baseline parent alpha's related activities
+   - Identify baseline ActivitySpaces that contribute to parent alpha states
+   - Specialize/adapt baseline activities for this specialized alpha
+   - Example: If new alpha "Platform Capability" contributesTo "Platform"
+     - Review baseline activities contributing to Platform states
+     - Adapt "Design Platform Architecture" → "Design Capability Interface"
+     - Adapt "Deploy Platform Services" → "Deploy Capability Implementation"
+   
+   **Source 3 - Baseline ActivitySpace Patterns:**
+   - Review baseline ActivitySpaces that semantically relate to this alpha's focus
+   - Look for activities in those spaces that support similar progressions
+   - Example: For "Security Framework" alpha (Solution focus):
+     - Review "Architect and Build the Foundation" ActivitySpace
+     - Review "Govern and Evolve" ActivitySpace
+     - Adapt existing activity patterns to security context
+
+4. **For each inferred activity, define:**
+   
+   ```
+   Activity Name: [Specific action supporting state progression]
+   Description: [What this activity accomplishes - single sentence]
+   Activity Space Name: [Baseline or practice activity space]
+   Focus Name: [Value | Solution | Endeavor - match alpha focus]
+   Contributes To:
+     - Alpha Name: [target alpha]
+       State Name: [target state this activity progresses toward]
+   Works On: [Work products created/updated]
+     - Work Product Name: [relevant work product]
+       Level Of Detail Name: [level produced/consumed]
+   Required Competencies: [baseline competency names]
+   Recommended Competency Levels: [competency levels]
+   Involves: [PersonaGroup names]
+   Narrative: [Technique narrative with source-derived guidance]
+     - Overview: [What this activity accomplishes]
+     - Technique: [How to perform - inferred from source or baseline patterns]
+     - Common Pitfalls: [What to avoid - inferred from best practices]
+   Citations: [Reference source material if explicit, otherwise baseline practice]
+   ```
+
+**Gap Analysis Checklist Template:**
+
+Create a table showing coverage:
+
+```markdown
+## Alpha-State-Activity Coverage Matrix
+
+| Alpha Name | State Name | Seq | State Type | Activities Contributing | Status | Action |
+|:-----------|:-----------|:----|:-----------|:----------------------|:-------|:-------|
+| Opportunity | Initiated | 1 | Prepared | Initiate Platform Opportunity | ✓ Covered | None |
+| Opportunity | Determined | 2 | Progression | Determine Platform Value | ✓ Covered | None |
+| Platform | Architecture Selected | 1 | Prepared | - | ❌ Gap | ADD: "Select Platform Architecture" (bootstrap) |
+| Platform | Baselined | 2 | Progression | - | ❌ Gap | ADD: "Baseline Platform Configuration" |
+| Platform | Provisioned | 3 | Progression | Provision Infrastructure | ✓ Covered | None |
+| Requirements | Conceived | 1 | Null Point | - | ⊘ Skip | None (null point - no activity needed) |
+| Requirements | Bounded | 2 | Progression | Define Requirement Boundaries | ✓ Covered | None |
+| Platform Capability | Identified | 1 | Prepared | - | ❌ Gap | ADD: "Identify Required Capabilities" (bootstrap) |
+| Platform Capability | Designed | 2 | Progression | - | ❌ Gap | ADD: "Design Capability Interface" |
+| ... | ... | ... | ... | ... | ... | ... |
+```
+
+**State Type Legend:**
+- **Null Point**: No activity needed - state represents absence/non-existence
+- **Prepared**: Bootstrap activity needed - state represents actual initial achievement
+- **Progression**: Standard activity needed - state represents advancement from prior state
+
+**Inference Heuristics by Alpha Type:**
+
+**For Redeclarations (baseline alpha enrichment):**
+- Review baseline activities that already contribute to baseline alpha states
+- Adapt baseline activity narratives with practice-specific context
+- Example: Baseline "Platform" has state "Provisioned"
+  - Baseline activity: "Deploy Platform Services"
+  - Practice enrichment: Add cloud-specific provisioning steps to narrative
+
+**For Specializations (new alphas with contributesTo):**
+- Start with parent alpha's activity patterns
+- Specialize activity names to reflect new alpha's narrower scope
+- Example: New alpha "Internal Developer Platform" contributesTo "Platform"
+  - Parent activity: "Design Platform Architecture"
+  - Specialized activity: "Design Developer Portal Interface"
+  - Parent activity: "Deploy Platform Services"
+  - Specialized activity: "Deploy IDP Catalog and Templates"
+
+**Activity Naming Pattern for Inferred Activities:**
+
+- **Pattern:** `[Verb] [Alpha-Specific Object]`
+- **Verb selection:**
+  - Bootstrap/Initial prepared states: Identify, Initiate, Recognize, Scope, Select, Assess, Discover
+  - Early states (2-3): Design, Define, Plan, Specify, Establish
+  - Middle states (4-5): Implement, Deploy, Build, Configure, Provision
+  - Late states (6+): Optimize, Evolve, Measure, Improve, Scale, Sustain
+- **Object:** Reference the alpha name or core concept
+- **Examples:**
+  - **Bootstrap activities (prepared initial states):**
+    - "Identify Security Requirements" (Security Framework, state 1: Identified)
+    - "Initiate Platform Opportunity" (Platform, state 1: Opportunity Initiated)
+    - "Assess Current Architecture" (Architecture, state 1: Assessed)
+    - "Recognize Stakeholder Needs" (Stakeholders, state 1: Recognized)
+  - **Progression activities (subsequent states):**
+    - "Design Security Controls" (Security Framework, state 2: Designed)
+    - "Implement Access Policies" (Security Framework, state 3: Implemented)
+    - "Deploy Capability Services" (Platform Capability, state 4: Deployed)
+    - "Optimize Platform Performance" (Platform, state 6: Optimized)
+
+**Quality Gates:**
+
+- [ ] Initial state evaluated for null point vs. prepared position
+- [ ] Prepared initial states have bootstrap activities with contributesTo
+- [ ] Null point initial states correctly skipped (no activity needed)
+- [ ] Every subsequent state (2+) has ≥1 activity with contributesTo
+- [ ] Inferred activities reference source material where possible
+- [ ] Inferred activities adapt baseline patterns appropriately
+- [ ] Activity narratives provide actionable technique guidance
+- [ ] Gap analysis matrix shows 100% coverage with state types documented
+- [ ] Inferred activities have all required properties (contributesTo, worksOn, competencies, narrative)
+
+**Worked Example: Platform Capability Alpha Gap Analysis**
+
+```markdown
+Alpha: Platform Capability (specialization, contributesTo: Platform)
+
+States:
+1. Identified - "Capability requirements recognized and documented"
+2. Designed - "Capability interface and contracts specified"
+3. Implemented - "Capability services deployed and operational"
+4. Validated - "Capability meets requirements and performance targets"
+5. Optimized - "Capability performance continuously improved"
+
+Initial State Evaluation:
+- State 1 "Identified" is PREPARED (not null point)
+- State description: "requirements recognized and documented" → achievement verb
+- Reaching this from nothing requires work: stakeholders must recognize need, document requirements
+- Decision: NEEDS BOOTSTRAP ACTIVITY
+
+Gap Analysis:
+- State 1 (Identified): ❌ No activity found
+  → Infer: "Identify Platform Capability Requirements"
+  → Source: Phase 1 mentioned "capability identification workshops"
+  → ActivitySpace: "Understand Stakeholder Requirements"
+  
+- State 2 (Designed): ❌ No activity found
+  → Infer: "Design Platform Capability Interface"
+  → Source: Parent alpha (Platform) has "Design Platform Architecture" 
+  → Adapt for capability context: interface contracts vs. full architecture
+  → ActivitySpace: "Architect and Build the Foundation"
+  
+- State 3 (Implemented): ✓ Activity exists: "Implement Capability Services"
+  
+- State 4 (Validated): ❌ No activity found
+  → Infer: "Validate Capability Performance"
+  → Source: Baseline ActivitySpace "Test and Validate" pattern
+  → ActivitySpace: "Test and Validate the Platform"
+  
+- State 5 (Optimized): ✓ Activity exists: "Optimize Capability Efficiency"
+
+Result: 2 existing activities, 3 gaps filled with inferred activities
+```
+
+**Documentation in Mapping Guide:**
+
+Add a dedicated section after Activity Mappings:
+
+```markdown
+### Alpha-State-Activity Gap Analysis
+
+**Coverage Summary:**
+- Total alpha states requiring activities: X
+- States with existing activity coverage: Y
+- Activity gaps identified: Z
+- Inferred activities added: Z
+
+**Gap Analysis Matrix:**
+[Include coverage table from above]
+
+**Inferred Activities:**
+
+For each gap, document the inferred activity with:
+- Activity name and description
+- Inference rationale (source: methodology content, parent alpha pattern, or baseline ActivitySpace)
+- Baseline activity adapted (if applicable)
+- All required activity properties
+```
+
 ### Step 8: Map Patterns (REQUIRED)
 
 **CRITICAL: Every practice MUST have at least one pattern.** Patterns coordinate multiple alphas/concerns through a lifecycle.
@@ -1226,6 +1481,13 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 - ✓ All Phase 1 concerns mapped to alphas (redeclaration or specialization)
 - ✓ All Phase 1 work products mapped with LODs and contributesTo
 - ✓ All Phase 1 activities mapped with complete references
+- ✓ **Alpha-state-activity gap analysis complete:**
+  - ✓ Initial states evaluated (null point vs. prepared position)
+  - ✓ Prepared initial states have bootstrap activities
+  - ✓ Every subsequent state (2+) has ≥1 activity with contributesTo
+  - ✓ Gap analysis matrix created showing 100% coverage with state types
+  - ✓ Inferred activities documented with inference rationale
+  - ✓ Inferred activities have complete properties (contributesTo, worksOn, competencies, narrative)
 - ✓ All Phase 1 competencies mapped to exact baseline names
 - ✓ All Phase 1 personas and teams mapped
 - ✓ All Phase 1 patterns mapped to baseline pattern structure

@@ -1,0 +1,1065 @@
+{
+  "kind": "baseline",
+  "name": "Partner Ecosystem Essentials",
+  "description": "A baseline practice framework for engaging with partner ecosystems in open hybrid cloud and enterprise platform business models, covering partner lifecycle management, technical enablement, co-sell orchestration, and value realization.",
+  "version": "1.0",
+  "authors": [
+    "Ed Seymour"
+  ],
+  "createdAt": "2026-06-15T00:00:00Z",
+  "updatedAt": "2026-06-15T00:00:00Z",
+  "keywords": [
+    "partner ecosystem",
+    "channel management",
+    "partner account management",
+    "co-sell",
+    "partner enablement",
+    "ecosystem governance",
+    "ISV",
+    "system integrator",
+    "cloud service provider"
+  ],
+  "focuses": [
+    {
+      "name": "Value",
+      "description": "Focuses on partner-driven business value, revenue models, and ecosystem ROI."
+    },
+    {
+      "name": "Solution",
+      "description": "Encapsulates partner technical integration, certification, and co-created offerings."
+    },
+    {
+      "name": "Endeavor",
+      "description": "Governs partner relationship execution, enablement programs, and operational workflows."
+    }
+  ],
+  "alphas": [
+    {
+      "name": "Partner Opportunity",
+      "description": "The business drivers and market opportunities that motivate partner ecosystem engagement and expansion.",
+      "focusName": "Value",
+      "relatesTo": [
+        {
+          "relationship": "drives",
+          "alphaName": "Partner Relationship"
+        },
+        {
+          "relationship": "justifies",
+          "alphaName": "Partner Revenue Model"
+        }
+      ],
+      "states": [
+        {
+          "name": "Identified",
+          "description": "A potential partner ecosystem opportunity is recognized in a market segment or technology domain.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Qualified",
+          "description": "The partner opportunity is assessed against Ideal Partner Profile (IPP) criteria and strategic fit.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Valued",
+          "description": "The potential partner-driven ARR, market reach, and technical capabilities are quantified.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Prioritized",
+          "description": "The opportunity is prioritized within the ecosystem portfolio and resourced appropriately.",
+          "seq": 4,
+          "checklist": []
+        },
+        {
+          "name": "Engaged",
+          "description": "Active partnership activities are underway to address the opportunity.",
+          "seq": 5,
+          "checklist": []
+        },
+        {
+          "name": "Realized",
+          "description": "The partnership is delivering measurable business outcomes and ecosystem value.",
+          "seq": 6,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Revenue Model",
+      "description": "The financial and incentive structures that govern how partners generate and share revenue within the ecosystem.",
+      "focusName": "Value",
+      "relatesTo": [
+        {
+          "relationship": "incentivizes",
+          "alphaName": "Partner Relationship"
+        },
+        {
+          "relationship": "measures",
+          "alphaName": "Partner Performance"
+        }
+      ],
+      "states": [
+        {
+          "name": "Defined",
+          "description": "The revenue-sharing, rebate, or incentive model is established for the partner type (Resell, CCSP, ISV).",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Aligned",
+          "description": "Partner incentives are aligned with consumption-based, recurring revenue models rather than transactional bookings.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Automated",
+          "description": "Revenue attribution, deal registration, and incentive crediting are automated through integrated systems.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Optimized",
+          "description": "The revenue model drives predictable partner behavior and maximizes ecosystem ROI.",
+          "seq": 4,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Performance",
+      "description": "The measurable outcomes and KPIs tracking partner contribution to ecosystem goals.",
+      "focusName": "Value",
+      "relatesTo": [
+        {
+          "relationship": "evaluates",
+          "alphaName": "Partner Relationship"
+        },
+        {
+          "relationship": "informs",
+          "alphaName": "Partner Program"
+        }
+      ],
+      "states": [
+        {
+          "name": "Baselined",
+          "description": "Initial partner performance metrics and targets are established.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Tracked",
+          "description": "Partner-sourced ARR, influenced pipeline, and technical milestones are actively monitored.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Reviewed",
+          "description": "Regular Quarterly Business Reviews (QBRs) assess performance against Partner Success Plans.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Optimized",
+          "description": "Performance data drives continuous improvement in partner engagement strategies.",
+          "seq": 4,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Relationship",
+      "description": "The structured engagement between the organization and its partner organizations, from registration through strategic alliance.",
+      "focusName": "Endeavor",
+      "relatesTo": [
+        {
+          "relationship": "progresses through",
+          "alphaName": "Partner Program"
+        },
+        {
+          "relationship": "produces",
+          "alphaName": "Partner Solution"
+        },
+        {
+          "relationship": "governed by",
+          "alphaName": "Partner Governance"
+        }
+      ],
+      "states": [
+        {
+          "name": "Registered",
+          "description": "Partner has enrolled in the ecosystem program and gained portal access.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Onboarded",
+          "description": "Partner has completed initial enablement and understands program structure.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Activated",
+          "description": "Partner has logged first deal, completed first certification, or launched first co-marketing activity.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Engaged",
+          "description": "Partner is actively selling, building, or delivering with regular cadence of activities.",
+          "seq": 4,
+          "checklist": []
+        },
+        {
+          "name": "Strategic",
+          "description": "Partner has achieved Premier/Advanced tier with dedicated PAM and joint business planning.",
+          "seq": 5,
+          "checklist": []
+        },
+        {
+          "name": "Renewing",
+          "description": "Partnership value is being sustained through ongoing investment and mutual commitment.",
+          "seq": 6,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Program",
+      "description": "The structured framework of tiers, tracks, incentives, and enablement that governs partner ecosystem participation.",
+      "focusName": "Endeavor",
+      "relatesTo": [
+        {
+          "relationship": "structures",
+          "alphaName": "Partner Relationship"
+        },
+        {
+          "relationship": "enables",
+          "alphaName": "Partner Capability"
+        }
+      ],
+      "states": [
+        {
+          "name": "Designed",
+          "description": "Program tiers, modules (Build, Resell, Sell With, CCSP), and progression criteria are defined.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Launched",
+          "description": "Partner portal, program documentation, and enrollment workflows are operational.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Governed",
+          "description": "Points-based meritocracy, tier progression, and automated crediting systems are enforced.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Evolving",
+          "description": "Program rules, incentives, and benefits adapt based on partner feedback and market dynamics.",
+          "seq": 4,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Capability",
+      "description": "The technical skills, certifications, specializations, and delivery competencies that partners develop to serve the ecosystem.",
+      "focusName": "Solution",
+      "relatesTo": [
+        {
+          "relationship": "enables delivery of",
+          "alphaName": "Partner Solution"
+        },
+        {
+          "relationship": "developed through",
+          "alphaName": "Partner Enablement"
+        }
+      ],
+      "states": [
+        {
+          "name": "Assessed",
+          "description": "Partner's current technical capabilities and skill gaps are identified.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Developing",
+          "description": "Partner team members are actively pursuing training and certifications.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Certified",
+          "description": "Partner has achieved required technical certifications and validated competencies.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Specialized",
+          "description": "Partner has developed deep expertise in specific technology areas or use cases.",
+          "seq": 4,
+          "checklist": []
+        },
+        {
+          "name": "Scaling",
+          "description": "Partner is independently delivering solutions and training new team members.",
+          "seq": 5,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Solution",
+      "description": "The co-created technical offerings, integrations, and services that partners develop and deliver to joint customers.",
+      "focusName": "Solution",
+      "relatesTo": [
+        {
+          "relationship": "addresses",
+          "alphaName": "Partner Opportunity"
+        },
+        {
+          "relationship": "validated through",
+          "alphaName": "Partner Certification"
+        }
+      ],
+      "states": [
+        {
+          "name": "Identified",
+          "description": "A potential solution or integration opportunity is recognized.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Designed",
+          "description": "Solution architecture is defined with clear integration points to platform offerings.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Validated",
+          "description": "Partner has self-validated compatibility and basic functionality.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Certified",
+          "description": "Solution has achieved formal certification and ecosystem catalog placement.",
+          "seq": 4,
+          "checklist": []
+        },
+        {
+          "name": "In Market",
+          "description": "Solution is actively sold, supported, and deployed with joint customers.",
+          "seq": 5,
+          "checklist": []
+        },
+        {
+          "name": "Evolving",
+          "description": "Solution roadmap is aligned with platform evolution and customer feedback.",
+          "seq": 6,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Certification",
+      "description": "The formal validation and certification processes that verify partner solutions meet technical, security, and lifecycle standards.",
+      "focusName": "Solution",
+      "relatesTo": [
+        {
+          "relationship": "validates",
+          "alphaName": "Partner Solution"
+        },
+        {
+          "relationship": "requires",
+          "alphaName": "Partner Capability"
+        }
+      ],
+      "states": [
+        {
+          "name": "Initiated",
+          "description": "Partner has begun the certification process and understands requirements.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Testing",
+          "description": "Solution is undergoing validation testing for compatibility, security, and performance.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Certified",
+          "description": "Solution has passed all certification requirements and earned ecosystem badge.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Published",
+          "description": "Certified solution is published in ecosystem catalog with support commitments.",
+          "seq": 4,
+          "checklist": []
+        },
+        {
+          "name": "Maintained",
+          "description": "Certification is kept current through regular recertification and lifecycle management.",
+          "seq": 5,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Enablement",
+      "description": "The training, technical resources, documentation, and support provided to build partner capabilities.",
+      "focusName": "Endeavor",
+      "relatesTo": [
+        {
+          "relationship": "develops",
+          "alphaName": "Partner Capability"
+        },
+        {
+          "relationship": "supports",
+          "alphaName": "Partner Relationship"
+        }
+      ],
+      "states": [
+        {
+          "name": "Scoped",
+          "description": "Enablement needs are assessed and training curriculum is defined.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Available",
+          "description": "Training portal, courses, labs, and technical documentation are accessible.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Delivered",
+          "description": "Partners are actively consuming enablement resources and completing certifications.",
+          "seq": 3,
+          "checklist": []
+        },
+        {
+          "name": "Self-Service",
+          "description": "Enablement is automated with on-demand access and automated crediting for completions.",
+          "seq": 4,
+          "checklist": []
+        }
+      ]
+    },
+    {
+      "name": "Partner Governance",
+      "description": "The policies, compliance requirements, and operational controls that govern partner ecosystem operations.",
+      "focusName": "Endeavor",
+      "relatesTo": [
+        {
+          "relationship": "constrains",
+          "alphaName": "Partner Relationship"
+        },
+        {
+          "relationship": "protects",
+          "alphaName": "Partner Revenue Model"
+        }
+      ],
+      "states": [
+        {
+          "name": "Defined",
+          "description": "Partner program rules, deal registration policies, and conflict resolution processes are documented.",
+          "seq": 1,
+          "checklist": []
+        },
+        {
+          "name": "Enforced",
+          "description": "Governance policies are actively monitored and violations are addressed.",
+          "seq": 2,
+          "checklist": []
+        },
+        {
+          "name": "Automated",
+          "description": "Deal protection, territory rules, and incentive eligibility are enforced through automated systems.",
+          "seq": 3,
+          "checklist": []
+        }
+      ]
+    }
+  ],
+  "activitySpaces": [
+    {
+      "name": "Identify Partner Opportunities",
+      "description": "Scan the market for potential partner relationships that align with strategic technology areas and customer needs.",
+      "focusName": "Value",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Opportunity",
+          "stateName": "Identified"
+        },
+        {
+          "alphaName": "Partner Opportunity",
+          "stateName": "Qualified"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Strategic Alignment",
+        "Ecosystem Analysis"
+      ]
+    },
+    {
+      "name": "Assess Partner Value",
+      "description": "Evaluate potential partner contributions including technical capabilities, market reach, customer relationships, and ARR potential against Ideal Partner Profile.",
+      "focusName": "Value",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Opportunity",
+          "stateName": "Valued"
+        },
+        {
+          "alphaName": "Partner Opportunity",
+          "stateName": "Prioritized"
+        }
+      ],
+      "requiredCompetencies": [
+        "Ecosystem Analysis",
+        "Partner Strategic Alignment"
+      ]
+    },
+    {
+      "name": "Track Partner Performance",
+      "description": "Monitor partner-sourced ARR, influenced pipeline, certification progress, and program engagement through automated dashboards and QBR scorecards.",
+      "focusName": "Value",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Performance",
+          "stateName": "Tracked"
+        },
+        {
+          "alphaName": "Partner Performance",
+          "stateName": "Reviewed"
+        },
+        {
+          "alphaName": "Partner Performance",
+          "stateName": "Optimized"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Operations Management",
+        "Ecosystem Analysis"
+      ]
+    },
+    {
+      "name": "Design Revenue Models",
+      "description": "Define partner-specific incentive structures, rebate programs, and consumption-based compensation aligned with recurring revenue objectives.",
+      "focusName": "Value",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Revenue Model",
+          "stateName": "Defined"
+        },
+        {
+          "alphaName": "Partner Revenue Model",
+          "stateName": "Aligned"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Strategic Alignment",
+        "Partner Operations Management"
+      ]
+    },
+    {
+      "name": "Onboard Partners",
+      "description": "Execute event-driven onboarding workflows with tailored activation tracks for ISVs, resellers, and service providers.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Registered"
+        },
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Onboarded"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Operations Management",
+        "Partner Relationship Management"
+      ]
+    },
+    {
+      "name": "Manage Partner Relationships",
+      "description": "Orchestrate ongoing partner engagement through Partner Success Plans, QBRs, executive alignment, and cross-functional coordination.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Activated"
+        },
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Engaged"
+        },
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Strategic"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Relationship Management",
+        "Partner Strategic Alignment"
+      ]
+    },
+    {
+      "name": "Orchestrate Co-Sell Activities",
+      "description": "Coordinate matrixed co-selling efforts including account mapping, deal registration, joint pipeline management, and territory alignment.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Engaged"
+        },
+        {
+          "alphaName": "Partner Opportunity",
+          "stateName": "Engaged"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Co-Sell Orchestration",
+        "Partner Conflict Resolution"
+      ]
+    },
+    {
+      "name": "Develop Partner Programs",
+      "description": "Design and evolve partner program structure including tiers, modules, progression criteria, and points-based meritocracy systems.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Program",
+          "stateName": "Designed"
+        },
+        {
+          "alphaName": "Partner Program",
+          "stateName": "Launched"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Strategic Alignment",
+        "Partner Operations Management"
+      ]
+    },
+    {
+      "name": "Enable Partner Capabilities",
+      "description": "Deliver technical training, certification programs, workshops, and hands-on enablement to build partner skills and specializations.",
+      "focusName": "Solution",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Enablement",
+          "stateName": "Available"
+        },
+        {
+          "alphaName": "Partner Enablement",
+          "stateName": "Delivered"
+        },
+        {
+          "alphaName": "Partner Capability",
+          "stateName": "Developing"
+        },
+        {
+          "alphaName": "Partner Capability",
+          "stateName": "Certified"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Technical Enablement",
+        "Partner Solutions Architecture"
+      ]
+    },
+    {
+      "name": "Guide Solution Development",
+      "description": "Support partners in building and validating co-created solutions, integrations, and service offerings aligned with platform roadmap.",
+      "focusName": "Solution",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Solution",
+          "stateName": "Identified"
+        },
+        {
+          "alphaName": "Partner Solution",
+          "stateName": "Designed"
+        },
+        {
+          "alphaName": "Partner Solution",
+          "stateName": "Validated"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Solutions Architecture",
+        "Partner Technical Enablement"
+      ]
+    },
+    {
+      "name": "Manage Certification Processes",
+      "description": "Execute partner solution certification workflows including testing, validation, security review, and ecosystem catalog publication.",
+      "focusName": "Solution",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Certification",
+          "stateName": "Testing"
+        },
+        {
+          "alphaName": "Partner Certification",
+          "stateName": "Certified"
+        },
+        {
+          "alphaName": "Partner Certification",
+          "stateName": "Published"
+        },
+        {
+          "alphaName": "Partner Solution",
+          "stateName": "Certified"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Solutions Architecture",
+        "Partner Operations Management"
+      ]
+    },
+    {
+      "name": "Execute Joint Go-To-Market",
+      "description": "Plan and deliver co-marketing campaigns, events, demand generation, and customer-facing activities leveraging Market Development Funds.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Relationship",
+          "stateName": "Engaged"
+        },
+        {
+          "alphaName": "Partner Solution",
+          "stateName": "In Market"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Relationship Management",
+        "Partner Strategic Alignment"
+      ]
+    },
+    {
+      "name": "Govern Partner Ecosystem",
+      "description": "Enforce program rules, resolve channel conflicts, manage deal registration, and maintain governance policies.",
+      "focusName": "Endeavor",
+      "contributesTo": [
+        {
+          "alphaName": "Partner Governance",
+          "stateName": "Defined"
+        },
+        {
+          "alphaName": "Partner Governance",
+          "stateName": "Enforced"
+        },
+        {
+          "alphaName": "Partner Governance",
+          "stateName": "Automated"
+        }
+      ],
+      "requiredCompetencies": [
+        "Partner Conflict Resolution",
+        "Partner Operations Management"
+      ]
+    }
+  ],
+  "competencies": [
+    {
+      "name": "Partner Strategic Alignment",
+      "description": "The ability to align partner ecosystem strategy with business objectives, market opportunities, and technology roadmaps.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Understands the purpose of partner ecosystems and basic program structures.",
+          "level": 1,
+          "competencyName": "Partner Strategic Alignment"
+        },
+        {
+          "name": "Applies",
+          "description": "Can articulate how specific partner types contribute to go-to-market strategy.",
+          "level": 2,
+          "competencyName": "Partner Strategic Alignment"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently develop partner strategies and Ideal Partner Profiles aligned with business goals.",
+          "level": 3,
+          "competencyName": "Partner Strategic Alignment"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can pivot ecosystem strategy in response to market dynamics and competitive pressures.",
+          "level": 4,
+          "competencyName": "Partner Strategic Alignment"
+        },
+        {
+          "name": "Innovating",
+          "description": "Pioneers new partner business models and ecosystem strategies that redefine industry norms.",
+          "level": 5,
+          "competencyName": "Partner Strategic Alignment"
+        }
+      ]
+    },
+    {
+      "name": "Ecosystem Analysis",
+      "description": "The ability to assess partner capabilities, market potential, and ecosystem performance using data-driven methods.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Can read basic partner performance reports and understand key metrics.",
+          "level": 1,
+          "competencyName": "Ecosystem Analysis"
+        },
+        {
+          "name": "Applies",
+          "description": "Can analyze partner performance against targets and identify trends.",
+          "level": 2,
+          "competencyName": "Ecosystem Analysis"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently design QBR scorecards and translate data into actionable partner strategies.",
+          "level": 3,
+          "competencyName": "Ecosystem Analysis"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can build predictive models for partner success and ecosystem ROI optimization.",
+          "level": 4,
+          "competencyName": "Ecosystem Analysis"
+        },
+        {
+          "name": "Innovating",
+          "description": "Develops novel analytical frameworks for ecosystem intelligence and partner valuation.",
+          "level": 5,
+          "competencyName": "Ecosystem Analysis"
+        }
+      ]
+    },
+    {
+      "name": "Partner Relationship Management",
+      "description": "The ability to build, nurture, and manage strategic relationships with partner organizations.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Understands partner communication channels and basic engagement protocols.",
+          "level": 1,
+          "competencyName": "Partner Relationship Management"
+        },
+        {
+          "name": "Applies",
+          "description": "Can execute Partner Success Plans and conduct routine partner touchpoints.",
+          "level": 2,
+          "competencyName": "Partner Relationship Management"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently manage strategic partner portfolios and navigate complex organizational dynamics.",
+          "level": 3,
+          "competencyName": "Partner Relationship Management"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can build executive-level relationships and orchestrate multi-partner alliances.",
+          "level": 4,
+          "competencyName": "Partner Relationship Management"
+        },
+        {
+          "name": "Innovating",
+          "description": "Creates transformative partnership models that become industry benchmarks.",
+          "level": 5,
+          "competencyName": "Partner Relationship Management"
+        }
+      ]
+    },
+    {
+      "name": "Partner Co-Sell Orchestration",
+      "description": "The ability to coordinate co-selling activities across matrixed partner and direct sales teams.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Understands deal registration and basic co-sell processes.",
+          "level": 1,
+          "competencyName": "Partner Co-Sell Orchestration"
+        },
+        {
+          "name": "Applies",
+          "description": "Can facilitate account mapping and coordinate simple joint sales motions.",
+          "level": 2,
+          "competencyName": "Partner Co-Sell Orchestration"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently orchestrate complex multi-threaded co-sell campaigns and manage pipeline commitments.",
+          "level": 3,
+          "competencyName": "Partner Co-Sell Orchestration"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can architect co-sell frameworks across multiple partner types and geographies.",
+          "level": 4,
+          "competencyName": "Partner Co-Sell Orchestration"
+        },
+        {
+          "name": "Innovating",
+          "description": "Develops novel co-sell methodologies that maximize ecosystem leverage.",
+          "level": 5,
+          "competencyName": "Partner Co-Sell Orchestration"
+        }
+      ]
+    },
+    {
+      "name": "Partner Technical Enablement",
+      "description": "The ability to design and deliver technical training and enablement programs for partner audiences.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Can deliver basic product training using existing materials.",
+          "level": 1,
+          "competencyName": "Partner Technical Enablement"
+        },
+        {
+          "name": "Applies",
+          "description": "Can customize enablement content for different partner technical roles.",
+          "level": 2,
+          "competencyName": "Partner Technical Enablement"
+        },
+        {
+          "name": "Masters",
+          "description": "Can design comprehensive certification programs and hands-on technical workshops.",
+          "level": 3,
+          "competencyName": "Partner Technical Enablement"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can build self-service enablement platforms and adaptive learning pathways.",
+          "level": 4,
+          "competencyName": "Partner Technical Enablement"
+        },
+        {
+          "name": "Innovating",
+          "description": "Pioneers new partner enablement methodologies and learning technologies.",
+          "level": 5,
+          "competencyName": "Partner Technical Enablement"
+        }
+      ]
+    },
+    {
+      "name": "Partner Solutions Architecture",
+      "description": "The ability to guide partners in designing, validating, and certifying technical integrations and solutions.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Understands basic integration patterns and partner solution requirements.",
+          "level": 1,
+          "competencyName": "Partner Solutions Architecture"
+        },
+        {
+          "name": "Applies",
+          "description": "Can assist partners with solution design and technical troubleshooting.",
+          "level": 2,
+          "competencyName": "Partner Solutions Architecture"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently guide partners through complex integrations and certification processes.",
+          "level": 3,
+          "competencyName": "Partner Solutions Architecture"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can architect multi-vendor solutions and resolve systemic integration challenges.",
+          "level": 4,
+          "competencyName": "Partner Solutions Architecture"
+        },
+        {
+          "name": "Innovating",
+          "description": "Develops breakthrough integration patterns and ecosystem reference architectures.",
+          "level": 5,
+          "competencyName": "Partner Solutions Architecture"
+        }
+      ]
+    },
+    {
+      "name": "Partner Operations Management",
+      "description": "The ability to manage partner program operations, systems, and automated workflows.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Can navigate partner portals and execute basic operational tasks.",
+          "level": 1,
+          "competencyName": "Partner Operations Management"
+        },
+        {
+          "name": "Applies",
+          "description": "Can manage deal registration, MDF allocation, and program compliance.",
+          "level": 2,
+          "competencyName": "Partner Operations Management"
+        },
+        {
+          "name": "Masters",
+          "description": "Can design and optimize partner operational workflows and automation.",
+          "level": 3,
+          "competencyName": "Partner Operations Management"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can architect integrated partner ecosystems and PRM platforms.",
+          "level": 4,
+          "competencyName": "Partner Operations Management"
+        },
+        {
+          "name": "Innovating",
+          "description": "Creates novel ecosystem operations paradigms and automation frameworks.",
+          "level": 5,
+          "competencyName": "Partner Operations Management"
+        }
+      ]
+    },
+    {
+      "name": "Partner Conflict Resolution",
+      "description": "The ability to identify, mediate, and resolve channel conflicts and multi-partner disputes.",
+      "levels": [
+        {
+          "name": "Basic",
+          "description": "Understands common sources of channel conflict and escalation paths.",
+          "level": 1,
+          "competencyName": "Partner Conflict Resolution"
+        },
+        {
+          "name": "Applies",
+          "description": "Can mediate simple territory or deal registration conflicts.",
+          "level": 2,
+          "competencyName": "Partner Conflict Resolution"
+        },
+        {
+          "name": "Masters",
+          "description": "Can independently resolve complex multi-partner conflicts while preserving relationships.",
+          "level": 3,
+          "competencyName": "Partner Conflict Resolution"
+        },
+        {
+          "name": "Adapts",
+          "description": "Can design conflict prevention frameworks and scalable resolution processes.",
+          "level": 4,
+          "competencyName": "Partner Conflict Resolution"
+        },
+        {
+          "name": "Innovating",
+          "description": "Develops transformative approaches to ecosystem governance and conflict prevention.",
+          "level": 5,
+          "competencyName": "Partner Conflict Resolution"
+        }
+      ]
+    }
+  ]
+}

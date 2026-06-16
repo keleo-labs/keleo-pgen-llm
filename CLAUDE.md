@@ -65,9 +65,10 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 
 **Phase 2: Mapping**
 - Input: Analysis report + baseline practice + semantic guidance
-- Process: Map analyzed elements to baseline practice using Practice Language semantics
+- Process: Map analyzed elements to baseline practice using Practice Language semantics, including alpha-state-activity gap analysis
 - Output: `02-mapping-guide.md` (~40-60K words)
 - Prompt: `prompts/phase-2-mapping.md`
+- Key Step: Step 7.5 - Alpha-state-activity gap analysis ensures every alpha state has supporting activities
 
 **Phase 3: JSON Generation**
 - Input: Mapping guide + schema + baseline practice
@@ -140,10 +141,18 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 ### Alpha Handling
 - **Redeclaration**: Enriching baseline alphas with additional checklists/narratives while preserving exact baseline structure
 - **Specialization**: Creating new alphas that contribute to baseline alphas (e.g., "Platform Capability" → "Platform")
-  - **CRITICAL RULE - NO FLOATING ALPHAS**: ALL new alphas MUST have a `contributesTo` relationship pointing to a baseline alpha
+  - **CRITICAL RULE - NO FLOATING ALPHAS**: ALL new alphas MUST have a `contributesTo` relationship pointing to a baseline alpha, practice-local alpha, OR external practice alpha
   - Floating alphas (new alphas without `contributesTo`) are **strictly prohibited** by the Practice Language semantics
+  - **Cross-Practice References**: Alphas can contribute to alphas from other practices using `practiceDependencyNames`
 - **Instances**: Tracking specific occurrences (e.g., "Security Team" and "Platform Team" as instances of "Team")
 - When multiple perspectives reference the same alpha, create a SINGLE merged redeclaration, not separate definitions
+
+### Orchestration Practices
+- When source methodology describes an **overarching lifecycle pattern** spanning multiple domains:
+  - **Divide** content into separate practices by domain/concern/focus
+  - **Create orchestration practice** that coordinates via patterns using `practiceDependencyNames`
+  - Orchestration practice focuses on **pattern coordination**, NOT alpha redefinition
+  - Use `practiceDependencyNames` to load alphas from other practices for pattern references
 
 ### Schema Rules
 - All symbolic references (alphaName, stateName, activitySpaceName, etc.) must be exact, case-sensitive string matches

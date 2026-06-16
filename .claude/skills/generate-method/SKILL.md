@@ -264,6 +264,12 @@ No conversational context is required - only file contents.
 
 3. **Analyze source materials:**
    - Extract outcomes, concerns, progressive states, work products
+   - **Identify concern relationships and interactions:**
+     - Production flows: Which concerns produce/generate/create other concerns?
+     - Enablement patterns: Which concerns enable/support/facilitate others?
+     - Governance structures: Which concerns guide/constrain/govern others?
+     - Information flows: Which concerns provide data to/inform/validate others?
+     - Dependencies: Which concerns require/depend on others?
    - Identify activities, competencies, personas, teams
    - Map workflows and patterns
    - Determine practice boundaries
@@ -276,6 +282,7 @@ No conversational context is required - only file contents.
 **Quality Gates:**
 - ✓ All four perspectives represented
 - ✓ Clear traceability: Outcomes → Concerns → States → Work Products → Activities
+- ✓ **Concern relationships documented:** Production, enablement, governance, information flows identified
 - ✓ Progressive states reflect source's natural maturity (not forced template)
 - ✓ Rich activity narratives with citations
 - ✓ Clear practice boundaries justified
@@ -298,7 +305,24 @@ No conversational context is required - only file contents.
 **Process for Single Practice:**
 
 1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
-2. Generate complete `02-mapping-guide.md` with all alphas, work products, activities, patterns
+2. Map concerns to alphas (redeclaration vs specialization)
+3. **Identify terminology aliases and keywords:**
+   - Review source methodology for domain canonical terms
+   - Apply decision tree: variant→alias, instance→use instance, specialization→alias new alpha, synonym/acronym→keyword
+   - **ONE alias per element** (no duplicates for same baseline element)
+   - **Use keywords for synonyms/acronyms** (10-20 search/discovery terms)
+   - Target: 3-8 aliases + 10-20 keywords
+   - Document in "Keywords" and "Terminology Aliases" sections
+4. **Map concern relationships to alpha relatesTo arrays:**
+   - Review Phase 1 concern interactions
+   - For each NEW alpha, identify what it provides/enables/produces/guides/validates for other alphas
+   - Use active voice from provider perspective (directionality pattern)
+   - Document relationships in mapping guide
+5. **Generate patterns using THREE-PASS construction:**
+   - Pass 1: Extract pattern structure from source (phases, explicitly mentioned states)
+   - Pass 2: Backfill missing alpha states for complete matrix (REQUIRED - see Pattern Completeness Requirements)
+   - Pass 3: Consider related alphas from practice/dependencies (OPTIONAL)
+6. Generate complete `02-mapping-guide.md` with terminology aliases, all alphas (including relatesTo), work products, activities, complete patterns
 
 **Process for Multi-Practice Method:**
 
@@ -313,9 +337,9 @@ No conversational context is required - only file contents.
 
 2. **Each agent prompt must include:**
    - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `deps/platform-adoption-kernel.json`, `references/semantics.md`
-   - What to generate: Complete practice mapping with metadata, alphas, work products, activities, patterns
+   - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
-   - Explicit instruction: "Generate COMPLETE mapping including alphas (if any), work products, activities, AND PATTERNS. CRITICAL: Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1). Patterns are REQUIRED for multi-alpha practices."
+   - Explicit instruction: "Generate COMPLETE mapping including: (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships; (4) Work products; (5) Activities; (6) PATTERNS with complete matrix coverage. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
 
 3. **After all agents complete:**
    - Combine practice mapping files into single `02-mapping-guide.md` (if using separate files)
@@ -330,6 +354,325 @@ No conversational context is required - only file contents.
    - Complete mapping specification
    - Validation checklist satisfied
 
+**CRITICAL: Terminology Aliasing for Domain Alignment**
+
+**Aliases bridge the gap between baseline practice terminology and source methodology vocabulary.**
+
+From `references/semantics.md` Section 9.2:
+
+**When to Create Aliases:**
+- Source methodology uses different term for same baseline concept
+- Baseline term is abstract/generic, source uses domain-specific term
+- Domain-specific terminology represents element differently
+- **ONE alias per PracticeElement** - if multiple terms exist, choose most canonical/common one
+
+**CRITICAL: One Alias Per Element**
+- Do NOT create multiple aliases for the same element (e.g., Platform → "AAP", Platform → "Automation Controller", Platform → "Automation Platform")
+- If you have multiple distinct terms, determine what they represent:
+  - **Synonyms/acronyms** → Use keywords, not aliases
+  - **Different facets/components** → Use specializations (e.g., Automation Controller, Execution Environment are specialized alphas)
+  - **Different deployments** → Use instances (e.g., Sandbox Platform, Production Platform)
+- Example WRONG: Platform → "Automation Controller" (Controller is a facet/specialization, not an alias!)
+- Example CORRECT: Create specialized alpha "Automation Controller" with contributesTo: Platform, then add keywords ["AAP", "Ansible Automation Platform", "automation platform"] to practice
+
+**Alias Priority (where to apply aliases):**
+1. **Work products**: When domain uses distinctly different canonical term (e.g., Deployment Documentation → "Playbook")
+2. **Activities**: When domain uses different operation names (e.g., Deploy System → "Run Playbook")
+3. **Personas**: When domain uses different role titles (e.g., Platform Engineer → "Automation Architect")
+4. **Specialized alphas**: OPTIONAL - only if shortened form is canonical (e.g., Execution Environment → "EE")
+5. **Baseline elements**: RARELY - only if domain uses completely different term
+
+**Understanding Instances vs Specializations:**
+- **Instances** = Same type, different deployments (Sandbox Platform, Non-Prod Platform, Production Platform)
+  - Same behavior, same states, different tracking
+  - Used for environment-specific tracking (dev/test/prod)
+  - Aliases on instances are rare (instances already have distinct names)
+  
+- **Specializations** = Different facets/components with specialized behavior
+  - New alpha with contributesTo pointing to parent
+  - Different states/lifecycle than parent
+  - Example: Automation Controller, Execution Environment, Automation Mesh are specialized facets of Platform
+  - May have aliases if domain uses shortened forms
+
+**Alias can be combined with:**
+- Redeclaration (enriching baseline element - rarely needs alias unless domain term differs significantly)
+- Specialization (new alpha representing facet/component + optional alias for shortened form)
+
+**PracticeElementAlias Structure:**
+```json
+{
+  "elementType": "Alpha | WorkProduct | Activity | Persona | PersonaGroup",
+  "name": "canonical baseline name",
+  "aliasName": "domain-specific alternative term"
+}
+```
+
+**CRITICAL RULE: Strict Alias Isolation**
+- Aliases are PRESENTATION-LAYER ONLY
+- **NEVER use aliasName in structural references** (alphaName, activitySpaceName, contributesTo, etc.)
+- ALL structural references MUST use canonical baseline names
+- Aliases enable user-facing terminology without breaking validation
+
+**Example: Ansible Automation Platform Aliases (CORRECT)**
+
+```markdown
+## Terminology Aliases
+
+**Alpha Specializations with Aliases:**
+- Execution Environment → "EE" (common abbreviation for specialized alpha)
+- Automation Mesh → "Mesh" (shortened domain term)
+- Event Rulebook → "Rulebook" (domain canonical term)
+
+**Alpha Instance Aliases:**
+- Automation Controller (instance of Platform) → "Controller" (shortened)
+- Execution Node Pool (instance of Platform) → "Execution Nodes" (domain term)
+
+**WorkProduct Aliases:**
+- Deployment Documentation → "Playbook" (canonical Ansible term)
+- Architecture Definition → "Inventory" (Ansible-specific)
+- Credential → "Vault Credential" (domain-specific type)
+
+**Activity Aliases:**
+- Deploy System → "Run Playbook" (canonical Ansible operation)
+- Build Container Image → "Build EE" (domain shorthand)
+
+**Persona Aliases:**
+- Platform Engineer → "Automation Architect" (domain job title)
+- Developer → "Content Developer" (Ansible-specific role)
+```
+
+**Anti-Pattern Examples (WRONG):**
+
+**Example 1 - Ansible: Multiple aliases for one element**
+```markdown
+❌ WRONG:
+- Platform → "Automation Platform"
+- Platform → "AAP"
+- Platform → "Ansible Automation Platform"
+- Platform → "Automation Controller"
+
+Problems:
+1. "AAP", "Automation Platform" are SYNONYMS → use keywords!
+2. "Automation Controller" is a COMPONENT → use specialization!
+```
+
+**Example 2 - OpenShift: Confusing instances with specializations**
+```markdown
+❌ WRONG:
+- Platform → "Production Cluster" (instance, not alias!)
+- Platform → "OCP" (synonym → keyword!)
+- Platform → "OpenShift Container Platform" (synonym → keyword!)
+
+Problems:
+1. "Production Cluster" is a deployment → use instance!
+2. "OCP", "OpenShift Container Platform" are synonyms → use keywords!
+```
+
+**Example 3 - Team Topologies: Confusing instances with aliases**
+```markdown
+❌ WRONG:
+- Team → "Stream-Aligned Team"
+- Team → "Platform Team"
+- Team → "Enabling Team"
+- Team → "Complicated Subsystem Team"
+
+Problem: These are TEAM TYPES → use instances, not aliases!
+- Stream-Aligned Team, Platform Team, etc. are instances of Team
+- Each team type has same behavior/states, different classification
+- Do NOT alias baseline Team multiple times
+```
+
+**CORRECT Alternatives:**
+
+```markdown
+## Ansible (CORRECT)
+Keywords: ["AAP", "ansible automation platform", "ansible", "controller", "EE"]
+Aliases: Platform → "Automation Platform", Deployment Documentation → "Playbook"
+Specializations: Execution Environment (component with unique build→publish lifecycle)
+Instances: Production Automation Platform, Staging Automation Platform (deployments)
+
+## OpenShift (CORRECT)
+Keywords: ["OCP", "openshift", "k8s", "kubernetes", "container platform"]
+Aliases: Infrastructure Definition → "Operator Manifest"
+Specializations: Application Scalability (capability with unique scaling states)
+Instances: Production OCP Cluster, Dev OCP Cluster (deployments)
+
+## Team Topologies (CORRECT)
+Keywords: ["stream-aligned", "platform team", "enabling team", "cognitive load"]
+Aliases: Activity → "Team Interaction Design" (minimal aliases needed)
+Specializations: Team Topology Design, Cognitive Load (concepts with unique states)
+Instances: Stream-Aligned Team, Platform Team, Enabling Team (team types)
+Instances: Platform Engineering Team Alpha, Payments Team (specific named teams)
+```
+
+**Alias Identification Heuristics:**
+
+**Decision Tree for Each Domain Term:**
+
+1. **Is this term a canonical alternative to a baseline element?**
+   - YES → Consider alias (e.g., "Playbook" for "Deployment Documentation")
+   - NO → Go to step 2
+
+2. **Does this term represent a different deployment of same type?**
+   - YES → Use **instance** (e.g., "Sandbox Platform", "Production Platform")
+   - Instances = same behavior, different tracking (dev/test/prod environments)
+   - NO → Go to step 3
+
+3. **Does this term represent a facet/component with specialized behavior?**
+   - YES → Use **specialization** (e.g., "Automation Controller", "Execution Environment" are facets of Platform with unique lifecycles)
+   - Specializations = new alpha with contributesTo, different states/behavior
+   - Optional: alias the specialized alpha if domain uses shortened form
+   - NO → Go to step 4
+
+4. **Is this an acronym/abbreviation/synonym?**
+   - YES → Add to **keywords** array (e.g., "AAP", "automation platform", "EE")
+   - NO → Skip
+
+**Three-Way Distinction:**
+- **Alias (1 per element):** "Playbook" replaces "Deployment Documentation" in presentation
+- **Keywords (10-20 per practice):** ["AAP", "ansible", "automation", "controller", "EE"] for search
+- **Specialization:** "Automation Controller" is new alpha (facet of Platform with unique states)
+- **Instance:** "Production Platform" is deployment tracking (same states as Platform)
+
+**Examples Across Domains:**
+
+**Ansible Automation:**
+- "Automation Platform" vs "Platform" → **Alias** (canonical domain term) ✓
+- "Playbook" vs "Deployment Documentation" → **Alias** ✓
+- "Production Automation Platform" vs "Staging Automation Platform" → **Instances** (deployments) ✓
+- "Execution Environment" has unique build→publish lifecycle → **Specialization** (component/facet) ✓
+- "AAP", "ansible", "controller", "EE" → **Keywords** ✓
+
+**OpenShift:**
+- "Deployment Config" vs "Deployment Documentation" → **Alias** ✓
+- "Production OCP Cluster" vs "Dev OCP Cluster" → **Instances** (deployments) ✓
+- "Application Scalability" has unique states → **Specialization** (capability) ✓
+- "OCP", "openshift", "k8s", "container platform" → **Keywords** ✓
+
+**Team Topologies:**
+- "Stream-Aligned Team", "Platform Team", "Enabling Team" → **Instances** (team types) ✓
+- "Platform Engineering Team Alpha", "Payments Team" → **Instances** (specific teams) ✓
+- "Cognitive Load", "Team Interaction Mode" → **Specializations** (organizational concepts) ✓
+- "stream-aligned", "enabling team", "cognitive load" → **Keywords** ✓
+
+**Complete Example - Multi-Domain Pattern:**
+```markdown
+## Example 1: Ansible Automation Practice
+
+### Keywords (search/discovery)
+["AAP", "ansible automation platform", "ansible", "automation", "controller", 
+ "EE", "execution environment", "playbook", "inventory", "mesh", "hub", 
+ "event-driven", "rulebook", "RBAC"]
+
+### Alphas (specializations = facets/components)
+- **Execution Environment** (specialization of Platform)
+  - contributesTo: Platform
+  - States: Default Available → Custom Built → Governed → Optimized
+
+### Alpha Instances (deployments)
+- Production Automation Platform (instance of Platform)
+- Staging Automation Platform (instance of Platform)
+
+### Terminology Aliases (3-5 canonical terms)
+- Platform → "Automation Platform" (canonical Ansible term for platform)
+- Deployment Documentation → "Playbook"
+- Deploy System → "Run Playbook"
+- Platform Engineer → "Automation Architect"
+
+---
+
+## Example 2: OpenShift Platform Practice
+
+### Keywords (search/discovery)
+["OCP", "openshift", "kubernetes", "k8s", "container platform", "pods", 
+ "operators", "routes", "deployment", "imagestream"]
+
+### Alphas (specializations)
+- **Application Scalability** (specialization of Software System)
+  - contributesTo: Software System
+  - States: Manual Scaling → HPA Configured → Custom Metrics → Predictive
+
+### Alpha Instances (deployments)
+- Production OCP Cluster (instance of Platform)
+- Non-Prod OCP Cluster (instance of Platform)
+
+### Terminology Aliases (3-5 canonical terms)
+- Deployment Documentation → "Deployment Config"
+- Infrastructure Definition → "Operator Manifest"
+- Deploy System → "oc apply"
+
+---
+
+## Example 3: Team Topologies Practice
+
+### Keywords (search/discovery)
+["stream-aligned", "enabling team", "platform team", "complicated subsystem",
+ "cognitive load", "team interaction", "conway's law", "inverse conway",
+ "team types", "interaction modes"]
+
+### Alphas (specializations = organizational concepts)
+- **Team Topology Design** (specialization of Team)
+  - contributesTo: Team
+  - States: Static Structure → Four Types Defined → Explicit Modes → Sensing & Evolving
+
+- **Cognitive Load** (new alpha)
+  - contributesTo: Team
+  - States: Unmanaged → Load Awareness → Domain Boundaries → Active Reduction
+
+### Alpha Instances (team types as instances of Team)
+- Stream-Aligned Team (instance of Team - team type)
+- Platform Team (instance of Team - team type)
+- Enabling Team (instance of Team - team type)
+- Complicated Subsystem Team (instance of Team - team type)
+
+### Alpha Instances (specific named teams)
+- Platform Engineering Team Alpha (instance of Team - specific team)
+- Payments Stream Team (instance of Team - specific team)
+- Data Platform Team (instance of Team - specific team)
+
+### Terminology Aliases (3-5 canonical terms)
+- Activity → "Team Interaction Design"
+- Way Of Working → "Team Working Agreement"
+```
+
+**Quality Target:** 3-8 aliases per practice (focused on genuinely different canonical terms)
+
+**Phase 2 Mapping Template:**
+
+```markdown
+## Keywords
+
+**Purpose:** Synonyms, acronyms, abbreviations, search terms for discoverability
+
+[List 10-20 domain-specific terms, acronyms, product names, abbreviations from source methodology]
+
+**General Pattern:** Include:
+- Product/vendor names and acronyms
+- Domain-specific terminology and jargon
+- Component/feature names
+- Common abbreviations
+- Alternative terms for baseline concepts
+
+## Terminology Aliases
+
+**CRITICAL RULE: ONE alias per element. Use keywords for multiple synonyms.**
+
+### WorkProduct Aliases
+- [Baseline WorkProduct] → "[Domain Term]" (canonical domain equivalent)
+
+### Activity Aliases  
+- [Baseline Activity] → "[Domain Operation]" (domain-specific operation name)
+
+### Persona Aliases
+- [Baseline Persona] → "[Domain Role]" (job title in this domain)
+
+### Specialized Alpha Aliases (OPTIONAL - only if aliasing the NEW alpha)
+- [New Alpha Name] → "[Domain Short Form]" (shortened/alternative term)
+
+**Total: 3-8 aliases** (focus on genuinely different canonical terms)
+**Total Keywords: 10-20 terms** (all synonyms, acronyms, search terms)
+```
+
 **Critical Mapping Rules:**
 
 From `references/semantics.md`:
@@ -342,7 +685,29 @@ From `references/semantics.md`:
   - **For baseline alpha analysis**: Read existing `relatesTo` relationships from baseline and dependent practices to understand how the alpha functions within the framework
   - **For new alphas ONLY**: Define domain-specific `relatesTo` relationships using appropriate relationship verbs
   - **Do NOT** add `relatesTo` to redeclarations - these inherit baseline relationships
-  - Relationship types: dependency ("depends on", "requires"), production ("produces", "built by"), guidance ("guides", "constrains"), information flow ("provides", "validates"), enabling ("enables", "supports"), impact ("influences", "justifies"), consumption ("consumes", "hosts")
+  - **DIRECTIONALITY PATTERN (CRITICAL)**: The alpha declaring `relatesTo` is the SOURCE imparting something to the target alphas
+    - Read as: `[Alpha with relatesTo] [relationship verb] [target alphaName]`
+    - Example: Platform has `relatesTo: [{relationship: "enables", alphaName: "Software System"}]` → "Platform enables Software System"
+    - This is a "reverse dependency" pattern: declare what you provide/influence, not what you depend on
+    - Benefits: Localized declarations, producer/provider pattern, new alphas don't require modifying existing ones
+  - **IDENTIFYING RELATIONSHIPS**: Look for interactions between concerns in Phase 1 analysis where one concern provides/influences another:
+    - Production: "Alpha A produces B", "Alpha A generates B", "Alpha A creates B"
+      - → A.relatesTo = [{relationship: "produces", alphaName: "B"}]
+    - Enablement: "Alpha A enables B", "Alpha A supports B", "Alpha A facilitates B"
+      - → A.relatesTo = [{relationship: "enables", alphaName: "B"}]
+    - Guidance: "Alpha A guides B", "Alpha A constrains B", "Alpha A governs B"
+      - → A.relatesTo = [{relationship: "guides", alphaName: "B"}]
+    - Information flow: "Alpha A provides data to B", "Alpha A informs B"
+      - → A.relatesTo = [{relationship: "provides", alphaName: "B"}]
+    - Validation: "Alpha A validates B", "Alpha A verifies B", "Alpha A evidences B"
+      - → A.relatesTo = [{relationship: "validates", alphaName: "B"}]
+    - Impact: "Alpha A influences B", "Alpha A justifies B"
+      - → A.relatesTo = [{relationship: "influences", alphaName: "B"}]
+    - Hosting/Consumption: "Alpha A hosts B", "Alpha A contains B"
+      - → A.relatesTo = [{relationship: "hosts", alphaName: "B"}]
+  - **REVERSE DEPENDENCIES**: For dependency relationships, flip the direction:
+    - Source says "X requires Y" → Y.relatesTo = [{relationship: "required by", alphaName: "X"}] OR X.relatesTo = [{relationship: "depends on", alphaName: "Y"}]
+    - Prefer active voice from provider perspective: "Y enables X" over "X depends on Y"
 - **Exact name matching:** All baseline references are case-sensitive (Section 3)
 - **Orthogonal tags:** Use {domainTags, lifecycleTags, organizationalTags} (Section 3.1.2)
 - **Redeclaration vs Specialization:** Follow decision framework (Section 9.2.5)
@@ -426,17 +791,211 @@ Practice Narrative:
 - [ ] All narrative contexts are 1-3 sentences (NOT paragraphs)
 - [ ] Citations referenced in citationNames arrays
 
+**CRITICAL: Pattern Completeness Requirements**
+
+**Patterns MUST show complete alpha state progressions across all PatternViews.**
+
+Common anti-pattern: Patterns only include alpha states explicitly mentioned in source content, resulting in sparse/incomplete pattern matrices with missing cells.
+
+**THREE-PASS PATTERN CONSTRUCTION:**
+
+**Pass 1: Source-Driven Pattern Structure**
+- Extract pattern structure from source methodology
+- Identify phases/stages (PatternViews) from source content
+- Map explicitly mentioned alpha states to PatternViews
+- Result: Initial pattern structure with explicit source mappings
+
+**Pass 2: Alpha-Driven Completeness (REQUIRED)**
+- **For each alpha in the pattern:**
+  - Review ALL states of the alpha
+  - For EACH PatternView, determine appropriate state:
+    - **First View (Prerequisites/Initial):** Starting state or "not yet started" state
+    - **Middle Views:** Progressive states showing maturation
+    - **Last View (Target/Final):** Advanced/optimized state
+  - **Backfill missing alpha states** using these heuristics:
+    - If alpha doesn't appear in a view, identify which state is appropriate for that lifecycle phase
+    - States should progress logically across views (earlier states → later states)
+    - **CRITICAL RULE:** If an alpha's state doesn't change from previous view, STILL include it in the final PatternView
+    - Only omit unchanged states in non-final views (compression), NEVER in the last view
+
+**Pass 3: Related Alpha Discovery (OPTIONAL but RECOMMENDED)**
+- **Identify candidate alphas from:**
+  - Other alphas in same practice (not yet in pattern)
+  - Alphas from practice dependencies (excluding baseline unless explicitly relevant)
+  - Alphas related via `relatesTo` relationships
+- **For each candidate alpha, evaluate:**
+  - Does this alpha's progression support the pattern narrative?
+  - Would including this alpha states provide meaningful insights into the lifecycle?
+  - Is there a natural state progression across the pattern views?
+- **Add relevant alphas** with complete state progressions
+
+**Pattern Completeness Matrix Example:**
+
+**BAD (Sparse Pattern - Missing Cells):**
+```
+| View | Team Topology Design | Cognitive Load | Team Interaction Mode | Organizational Sensing |
+|------|---------------------|----------------|----------------------|----------------------|
+| 0    | Static Structure    | Unmanaged Load | [MISSING]            | [MISSING]           |
+| 1    | Four Types Defined  | Load Awareness | Mode Awareness       | [MISSING]           |
+| 2    | Explicit Modes      | [MISSING]      | Explicit Assignment  | Sensors Established |
+| 3    | Sensing & Evolving  | [MISSING]      | Strategic Evolution  | Trigger-Based       |
+| 4    | Self-Steering Org   | Continuous Opt | [MISSING]            | Cybernetic Steering |
+```
+
+**GOOD (Complete Pattern - Full Coverage):**
+```
+| View | Team Topology Design | Cognitive Load | Team Interaction Mode | Organizational Sensing |
+|------|---------------------|----------------|----------------------|----------------------|
+| 0    | Static Structure    | Unmanaged Load | Undefined Interact.  | Static Organization |
+| 1    | Four Types Defined  | Load Awareness | Mode Awareness       | Ad Hoc Adjustments  |
+| 2    | Explicit Modes      | Domain Bounds  | Explicit Assignment  | Sensors Established |
+| 3    | Sensing & Evolving  | Active Reduction| Strategic Evolution | Trigger-Based Evol. |
+| 4    | Self-Steering Org   | Continuous Opt | Optimized Patterns   | Cybernetic Steering |
+```
+
+**Pattern Construction Workflow:**
+
+1. **Extract from source:** Identify pattern name, description, phases
+2. **Map explicit references:** Add alpha states mentioned in source
+3. **Alpha completeness pass:**
+   - List all alphas that appear in ANY PatternView
+   - For each alpha, create state progression table
+   - Backfill missing cells using state progression logic
+4. **Related alpha discovery:**
+   - Review practice alphas not yet in pattern
+   - Review dependency practice alphas
+   - Add alphas with meaningful progressions
+5. **Validate completeness:**
+   - Every alpha has entry in every PatternView (no missing cells)
+   - States progress logically from early to late
+   - Final PatternView includes ALL alphas (even if state unchanged from previous view)
+
+**Pattern Completeness Checklist (Phase 2 Mapping):**
+- [ ] Pattern identifies all participating alphas upfront
+- [ ] Each alpha has state progression documented across all views
+- [ ] Missing cells backfilled using state sequence analysis
+- [ ] Final PatternView includes ALL alphas (mandatory completeness rule)
+- [ ] Related alphas from dependencies considered for inclusion
+- [ ] Pattern narrative explains lifecycle progression coherently
+
+**Worked Example: Team Topology Evolution Journey**
+
+**Pass 1 (Source-Driven):** Extract from Team Topologies book
+- Pattern Name: "Team Topology Evolution Journey"
+- 5 Views: Prerequisites, Crawl, Walk, Run, Fly
+- Explicitly mentioned states:
+  - View 0: Team Topology Design (Static), Cognitive Load (Unmanaged)
+  - View 1: Team Topology Design (Four Types), Cognitive Load (Awareness), Team Interaction Mode (Awareness)
+  - View 2: Team Topology Design (Explicit), Team Interaction Mode (Explicit Assignment), Org Sensing (Sensors)
+  - View 3: Team Topology Design (Sensing), Org Sensing (Trigger-Based), Team Interaction Mode (Strategic)
+  - View 4: Team Topology Design (Self-Steering), Org Sensing (Cybernetic), Cognitive Load (Continuous)
+
+**Identified Alphas:** Team Topology Design, Cognitive Load, Team Interaction Mode, Organizational Sensing
+
+**Pass 2 (Backfill Missing States):**
+
+*Team Interaction Mode - Missing in View 0:*
+- Review states: Undefined Interactions, Mode Awareness, Explicit Mode Assignment, Strategic Mode Evolution, Optimized Interaction Patterns
+- View 0 (Prerequisites): "Undefined Interactions" (before awareness exists)
+- **Add:** {alphaName: "Team Interaction Mode", stateName: "Undefined Interactions"}
+
+*Organizational Sensing - Missing in View 0 and View 1:*
+- Review states: Static Organization, Ad Hoc Adjustments, Teams as Sensors Established, Trigger-Based Evolution, Cybernetic Self-Steering
+- View 0 (Prerequisites): "Static Organization" (traditional hierarchy)
+- View 1 (Crawl): "Ad Hoc Adjustments" (starting to respond but not systematic)
+- **Add:** View 0: {alphaName: "Organizational Sensing", stateName: "Static Organization"}
+- **Add:** View 1: {alphaName: "Organizational Sensing", stateName: "Ad Hoc Adjustments"}
+
+*Cognitive Load - Missing in View 2 and View 3:*
+- Review states: Unmanaged Load, Load Awareness, Domain Boundaries Established, Active Load Reduction, Continuous Optimization
+- View 2 (Walk): "Domain Boundaries Established" (aligns with "Explicit Interaction Modes")
+- View 3 (Run): "Active Load Reduction" (proactive management)
+- **Add:** View 2: {alphaName: "Cognitive Load", stateName: "Domain Boundaries Established"}
+- **Add:** View 3: {alphaName: "Cognitive Load", stateName: "Active Load Reduction"}
+
+*Team Interaction Mode - Missing in View 4:*
+- **FINAL VIEW RULE:** Must include even if state unchanged
+- View 4 (Fly): "Optimized Interaction Patterns" (final state)
+- **Add:** View 4: {alphaName: "Team Interaction Mode", stateName: "Optimized Interaction Patterns"}
+
+**Result:** Complete 4×5 matrix (20 alphaState entries)
+
+**Pass 3 (Related Alpha Discovery):**
+- Review practice alphas: Team, Work, Way of Working
+- Review baseline alphas related to Team
+- Evaluate: Would "Team" alpha state progression add value to pattern?
+  - Team states: Seeded → Formed → Collaborating → Performing → Adjourned
+  - Conclusion: Focus is on topology/interaction patterns, not team lifecycle - SKIP
+- Evaluate: Would "Way of Working" add value?
+  - Way of Working states: Principles Established → Foundation Established → In Use → In Place → Retired
+  - Conclusion: Topology pattern is about structure, not process - SKIP
+- **Decision:** Keep pattern focused on 4 topology-specific alphas (no additions from Pass 3)
+
 **Quality Gates:**
 - ✓ All Phase 1 concerns mapped to alphas
 - ✓ All new alphas have contributesTo
+- ✓ **Keywords identified (target: 10-20 terms)**
+  - ✓ Synonyms, acronyms, abbreviations, search terms
+  - ✓ Domain-specific product names and jargon
+- ✓ **Terminology aliases identified (target: 3-8 aliases)**
+  - ✓ ONE alias per PracticeElement (no duplicates for same element)
+  - ✓ Aliases prioritize specialized alphas and instances
+  - ✓ Domain canonical terms mapped (not multiple synonyms/acronyms)
+  - ✓ Synonyms/acronyms in keywords, not aliases
+  - ✓ Rationale provided for each alias
+- ✓ **All Phase 1 concern relationships mapped to alpha relatesTo arrays**
+- ✓ **relatesTo relationships use directionality pattern (provider perspective)**
 - ✓ All baseline references are exact canonical names
 - ✓ Tags use orthogonal structure
+- ✓ **Alpha-state-activity coverage validated:**
+  - ✓ Every alpha state (beyond initial) has ≥1 activity with contributesTo
+  - ✓ Gap analysis matrix created showing 100% coverage
+  - ✓ Inferred activities documented with rationale (source, parent alpha, or baseline pattern)
+  - ✓ Inferred activities have complete properties (contributesTo, worksOn, competencies, narrative)
+- ✓ **Pattern completeness validated:**
+  - ✓ Each alpha in pattern has state in EVERY PatternView (complete matrix)
+  - ✓ Final PatternView includes ALL pattern alphas (no omissions)
+  - ✓ States progress logically across views (early → late)
+  - ✓ Pattern matrix dimensions: N alphas × M views = N×M total alphaState entries
 - ✓ Validation checklist completely satisfied
 
 **User Feedback:**
 - "Reading analysis report and loading baseline practice..."
+- "Identifying terminology aliases for domain alignment..."
 - "Mapping N concerns to alphas using redeclaration/specialization framework..."
-- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md"
+- "Conducting alpha-state-activity gap analysis..."
+- "Evaluating initial states: A null-point, B prepared positions requiring bootstrap activities..."
+- "Identified X alpha states requiring activities, Y covered, Z gaps - inferring missing activities..."
+- "Gap analysis complete: 100% alpha state coverage achieved (including B bootstrap activities)"
+- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md (includes N aliases, Z inferred activities)"
+
+**Post-Assembly Verification Checklist (for methods):**
+
+After assembling method JSON, verify BEFORE validation:
+
+```bash
+# Check kind property exists at root
+jq '.kind' practices/<method-name>/<method-name>.json
+# Should output: "method"
+
+# Check all practices have kind property
+jq '.practices[] | {name, kind}' practices/<method-name>/<method-name>.json
+# Each practice should have: "kind": "practice"
+# If any show "kind": null, fix with:
+jq '.practices = [.practices[] | if .kind == null then . + {kind: "practice"} else . end]' <file>.json > <file>-fixed.json
+
+# Check required root properties
+jq '{kind, name, description, baselinePracticeName, hasNarratives: (.narratives | length)}' practices/<method-name>/<method-name>.json
+# All should be present and non-null
+# hasNarratives should be >= 1 (method-level narrative)
+```
+
+If `kind` is missing, add it:
+```bash
+jq '. + {kind: "method"}' <file>.json > <file>-fixed.json
+```
+
+If `narratives` is missing, review Phase 1 analysis for overarching lifecycle and add method narrative.
 
 ### Step 3: Phase 3 - JSON Generation
 
@@ -450,8 +1009,17 @@ Practice Narrative:
 **Process for Single Practice:**
 
 1. Read `prompts/phase-3-json.md`, mapping guide, schema, baseline JSON
-2. Generate complete practice JSON
-3. Validate and fix until 0 errors
+2. Generate complete practice JSON with **REQUIRED discriminator property**:
+   ```json
+   {
+     "kind": "practice",  // CRITICAL: Required at root level
+     "name": "Practice Name",
+     "description": "...",
+     ...
+   }
+   ```
+3. Include aliases array from mapping guide
+4. Validate and fix until 0 errors
 
 **Process for Multi-Practice Method:**
 
@@ -468,10 +1036,10 @@ Practice Narrative:
 
 2. **Each agent prompt must include:**
    - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `deps/platform-adoption-kernel.json`
-   - What to generate: **Practice JSON** (NOT method JSON) - single practice object with kind="practice"
+   - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
-   - Schema compliance: all required properties (alphas, activities, work products, **patterns**, etc.)
-   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL: MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression."
+   - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression."
 
 3. **Agents run concurrently**, each producing one practice JSON file
 
@@ -479,15 +1047,27 @@ Practice Narrative:
 
 4. **After all practice JSONs complete:**
    - Read all 4 practice JSON files
-   - Create method structure:
+   - **Review Phase 1 analysis** for method-level overarching narrative (e.g., "The Cycle", SDLC mapping, value stream)
+   - Create method structure with **REQUIRED kind property AND method narrative**:
      ```json
      {
        "kind": "method",
        "name": "Method Name",
        "description": "...",
        "baselinePracticeName": "Platform Adoption Essentials",
+       "narratives": [
+         {
+           "name": "Method Lifecycle Narrative",
+           "description": "Overarching journey across all practices",
+           "narrativeTypeName": "The Cycle | STAR | Hero's Journey",
+           "narrativeContexts": [
+             {"seq": 1, "narrativeElementName": "...", "context": "..."},
+             ...
+           ],
+           "citationNames": [...]
+         }
+       ],
        "tags": {...},
-       "narratives": [...],
        "citations": [...],
        "practices": [
          <practice-1-json-content>,
@@ -497,12 +1077,23 @@ Practice Narrative:
        ]
      }
      ```
+   - **CRITICAL:** Ensure `"kind": "method"` is at root level (required discriminator property)
+   - **CRITICAL:** Add method-level narrative from Phase 1 analysis (usually "The Cycle" or similar framework)
    - Merge citations from all practices (deduplicate)
-   - Ensure each embedded practice has `kind: "practice"`
+   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` - check with: `jq '.practices[] | {name, kind}'`
+   - If any practice has `"kind": null`, the individual practice JSON generation omitted it - add it during assembly
 
 **Step 3C: Validation and Fixes**
 
-5. **Validate method JSON:**
+5. **Pre-validation checks (BEFORE running validator):**
+   - ✓ Verify `"kind": "method"` exists at root level
+   - ✓ Verify `"kind": "practice"` exists in each embedded practice
+   - ✓ Verify `name` and `description` exist at root level
+   - ✓ Verify `baselinePracticeName` exists at root level
+   - ✓ Verify `practices` array exists and has expected count
+   - ✓ **Verify `narratives` array exists with method-level narrative** (from Phase 1 overarching lifecycle)
+   
+6. **Validate method JSON:**
    ```bash
    python3 utils/validate-practice-json.py \
      practices/<method-name>/<method-name>.json \
@@ -510,8 +1101,9 @@ Practice Narrative:
      deps/language.schema.json
    ```
 
-6. **Fix errors:**
+7. **Fix errors:**
    - Schema violations (property names, types)
+   - **Missing `kind` property** (add "kind": "method" at root, "kind": "practice" in practices)
    - Cross-practice references (if any)
    - Missing properties
    - Iterate until 0 errors
@@ -527,6 +1119,7 @@ Practice Narrative:
 
 From `deps/language.schema.json`:
 
+- **Discriminator property:** `"kind": "practice"` REQUIRED at root level of every practice JSON (enables type discrimination)
 - **Checklist format:** Objects {name, description, seq}, NOT strings
 - **Competency references:** {competencyName, competencyLevelName}, NOT {competencyName, level}
 - **Persona property:** `competencies`, NOT `requiredCompetencies`
@@ -537,14 +1130,31 @@ From `deps/language.schema.json`:
 
 **Quality Gates:**
 - ✓ Valid JSON syntax (jq empty passes)
+- ✓ **Required discriminator properties (CHECK FIRST, BEFORE schema validation):**
+  - ✓ Practice JSON: `"kind": "practice"` at root level
+  - ✓ Method JSON: `"kind": "method"` at root level AND `"kind": "practice"` in each practices array element
+  - ✓ Verify with: `jq '.kind' <file>.json` (practice) or `jq '{kind, practices: [.practices[] | {name, kind}]}' <file>.json` (method)
 - ✓ Schema validation: 0 errors
 - ✓ Baseline validation: 0 errors
 - ✓ Internal integrity: 0 errors
 - ✓ All Phase 2 content in JSON
 - ✓ No floating alphas
+- ✓ **Aliases array populated from mapping guide:**
+  - ✓ 3-8 aliases (ONE per element, no duplicates)
+  - ✓ Aliases prioritize specialized alphas and instances
+  - ✓ elementType and name use canonical baseline names
+  - ✓ aliasName contains domain-specific canonical term
+  - ✓ Aliases NOT used in structural references (alphaName, activitySpaceName, etc.)
+- ✓ **Pattern matrix completeness:**
+  - ✓ Count pattern dimensions: N alphas appearing across all views
+  - ✓ Verify total alphaState entries = N × M (where M = number of PatternViews)
+  - ✓ Check final PatternView contains all N alphas
+  - ✓ No missing cells in pattern matrix
 
 **User Feedback:**
 - "Generating JSON from mapping guide..."
+- "Verifying discriminator property: kind='practice'..."
+- "Verifying required properties (name, description, baselinePracticeName)..."
 - "Running validation (schema, baseline, integrity)..."
 - "Found N errors in category X, applying fixes..."
 - "Validation passed! Generated schema-compliant JSON at practices/<name>/<name>.json"
@@ -714,11 +1324,25 @@ Single validation script replaces multiple utilities:
 - ❌ Multi-sentence descriptions (violates conciseness standards)
 - ❌ Insufficient citations (need 5-15 authoritative sources)
 - ❌ **Incomplete activity coverage** (must include ALL activities identified, not just 1-2 examples)
+- ❌ **Not identifying concern relationships** - Missing production flows, enablement patterns, governance structures, information flows between concerns
+  - **Fix:** Explicitly analyze how concerns interact: what produces what, what enables what, what governs what
+  - Document these relationships in concern analysis for Phase 2 mapping
 
 ### Phase 2 Pitfalls
 
 - ❌ Not reading semantics.md before mapping
 - ❌ Creating floating alphas (missing contributesTo)
+- ❌ **Missing or insufficient terminology aliases** - Saying "no aliases needed" when source uses domain-specific vocabulary
+  - **Fix:** Review source for domain canonical terms differing from baseline
+  - Examples: "Playbook" (vs Deployment Documentation), "Execution Environment" (specialized alpha)
+  - Target: 3-8 aliases per practice
+  - **ONE alias per element** - if multiple terms exist, use instances/specializations instead
+- ❌ **Multiple aliases for same element** - Creating Platform → "AAP", Platform → "Automation Controller", Platform → "Automation Platform"
+  - **Fix:** Distinguish synonyms vs facets vs deployments
+  - **Synonyms/acronyms** → keywords: "AAP", "automation platform", "ansible automation platform"
+  - **Facets/components** → specializations: "Automation Controller", "Automation Hub", "Execution Environment" (new alphas with contributesTo)
+  - **Different deployments** → instances: "Production AAP", "Staging AAP", "Development AAP" (same behavior, different tracking)
+  - Do NOT create multiple aliases for one baseline element
 - ❌ **CRITICAL: contributesTo only references baseline** - Forgetting that contributesTo can reference practice-local alphas (internal hierarchy) or external practice alphas (cross-practice dependency)
   - **Fix:** Consider all three contributesTo options: baseline, practice-local, external practice
   - Use State Alignment Heuristic to find best parent across all three sources
@@ -731,10 +1355,16 @@ Single validation script replaces multiple utilities:
   - **Fix:** Only define `relatesTo` on NEW alphas (specializations), not redeclarations
   - Redeclarations inherit baseline relationships automatically
 - ❌ **Missing relatesTo on new alphas** - New specialized alphas lack semantic relationships to peer alphas
-  - **Fix:** Define domain-specific relationships using appropriate verbs from semantics.md Section 4.1
+  - **Fix:** Review Phase 1 concern interactions and map to relatesTo arrays
+  - Define domain-specific relationships using appropriate verbs from semantics.md Section 4.1
+  - Use directionality pattern: alpha declares what it provides/enables/produces (not what it depends on)
   - Example: New alpha "Platform Capability" should relate to "Platform Asset" (produces), "Requirements" (validates), etc.
 - ❌ **Using vague relationship verbs** - Generic "relates to" instead of specific relationship types
-  - **Fix:** Use domain-appropriate verbs: "depends on", "produces", "guides", "validates", "enables", "constrains"
+  - **Fix:** Use domain-appropriate verbs: "produces", "enables", "guides", "validates", "constrains", "provides", "hosts"
+  - Prefer active voice from provider perspective
+- ❌ **Wrong relationship directionality** - Alpha declares dependencies instead of provisions
+  - **Fix:** Flip perspective - alpha should declare what it provides TO others, not what it needs FROM others
+  - "Platform enables Software System" not "Software System depends on Platform"
 - ❌ Using competency descriptions instead of exact baseline names
 - ❌ Using alias names in structural references (use canonical names)
 - ❌ Wrong alpha approach (should use redeclaration vs specialization framework)
@@ -743,6 +1373,11 @@ Single validation script replaces multiple utilities:
 - ❌ **Missing narrativeTypeName and narrativeContexts in narratives**
 - ❌ **Omitting alpha narratives (required for new alphas)**
 - ❌ **Omitting activity narratives (required for all activities)**
+- ❌ **Missing alpha-state-activity coverage** - Alpha states lack supporting activities to progress to those states
+  - **Fix:** Conduct alpha-state-activity gap analysis (Phase 2 Step 7.5)
+  - Every alpha state beyond initial MUST have ≥1 activity with contributesTo
+  - Infer missing activities from: (1) source material, (2) parent alpha patterns, (3) baseline ActivitySpace patterns
+  - Document gap analysis matrix and inferred activities with rationale
 - ❌ **CRITICAL: Degeneration in multi-practice methods** - Practice 1 gets full alpha/work product/activity coverage, but later practices only get activities (missing alphas and work products)
   - **Fix:** Use multi-agent approach (Phase 2 and Phase 3)
   - Each practice MUST have: metadata, alphas (if any), work products, activities, **patterns**
@@ -751,16 +1386,41 @@ Single validation script replaces multiple utilities:
   - **Fix:** Every multi-alpha practice MUST have at least one pattern
   - Pattern should have 3-5 PatternViews showing how alphas progress together
   - Use external lifecycle narratives (SDLC, PDCA, etc.) when appropriate
+- ❌ **Incomplete patterns (sparse matrices)** - Patterns only include alpha states explicitly mentioned in source, resulting in missing cells in pattern matrix
+  - **Fix:** Use THREE-PASS pattern construction (see Pattern Completeness Requirements section):
+    - Pass 1: Extract source-driven structure
+    - Pass 2: Backfill missing alpha states for complete progression (REQUIRED)
+    - Pass 3: Consider related alphas from practice/dependencies (OPTIONAL)
+  - Every alpha in pattern MUST have state in EVERY PatternView
+  - Final PatternView MUST include ALL alphas (even if state unchanged from previous view)
+  - Example: Pattern with 4 alphas and 5 views = 20 alphaState entries (4×5 complete matrix)
 
 ### Phase 3 Pitfalls
 
 - ❌ Not reading language.schema.json before generating
+- ❌ **Missing `kind` property at root level** - MOST COMMON ERROR
+  - **Fix Practice JSON:** Add `"kind": "practice"` at root level (conventionally first property for readability)
+  - **Fix Method JSON:** Add `"kind": "method"` at root level
+  - **Check EVERY practice in method:** `jq '.practices[] | {name, kind}'` - ALL must show "practice", not null
+  - This MUST be checked BEFORE schema validation (some schemas allow it to be missing but consumers fail)
+  - **Note:** Property order doesn't affect JSON validity, but discriminators are conventionally placed first
 - ❌ Checklist items as strings instead of objects
+- ❌ **Empty or missing aliases array** - Omitting aliases when mapping guide identified them
+  - **Fix:** Copy aliases from "Terminology Aliases" section of mapping guide to JSON aliases array
+  - Verify 3-8 entries (ONE per element, no duplicates)
+- ❌ **Using aliasName in structural references** - Using domain term instead of canonical name in alphaName, contributesTo, etc.
+  - **Fix:** ALL structural references MUST use canonical baseline names
+  - Aliases are presentation-layer only (for UI/documentation)
+  - Example: Use "Platform" in alphaName, not "Automation Platform" (even if alias exists)
 - ❌ Wrong competency reference format ({competencyName, level} instead of {competencyName, competencyLevelName})
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities
 - ❌ **Missing `activitySpaceName` property on activities** (required for flat Practice.activities)
-- ❌ **Missing `kind` property** (required on Method, Practice, and all PracticeElements for type discrimination)
+- ❌ **Missing `kind` property** (required discriminator for type discrimination)
+  - **Fix:** Add `"kind": "practice"` at root level for practice JSON
+  - **Fix:** Add `"kind": "method"` at root level for method JSON
+  - **Fix:** Ensure each practice in method's practices array has `"kind": "practice"`
+  - This is a CRITICAL property - schema validation may pass without it, but consumers will fail
 - ❌ Wrong PatternView property names (`alphas` instead of `alphaStates`, `views` instead of `patternViews`)
 - ❌ Missing contributesTo on LODs
 - ❌ **Adding relatesTo to redeclarations** - JSON includes relatesTo on baseline alpha redeclarations
@@ -771,11 +1431,23 @@ Single validation script replaces multiple utilities:
   - Use exact, case-sensitive alpha names
 - ❌ **Missing relatesTo on new alphas from mapping guide** - Mapping specifies relationships but JSON omits them
   - **Fix:** Copy relatesTo array from mapping guide to JSON for all new alphas
+- ❌ **Wrong relationship directionality** - Declaring dependencies instead of provisions
+  - **Fix:** Alpha A should declare what it provides/enables/produces for other alphas, not what it depends on
+  - Use active voice from provider perspective: "enables", "produces", "guides" rather than "depends on", "requires"
+  - Exception: "depends on" is valid when explicitly modeling a dependency relationship from the dependent's side
+- ❌ **Missing relationships on interconnected alphas** - Phase 1 analysis shows concern interactions but Phase 3 JSON has no relatesTo
+  - **Fix:** Review Phase 1 concern interactions and Phase 2 mapping for relationship opportunities
+  - Look for production flows, enablement patterns, governance structures, information flows
 - ❌ Markdown or metadata in JSON strings
 - ❌ **Generating only 1-2 example activities** (must generate ALL activities from mapping guide)
 - ❌ **Empty patterns array** when mapping guide has patterns
   - **Fix:** Verify patterns array populated with minimum 1 pattern per practice
   - Each pattern must have 2+ PatternViews with alphaStates showing progression
+- ❌ **Incomplete pattern matrices in JSON** - Pattern has 4 alphas but some PatternViews only have 2-3 alphaStates
+  - **Fix:** Complete the pattern matrix using state progression analysis
+  - Count: If pattern has N alphas and M PatternViews, JSON should have N×M alphaState entries total
+  - Validate final PatternView includes ALL alphas (mandatory completeness rule)
+  - Use alpha state sequences to backfill missing states for each view
 - ❌ **Using `assetName` (singular string) instead of `assetNames` (array of AssetReference objects)**
   - **Fix:** Replace `"assetName": "icon-name"` with `"assetNames": [{"assetName": "icon-name", "type": "icon"}]`
 - ❌ **Missing AssetReference `type` property**
@@ -822,6 +1494,7 @@ Practices can reference alphas from other practices, creating explicit dependenc
 {
   "name": "Platform Team Topology",
   "contributesTo": "Team Interaction",  // from Team Topologies practice
+  "practiceDependencyNames": ["Team Topologies"],
   "dependencies": [
     {
       "practiceName": "Team Topologies",
@@ -834,7 +1507,9 @@ Practices can reference alphas from other practices, creating explicit dependenc
 **Requirements:**
 
 - **Phase 2:** Document dependency in practice metadata section of mapping guide
-- **Phase 3:** Add to JSON `dependencies` array with practiceName and reason
+- **Phase 3:** Add to JSON:
+  - `practiceDependencyNames` array: list of practice names providing alphas
+  - `dependencies` array with practiceName and reason (detailed explanations)
 - External practice must be available for validation (or validation must skip external references)
 - Reference must use exact, case-sensitive alpha name from external practice
 
@@ -843,6 +1518,39 @@ Practices can reference alphas from other practices, creating explicit dependenc
 - Source methodology builds on concepts from another well-known practice
 - Avoiding duplication of alphas already defined elsewhere
 - Creating practice compositions (e.g., Platform Engineering practice depends on Team Topologies)
+- **Creating orchestration practices** that coordinate activities across multiple practices via patterns
+
+### Orchestration Practice Pattern
+
+**When to Use:**
+
+Source methodology describes an **overarching lifecycle pattern** that cuts across multiple domains/concerns, leading to a temptation to create one very large practice.
+
+**Correct Approach:**
+
+1. **Divide content logically** into separate practices (by domain/concern/focus)
+2. **Create a dedicated orchestration practice** that:
+   - Describes the overarching lifecycle pattern
+   - Uses `practiceDependencyNames` to load alphas from other practices
+   - Creates patterns that coordinate across loaded alphas
+   - Does NOT redefine alphas already in other practices
+   - Focuses on **pattern orchestration**, not alpha definition
+
+**Example:**
+
+**Source:** SAFe methodology with "The Cycle" lifecycle coordinating across multiple value streams
+
+**Wrong Approach:** Create one giant "SAFe" practice with 20+ alphas
+
+**Correct Approach:**
+- Practice 1: "Portfolio Management" (defines Portfolio, Epic, Value Stream alphas)
+- Practice 2: "Team Delivery" (defines Team, Iteration, Story alphas)
+- Practice 3: "Solution Delivery" (defines Solution, Architecture alphas)
+- **Practice 4: "SAFe Cycle Orchestration"** (orchestration practice)
+  - `practiceDependencyNames: ["Portfolio Management", "Team Delivery", "Solution Delivery"]`
+  - Defines 1-2 overarching patterns using alphas from dependencies
+  - Pattern views coordinate state progression across all loaded alphas
+  - Minimal or no alpha definitions (relies on loaded alphas)
 
 **Validation Considerations:**
 
@@ -851,24 +1559,29 @@ Practices can reference alphas from other practices, creating explicit dependenc
    - Read external practice JSON if available to verify alpha exists
    - Document dependency rationale in mapping guide
    - Use State Alignment Heuristic to validate semantic fit
+   - **For orchestration practices:** Clearly identify which alphas come from dependencies vs defined locally
 
 2. **During Phase 3 JSON Generation:**
-   - Populate dependencies array with all external practices referenced
+   - Populate `practiceDependencyNames` array with practice names (simple list)
+   - Populate `dependencies` array with detailed {practiceName, reason} objects
    - Ensure contributesTo references are exact matches (case-sensitive)
    - Document in practice description or narrative that it extends another practice
+   - **For orchestration practices:** Ensure patterns reference alphas from dependencies without redefining them
 
 3. **During Validation:**
-   - If external practice JSON is available: validate alpha name exists
-   - If external practice JSON is NOT available: document assumption that reference will be resolved at runtime
+   - **If external practice JSON is available:** validate alpha name exists in dependency
+   - **If external practice JSON is NOT available:** skip cross-practice alpha validation (allow references via practiceDependencyNames)
    - Check for circular dependencies (Practice A → Practice B → Practice A)
+   - **For methods:** Validate cross-practice references across embedded practices
 
 **Multi-Practice Method Considerations:**
 
 When generating a method with multiple practices:
 
 - Practices within the method can reference each other's alphas
-- These are still "external" references requiring dependency declarations
+- Use `practiceDependencyNames` to declare which practices provide alphas
 - Method assembly (Phase 3B) should validate cross-practice references across embedded practices
+- Validator should recognize `practiceDependencyNames` and allow alpha references from those practices
 
 ---
 
