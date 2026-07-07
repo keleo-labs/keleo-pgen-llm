@@ -101,8 +101,16 @@ In plan mode:
    - Take comprehensive notes
 
 2. **Determine structure:**
-   - **Practice** if: Single cohesive value stream, one use case
-   - **Method** if: Multiple distinct value streams, different use cases, separate practices
+   - **Practice** if: Single cohesive value stream, one use case, focused baseline coverage
+   - **Method** if: Multiple distinct value streams, different use cases, separate practices, OR broad baseline coverage requiring subdivision
+   
+   **Apply decision heuristics** (see "Practice vs Method Handling" section):
+   - Check for natural separation signals (use-cases, value-streams, stakeholder journeys, domains)
+   - If no clear separation, analyze baseline alpha coverage:
+     - Focused (3-6 alphas in 1-2 focuses) → Practice
+     - Broad (8+ alphas across all focuses) → Method with subdivided practices
+   - Use 1-level alpha relationship analysis to create coherent practice clusters
+   - Avoid "everything else" catch-all practices
 
 3. **Identify baseline practice:**
    - Ask user which baseline to use
@@ -293,6 +301,42 @@ No conversational context is required - only file contents.
 - "Extracted N concerns across M perspectives..."
 - "Phase 1 complete: Analysis report generated at practices/<name>/01-analysis-report.md"
 
+**CRITICAL: Phase 1 Completion Validation (REQUIRED)**
+
+After generating `01-analysis-report.md`, IMMEDIATELY validate completeness before proceeding to Phase 2:
+
+```bash
+# Count sections in analysis report
+grep "^## " practices/<name>/01-analysis-report.md | wc -l
+# Should show: 8 sections (Outcomes, Concerns, Progressive States, Work Products, Activities, Competencies, Personas, Workflows)
+
+# Verify each required section exists
+grep "^## 1. Outcomes$" practices/<name>/01-analysis-report.md
+grep "^## 2. Concerns$" practices/<name>/01-analysis-report.md  
+grep "^## 3. Progressive States$" practices/<name>/01-analysis-report.md
+grep "^## 4. Activities$" practices/<name>/01-analysis-report.md
+grep "^## 5. Competencies$" practices/<name>/01-analysis-report.md
+grep "^## 6. Personas$" practices/<name>/01-analysis-report.md
+grep "^## 7. Persona Groups$" practices/<name>/01-analysis-report.md
+grep "^## 8. Workflows$" practices/<name>/01-analysis-report.md
+
+# Count items in critical sections
+grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
+# Should show ≥5 concerns, ≥5 activities, ≥3 work products
+```
+
+**If ANY section is missing:**
+1. Identify which sections are incomplete
+2. Review Phase 1 prompt requirements  
+3. Re-read source materials for missing content
+4. Generate missing sections BEFORE proceeding to Phase 2
+
+**Common Phase 1 Omissions:**
+- Activities section empty or with only 1-2 activities (should have 5-15)
+- Work products section missing or incomplete (should have 5-10)
+- Competencies section sparse (should have 5-10 domain-specific competencies)
+- Workflows section empty (should have 2-5 workflow patterns)
+
 ### Step 2: Phase 2 - Mapping
 
 **Objective:** Map Phase 1 analysis to baseline practice framework
@@ -306,7 +350,15 @@ No conversational context is required - only file contents.
 
 1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
 2. Map concerns to alphas (redeclaration vs specialization)
-3. **Identify terminology aliases and keywords:**
+3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
+   - As you name Alphas, WorkProducts, Activities, Personas, Patterns, Assets: verify each name is GLOBALLY UNIQUE
+   - **NO name may appear in more than one element type** (e.g., cannot have Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
+   - When naming elements, choose distinct names:
+     - Alphas: Abstract concepts (e.g., "Platform Configuration", "Inference Service Configuration")
+     - WorkProducts: Artifacts with specificity (e.g., "Platform Configuration File", "Inference Service Configuration File")
+     - Activities: Action-oriented with verbs (e.g., "Configure Platform", "Deploy Inference Service")
+   - If you find a name collision during mapping, rename immediately before proceeding
+4. **Identify terminology aliases and keywords:**
    - Review source methodology for domain canonical terms
    - Apply decision tree: variant→alias, instance→use instance, specialization→alias new alpha, synonym/acronym→keyword
    - **ONE alias per element** (no duplicates for same baseline element)
@@ -318,10 +370,11 @@ No conversational context is required - only file contents.
    - For each NEW alpha, identify what it provides/enables/produces/guides/validates for other alphas
    - Use active voice from provider perspective (directionality pattern)
    - Document relationships in mapping guide
-5. **Generate patterns using THREE-PASS construction:**
+5. **Generate patterns using FOUR-PASS construction:**
    - Pass 1: Extract pattern structure from source (phases, explicitly mentioned states)
-   - Pass 2: Backfill missing alpha states for complete matrix (REQUIRED - see Pattern Completeness Requirements)
+   - Pass 2: Backfill missing alpha states for complete matrix (REQUIRED)
    - Pass 3: Consider related alphas from practice/dependencies (OPTIONAL)
+   - Pass 4: State distribution validation (REQUIRED - max 2 states per alpha per view, backfill late-appearing alphas)
 6. Generate complete `02-mapping-guide.md` with terminology aliases, all alphas (including relatesTo), work products, activities, complete patterns
 
 **Process for Multi-Practice Method:**
@@ -718,6 +771,14 @@ From `references/semantics.md`:
 
 **ALL narratives MUST be structured objects with narrativeTypeName and narrativeContexts arrays. NEVER use prose paragraphs.**
 
+**CRITICAL: Narrative Content Rules**
+
+- **NEVER reference the narrative name, type, or framework within the narrative itself**
+- Narrative name/description are metadata - they identify the narrative structure externally
+- Narrative contexts contain the actual story content - they should NOT mention the narrative type
+- **WRONG**: "In this Hero's Journey narrative, organizations embark on..." or "This narrative describes..."
+- **CORRECT**: "Organizations operate with fragmented infrastructure..." (direct story content)
+
 From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
 
 1. **Practice/Method Narratives** - REQUIRED structured format:
@@ -757,6 +818,22 @@ From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
 
 5. **Work Product Narratives** - OPTIONAL but recommended for complex work products
 
+**Narrative Content Examples:**
+
+**WRONG (Self-Referential):**
+```
+- Context: "In this Hero's Journey narrative, platform engineering organizations embark on a transformation..."
+- Context: "This Essay-type narrative explores how Platform Capabilities evolve..."
+- Context: "The following narrative describes the maturation journey..."
+```
+
+**CORRECT (Direct Content):**
+```
+- Context: "Organizations operate with fragmented infrastructure managed by siloed teams..."
+- Context: "Platform Capabilities evolve from tactical solutions to strategic enablers..."
+- Context: "Teams mature from reactive firefighting to proactive platform stewardship..."
+```
+
 **WRONG (Prose Paragraph):**
 ```
 Practice Narrative:
@@ -789,6 +866,7 @@ Practice Narrative:
 - [ ] All new alphas have narrative objects with narrativeTypeName
 - [ ] All activities have Technique narrative objects
 - [ ] All narrative contexts are 1-3 sentences (NOT paragraphs)
+- [ ] **Narrative contexts contain direct content (NO self-references to narrative type/name)**
 - [ ] Citations referenced in citationNames arrays
 
 **CRITICAL: Pattern Completeness Requirements**
@@ -797,7 +875,7 @@ Practice Narrative:
 
 Common anti-pattern: Patterns only include alpha states explicitly mentioned in source content, resulting in sparse/incomplete pattern matrices with missing cells.
 
-**THREE-PASS PATTERN CONSTRUCTION:**
+**FOUR-PASS PATTERN CONSTRUCTION:**
 
 **Pass 1: Source-Driven Pattern Structure**
 - Extract pattern structure from source methodology
@@ -828,6 +906,92 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
   - Would including this alpha states provide meaningful insights into the lifecycle?
   - Is there a natural state progression across the pattern views?
 - **Add relevant alphas** with complete state progressions
+
+**Pass 4: State Distribution Validation (REQUIRED)**
+
+**CRITICAL QUALITY CONSTRAINTS:**
+
+**Constraint 1: Alpha State Count Per PatternView**
+- **Preference:** 1 alpha state per alpha per PatternView (one state progresses to next)
+- **Maximum:** 2 alpha states per alpha per PatternView (initial + achieved in single view)
+- **Anti-pattern:** 3+ states per alpha in single view → **Pattern views are too coarse-grained**
+
+**When 3+ states appear for an alpha in a PatternView:**
+- **Root Cause:** PatternView represents too broad a lifecycle phase (e.g., "Implement" covering design → build → test → deploy)
+- **Fix:** Subdivide the pattern into finer-grained PatternViews
+- **Example:**
+  - **Before:** View 2 "Implement" has Platform states: Architecture Designed → Built → Deployed → Monitored (4 states!)
+  - **After:** Split into:
+    - View 2 "Design": Architecture Designed
+    - View 3 "Build": Built
+    - View 4 "Deploy": Deployed
+    - View 5 "Operate": Monitored
+
+**Constraint 2: Late-Appearing Alphas with Advanced States**
+- **Anti-pattern:** Alpha first appears in PatternView N with state "Achieved" or other advanced state, but was NOT in PatternViews 1 to N-1
+- **Problem:** Creates discontinuity - "How did we get to 'Achieved' when alpha wasn't tracked before?"
+- **Fix: Backfill earlier PatternViews with alpha's progression**
+
+**Backfill Heuristics:**
+1. **Identify the "sudden appearance":**
+   - Alpha X first appears in PatternView N
+   - Alpha X is at state Y (not the initial state)
+   - PatternViews 1 to N-1 do NOT include Alpha X
+
+2. **Determine backfill states:**
+   - Review Alpha X's state sequence: S1 → S2 → S3 → ... → Y
+   - Distribute earlier states across PatternViews 1 to N-1
+   - Follow natural progression: earlier views get earlier states
+
+3. **Backfill strategy:**
+   - **If N = 2 (appears in second view):** Add initial state to View 1
+   - **If N = 3 (appears in third view):** Add S1 to View 1, S2 to View 2
+   - **If N = 4+:** Distribute intermediate states across prior views
+   - **Guideline:** 1-2 states per view (prefer 1)
+
+4. **Validate progression coherence:**
+   - Does the backfilled state align with that PatternView's narrative?
+   - Does the state sequence make logical sense across views?
+   - If misalignment detected, adjust PatternView granularity (may need to split views)
+
+**Example - Late-Appearing Alpha (WRONG):**
+```
+Pattern: Platform Evolution Journey (5 views)
+| View | Platform        | Platform Asset | Platform Capability | Platform Governance |
+|------|----------------|----------------|---------------------|---------------------|
+| 0    | Conceived      | [none]         | [none]              | [none]             |
+| 1    | Architecture   | [none]         | [none]              | [none]             |
+| 2    | Development    | [none]         | Identified          | [none]             |
+| 3    | Operational    | Available      | Governed            | [SUDDEN: Compliant!]|
+| 4    | Optimizing     | Optimized      | Optimized           | Automated          |
+```
+
+**Problem:** Platform Governance suddenly appears at "Compliant" in View 3 (advanced state)
+
+**Example - Late-Appearing Alpha (FIXED with Backfill):**
+```
+Pattern: Platform Evolution Journey (5 views)
+| View | Platform        | Platform Asset | Platform Capability | Platform Governance |
+|------|----------------|----------------|---------------------|---------------------|
+| 0    | Conceived      | [none]         | [none]              | Undefined          | ← BACKFILL
+| 1    | Architecture   | [none]         | Identified          | Established        | ← BACKFILL
+| 2    | Development    | [none]         | Governed            | Enforced           | ← BACKFILL
+| 3    | Operational    | Available      | Optimized           | Compliant          | ← NOW logical!
+| 4    | Optimizing     | Optimized      | [same]              | Automated          |
+```
+
+**Analysis:**
+- Platform Governance backfilled into Views 0-2 with progressive states
+- Now shows natural maturation: Undefined → Established → Enforced → Compliant → Automated
+- No "sudden appearance" - governance is tracked from the beginning
+
+**Validation Checklist for Pass 4:**
+- [ ] Count alpha states per alpha per PatternView
+- [ ] If any alpha has 3+ states in a single view → **Subdivide pattern into finer PatternViews**
+- [ ] Identify any alphas appearing first in non-initial PatternView with advanced state
+- [ ] For each late-appearing alpha → **Backfill earlier PatternViews with progressive states**
+- [ ] Verify state sequences are logically coherent across all views
+- [ ] Final PatternView includes ALL alphas (previous rule from Pass 2)
 
 **Pattern Completeness Matrix Example:**
 
@@ -865,10 +1029,17 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
    - Review practice alphas not yet in pattern
    - Review dependency practice alphas
    - Add alphas with meaningful progressions
-5. **Validate completeness:**
+5. **State distribution validation (CRITICAL):**
+   - Count states per alpha per PatternView (max 2, prefer 1)
+   - If 3+ states in any view → subdivide pattern into finer views
+   - Identify late-appearing alphas with advanced states
+   - Backfill earlier views with progressive states for late alphas
+6. **Validate completeness:**
    - Every alpha has entry in every PatternView (no missing cells)
    - States progress logically from early to late
    - Final PatternView includes ALL alphas (even if state unchanged from previous view)
+   - No alpha has more than 2 states in a single view
+   - No alpha suddenly appears late with advanced state (backfill complete)
 
 **Pattern Completeness Checklist (Phase 2 Mapping):**
 - [ ] Pattern identifies all participating alphas upfront
@@ -877,6 +1048,11 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
 - [ ] Final PatternView includes ALL alphas (mandatory completeness rule)
 - [ ] Related alphas from dependencies considered for inclusion
 - [ ] Pattern narrative explains lifecycle progression coherently
+- [ ] **State distribution quality (Pass 4):**
+  - [ ] No alpha has more than 2 states in a single PatternView (prefer 1)
+  - [ ] If 3+ states detected, pattern views subdivided into finer granularity
+  - [ ] All alphas appearing in pattern are present from View 0 OR have clear justification
+  - [ ] No alphas suddenly appear in late views with advanced states (backfill complete)
 
 **Worked Example: Team Topology Evolution Journey**
 
@@ -931,6 +1107,30 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
   - Conclusion: Topology pattern is about structure, not process - SKIP
 - **Decision:** Keep pattern focused on 4 topology-specific alphas (no additions from Pass 3)
 
+**Pass 4 (State Distribution Validation):**
+
+**Check 1: States per alpha per view**
+- Count states for each alpha in each view:
+  - Team Topology Design: 1 state per view ✓
+  - Cognitive Load: 1 state per view ✓
+  - Team Interaction Mode: 1 state per view ✓
+  - Organizational Sensing: 1 state per view ✓
+- **Result:** All alphas have exactly 1 state per view (IDEAL - no subdivision needed)
+
+**Check 2: Late-appearing alphas**
+- Team Topology Design: Present from View 0 ✓
+- Cognitive Load: Present from View 0 ✓
+- Team Interaction Mode: Present from View 0 (after Pass 2 backfill) ✓
+- Organizational Sensing: Present from View 0 (after Pass 2 backfill) ✓
+- **Result:** No late-appearing alphas (Pass 2 backfill resolved them)
+
+**Final Validation:**
+- 4 alphas × 5 views = 20 alphaState entries ✓
+- No view has >2 states per alpha ✓
+- All alphas present from View 0 ✓
+- Natural progression across all views ✓
+- **PASS - Pattern is complete and well-distributed**
+
 **Quality Gates:**
 - ✓ All Phase 1 concerns mapped to alphas
 - ✓ All new alphas have contributesTo
@@ -957,6 +1157,11 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
   - ✓ Final PatternView includes ALL pattern alphas (no omissions)
   - ✓ States progress logically across views (early → late)
   - ✓ Pattern matrix dimensions: N alphas × M views = N×M total alphaState entries
+  - ✓ **State distribution quality (Pass 4):**
+    - ✓ No alpha has more than 2 states in a single PatternView (prefer 1)
+    - ✓ If 3+ states detected → pattern views subdivided into finer granularity
+    - ✓ No alpha suddenly appears late with advanced state
+    - ✓ Late-appearing alphas backfilled with progressive states in earlier views
 - ✓ Validation checklist completely satisfied
 
 **User Feedback:**
@@ -967,7 +1172,65 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
 - "Evaluating initial states: A null-point, B prepared positions requiring bootstrap activities..."
 - "Identified X alpha states requiring activities, Y covered, Z gaps - inferring missing activities..."
 - "Gap analysis complete: 100% alpha state coverage achieved (including B bootstrap activities)"
-- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md (includes N aliases, Z inferred activities)"
+- "Constructing patterns using four-pass approach..."
+- "Pass 1: Extracted pattern structure from source (M views, N alphas)"
+- "Pass 2: Backfilled missing alpha states for complete matrix"
+- "Pass 3: Evaluated related alphas from practice/dependencies"
+- "Pass 4: Validated state distribution - detected K alphas with excessive states, subdivided views"
+- "Pass 4: Backfilled L late-appearing alphas with progressive states in earlier views"
+- "Pattern validation complete: N×M matrix with 1-2 states per alpha per view"
+- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md (includes N aliases, Z inferred activities, complete patterns)"
+
+**CRITICAL: Phase 2 Completion Validation (REQUIRED)**
+
+After generating `02-mapping-guide.md`, IMMEDIATELY validate completeness before proceeding to Phase 3:
+
+```bash
+# Count major sections in mapping guide  
+grep "^## " practices/<name>/02-mapping-guide.md | wc -l
+# Should show: 7-9 sections (Keywords, Terminology Aliases, Alphas, Work Products, Activities, Patterns, Citations, Validation Checklist)
+
+# Verify critical sections exist
+grep "^## Keywords$" practices/<name>/02-mapping-guide.md
+grep "^## Terminology Aliases$" practices/<name>/02-mapping-guide.md
+grep "^## Alphas$" practices/<name>/02-mapping-guide.md
+grep "^## Work Products$" practices/<name>/02-mapping-guide.md
+grep "^## Activities$" practices/<name>/02-mapping-guide.md  
+grep "^## Patterns$" practices/<name>/02-mapping-guide.md
+grep "^## Citations$" practices/<name>/02-mapping-guide.md
+
+# Count mapped elements
+grep "^### Activity" practices/<name>/02-mapping-guide.md | wc -l
+# Should match or exceed Activity count from Phase 1 (typically 5-15)
+
+grep "^### " practices/<name>/02-mapping-guide.md | grep -i "work product" | wc -l
+# Should match Work Product count from Phase 1 (typically 5-10)
+
+grep "^### Alpha:" practices/<name>/02-mapping-guide.md | wc -l
+# Should show 3-8 alphas (redeclarations + specializations)
+
+grep "^### Pattern:" practices/<name>/02-mapping-guide.md | wc -l
+# Should show ≥1 pattern
+```
+
+**If ANY section is missing or incomplete:**
+1. Identify which sections are missing
+2. Review Phase 2 prompt requirements
+3. Read Phase 1 analysis for content that wasn't mapped
+4. Generate missing sections BEFORE proceeding to Phase 3
+
+**Common Phase 2 Omissions:**
+- **Activities section missing entirely** (CRITICAL - causes Phase 3 JSON to have 0 activities)
+- **Work Products section incomplete** (missing new work products beyond baseline)
+- Keywords or Terminology Aliases sections empty
+- Patterns section with incomplete matrices
+- Activities section with only 2-3 activities when Phase 1 identified 10+
+
+**Phase 2 Recovery Actions:**
+- If Activities missing: Generate complete Activities section from Phase 1 activities list
+- If Work Products incomplete: Generate New Work Products section from Phase 1 work products
+- If Patterns incomplete: Apply THREE-PASS pattern construction for complete matrix
+- If Keywords/Aliases empty: Review source terminology and apply decision tree
 
 **Post-Assembly Verification Checklist (for methods):**
 
@@ -1092,6 +1355,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - ✓ Verify `baselinePracticeName` exists at root level
    - ✓ Verify `practices` array exists and has expected count
    - ✓ **Verify `narratives` array exists with method-level narrative** (from Phase 1 overarching lifecycle)
+   - ✓ **Verify `citationNames` match actual citation `name` values** (use exact citation names, not kebab-case IDs)
    
 6. **Validate method JSON:**
    ```bash
@@ -1104,6 +1368,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 7. **Fix errors:**
    - Schema violations (property names, types)
    - **Missing `kind` property** (add "kind": "method" at root, "kind": "practice" in practices)
+   - **Citation name mismatches** (replace kebab-case IDs with exact citation names from citations array)
    - Cross-practice references (if any)
    - Missing properties
    - Iterate until 0 errors
@@ -1139,6 +1404,17 @@ From `deps/language.schema.json`:
 - ✓ Internal integrity: 0 errors
 - ✓ All Phase 2 content in JSON
 - ✓ No floating alphas
+- ✓ **PracticeElement name global uniqueness (CRITICAL - Run BEFORE schema validation):**
+  - ✓ **All PracticeElement names MUST be globally unique across the entire practice**
+  - ✓ This includes: Alphas, WorkProducts, Activities, Personas, Patterns, PatternViews, ActivitySpaces, Assets
+  - ✓ **NO name may appear in more than one element type** (e.g., cannot have both Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
+  - ✓ Verify with: `jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' <file>.json`
+  - ✓ Empty array `[]` = all names unique (PASS), non-empty array = duplicates found requiring renaming (FAIL)
+  - ✓ **If duplicates found:** Rename elements to disambiguate
+    - Common pattern: Add element-type suffix to most specific element
+    - Example: Alpha "Inference Service Configuration" + WorkProduct "Inference Service Configuration" → rename WorkProduct to "Inference Service Configuration File"
+    - Example: Alpha "Platform" + Activity "Platform" → rename Activity to "Build Platform" or "Deploy Platform"
+    - Update ALL references to renamed element (alphaName, workProductName, activityName in contributesTo/worksOn/etc.)
 - ✓ **Aliases array populated from mapping guide:**
   - ✓ 3-8 aliases (ONE per element, no duplicates)
   - ✓ Aliases prioritize specialized alphas and instances
@@ -1158,6 +1434,102 @@ From `deps/language.schema.json`:
 - "Running validation (schema, baseline, integrity)..."
 - "Found N errors in category X, applying fixes..."
 - "Validation passed! Generated schema-compliant JSON at practices/<name>/<name>.json"
+
+**CRITICAL: Phase 3 Completion Validation (REQUIRED)**
+
+After generating `<name>.json`, IMMEDIATELY validate completeness before reporting success:
+
+```bash
+# Verify discriminator property exists
+jq '.kind' practices/<name>/<name>.json
+# Must output: "practice" (or "method")
+
+# Count major arrays in JSON
+jq '{
+  alphas: (.alphas | length),
+  workProducts: (.workProducts | length),  
+  activities: (.activities | length),
+  patterns: (.patterns | length),
+  citations: (.citations | length)
+}' practices/<name>/<name>.json
+
+# Expected minimums:
+# alphas: ≥3 (baseline redeclarations + new alphas)
+# workProducts: ≥3 (baseline enrichments + new work products from Phase 2)
+# activities: ≥5 (should match Activity count from Phase 2 mapping guide)
+# patterns: ≥1 (every practice needs at least one pattern)
+# citations: ≥3 (authoritative sources)
+
+# Verify activities array is NOT empty
+jq '.activities | length' practices/<name>/<name>.json
+# If this returns 0, CRITICAL ERROR - must regenerate activities from mapping guide
+
+# Verify work products array is NOT empty  
+jq '.workProducts | length' practices/<name>/<name>.json
+# If this returns 0, CRITICAL ERROR - must regenerate work products from mapping guide
+
+# Verify all activities have required properties
+jq '[.activities[] | {name, hasActivitySpace: (.activitySpaceName != null), hasAssets: ((.assetNames | length) > 0), hasContributesTo: ((.contributesTo | length) > 0)}]' practices/<name>/<name>.json
+# All activities must have: activitySpaceName, assetNames (≥1), contributesTo (≥1)
+
+# Verify all alphas have icon assets
+jq '[.alphas[] | {name, iconCount: ([.assetNames[]? | select(.type == "icon")] | length)}]' practices/<name>/<name>.json
+# All alphas must have iconCount ≥ 1
+
+# CRITICAL: Verify PracticeElement name global uniqueness (NO duplicates across all element types)
+jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' practices/<name>/<name>.json
+# MUST output: [] (empty array) for all names unique
+# If non-empty: Shows duplicates that MUST be renamed
+```
+
+**If validation reveals missing content:**
+
+**CRITICAL ERROR: activities.length = 0**
+- Go back to Phase 2 mapping guide
+- Read Activities section (should have 5-15 activities)
+- Generate activities JSON array from mapping guide
+- Insert activities array into JSON
+- Re-validate
+
+**CRITICAL ERROR: workProducts.length = 0**
+- Go back to Phase 2 mapping guide  
+- Read Work Products section
+- Generate work products JSON array from mapping guide
+- Insert work products array into JSON
+- Re-validate
+
+**CRITICAL ERROR: Missing activity properties**
+- All activities MUST have: activitySpaceName, focusName, assetNames, contributesTo, worksOn, requiredCompetencies, recommendedCompetencyLevels
+- If any missing, regenerate activity objects with complete structure
+
+**CRITICAL ERROR: Alphas missing icon assets**
+- Every alpha MUST have at least one icon-type AssetReference
+- Add Font Awesome icon AssetReferences to alphas
+- Add corresponding font-character Asset definitions to assets array
+
+**CRITICAL ERROR: PracticeElement name collisions**
+- The uniqueness check found duplicate names across element types
+- Example: Alpha "Platform Configuration" AND WorkProduct "Platform Configuration" (INVALID)
+- **Fix procedure:**
+  1. Identify which element types share the name (from jq output showing count > 1)
+  2. Determine which element is most abstract/fundamental (usually Alpha)
+  3. Rename the more specific element with disambiguating suffix
+     - WorkProducts: Add "File", "Document", "Specification", "Template" suffix
+     - Activities: Add verb prefix like "Build", "Deploy", "Configure", "Validate"
+     - Patterns: Add "Pattern", "Journey", "Lifecycle" suffix
+  4. Update ALL references to renamed element throughout JSON:
+     - workProductName in activities.worksOn
+     - activityName in various references
+     - patternName in references
+     - assetName in assetNames arrays
+  5. Re-run uniqueness check to verify fix
+
+**DO NOT report Phase 3 complete until:**
+- ✓ activities.length matches Phase 2 Activity count (typically 5-15)
+- ✓ workProducts.length matches Phase 2 Work Product count (typically 3-10)  
+- ✓ All activities have complete properties (activitySpaceName, assetNames, contributesTo)
+- ✓ All alphas have icon AssetReferences
+- ✓ Validation passes with 0 errors
 
 ---
 
@@ -1371,6 +1743,10 @@ Single validation script replaces multiple utilities:
 - ❌ Flat tags array instead of orthogonal structure
 - ❌ **CRITICAL: Writing prose paragraphs instead of structured narrative objects**
 - ❌ **Missing narrativeTypeName and narrativeContexts in narratives**
+- ❌ **Self-referential narrative content** - Mentioning narrative type/name/framework within contexts
+  - **Fix:** Write direct story content without meta-references
+  - **WRONG:** "In this Hero's Journey, organizations embark..." or "This narrative explores..."
+  - **CORRECT:** "Organizations operate with fragmented infrastructure..." (direct content)
 - ❌ **Omitting alpha narratives (required for new alphas)**
 - ❌ **Omitting activity narratives (required for all activities)**
 - ❌ **Missing alpha-state-activity coverage** - Alpha states lack supporting activities to progress to those states
@@ -1387,17 +1763,42 @@ Single validation script replaces multiple utilities:
   - Pattern should have 3-5 PatternViews showing how alphas progress together
   - Use external lifecycle narratives (SDLC, PDCA, etc.) when appropriate
 - ❌ **Incomplete patterns (sparse matrices)** - Patterns only include alpha states explicitly mentioned in source, resulting in missing cells in pattern matrix
-  - **Fix:** Use THREE-PASS pattern construction (see Pattern Completeness Requirements section):
+  - **Fix:** Use FOUR-PASS pattern construction (see Pattern Completeness Requirements section):
     - Pass 1: Extract source-driven structure
     - Pass 2: Backfill missing alpha states for complete progression (REQUIRED)
     - Pass 3: Consider related alphas from practice/dependencies (OPTIONAL)
+    - Pass 4: State distribution validation (REQUIRED)
   - Every alpha in pattern MUST have state in EVERY PatternView
   - Final PatternView MUST include ALL alphas (even if state unchanged from previous view)
   - Example: Pattern with 4 alphas and 5 views = 20 alphaState entries (4×5 complete matrix)
+- ❌ **Too many states per alpha in single PatternView** - Alpha has 3+ states in one view (e.g., Platform: Conceived → Architected → Built in "Design Phase")
+  - **Root Cause:** PatternView is too coarse-grained, covering multiple lifecycle phases
+  - **Fix:** Subdivide pattern into finer-grained PatternViews
+  - **Example:**
+    - **Before:** "Implementation" view has Platform: Architected → Built → Deployed (3 states)
+    - **After:** Split into "Design" (Architected), "Build" (Built), "Deploy" (Deployed) views
+  - **Guideline:** Prefer 1 state per alpha per view, maximum 2
+- ❌ **Late-appearing alphas with advanced states** - Alpha suddenly appears in PatternView 3 at state "Achieved" but wasn't in Views 1-2
+  - **Root Cause:** Pattern mapping only included explicit mentions from source, missing progressive buildup
+  - **Fix:** Backfill earlier PatternViews with progressive states
+  - **Example:**
+    - **Before:** Platform Governance appears in View 3 with "Compliant" (advanced state)
+    - **After:** Backfill View 0: "Undefined", View 1: "Established", View 2: "Enforced", View 3: "Compliant"
+  - **Detection:** Review first appearance of each alpha - if not in initial view AND not at initial state, backfill needed
+  - **Guideline:** All alphas should appear from View 0 or have clear justification for delayed introduction
 
 ### Phase 3 Pitfalls
 
 - ❌ Not reading language.schema.json before generating
+- ❌ **PracticeElement name collisions** - CRITICAL ERROR - Using same name for different element types
+  - **Problem:** Alpha "Platform Configuration" + WorkProduct "Platform Configuration" = INVALID (names must be globally unique)
+  - **Detection:** Run `jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' <file>.json`
+  - **Fix:** Rename more specific element with disambiguating suffix:
+    - WorkProduct collision: Add "File", "Document", "Template" (e.g., "Platform Configuration" → "Platform Configuration File")
+    - Activity collision: Add verb prefix (e.g., "Platform" → "Configure Platform")
+    - Pattern collision: Add "Pattern", "Journey" (e.g., "Delivery" → "Delivery Journey")
+  - **Update references:** Search and replace all references to renamed element (workProductName, activityName, etc.)
+  - **Common culprit:** Alphas and WorkProducts sharing names (alpha is usually concept, work product is the artifact)
 - ❌ **Missing `kind` property at root level** - MOST COMMON ERROR
   - **Fix Practice JSON:** Add `"kind": "practice"` at root level (conventionally first property for readability)
   - **Fix Method JSON:** Add `"kind": "method"` at root level
@@ -1614,6 +2015,101 @@ When generating a method with multiple practices:
 - Different value-streams (platform building vs consuming) → Method
 - Different stakeholder journeys (builders vs consumers) → Method
 - Different capability domains (security, observability, deployment) → Method
+- **Broad baseline coverage** (large swathes of alphas/concerns across multiple focuses) → Method
+
+**NEW: Baseline Coverage Heuristic:**
+
+A practice should NOT broadly cover the entire baseline platform or large swathes of unrelated concerns. If source content appears to span extensive baseline coverage without distinct use-cases or focuses:
+
+**Step 1: Check for natural separation signals (existing heuristics)**
+- Different use-cases? → Separate practices
+- Different value-streams? → Separate practices
+- Different stakeholder journeys? → Separate practices
+- Different capability domains? → Separate practices
+
+**Step 2: If no natural separation evident, analyze baseline alpha coverage**
+
+Read `deps/platform-adoption-kernel.json` and assess which baseline alphas are touched:
+
+- **Focused Practice**: Touches 3-6 baseline alphas within 1-2 focuses, with clear relational coherence
+  - Example: Platform practice touches Platform, Platform Asset, Platform Capability (Solution focus)
+  - Example: Team practice touches Team, Persona, Team Contract (Endeavor focus)
+
+- **Broad Coverage → Requires Subdivision**: Touches 8+ baseline alphas spanning all 3 focuses OR large concern areas
+  - Example: Methodology covers Platform (Solution), Team (Endeavor), Requirements (Value), Way of Working, Work → TOO BROAD
+  - Action: Subdivide by alpha relationship clusters
+
+**Step 3: Subdivision Strategy - Alpha Relationship Clusters (1-level deep)**
+
+When broad coverage is detected:
+
+1. **Identify primary alpha focuses** from source content
+   - Which alphas are central to different parts of the methodology?
+   - Example: Platform engineering content → Platform alpha cluster
+   - Example: Team design content → Team alpha cluster
+   - Example: Value realization content → Requirements/Stakeholder alpha cluster
+
+2. **For each primary alpha, analyze 1-level relationships:**
+   - Read baseline alpha's `relatesTo` array
+   - Include directly related alphas (production, enablement, governance)
+   - **Stop at 1 level** - don't recursively traverse the entire graph
+   
+   Example for Platform alpha:
+   ```
+   Platform (primary)
+   ├─ produces → Platform Asset (include)
+   ├─ produces → Platform Capability (include)
+   ├─ governed by → Platform Governance (include)
+   └─ enables → Software System (STOP - 1 level limit, separate practice)
+   ```
+
+3. **Create practice boundaries using 1-level clusters:**
+   - Practice 1: Platform + Platform Asset + Platform Capability + Platform Governance (cluster around Platform)
+   - Practice 2: Team + Persona + Team Contract (cluster around Team)
+   - Practice 3: Requirements + Stakeholder + Commitment (cluster around Requirements)
+
+4. **Validate separation makes sense:**
+   - Each practice has coherent value proposition
+   - Practices can be adopted independently
+   - Cross-practice coordination via patterns (orchestration practice if needed)
+   - No practice is "everything else" (avoid catch-all practices)
+
+**Examples:**
+
+**Correct - Focused Practice (PASS):**
+- Source: OpenShift Platform Administration
+- Baseline Coverage: Platform, Platform Asset, Platform Capability, Platform Governance (4 alphas, 1 focus)
+- Relationship Depth: All within 1-level cluster of Platform
+- Decision: **Single Practice** ✓
+
+**Correct - Focused Practice with Cross-Focus (PASS):**
+- Source: Platform Team Topology Design
+- Baseline Coverage: Team, Persona, Team Contract, Platform (4 alphas, 2 focuses)
+- Relationship Depth: Team cluster (3) + Platform (1-level relation: "Team operates Platform")
+- Decision: **Single Practice** ✓ (coherent around team-platform relationship)
+
+**Incorrect - Broad Coverage (SUBDIVIDE):**
+- Source: SAFe Agile Framework
+- Baseline Coverage: Work, Team, Requirements, Solution, Portfolio, Stakeholder, Commitment, Way of Working (8+ alphas, all 3 focuses)
+- Relationship Depth: Covers 3+ distinct 1-level clusters with no unifying theme
+- Decision: **Method with 3-4 Practices** (subdivide by focus and alpha clusters)
+  - Practice 1: Portfolio & Investment (Portfolio, Stakeholder, Commitment cluster)
+  - Practice 2: Solution Engineering (Solution, Requirements cluster)
+  - Practice 3: Team Delivery (Team, Work, Way of Working cluster)
+  - Practice 4: SAFe Orchestration (patterns coordinating across practices)
+
+**Incorrect - "Everything Else" Anti-Pattern (AVOID):**
+- Practice 1: Platform Engineering (Platform cluster)
+- Practice 2: Team Design (Team cluster)
+- Practice 3: Requirements & Solution & Stakeholders & Work & ... (WRONG - catch-all)
+- **Fix:** Identify coherent cluster for Practice 3 or merge into Practice 1/2 if truly supporting
+
+**Key Principles:**
+
+1. **Prefer focus over breadth** - Practices should go deep in focused areas, not shallow across everything
+2. **Use 1-level relationship analysis** - Prevents both over-fragmentation and mega-practices
+3. **Validate independent value** - Each practice should deliver standalone value
+4. **Use orchestration for coordination** - Method-level patterns or orchestration practices coordinate across focused practices
 
 ---
 

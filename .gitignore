@@ -3,11 +3,14 @@
 
 # Generated practices (track directory structure, but you may want to review generated files)
 # Uncomment the following lines if you don't want to track generated practice files:
-# practices/*/research-report.md
-# practices/*/*.json
+practices/*
+practice-resources/*
+archive
+
 
 .claude/settings.local.json
 .claude/settings.json
 
 # Keep the practices directory structure
 !practices/.gitkeep
+!practice-resources/.gitkeep
