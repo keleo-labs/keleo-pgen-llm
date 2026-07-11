@@ -90,11 +90,32 @@ This skill updates existing Practice or Method JSON files to align with the late
    jq '.alphas[] | {name, relatesTo}' <baseline-practice.json>
    ```
 
-4. **Identify what has changed since original generation:**
+4. **Check baseline for dependencies and resolve:**
+   ```bash
+   python3 utils/resolve-baseline.py <baseline-practice.json> --check-only -o /dev/null
+   ```
+   
+   If `hasDependencies: true`: 
+   - Report dependency names to user and ask for file paths
+   - Recursively check transitive dependencies
+   - Create effective baseline:
+     ```bash
+     python3 utils/resolve-baseline.py \
+       <baseline-practice.json> \
+       <dependency-1.json> [<dependency-2.json> ...] \
+       -o practices/<name>/_effective-baseline.json
+     ```
+   - Use `_effective-baseline.json` for all analysis/mapping phases
+   - Use the **original** baseline for validation
+   
+   If `hasDependencies: false`: use the provided baseline file directly.
+
+5. **Identify what has changed since original generation:**
    - New baseline alphas or relationships?
    - New competency levels?
    - Schema property changes?
    - New semantic requirements (primary alpha focus, aliases, pattern completeness)?
+   - Baseline dependencies: [list if `baselinePracticeNames` present, "none" otherwise]
 
 ### Step 1: Ask User for Update Mode
 
@@ -178,6 +199,7 @@ Which update mode would you like to use?
 **Key reference files (read from generate-method skill):**
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
+- Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill:**
@@ -199,6 +221,7 @@ Which update mode would you like to use?
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names)
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
 
 **Apply ALL latest validations from generate-method skill:**
@@ -321,6 +344,7 @@ Create `practices/<name>/01-analysis-report.md` with extracted content:
 **Key reference files (read from generate-method skill):**
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
+- Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill to extracted content:**
@@ -353,6 +377,7 @@ Create `practices/<name>/01-analysis-report.md` with extracted content:
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names)
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
 
 **Apply ALL latest validations from generate-method skill:**

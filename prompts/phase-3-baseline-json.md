@@ -459,7 +459,32 @@ When an element (alpha, activitySpace, etc.) references an asset:
 
 **Add to JSON skeleton.**
 
-### Step 11: Final Validation Checks
+### Step 11: Build PracticeElementAliases Array (if applicable)
+
+**If this baseline adapts a parent baseline's terminology for a domain**, add aliases that map canonical element names to domain-appropriate terms. Aliases are presentation-layer substitutions only — all structural references in JSON must use canonical names.
+
+```json
+{
+  "practiceElementAliases": [
+    {
+      "practiceElementType": "Alpha",
+      "practiceElementName": "Canonical name from baseline",
+      "aliasName": "Domain-specific term"
+    }
+  ]
+}
+```
+
+**Rules:**
+- ✓ Every `practiceElementName` must match an existing element in this baseline or parent baseline
+- ✓ `practiceElementType` must match the element's type (Alpha, ActivitySpace, Focus, Competency, NarrativeType)
+- ✓ No duplicate aliases (same practiceElementType + practiceElementName)
+- ✓ `aliasName` must NEVER appear in any structural reference within the JSON
+- ✓ Aliases are optional — only include if the baseline adapts terminology from a parent
+
+**Add to JSON skeleton.**
+
+### Step 12: Final Validation Checks
 
 Before writing the final JSON file, validate:
 
@@ -488,11 +513,17 @@ Before writing the final JSON file, validate:
 - ✓ All `narrativeElementName` references exist in the narrative type's elements
 - ✓ All `assetName` references exist in assets array
 
+**Alias Validation (if applicable):**
+- ✓ All alias `practiceElementName` values match existing elements
+- ✓ All alias `practiceElementType` values match element types
+- ✓ No duplicate aliases
+- ✓ No `aliasName` used in structural references
+
 **Coverage Validation:**
 - ✓ Every alpha state has ≥1 activity space contributing to it
 - ✓ Baseline-level narrative present
 
-### Step 12: Write Final JSON
+### Step 13: Write Final JSON
 
 **Write to: `baselines/<name>/<name>.json`**
 
@@ -526,7 +557,7 @@ Before writing the final JSON file, validate:
 - No trailing commas
 - Escape special characters in strings
 
-### Step 13: Validate with Script
+### Step 14: Validate with Script
 
 **After writing JSON, validate:**
 

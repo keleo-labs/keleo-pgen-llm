@@ -104,6 +104,7 @@ In plan mode:
    - Ask user which baseline to use
    - Default suggestion: `deps/platform-adoption-kernel.json`
    - Validate baseline file exists and is valid JSON
+   - **After validating, proceed to Step 0.5: Baseline Dependency Resolution**
 
 3. **Initial structure assessment (preliminary only):**
    - **Note:** Final practice delineation happens in Step 1.5 (Delineation Gate) before Phase 2 delegation
@@ -123,6 +124,74 @@ In plan mode:
    - **Note:** Practice boundaries will be finalized in Step 1.5 (Delineation Gate) before Phase 2 delegation
 
 5. **Exit plan mode** with clear execution roadmap
+
+---
+
+### Step 0.5: Baseline Dependency Resolution
+
+**Objective:** Detect and resolve baseline dependencies to create a complete "effective baseline" that contains all inherited elements with domain-specific alias context.
+
+**When this step is needed:** Only when the user-provided baseline JSON has a non-empty `baselinePracticeNames` array. If the baseline has no dependencies, skip this step and use the provided baseline file as-is for all subsequent steps.
+
+**Process:**
+
+1. **Check for dependencies:**
+   ```bash
+   python3 utils/resolve-baseline.py <baseline-practice.json> --check-only -o /dev/null
+   ```
+   This reports whether the baseline has `baselinePracticeNames` and lists any dependencies and aliases.
+   - If `hasDependencies: false`: **Skip this step.** Use the provided baseline file directly.
+   - If `hasDependencies: true`: Continue to step 2.
+
+2. **Report dependencies and ask user for files:**
+   The check-only output lists `dependencyNames`. Present them to the user:
+   ```
+   The baseline practice "<name>" declares dependencies on other baselines:
+   - <dependency-name-1>
+   - <dependency-name-2>
+   
+   Since there is no practice library, I need the JSON files for each dependency.
+   Please provide the file path for each:
+   1. <dependency-name-1>: ?
+   2. <dependency-name-2>: ?
+   ```
+   
+   **Wait for user to provide file paths before proceeding.**
+
+3. **Recursively check transitive dependencies:**
+   For each dependency file the user provides, run `--check-only` to see if it has its own `baselinePracticeNames`. If so, ask the user for those files too. Continue until all baselines in the chain have no further dependencies.
+
+4. **Create effective baseline using the resolver utility:**
+   ```bash
+   python3 utils/resolve-baseline.py \
+     <baseline-practice.json> \
+     <dependency-1.json> [<dependency-2.json> ...] \
+     -o <output-dir>/_effective-baseline.json
+   ```
+   
+   The utility programmatically:
+   - Determines merge order (root-first, leaf-last)
+   - Merges baselines using name-keyed union (child overrides parent where element names match)
+   - Applies `practiceElementAliases` as `_aliasContext` annotations on elements (adds `_domainAlias` to each aliased element and a top-level `_aliasContext` section)
+   - Preserves canonical names in all structural positions
+   - Writes the effective baseline to the output path
+   
+   The stdout JSON report shows the effective baseline composition (alpha count, alias count, etc.). Report this to the user.
+
+5. **Set effective baseline path:**
+   For ALL subsequent steps (Step 1.5 through Step 3), use `<output-dir>/_effective-baseline.json` wherever the baseline file path is referenced for analysis and mapping. For **validation** (running `validate-practice-json.py`), always use the **original user-provided baseline file** — canonical names in the generated JSON must match the actual baseline, not the effective baseline annotations.
+
+**User Feedback:**
+- "Checking baseline for dependencies..."
+- "Baseline '<name>' depends on: [list]. Please provide file paths for each."
+- "Resolved dependency chain: Root → Layer1 → Leaf"
+- "Created effective baseline with N alphas (K aliased), M activitySpaces, J competencies"
+- "Domain terminology: 'Platform' → 'Automation Platform', 'Engineering' → 'Automation Engineering', etc."
+- "Using effective baseline for analysis/mapping phases. Canonical names will be used in generated JSON."
+
+**CRITICAL:** If ANY dependency file cannot be provided by the user, STOP and discuss alternatives. Do NOT proceed with an incomplete baseline — this will cause mapping errors and validation failures.
+
+**CRITICAL:** Extension practices MUST use canonical element names (from `practiceElementName`) in all structural references (`contributesTo`, `alphaName`, `stateName`, `competencyName`, etc.), not alias names (`aliasName`). The alias context helps the LLM understand domain semantics during analysis and mapping, but the generated JSON output always uses canonical names.
 
 ---
 
@@ -349,10 +418,11 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 
 **Process:**
 
-1. **Load baseline practice JSON:**
+1. **Load baseline practice JSON** (use effective baseline from Step 0.5 if dependencies were resolved, otherwise use the user-provided baseline directly):
    ```bash
-   jq '.alphas[] | {name, description, focusName, relatesTo}' <baseline-practice.json>
+   jq '.alphas[] | {name, description, focusName, relatesTo, _domainAlias}' <effective-baseline-or-baseline.json>
    ```
+   If the effective baseline has `_aliasContext`, review domain aliases to understand the baseline's domain-specific terminology. Use canonical names for structural decisions, but let domain aliases inform your semantic understanding of each alpha's role.
 
 2. **Map Phase 1 concerns to baseline alphas:**
    - Which baseline alphas does the content enrich (redeclarations)?
@@ -407,7 +477,7 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 **Process for Single Practice:**
 
-1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
+1. Read `prompts/phase-2-mapping.md`, analysis report, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies), semantics.md
 2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
 3. Map concerns to alphas (redeclaration vs specialization)
 3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
@@ -450,7 +520,8 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 2. **Each agent prompt must include:**
    - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
-   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `deps/platform-adoption-kernel.json`, `references/semantics.md`, `prompts/phase-2-mapping.md`
+   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies), `references/semantics.md`, `prompts/phase-2-mapping.md`
+   - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline includes domain-specific aliases (e.g., 'Platform' is known as 'Automation Platform' in this domain). Use domain terms for semantic understanding but always use canonical names in structural references."
    - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
    - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships; (4) Work products; (5) Activities; (6) PATTERNS with complete matrix coverage. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
@@ -1355,7 +1426,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 
 **Process for Single Practice:**
 
-1. Read `prompts/phase-3-json.md`, mapping guide, schema, baseline JSON
+1. Read `prompts/phase-3-json.md`, mapping guide, schema, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies). If the effective baseline has `_aliasContext`, note that all structural references MUST use canonical names.
 2. Generate complete practice JSON with **REQUIRED discriminator property**:
    ```json
    {
@@ -1382,7 +1453,8 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    ```
 
 2. **Each agent prompt must include:**
-   - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `deps/platform-adoption-kernel.json`
+   - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies)
+   - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline uses domain aliases for semantic context. All structural references in the JSON (contributesTo, alphaName, stateName, etc.) MUST use canonical names, not alias names."
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
@@ -1441,11 +1513,11 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - ✓ **Verify `narratives` array exists with method-level narrative** (from Phase 1 overarching lifecycle)
    - ✓ **Verify `citationNames` match actual citation `name` values** (use exact citation names, not kebab-case IDs)
    
-6. **Validate method JSON:**
+6. **Validate method JSON** (always use the **original user-provided baseline**, not the effective baseline — generated JSON uses canonical names):
    ```bash
    python3 utils/validate-practice-json.py \
      practices/<method-name>/<method-name>.json \
-     deps/platform-adoption-kernel.json \
+     <original-baseline-practice.json> \
      deps/language.schema.json
    ```
 
@@ -1759,10 +1831,28 @@ The skill does NOT assume a specific baseline practice. Instead:
 - Validation script validates against provided baseline
 - Works with any baseline following Practice Language schema
 
+**Baseline Dependency Resolution (Step 0.5):**
+
+If the provided baseline declares `baselinePracticeNames` (an array of other baseline names it depends on), the skill resolves the dependency chain:
+
+- Asks user for dependent baseline file paths (there is no practice library/registry)
+- Recursively resolves transitive dependencies until root baselines are reached
+- Merges baselines in dependency order (root-first, leaf-last overlay)
+- Creates `_effective-baseline.json` in the output directory with merged elements
+- Surfaces `practiceElementAliases` from child baselines as `_aliasContext` annotations for semantic understanding
+- Uses the effective baseline for analysis and mapping phases
+- Validation always uses the **original** user-provided baseline (canonical names)
+
+**Alias Context:**
+
+Child baselines often define `practiceElementAliases` that map generic parent terms to domain-specific terminology (e.g., "Platform" → "Automation Platform"). These aliases are surfaced in the effective baseline so agents understand the domain vocabulary during analysis and mapping. Extension practices always use canonical names in structural references — aliases inform semantic reasoning, not JSON output.
+
 **Benefits:**
 - Flexibility to use different baselines
 - No hardcoded assumptions
 - Baseline can evolve independently
+- Baseline dependency chains are resolved automatically
+- Domain-specific terminology improves semantic quality of analysis and mapping
 
 ### Clean Three-Phase Structure
 

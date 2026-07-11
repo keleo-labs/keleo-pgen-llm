@@ -51,6 +51,50 @@ This skill orchestrates a 4-phase pipeline:
 - Token budget management
 - User alignment on scope and approach
 
+### Baseline Dependency Resolution (Parent Baselines)
+
+**When this step is needed:** When creating a baseline that extends one or more existing baselines (the new baseline will declare `baselinePracticeNames` in its output JSON).
+
+**Process:**
+
+1. **If user indicates this baseline extends other baseline(s):**
+   - Ask for file path(s) of parent baseline(s)
+   - The new baseline's JSON will declare these in `baselinePracticeNames`
+
+2. **Check each parent for transitive dependencies:**
+   ```bash
+   python3 utils/resolve-baseline.py <parent-baseline.json> --check-only -o /dev/null
+   ```
+   If any parent has `baselinePracticeNames`, ask the user for those transitive dependency files. Continue until all roots are reached.
+
+3. **Create effective parent baseline using the resolver utility:**
+   ```bash
+   python3 utils/resolve-baseline.py \
+     <parent-baseline.json> \
+     [<grandparent-1.json> ...] \
+     -o baselines/<name>/_effective-parent-baseline.json
+   ```
+   The utility programmatically merges baselines in dependency order and applies `practiceElementAliases` as `_aliasContext` annotations with `_domainAlias` on each aliased element. If only one parent with no transitive dependencies, the utility copies it directly (alias annotations are still applied).
+
+5. **Use effective parent baseline in all phases:**
+   - **Phase 1.5:** Read effective parent to understand inherited elements and their domain terminology
+   - **Phase 2:** Read effective parent to avoid duplicating elements and to use correct cross-references
+   - **Phase 3:** Reference parent elements for cross-reference validation
+
+**Merging semantics (overlay, name-keyed union):**
+- Start with root baseline (no parents)
+- Layer each child on top: child elements with same name override parent, new elements are added
+- Metadata (name, description) comes from the leaf parent
+- Result is the complete set of inherited elements this new baseline can reference
+
+**CRITICAL:** The NEW baseline being created does NOT need to redeclare all parent elements. It can:
+- Redeclare parent elements with domain-specific descriptions (override)
+- Add entirely new elements not in any parent
+- Reference parent elements in `relatesTo` without redeclaring them
+- Define its own `practiceElementAliases` to rename inherited elements for its domain
+
+The effective parent baseline provides the complete context for understanding what is inherited.
+
 ### Directory Structure
 
 ```
@@ -69,7 +113,7 @@ These documents must be readable for all phases:
 1. **`references/domain-framework.md`** - Four-perspective analysis (Business, Technology, People, Process)
 2. **`references/semantics.md`** - Practice Language semantic guidance
 3. **`deps/language.schema.json`** - JSON Schema definition
-4. **Optional parent baseline** - If this baseline extends another baseline (rare)
+4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
 
 ## Phase 1: Analysis
 
@@ -125,8 +169,9 @@ These documents must be readable for all phases:
    ```
    Read baselines/<name>/01-analysis-report.md (Phase 1 output)
    Read references/domain-framework.md
-   Read optional parent baseline (if provided)
+   Read effective parent baseline (from Baseline Dependency Resolution, if this baseline extends others)
    ```
+   If the effective parent has `_aliasContext`, review domain aliases to understand inherited elements by their domain-specific names.
 
 2. **Identify Focus Areas** (2-4 high-level groupings):
    - Analyze Phase 1 concern patterns for natural clustering
@@ -180,13 +225,14 @@ These documents must be readable for all phases:
    ```
    Read baselines/<name>/01.5-distilled-essentials.md (PRIMARY SOURCE)
    Read baselines/<name>/01-analysis-report.md (supporting detail)
-   Read optional parent baseline (if provided)
+   Read effective parent baseline (from Baseline Dependency Resolution, if this baseline extends others)
    Read references/semantics.md
    ```
+   If the effective parent has `_aliasContext`, use domain aliases for semantic understanding of inherited elements. The new baseline's elements should use canonical names in structural references (`relatesTo`, etc.).
 
 2. **Map Metadata**:
    - Name, description, version, authors, keywords
-   - NO baselinePracticeName (unless extending another baseline)
+   - NO baselinePracticeName at root (use `baselinePracticeNames` array if extending other baselines)
 
 3. **Use Identified Focuses** from Phase 1.5:
    - Validate focus coverage
@@ -282,6 +328,13 @@ These documents must be readable for all phases:
 
 6. **Validate with Script**:
    ```bash
+   # If extending parent baseline(s), pass effective parent for cross-reference validation:
+   python3 utils/validate-baseline-json.py \
+     baselines/<name>/<name>.json \
+     baselines/<name>/_effective-parent-baseline.json \
+     deps/language.schema.json
+
+   # If standalone (no parents):
    python3 utils/validate-baseline-json.py \
      baselines/<name>/<name>.json \
      deps/language.schema.json
@@ -469,9 +522,15 @@ baselines/<baseline-name>/
 **Validation:**
 
 ```bash
-# Validate baseline JSON
+# Validate baseline JSON (standalone, no parents)
 python3 utils/validate-baseline-json.py \
   baselines/<baseline-name>/<baseline-name>.json \
+  deps/language.schema.json
+
+# Validate baseline JSON (extending parent baselines)
+python3 utils/validate-baseline-json.py \
+  baselines/<baseline-name>/<baseline-name>.json \
+  baselines/<baseline-name>/_effective-parent-baseline.json \
   deps/language.schema.json
 
 # Expected output: {"valid": true, "errors": [], "warnings": []}
