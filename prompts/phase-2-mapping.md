@@ -38,13 +38,84 @@ You have access to the following resources via the Read tool:
 
 ## Instructions
 
+### Step 0: Practice Delineation
+
+**Purpose:** Determine whether the source methodology maps to a single practice or a method with multiple practices. This decision requires baseline context and MUST happen here in Phase 2, not earlier.
+
+**Why this step exists:** Phase 1 analysis extracts concerns without baseline context. Only after reading the baseline practice JSON can you map concerns to baseline alphas and make an informed practice boundary decision. Any "Preliminary Structure" declared in Phase 1 is an observation, not a binding decision — override it if the alpha coverage analysis warrants it.
+
+**Step 0.1: Load Baseline and Count Alpha Coverage**
+
+1. **Read baseline practice JSON completely** (path provided by user):
+   - Extract all alphas with their `focusName` and `relatesTo` arrays
+   - Note the focus areas (e.g., Value, Solution, Endeavor)
+
+2. **Map Phase 1 concerns to baseline alphas:**
+   - Which baseline alphas does the content enrich? (redeclarations — adding checklists/narratives to existing alphas)
+   - Which baseline alphas need specialization? (new alphas with `contributesTo` pointing to baseline alphas)
+   - Count total baseline alpha coverage (redeclarations + contributesTo targets)
+
+3. **Analyze coverage pattern:**
+   - **Focused** (3-6 alphas in 1-2 focuses) → Likely single practice
+   - **Moderate** (7 alphas across 2 focuses) → Likely single practice with broad scope
+   - **Broad** (8+ alphas across all 3 focuses) → Likely method requiring subdivision
+
+**Step 0.2: Apply Primary Alpha Focus Strategy**
+
+**If coverage appears focused (3-7 alphas):**
+1. Identify ONE primary alpha from content (the alpha most content is dedicated to)
+2. Use baseline `relatesTo` to find related alphas (1-level deep only)
+3. Validate: Does content naturally organize around this primary alpha?
+4. **Decision: Single Practice**
+
+**If coverage appears broad (8+ alphas):**
+1. Check for natural separation signals from source material:
+   - Different use-cases? Different value-streams? Different stakeholder journeys?
+   - Different capability domains/chapters?
+   - Distinct concern clusters with weak cross-group ties?
+2. Identify multiple potential primary alphas from content
+3. For each candidate primary alpha:
+   - What content clusters around it?
+   - What related alphas (via `relatesTo`) does it pull in?
+   - Does this create a coherent 3-7 alpha practice?
+4. **Decision: Method with 2+ Practices**
+   - Create one practice per primary alpha cluster
+   - Each practice: 1 primary + 2-6 related = 3-7 total
+
+**If practice boundaries are unclear:**
+- Document the ambiguity in the Delineation Analysis section
+- Present alpha coverage analysis and potential primary alpha options
+- Proceed with best judgment, noting uncertainty for human review
+
+**Step 0.3: Document Delineation Decision**
+
+At the TOP of the mapping guide output (after Metadata, before Baseline Practice Index), include a **Delineation Analysis** section:
+
+```markdown
+## Delineation Analysis
+
+- **Alpha Coverage Count**: N baseline alphas touched
+- **Focus Distribution**: Value: X, Solution: Y, Endeavor: Z
+- **Primary Alpha(s)**: [identified primary alpha(s) with rationale]
+- **Decision**: Single Practice | Method (N practices)
+- **Rationale**: [2-3 sentences justifying the decision]
+```
+
+**REQUIRED when alpha count >= 8 and all focuses represented:** If concluding SINGLE PRACTICE despite broad coverage, you MUST provide explicit justification explaining why subdivision is not appropriate. Valid justifications include:
+- Most alphas are redeclarations (enrichment of existing alphas) not specializations (new alphas)
+- Content is tightly integrated around one primary alpha despite breadth
+- Source methodology explicitly presents content as a unified framework
+- Subdivision would create practices that lack independent value
+
+**Proceed to Step 1 with delineation decision established.**
+
 ### Step 1: Load Resources
 
 **Read these in order:**
 
 1. **Read `practices/<practice-name>/01-analysis-report.md`**
    - Review all extracted concerns, work products, activities, competencies, personas, workflows
-   - Understand the practice structure (single vs multiple practices)
+   - Review preliminary practice structure (will be validated/overridden by Step 0 delineation)
 
 2. **Read the baseline practice JSON** (path provided by user)
    - **CRITICAL:** Read BOTH names AND descriptions for semantic understanding
@@ -1046,6 +1117,7 @@ Practice Element Aliases:
 8. **All LODs have contributesTo array** (required field)
 9. **Narrative contexts are 1-3 sentences** (not paragraphs)
 10. **Citations have NO narratives property** (metadata only)
+11. **Delineation justified** - Mapping guide includes "Delineation Analysis" section; if alpha count >= 8 and all focuses represented, explicit justification for practice structure decision is provided
 
 ## Output Format
 
@@ -1061,6 +1133,15 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - **Source Analysis**: practices/<practice-name>/01-analysis-report.md
 - **Baseline Practice**: <path to baseline JSON>
 - **Practice Type**: Single Practice | Method (Multiple Practices)
+
+## Delineation Analysis
+
+- **Alpha Coverage Count**: [N baseline alphas touched]
+- **Focus Distribution**: Value: [X], Solution: [Y], Endeavor: [Z]
+- **Primary Alpha(s)**: [identified primary alpha(s) with rationale]
+- **Decision**: Single Practice | Method (N practices)
+- **Rationale**: [2-3 sentences justifying the decision]
+- **Broad Coverage Justification**: [REQUIRED if alpha count >= 8 and all focuses represented]
 
 ## Baseline Practice Index
 
@@ -1495,5 +1576,7 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 - ✓ No floating alphas (all new alphas have contributesTo)
 - ✓ Tags use orthogonal structure throughout
 - ✓ Validation checklist completely satisfied
+- ✓ Delineation Analysis section present with justified practice structure decision
+- ✓ If broad coverage (8+ alphas, all focuses), explicit justification provided for practice structure
 
 This mapping guide will be used as input for Phase 3 (JSON Generation).

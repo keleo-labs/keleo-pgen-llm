@@ -106,7 +106,7 @@ In plan mode:
    - Validate baseline file exists and is valid JSON
 
 3. **Initial structure assessment (preliminary only):**
-   - **Note:** Final practice delineation happens in Phase 2 Mapping when baseline context is available
+   - **Note:** Final practice delineation happens in Step 1.5 (Delineation Gate) before Phase 2 delegation
    - Check for obvious separation signals from source:
      - Multiple distinct use-cases mentioned? (e.g., greenfield vs brownfield)
      - Different stakeholder journeys? (e.g., builders vs consumers)
@@ -120,7 +120,7 @@ In plan mode:
    - Phase execution sequence
    - Expected complexity and size
    - Potential challenges
-   - **Note:** Practice boundaries will be finalized in Phase 2 after baseline mapping
+   - **Note:** Practice boundaries will be finalized in Step 1.5 (Delineation Gate) before Phase 2 delegation
 
 5. **Exit plan mode** with clear execution roadmap
 
@@ -283,7 +283,7 @@ No conversational context is required - only file contents.
      - Phase 1 extracts concerns WITHOUT determining practice boundaries
      - Phase 1 does NOT identify primary alphas (need baseline context first)
      - Phase 1 does NOT decide practice vs method (need baseline alpha mapping first)
-     - **Practice delineation happens in Phase 2** after baseline mapping
+     - **Practice delineation happens in Step 1.5** (Delineation Gate) before Phase 2 delegation
      - If source has obvious separate sections (chapters/domains), note them, but don't finalize boundaries yet
 
 4. **Generate output:** Write to `practices/<practice-name>/01-analysis-report.md`
@@ -297,7 +297,7 @@ No conversational context is required - only file contents.
 - ✓ **Concern relationships documented:** Production, enablement, governance, information flows identified
 - ✓ Progressive states reflect source's natural maturity (not forced template)
 - ✓ Rich activity narratives with citations
-- ✓ Clear practice boundaries justified
+- ✓ Preliminary practice structure noted (final boundaries deferred to Phase 2)
 
 **User Feedback:** Brief progress updates
 
@@ -341,60 +341,66 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 - Competencies section sparse (should have 5-10 domain-specific competencies)
 - Workflows section empty (should have 2-5 workflow patterns)
 
+### Step 1.5: Practice Delineation Gate (Main Agent Only)
+
+**Objective:** Determine practice structure BEFORE delegating Phase 2 mapping.
+
+**CRITICAL:** This step MUST be performed by the main agent, not delegated to subagents. The delegation strategy (single agent vs parallel agents) depends on this step's outcome. Phase 2 subagents will independently validate this decision via Step 0 of `phase-2-mapping.md`.
+
+**Process:**
+
+1. **Load baseline practice JSON:**
+   ```bash
+   jq '.alphas[] | {name, description, focusName, relatesTo}' <baseline-practice.json>
+   ```
+
+2. **Map Phase 1 concerns to baseline alphas:**
+   - Which baseline alphas does the content enrich (redeclarations)?
+   - Which baseline alphas need specialization (new alphas with `contributesTo`)?
+   - Count total baseline alpha coverage (both redeclarations + contributesTo targets)
+
+3. **Analyze coverage pattern:**
+   - **Focused** (3-7 alphas in 1-2 focuses) → Likely single practice
+   - **Broad** (8+ alphas across all 3 focuses) → Likely method requiring subdivision
+
+4. **If focused (3-7 alphas):**
+   - Identify ONE primary alpha from content
+   - Use baseline `relatesTo` to find related alphas (1-level deep)
+   - Validate: Does content naturally organize around this primary alpha?
+   - **Decision: Single Practice** ✓
+
+5. **If broad (8+ alphas):**
+   - Identify multiple potential primary alphas from content
+   - For each candidate primary alpha:
+     - What content clusters around it?
+     - What related alphas (via `relatesTo`) does it pull in?
+     - Does this create a coherent 3-7 alpha practice?
+   - Check for natural separation from source material
+   - **Decision: Method with 2+ Practices** ✓
+     - Create one practice per primary alpha cluster
+     - Each practice: 1 primary + 2-6 related = 3-7 total
+
+6. **If practice boundaries unclear:**
+   - **Ask user** for guidance
+   - Present analysis of alpha coverage and potential primary alpha options
+   - Get confirmation before proceeding
+
+**GATE DECISION:**
+
+- **Single Practice** → Step 2 delegates to one agent (or main agent proceeds directly)
+- **Multi-Practice Method** → Step 2 launches parallel agents, one per practice
+
+**Pass delineation results to Phase 2 agents:** Include the primary alpha decision, alpha coverage list, and practice boundaries in each agent's prompt so they can validate via Step 0 of `phase-2-mapping.md`.
+
+For the full Primary Alpha Focus Strategy with worked examples, see the **Practice vs Method Handling** reference section below.
+
 ### Step 2: Phase 2 - Mapping
 
 **Objective:** Map Phase 1 analysis to baseline practice framework
 
-**CRITICAL FIRST STEP: Practice Delineation Decision**
+**Prerequisite:** Step 1.5 delineation gate must be complete.
 
-**Practice boundaries are determined in Phase 2**, not planning, because you need baseline context to:
-- Identify which baseline alphas the content maps to
-- Determine primary alpha focus
-- Assess alpha relationship coverage (via `relatesTo`)
-- Make informed practice vs method decisions
-
-**Step 2.1: Read Baseline Practice and Identify Alpha Coverage**
-
-1. **Read baseline practice JSON completely:**
-   ```bash
-   jq '.alphas[] | {name, description, focusName, relatesTo}' <baseline-practice.json>
-   ```
-2. **Map Phase 1 concerns to baseline alphas:**
-   - Which baseline alphas does the content enrich (redeclarations)?
-   - Which baseline alphas need specialization (new alphas with contributesTo)?
-   - Count total baseline alpha coverage (both redeclarations + contributesTo targets)
-3. **Analyze coverage pattern:**
-   - Focused (3-6 alphas in 1-2 focuses) → Likely single practice
-   - Broad (8+ alphas across all 3 focuses) → Likely method requiring subdivision
-
-**Step 2.2: Apply Primary Alpha Focus Strategy**
-
-**If coverage appears focused (3-6 alphas):**
-1. Identify ONE primary alpha from content
-2. Use baseline `relatesTo` to find related alphas (1-level deep)
-3. Validate: Does content naturally organize around this primary alpha?
-4. **Decision: Single Practice** ✓
-
-**If coverage appears broad (8+ alphas):**
-1. Identify multiple potential primary alphas from content
-2. For each candidate primary alpha:
-   - What content clusters around it?
-   - What related alphas (via `relatesTo`) does it pull in?
-   - Does this create a coherent 3-7 alpha practice?
-3. Check for natural separation from source:
-   - Different use-cases mentioned?
-   - Different value streams described?
-   - Separate capability domains/chapters?
-4. **Decision: Method with 2+ Practices** ✓
-   - Create one practice per primary alpha cluster
-   - Each practice: 1 primary + 2-6 related = 3-7 total
-
-**If practice boundaries unclear:**
-- **Ask user** for guidance on how to subdivide
-- Present analysis of alpha coverage and potential primary alpha options
-- Get confirmation before proceeding
-
-**APPROACH DECISION (Based on Step 2.2):**
+**APPROACH DECISION (from Step 1.5):**
 
 - **Single Practice**: Generate mapping guide directly (one step)
 - **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach
@@ -402,7 +408,7 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 **Process for Single Practice:**
 
 1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
-2. **Document primary alpha decision** at top of mapping guide
+2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
 3. Map concerns to alphas (redeclaration vs specialization)
 3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
    - As you name Alphas, WorkProducts, Activities, Personas, Patterns, Assets: verify each name is GLOBALLY UNIQUE
@@ -443,10 +449,11 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
    ```
 
 2. **Each agent prompt must include:**
-   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `deps/platform-adoption-kernel.json`, `references/semantics.md`
+   - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
+   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `deps/platform-adoption-kernel.json`, `references/semantics.md`, `prompts/phase-2-mapping.md`
    - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
-   - Explicit instruction: "Generate COMPLETE mapping including: (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships; (4) Work products; (5) Activities; (6) PATTERNS with complete matrix coverage. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
+   - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships; (4) Work products; (5) Activities; (6) PATTERNS with complete matrix coverage. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
 
 3. **After all agents complete:**
    - Combine practice mapping files into single `02-mapping-guide.md` (if using separate files)
@@ -2121,7 +2128,7 @@ When generating a method with multiple practices:
 
 ## Practice vs Method Handling
 
-**CRITICAL: Practice delineation happens in Phase 2 Mapping**, not during planning or Phase 1 analysis.
+**CRITICAL: Practice delineation is performed in Step 1.5 (Delineation Gate) by the main agent**, then each Phase 2 subagent independently validates it via Step 0 of `phase-2-mapping.md`.
 
 **Why:** You need baseline practice context to:
 - Map Phase 1 concerns to baseline alphas
@@ -2140,12 +2147,16 @@ When generating a method with multiple practices:
 - Don't map to baseline alphas yet (no baseline context)
 - Don't decide practice vs method
 
-**Phase 2 Mapping:** **PRACTICE DELINEATION DECISION POINT** ⬅️ **HERE**
-- Map Phase 1 concerns to baseline alphas
-- Identify baseline alpha coverage (3-6 alphas? 8+ alphas?)
+**Step 1.5 (Delineation Gate):** **PRACTICE DELINEATION DECISION POINT** ⬅️ **HERE**
+- Main agent maps Phase 1 concerns to baseline alphas
+- Identify baseline alpha coverage (3-7 alphas? 8+ alphas?)
 - Determine primary alpha(s) using source content + baseline relatesTo
 - Decide: Single practice OR Method with multiple practices
-- Document decision at top of mapping guide
+- Gate decision determines Phase 2 delegation strategy
+
+**Phase 2 Mapping (Step 0 validates):**
+- Each Phase 2 subagent independently validates delineation via Step 0 of `phase-2-mapping.md`
+- Document Delineation Analysis at top of mapping guide
 
 ### Practice (Single Value Stream)
 

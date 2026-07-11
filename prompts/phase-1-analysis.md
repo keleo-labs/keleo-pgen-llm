@@ -250,19 +250,22 @@ Identify the overarching lifecycle using "The Cycle" from domain-framework:
 
 Map methodology phases/stages to this cycle framework.
 
-### Step 12: Identify Practices
+### Step 12: Identify Preliminary Practice Structure
 
-**How should outcomes be grouped?**
+**How might outcomes be grouped?**
 
-Determine if source describes:
-- **Single Practice** (one cohesive value stream)
-- **Multiple Practices** (distinct use cases, value streams, or capability domains)
+**NOTE:** This is a PRELIMINARY structural observation based on source content alone. The FINAL practice vs method decision happens in Phase 2 (Step 0: Practice Delineation) when baseline alpha context is available. Do not treat this assessment as binding.
 
-Use these heuristics:
+Observe whether source describes:
+- **Likely Single Practice** (one cohesive value stream, unified framework)
+- **Likely Multiple Practices** (distinct use cases, value streams, or capability domains)
+
+Note these structural separation signals (same qualitative signals used in Phase 2, but without baseline alpha coverage analysis):
 - Different use-cases (greenfield vs brownfield)
 - Different value-streams (platform building vs consuming)
 - Different stakeholder journeys (builders vs consumers)
 - Different capability domains (security, observability, deployment)
+- Distinct concern clusters (groups of concerns with strong internal relationships but weak cross-group ties)
 
 For each Practice:
 - **Name**
@@ -299,7 +302,7 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 ## Metadata
 - **Analysis Date**: YYYY-MM-DD
 - **Source Materials**: [list]
-- **Practice Type**: Single Practice | Multiple Practices
+- **Preliminary Structure**: Likely Single Practice | Likely Multiple Practices | Unclear (Phase 2 will determine)
 - **Analyst**: [your name]
 
 ## 1. Outcomes
@@ -569,7 +572,7 @@ Where `<practice-name>` is kebab-case derived from the methodology name (e.g., "
 - ✓ Activities have rich "How to Perform" narratives with citations
 - ✓ Competencies, personas, and teams clearly defined
 - ✓ Patterns and lifecycle mapped to workflow frameworks
-- ✓ Practice boundaries clearly justified (value streams, use cases, stakeholder journeys)
+- ✓ Preliminary practice structure observed with structural signals noted (final boundaries determined in Phase 2)
 - ✓ Comprehensive citations to source materials
 
 This analysis will be used as input for Phase 2 (Mapping to Baseline Practice).

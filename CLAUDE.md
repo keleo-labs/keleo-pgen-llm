@@ -81,19 +81,25 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 - Process: LLM analyzes methodology structure, outcomes, concerns, activities, workflows
 - Output: `01-analysis-report.md` (~30-50K words)
 - Prompt: `prompts/phase-1-analysis.md`
-- **Note:** Phase 1 does NOT determine practice boundaries - extracts concerns without baseline context
+- **Note:** Phase 1 does NOT determine practice boundaries - extracts preliminary structural observations without baseline context
 
-**Phase 2: Mapping** ⬅️ **PRACTICE DELINEATION HAPPENS HERE**
-- Input: Analysis report + baseline practice + semantic guidance
+**Step 1.5: Delineation Gate** ⬅️ **PRACTICE DELINEATION HAPPENS HERE**
+- Performed by main agent BEFORE delegating Phase 2
+- Process: Load baseline JSON, map Phase 1 concerns to baseline alphas, count coverage
+- Decision: 3-7 alphas = single practice, 8+ alphas = likely method requiring subdivision
+- Gate determines delegation strategy (one agent vs parallel agents)
+- See SKILL.md Step 1.5 for full algorithm
+
+**Phase 2: Mapping**
+- Input: Analysis report + baseline practice + semantic guidance + delineation results from Step 1.5
 - Process: 
-  - **FIRST:** Map Phase 1 concerns to baseline alphas
-  - **THEN:** Identify primary alpha(s) and determine practice boundaries based on baseline coverage
-  - **FINALLY:** Map elements to baseline practice using Practice Language semantics
-- Output: `02-mapping-guide.md` (~40-60K words)
+  - **FIRST:** Validate delineation decision (Step 0 of phase-2-mapping.md)
+  - **THEN:** Map elements to baseline practice using Practice Language semantics
+- Output: `02-mapping-guide.md` (~40-60K words) with Delineation Analysis section
 - Prompt: `prompts/phase-2-mapping.md`
 - Key Steps: 
+  - Delineation validation (Step 0) with alpha coverage analysis and justification
   - Primary alpha identification using baseline relatesTo relationships
-  - Practice vs Method decision based on alpha coverage (3-7 alphas = practice, 8+ = method)
   - Alpha-state-activity gap analysis ensures every alpha state has supporting activities
 
 **Phase 3: JSON Generation**
