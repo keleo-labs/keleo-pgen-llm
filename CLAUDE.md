@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Practice Language Code Generation System** that uses LLMs in a three-phase pipeline to convert enterprise methodology documentation into standardized, schema-compliant JSON. The system analyzes source methodologies (e.g., AWS Well-Architected, SAFe, TOGAF, Team Topologies) and maps them to the Platform Adoption Essentials baseline framework.
+This is a **Practice Language Code Generation System** that uses LLMs to convert enterprise methodology documentation into standardized, schema-compliant JSON. The system supports two types of artifacts:
+
+1. **Baseline Practices** (foundational frameworks) - Created with `/create-baseline-method`
+2. **Extension Practices** (specialized implementations) - Created with `/generate-method`
+
+Extension practices analyze source methodologies (e.g., AWS Well-Architected, SAFe, TOGAF, Team Topologies) and map them to baseline frameworks like Platform Adoption Essentials.
 
 ## Directory Structure
 
@@ -12,26 +17,40 @@ This is a **Practice Language Code Generation System** that uses LLMs in a three
 keleo-pgen-llm/
 ├── .claude/
 │   └── skills/
-│       └── generate-method/      # Main translation skill
+│       ├── generate-method/              # Extension practice creation skill
+│       │   └── SKILL.md
+│       └── create-baseline-method/       # Baseline practice creation skill
 │           └── SKILL.md
 ├── deps/                                   # Symlinks to keleo-studio
 │   ├── language.schema.json               # JSON Schema definition
-│   └── platform-adoption-kernel.json      # Baseline framework
+│   ├── platform-adoption-kernel.json      # Baseline framework (Platform Adoption)
+│   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
 ├── references/                             # Analysis framework documentation
 │   ├── domain-framework.md
 │   ├── semantics.md
 │   └── workproduct-assessment-rubric.csv
-├── prompts/                                # Three-phase prompt system
+├── prompts/                                # Prompt system (extension practices)
 │   ├── phase-1-analysis.md                # Phase 1: Analysis
 │   ├── phase-2-mapping.md                 # Phase 2: Mapping
-│   └── phase-3-json.md                    # Phase 3: JSON generation
-├── practices/                              # Generated output directory
-│   └── <practice-name>/                   # One subdirectory per practice/method
-│       ├── 01-analysis-report.md          # Phase 1 output (~30-50K words)
-│       ├── 02-mapping-guide.md            # Phase 2 output (~40-60K words)
-│       └── <practice-name>.json           # Phase 3 output (schema-compliant JSON)
+│   ├── phase-3-json.md                    # Phase 3: JSON generation
+│   ├── phase-1-baseline-analysis.md       # Phase 1: Baseline analysis
+│   ├── phase-1.5-baseline-distillation.md # Phase 1.5: Baseline distillation (NEW)
+│   ├── phase-2-baseline-mapping.md        # Phase 2: Baseline mapping
+│   └── phase-3-baseline-json.md           # Phase 3: Baseline JSON generation
+├── practices/                              # Extension practices output
+│   └── <practice-name>/
+│       ├── 01-analysis-report.md
+│       ├── 02-mapping-guide.md
+│       └── <practice-name>.json
+├── baselines/                              # Baseline practices output
+│   └── <baseline-name>/
+│       ├── 01-analysis-report.md
+│       ├── 01.5-distilled-essentials.md   # NEW: Distillation phase
+│       ├── 02-mapping-guide.md
+│       └── <baseline-name>.json
 ├── utils/
-│   └── validate-practice-json.py          # Unified validation script
+│   ├── validate-practice-json.py          # Extension practice validation
+│   └── validate-baseline-json.py          # Baseline practice validation
 └── CLAUDE.md                              # This file
 ```
 
@@ -59,16 +78,23 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 
 **Phase 1: Analysis**
 - Input: Source methodology documentation
-- Process: LLM analyzes methodology structure, outcomes, concerns, activities, workflows, practices
+- Process: LLM analyzes methodology structure, outcomes, concerns, activities, workflows
 - Output: `01-analysis-report.md` (~30-50K words)
 - Prompt: `prompts/phase-1-analysis.md`
+- **Note:** Phase 1 does NOT determine practice boundaries - extracts concerns without baseline context
 
-**Phase 2: Mapping**
+**Phase 2: Mapping** ⬅️ **PRACTICE DELINEATION HAPPENS HERE**
 - Input: Analysis report + baseline practice + semantic guidance
-- Process: Map analyzed elements to baseline practice using Practice Language semantics, including alpha-state-activity gap analysis
+- Process: 
+  - **FIRST:** Map Phase 1 concerns to baseline alphas
+  - **THEN:** Identify primary alpha(s) and determine practice boundaries based on baseline coverage
+  - **FINALLY:** Map elements to baseline practice using Practice Language semantics
 - Output: `02-mapping-guide.md` (~40-60K words)
 - Prompt: `prompts/phase-2-mapping.md`
-- Key Step: Step 7.5 - Alpha-state-activity gap analysis ensures every alpha state has supporting activities
+- Key Steps: 
+  - Primary alpha identification using baseline relatesTo relationships
+  - Practice vs Method decision based on alpha coverage (3-7 alphas = practice, 8+ = method)
+  - Alpha-state-activity gap analysis ensures every alpha state has supporting activities
 
 **Phase 3: JSON Generation**
 - Input: Mapping guide + schema + baseline practice
@@ -135,8 +161,114 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 ### Dependencies (Symlinks to keleo-studio)
 - `deps/language.schema.json` - JSON Schema definition for Practice Language
 - `deps/platform-adoption-kernel.json` - Platform Adoption Essentials baseline framework
+- `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
+
+## Baseline Practices (Foundational Frameworks)
+
+### What are Baseline Practices?
+
+Baseline practices are **foundational frameworks** that define the core ontology for a domain. They establish:
+- **Focuses**: High-level groupings of concerns (e.g., Value, Solution, Endeavor OR custom groupings)
+- **Root-Level Alphas**: Core concerns with no parent (have `relatesTo` relationships, NOT `contributesTo`)
+- **ActivitySpaces**: Generalizable execution boundaries (not specific activities)
+- **Competencies**: Universal skill categories with 5-level progressions
+- **NarrativeTypes**: Reusable storytelling frameworks
+
+**Extension practices** (created with `/generate-method`) then specialize baselines by adding:
+- New alphas with `contributesTo` (specializations of baseline alphas)
+- Concrete activities (mapped to baseline activitySpaces)
+- Work products with levels of detail
+- Lifecycle patterns coordinating alphas
+
+### Four-Phase Baseline Creation Pipeline
+
+**Use `/create-baseline-method` to create baseline practices:**
+
+**Phase 1: Analysis** (Same as extension practices)
+- Extract comprehensive methodology structure (~30-50K words)
+- Emphasize universal, framework-level concepts
+- Output: `baselines/<name>/01-analysis-report.md`
+
+**Phase 1.5: Distillation** (NEW - CRITICAL)
+- **Identify Focus Areas**: Analyze concern patterns to discover natural groupings (2-4 focuses)
+  - **Default**: Value, Solution, Endeavor (from Platform Adoption Kernel)
+  - **Custom**: Domain-specific groupings (e.g., Partner Ecosystem → Value, Engagement, Go-to-Market)
+- **Distill Essential Concerns**: Reduce Phase 1 concerns to 8-15 foundational alphas
+- **Generalize Activity Types**: Abstract activities to 6-12 high-level execution boundaries
+- **Identify Universal Competencies**: Extract 5-10 skill categories with 5 levels
+- **Define Narrative Frameworks**: Identify 3-5 reusable storytelling structures
+- Output: `baselines/<name>/01.5-distilled-essentials.md` (~15-25K words)
+
+**Phase 2: Baseline Mapping**
+- Transform Phase 1.5 distilled essentials into baseline structures
+- Map essential concerns → alphas (with `relatesTo`, NO `contributesTo`)
+- Map activity types → activitySpaces (with `contributesTo` to alpha states)
+- Define competencies with 5-level progressions
+- Define narrativeTypes with narrative elements
+- Output: `baselines/<name>/02-mapping-guide.md` (~40-60K words)
+
+**Phase 3: Baseline JSON**
+- Generate `"kind": "practiceBaseline"` JSON
+- Include top-level definitions: focuses, competencies, activitySpaces, narrativeTypes
+- Alphas have NO `contributesTo`, all have `relatesTo` arrays
+- Validate with `utils/validate-baseline-json.py`
+- Output: `baselines/<name>/<name>.json`
+
+### Baseline vs Extension Practice Decision
+
+**Use `/create-baseline-method` when:**
+- ✓ Creating a **foundational framework** for a domain
+- ✓ Defining **root-level concerns** (no parent baseline to extend)
+- ✓ Establishing **focuses, competencies, narrative types** for a domain
+- ✓ Source methodology defines **universal ontology**
+
+**Use `/generate-method` when:**
+- ✓ Creating a **practice that extends** an existing baseline
+- ✓ Defining **specialized alphas** with `contributesTo`
+- ✓ Adding **activities, work products, patterns** (not in baselines)
+- ✓ Source methodology is an **implementation** of a framework
+
+**Examples:**
+
+| Source Methodology | Skill to Use | Rationale |
+|-------------------|--------------|-----------|
+| Platform Adoption Essentials | `/create-baseline-method` | Foundational framework for platform engineering |
+| AWS Well-Architected (specific practices) | `/generate-method` | Extends Platform Adoption baseline |
+| Partner Ecosystem Essentials | `/create-baseline-method` | Foundational framework for partner management |
+| Specific Partner Demand Gen practice | `/generate-method` | Extends Partner Ecosystem baseline |
+| Team Topologies | `/create-baseline-method` | Foundational framework for team design |
+| Specific SDLC practice | `/generate-method` | Extends appropriate baseline |
+
+### Key Structural Differences
+
+| Element | Extension Practice | Baseline Practice |
+|---------|-------------------|-------------------|
+| **kind property** | `"practice"` or `"method"` | `"practiceBaseline"` |
+| **baselinePracticeName** | REQUIRED (references parent) | OPTIONAL (may reference parent baseline) |
+| **Focuses** | Referenced from baseline | DEFINED in baseline (2-4 focuses) |
+| **Alpha contributesTo** | REQUIRED on new alphas | NOT PRESENT (root-level) |
+| **Alpha relatesTo** | Optional | REQUIRED (show interconnections) |
+| **Competencies** | Referenced from baseline | DEFINED with 5 levels |
+| **ActivitySpaces** | Referenced from baseline | DEFINED in baseline |
+| **NarrativeTypes** | Referenced from baseline | DEFINED in baseline |
+| **Activities** | Defined in practice | NOT PRESENT |
+| **WorkProducts** | Defined in practice | NOT PRESENT |
+| **Patterns** | Defined in practice | NOT PRESENT |
+
+### Baseline Output Location
+
+All files for a baseline are co-located in `baselines/<baseline-name>/`:
+
+- **`01-analysis-report.md`** - Phase 1 output: Comprehensive analysis (~30-50K words)
+- **`01.5-distilled-essentials.md`** - Phase 1.5 output: Essential elements (~15-25K words) **[NEW]**
+- **`02-mapping-guide.md`** - Phase 2 output: Baseline mapping (~40-60K words)
+- **`<baseline-name>.json`** - Phase 3 output: Schema-compliant baseline JSON
 
 ## Important Constraints and Patterns
+
+### Extension Practice Constraints
+
+These constraints apply to **extension practices** created with `/generate-method`:
 
 ### Alpha Handling
 - **Redeclaration**: Enriching baseline alphas with additional checklists/narratives while preserving exact baseline structure
@@ -147,12 +279,45 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 - **Instances**: Tracking specific occurrences (e.g., "Security Team" and "Platform Team" as instances of "Team")
 - When multiple perspectives reference the same alpha, create a SINGLE merged redeclaration, not separate definitions
 
-### Orchestration Practices
-- When source methodology describes an **overarching lifecycle pattern** spanning multiple domains:
-  - **Divide** content into separate practices by domain/concern/focus
-  - **Create orchestration practice** that coordinates via patterns using `practiceDependencyNames`
-  - Orchestration practice focuses on **pattern coordination**, NOT alpha redefinition
-  - Use `practiceDependencyNames` to load alphas from other practices for pattern references
+### Practice Structure - Primary Alpha Focus
+
+**Core Principle:** Each practice should focus around ONE primary alpha, with secondary coverage of that alpha's directly related alphas (via `relatesTo` relationships). This creates focused, coherent practices with broad coverage of loosely related concerns.
+
+**Practice Composition:**
+- **Primary Alpha**: ONE central baseline alpha that is the main focus (e.g., Platform, Team, Requirements)
+- **Related Alphas**: 2-6 alphas directly related to primary via `relatesTo` relationships (1-level deep)
+- **Total Coverage**: 3-7 alphas per practice (broad, loosely related coverage)
+- **Coherence**: All content should relate back to the primary alpha's value proposition
+
+**Example - Platform-Focused Practice:**
+- Primary: Platform
+- Related (from Platform.relatesTo): Platform Asset (hosts), Platform Consumption Interface (exposes), Platform Governance (governed by), Team (built by)
+- Result: 5 alphas with broad coverage of platform infrastructure concerns
+
+**Example - Team-Focused Practice:**
+- Primary: Team  
+- Related (from Team.relatesTo): Work (performs), Way Of Working (applies), Platform (built by reversed), Organizational Change (enabled by)
+- Result: 5 alphas with broad coverage of team and organizational concerns
+
+**Anti-Pattern:** "Everything else" catch-all practices without identifiable primary alpha
+
+### Orchestration Practices (Exception)
+
+**When to Create:** Source methodology describes an overarching lifecycle or coordination framework that ties together multiple domain practices
+
+**Structure:**
+- **Purpose**: Cross-practice coordination, NOT content duplication
+- **Dependencies**: Lists all practices it coordinates via `practiceDependencyNames`
+- **Content**:
+  - **Aliases**: Unifying terminology across dependent practices
+  - **Patterns**: Lifecycle patterns referencing alphas from multiple dependent practices
+  - **Minimal Alphas**: ONLY if coordination requires new tracking concepts
+- **No Redeclaration**: Does NOT redefine alphas from dependent practices
+- **Example**: SDLC Orchestration practice coordinating Development, Deployment, Operations practices
+
+**Orchestration vs Regular Practice:**
+- Regular Practice: Primary alpha + related alphas (content-focused)
+- Orchestration Practice: Dependencies + patterns + aliases (coordination-focused)
 
 ### Schema Rules
 - All symbolic references (alphaName, stateName, activitySpaceName, etc.) must be exact, case-sensitive string matches
@@ -225,9 +390,53 @@ This project requires the **keleo-studio** repository to be present at `../../ke
 
 ## Development Workflow
 
-### Using the Translation Skill
+### Creating Baseline Practices
 
-The primary workflow uses the `/generate-method` skill:
+Use the `/create-baseline-method` skill to create foundational frameworks:
+
+```
+/create-baseline-method [source files or URLs]
+```
+
+This skill automates the four-phase baseline creation pipeline:
+
+**1. Planning (MANDATORY):**
+- Enters plan mode automatically
+- Analyzes source materials for baseline appropriateness
+- Identifies potential custom Focuses
+- Creates execution roadmap
+
+**2. Phase 1 - Analysis:**
+- Extracts comprehensive methodology structure
+- Emphasizes universal, framework-level concepts
+- Outputs `baselines/<name>/01-analysis-report.md` (~30-50K words)
+
+**3. Phase 1.5 - Distillation (CRITICAL NEW PHASE):**
+- Identifies Focus areas (default or custom)
+- Distills essential concerns to 8-15 foundational alphas
+- Generalizes activity types to 6-12 execution boundaries
+- Identifies universal competencies (5-10 with 5 levels)
+- Defines narrative frameworks (3-5)
+- Outputs `baselines/<name>/01.5-distilled-essentials.md` (~15-25K words)
+
+**4. Phase 2 - Baseline Mapping:**
+- Maps distilled essentials to baseline structures
+- Transforms concerns → alphas (with `relatesTo`, NO `contributesTo`)
+- Defines focuses, competencies, activitySpaces, narrativeTypes
+- Outputs `baselines/<name>/02-mapping-guide.md` (~40-60K words)
+
+**5. Phase 3 - Baseline JSON:**
+- Generates `"kind": "practiceBaseline"` JSON
+- Validates with `utils/validate-baseline-json.py`
+- Outputs `baselines/<name>/<name>.json`
+
+**Output Location**: All files for a baseline are co-located in `baselines/<baseline-name>/`
+
+The skill is defined in `.claude/skills/create-baseline-method/SKILL.md` and uses baseline-specific prompts from `prompts/`.
+
+### Creating Extension Practices
+
+Use the `/generate-method` skill to create practices that extend baselines:
 
 ```
 /generate-method [source files or URLs]
@@ -243,17 +452,17 @@ This skill automates the three-phase pipeline:
 
 **2. Phase 1 - Analysis:**
 - Analyzes methodology structure: outcomes, concerns, activities, workflows, practices
-- Outputs `01-analysis-report.md` (~30-50K words)
+- Outputs `practices/<name>/01-analysis-report.md` (~30-50K words)
 
 **3. Phase 2 - Mapping:**
 - Maps analyzed elements to baseline practice
 - Uses semantic guidance from `references/semantics.md`
-- Outputs `02-mapping-guide.md` (~40-60K words)
+- Outputs `practices/<name>/02-mapping-guide.md` (~40-60K words)
 
 **4. Phase 3 - JSON Generation:**
 - Generates schema-compliant JSON from mapping guide
 - Validates with `utils/validate-practice-json.py`
-- Outputs `<practice-name>.json` or `<method-name>.json`
+- Outputs `practices/<name>/<practice-name>.json` or `<method-name>.json`
 
 **Output Location**: All files for a practice are co-located in `practices/<practice-name>/`
 

@@ -100,28 +100,27 @@ In plan mode:
    - All provided PDFs, URLs, markdown files
    - Take comprehensive notes
 
-2. **Determine structure:**
-   - **Practice** if: Single cohesive value stream, one use case, focused baseline coverage
-   - **Method** if: Multiple distinct value streams, different use cases, separate practices, OR broad baseline coverage requiring subdivision
-   
-   **Apply decision heuristics** (see "Practice vs Method Handling" section):
-   - Check for natural separation signals (use-cases, value-streams, stakeholder journeys, domains)
-   - If no clear separation, analyze baseline alpha coverage:
-     - Focused (3-6 alphas in 1-2 focuses) → Practice
-     - Broad (8+ alphas across all focuses) → Method with subdivided practices
-   - Use 1-level alpha relationship analysis to create coherent practice clusters
-   - Avoid "everything else" catch-all practices
-
-3. **Identify baseline practice:**
+2. **Identify baseline practice:**
    - Ask user which baseline to use
    - Default suggestion: `deps/platform-adoption-kernel.json`
    - Validate baseline file exists and is valid JSON
 
+3. **Initial structure assessment (preliminary only):**
+   - **Note:** Final practice delineation happens in Phase 2 Mapping when baseline context is available
+   - Check for obvious separation signals from source:
+     - Multiple distinct use-cases mentioned? (e.g., greenfield vs brownfield)
+     - Different stakeholder journeys? (e.g., builders vs consumers)
+     - Clearly separate capability domains? (e.g., security chapter + deployment chapter)
+   - **If obvious separation:** Plan for method with multiple practices
+   - **If unified framework:** Plan for single practice (subject to Phase 2 validation)
+   - **Key principle:** Don't determine primary alphas or practice boundaries yet - you need baseline context first
+
 4. **Plan execution:**
-   - Practice name (kebab-case)
+   - Tentative practice/method name (kebab-case)
    - Phase execution sequence
    - Expected complexity and size
    - Potential challenges
+   - **Note:** Practice boundaries will be finalized in Phase 2 after baseline mapping
 
 5. **Exit plan mode** with clear execution roadmap
 
@@ -280,7 +279,12 @@ No conversational context is required - only file contents.
      - Dependencies: Which concerns require/depend on others?
    - Identify activities, competencies, personas, teams
    - Map workflows and patterns
-   - Determine practice boundaries
+   - **Note on practice boundaries:**
+     - Phase 1 extracts concerns WITHOUT determining practice boundaries
+     - Phase 1 does NOT identify primary alphas (need baseline context first)
+     - Phase 1 does NOT decide practice vs method (need baseline alpha mapping first)
+     - **Practice delineation happens in Phase 2** after baseline mapping
+     - If source has obvious separate sections (chapters/domains), note them, but don't finalize boundaries yet
 
 4. **Generate output:** Write to `practices/<practice-name>/01-analysis-report.md`
    - Follow exact format from phase-1-analysis.md prompt
@@ -341,7 +345,56 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 
 **Objective:** Map Phase 1 analysis to baseline practice framework
 
-**APPROACH DECISION:**
+**CRITICAL FIRST STEP: Practice Delineation Decision**
+
+**Practice boundaries are determined in Phase 2**, not planning, because you need baseline context to:
+- Identify which baseline alphas the content maps to
+- Determine primary alpha focus
+- Assess alpha relationship coverage (via `relatesTo`)
+- Make informed practice vs method decisions
+
+**Step 2.1: Read Baseline Practice and Identify Alpha Coverage**
+
+1. **Read baseline practice JSON completely:**
+   ```bash
+   jq '.alphas[] | {name, description, focusName, relatesTo}' <baseline-practice.json>
+   ```
+2. **Map Phase 1 concerns to baseline alphas:**
+   - Which baseline alphas does the content enrich (redeclarations)?
+   - Which baseline alphas need specialization (new alphas with contributesTo)?
+   - Count total baseline alpha coverage (both redeclarations + contributesTo targets)
+3. **Analyze coverage pattern:**
+   - Focused (3-6 alphas in 1-2 focuses) → Likely single practice
+   - Broad (8+ alphas across all 3 focuses) → Likely method requiring subdivision
+
+**Step 2.2: Apply Primary Alpha Focus Strategy**
+
+**If coverage appears focused (3-6 alphas):**
+1. Identify ONE primary alpha from content
+2. Use baseline `relatesTo` to find related alphas (1-level deep)
+3. Validate: Does content naturally organize around this primary alpha?
+4. **Decision: Single Practice** ✓
+
+**If coverage appears broad (8+ alphas):**
+1. Identify multiple potential primary alphas from content
+2. For each candidate primary alpha:
+   - What content clusters around it?
+   - What related alphas (via `relatesTo`) does it pull in?
+   - Does this create a coherent 3-7 alpha practice?
+3. Check for natural separation from source:
+   - Different use-cases mentioned?
+   - Different value streams described?
+   - Separate capability domains/chapters?
+4. **Decision: Method with 2+ Practices** ✓
+   - Create one practice per primary alpha cluster
+   - Each practice: 1 primary + 2-6 related = 3-7 total
+
+**If practice boundaries unclear:**
+- **Ask user** for guidance on how to subdivide
+- Present analysis of alpha coverage and potential primary alpha options
+- Get confirmation before proceeding
+
+**APPROACH DECISION (Based on Step 2.2):**
 
 - **Single Practice**: Generate mapping guide directly (one step)
 - **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach
@@ -349,7 +402,8 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 **Process for Single Practice:**
 
 1. Read `prompts/phase-2-mapping.md`, analysis report, baseline JSON, semantics.md
-2. Map concerns to alphas (redeclaration vs specialization)
+2. **Document primary alpha decision** at top of mapping guide
+3. Map concerns to alphas (redeclaration vs specialization)
 3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
    - As you name Alphas, WorkProducts, Activities, Personas, Patterns, Assets: verify each name is GLOBALLY UNIQUE
    - **NO name may appear in more than one element type** (e.g., cannot have Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
@@ -730,6 +784,13 @@ Instances: Platform Engineering Team Alpha, Payments Team (specific named teams)
 
 From `references/semantics.md`:
 
+- **EXACT COMPETENCY LEVEL NAMES:** All `competencyLevelName` values MUST exactly match CompetencyLevel.name from baseline practice for the specific competency
+  - **Level names vary by competency** - each competency defines its own level progression
+  - **Extract baseline competency levels dynamically:** `jq '.competencies[] | {name, levels: [.levels[].name]}' <baseline-practice.json>`
+  - Example (Platform Adoption Essentials - Analysis competency): "Basic", "Applies", "Masters", "Adapts", "Innovating"
+  - Common errors: "Advanced" (check baseline for actual name), "Expert" (check baseline), "Intermediate" (check baseline), "Beginner" (check baseline)
+  - **Validate all competencyLevelName values in Phase 2 mapping guide against baseline competency levels**
+  - Validation command: For each competencyLevelName in mapping, verify it exists in that competency's levels array
 - **NO FLOATING ALPHAS:** All new alphas MUST have `contributesTo` (Section 4.1)
   - Valid targets: baseline alphas, practice-local alphas (internal hierarchy), or external practice alphas (creates dependency)
   - Practice-local references create multi-level specialization chains (Alpha C → B → A → Baseline)
@@ -1211,6 +1272,13 @@ grep "^### Alpha:" practices/<name>/02-mapping-guide.md | wc -l
 
 grep "^### Pattern:" practices/<name>/02-mapping-guide.md | wc -l
 # Should show ≥1 pattern
+
+# CRITICAL: Validate competency level names against baseline
+# Extract all competency level names from mapping guide (activities and personas)
+grep -i "competency level\|recommended.*level" practices/<name>/02-mapping-guide.md | grep -oE '(Basic|Applies|Masters|Adapts|Innovating|Advanced|Expert|Intermediate|Beginner|Novice|Proficient)' | sort -u
+# Compare against baseline competency levels
+jq '.competencies[] | {name, levels: [.levels[].name]}' <baseline-practice.json>
+# ANY level name not in baseline = ERROR requiring fix
 ```
 
 **If ANY section is missing or incomplete:**
@@ -1218,6 +1286,15 @@ grep "^### Pattern:" practices/<name>/02-mapping-guide.md | wc -l
 2. Review Phase 2 prompt requirements
 3. Read Phase 1 analysis for content that wasn't mapped
 4. Generate missing sections BEFORE proceeding to Phase 3
+
+**If competency level name mismatches found:**
+1. Extract valid level names for each competency from baseline
+2. Review mapping guide and replace invalid level names with correct baseline names
+3. Common fixes:
+   - "Advanced" → "Masters" (for most competencies in Platform Adoption Essentials)
+   - "Expert" → "Innovating"
+   - "Intermediate" → "Applies"
+   - "Beginner" or "Novice" → "Basic"
 
 **Common Phase 2 Omissions:**
 - **Activities section missing entirely** (CRITICAL - causes Phase 3 JSON to have 0 activities)
@@ -1426,9 +1503,17 @@ From `deps/language.schema.json`:
   - ✓ Verify total alphaState entries = N × M (where M = number of PatternViews)
   - ✓ Check final PatternView contains all N alphas
   - ✓ No missing cells in pattern matrix
+- ✓ **Competency level names match baseline (CRITICAL - Run BEFORE schema validation):**
+  - ✓ **All competencyLevelName values MUST exactly match CompetencyLevel.name from baseline practice**
+  - ✓ Extract practice level names: `jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName, .personas[].competencies[]?.competencyLevelName] | unique | sort'`
+  - ✓ Extract baseline level names: `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
+  - ✓ Compare: every practice level name must exist in baseline level names
+  - ✓ Common errors: "Advanced" (not in baseline), "Expert" (not in baseline), "Intermediate" (not in baseline)
+  - ✓ **If mismatches found:** Replace invalid names with exact baseline names (see fix procedure above)
 
 **User Feedback:**
 - "Generating JSON from mapping guide..."
+- "Validating competency level names against baseline..."
 - "Verifying discriminator property: kind='practice'..."
 - "Verifying required properties (name, description, baselinePracticeName)..."
 - "Running validation (schema, baseline, integrity)..."
@@ -1480,6 +1565,17 @@ jq '[.alphas[] | {name, iconCount: ([.assetNames[]? | select(.type == "icon")] |
 jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' practices/<name>/<name>.json
 # MUST output: [] (empty array) for all names unique
 # If non-empty: Shows duplicates that MUST be renamed
+
+# CRITICAL: Verify competency level names match baseline practice
+# Extract all used competency level names from activities
+jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName] | unique | sort' practices/<name>/<name>.json > /tmp/practice-levels.json
+# Extract all used competency level names from personas
+jq '[.personas[].competencies[]?.competencyLevelName] | unique | sort' practices/<name>/<name>.json >> /tmp/practice-levels-personas.json
+# Combine and deduplicate
+jq -s 'add | unique | sort' /tmp/practice-levels.json /tmp/practice-levels-personas.json
+# Compare against baseline competency levels
+jq '[.competencies[].levels[].name] | unique | sort' <baseline-practice.json>
+# ANY level name in practice but not in baseline = ERROR requiring fix
 ```
 
 **If validation reveals missing content:**
@@ -1523,6 +1619,29 @@ jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[
      - patternName in references
      - assetName in assetNames arrays
   5. Re-run uniqueness check to verify fix
+
+**CRITICAL ERROR: Invalid competency level names**
+- The competency level validation found level names not in baseline practice
+- Example: Using "Advanced" when baseline has "Masters", or "Expert" when baseline has "Innovating"
+- **Fix procedure:**
+  1. Extract baseline competency level names: `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
+  2. Build mapping of invalid → valid names:
+     - Common mappings for Platform Adoption Essentials:
+       - "Advanced" → "Masters"
+       - "Expert" → "Innovating"
+       - "Intermediate" → "Applies"
+       - "Beginner" or "Novice" → "Basic"
+     - For other baselines: inspect actual level names and map accordingly
+  3. Replace invalid level names in JSON:
+     - In activities: `.activities[].recommendedCompetencyLevels[].competencyLevelName`
+     - In personas: `.personas[].competencies[].competencyLevelName`
+  4. Use jq or Edit tool to perform replacements:
+     ```bash
+     # Example: Replace "Advanced" with "Masters"
+     jq '(.activities[].recommendedCompetencyLevels[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"' <file>.json
+     jq '(.personas[].competencies[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"' <file>.json
+     ```
+  5. Re-run competency level validation to verify all names now match baseline
 
 **DO NOT report Phase 3 complete until:**
 - ✓ activities.length matches Phase 2 Activity count (typically 5-15)
@@ -1737,6 +1856,12 @@ Single validation script replaces multiple utilities:
 - ❌ **Wrong relationship directionality** - Alpha declares dependencies instead of provisions
   - **Fix:** Flip perspective - alpha should declare what it provides TO others, not what it needs FROM others
   - "Platform enables Software System" not "Software System depends on Platform"
+- ❌ **Using invalid competency level names** - Using descriptive names instead of exact baseline CompetencyLevel.name values
+  - **Fix:** Extract valid level names from baseline: `jq '.competencies[] | {name, levels: [.levels[].name]}'`
+  - Use EXACT level names from baseline (case-sensitive)
+  - Common errors: "Advanced" (check baseline), "Expert" (check baseline), "Intermediate" (check baseline)
+  - For Platform Adoption Essentials: use "Basic", "Applies", "Masters", "Adapts", "Innovating"
+  - **Validate BEFORE Phase 3:** Check all competencyLevelName values in mapping guide against baseline
 - ❌ Using competency descriptions instead of exact baseline names
 - ❌ Using alias names in structural references (use canonical names)
 - ❌ Wrong alpha approach (should use redeclaration vs specialization framework)
@@ -1813,6 +1938,14 @@ Single validation script replaces multiple utilities:
   - **Fix:** ALL structural references MUST use canonical baseline names
   - Aliases are presentation-layer only (for UI/documentation)
   - Example: Use "Platform" in alphaName, not "Automation Platform" (even if alias exists)
+- ❌ **Invalid competency level names in JSON** - Using level names not in baseline practice
+  - **Problem:** competencyLevelName values don't match baseline CompetencyLevel.name values
+  - **Detection:** `jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName, .personas[].competencies[]?.competencyLevelName] | unique | sort'` and compare to `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
+  - **Fix:** Replace invalid level names with exact baseline names
+    - Extract valid names from baseline for each competency
+    - Use jq to replace invalid names: `jq '(.activities[].recommendedCompetencyLevels[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"'`
+    - Common replacements for Platform Adoption Essentials: "Advanced"→"Masters", "Expert"→"Innovating", "Intermediate"→"Applies", "Beginner"→"Basic"
+  - **Validate:** Re-run detection after fixes to ensure all level names now match baseline
 - ❌ Wrong competency reference format ({competencyName, level} instead of {competencyName, competencyLevelName})
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities
@@ -1988,128 +2121,249 @@ When generating a method with multiple practices:
 
 ## Practice vs Method Handling
 
+**CRITICAL: Practice delineation happens in Phase 2 Mapping**, not during planning or Phase 1 analysis.
+
+**Why:** You need baseline practice context to:
+- Map Phase 1 concerns to baseline alphas
+- Identify primary alpha(s) from baseline alpha coverage
+- Use baseline `relatesTo` relationships to determine related alphas
+- Make informed practice boundary decisions based on semantic alignment
+
+### When This Decision Happens
+
+**Planning Phase:** Preliminary assessment only
+- Note obvious source separations (chapters, domains, use-cases)
+- Don't determine primary alphas or practice boundaries
+
+**Phase 1 Analysis:** Extract concerns without boundaries
+- Identify all concerns from source material
+- Don't map to baseline alphas yet (no baseline context)
+- Don't decide practice vs method
+
+**Phase 2 Mapping:** **PRACTICE DELINEATION DECISION POINT** ⬅️ **HERE**
+- Map Phase 1 concerns to baseline alphas
+- Identify baseline alpha coverage (3-6 alphas? 8+ alphas?)
+- Determine primary alpha(s) using source content + baseline relatesTo
+- Decide: Single practice OR Method with multiple practices
+- Document decision at top of mapping guide
+
 ### Practice (Single Value Stream)
 
-**When:** Single cohesive value stream, one use case, unified stakeholder journey
+**When:** 
+- Source content maps to 3-7 baseline alphas
+- ONE clear primary alpha identifiable
+- Related alphas cluster around primary (via relatesTo)
+- Cohesive value proposition
 
 **Structure:**
 - One analysis report (covers entire practice)
-- One mapping guide (maps to baseline)
+- One mapping guide (maps to baseline, documents primary alpha decision)
 - One Practice JSON
 
-**Example:** "Team Topologies" as single practice
+**Example:** "Team Topologies" - if content focused on Team (primary) + 2-6 related alphas
 
 ### Method (Multiple Practices)
 
-**When:** Multiple distinct value streams, different use cases, separate practices
+**When:** 
+- Source content maps to 8+ baseline alphas across multiple focuses
+- Multiple potential primary alphas identified
+- Natural separation signals from source (use-cases, value-streams, domains)
+- Each practice cluster has 3-7 alphas
 
 **Structure:**
-- One analysis report (covers all practices with clear boundaries)
-- One mapping guide (maps each practice separately + method integration)
+- One analysis report (covers all concerns)
+- One mapping guide per practice (each documents its primary alpha + related alphas)
 - One Method JSON with embedded practices array
 
-**Example:** "AWS Well-Architected Framework" as method with 6 pillar practices
+**Example:** "AWS Well-Architected Framework" - 6 pillars each with own primary alpha
 
-**Decision Heuristics:**
-- Different use-cases (greenfield vs brownfield) → Method
-- Different value-streams (platform building vs consuming) → Method
-- Different stakeholder journeys (builders vs consumers) → Method
-- Different capability domains (security, observability, deployment) → Method
-- **Broad baseline coverage** (large swathes of alphas/concerns across multiple focuses) → Method
+**CRITICAL: Primary Alpha Focus Strategy (Applied in Phase 2)**
 
-**NEW: Baseline Coverage Heuristic:**
+**Core Principle:** Each practice should focus around ONE primary alpha, with secondary coverage of that alpha's directly related alphas (via `relatesTo` relationships). This creates focused, coherent practices with broad coverage of loosely related concerns.
 
-A practice should NOT broadly cover the entire baseline platform or large swathes of unrelated concerns. If source content appears to span extensive baseline coverage without distinct use-cases or focuses:
-
-**Step 1: Check for natural separation signals (existing heuristics)**
-- Different use-cases? → Separate practices
+**Step 1: Check for natural separation signals**
+- Different use-cases? → Separate practices (each with own primary alpha)
 - Different value-streams? → Separate practices
-- Different stakeholder journeys? → Separate practices
+- Different stakeholder journeys? → Separate practices  
 - Different capability domains? → Separate practices
 
-**Step 2: If no natural separation evident, analyze baseline alpha coverage**
+**Step 2: If no natural separation evident, identify primary alphas from source content**
 
-Read `deps/platform-adoption-kernel.json` and assess which baseline alphas are touched:
+Analyze the source material to determine which baseline alphas are central themes:
 
-- **Focused Practice**: Touches 3-6 baseline alphas within 1-2 focuses, with clear relational coherence
-  - Example: Platform practice touches Platform, Platform Asset, Platform Capability (Solution focus)
-  - Example: Team practice touches Team, Persona, Team Contract (Endeavor focus)
+- What are the main conceptual focuses? (e.g., "platform infrastructure", "team design", "value delivery")
+- Which alphas have the most content dedicated to them?
+- What are the key outcomes the methodology is trying to achieve?
 
-- **Broad Coverage → Requires Subdivision**: Touches 8+ baseline alphas spanning all 3 focuses OR large concern areas
-  - Example: Methodology covers Platform (Solution), Team (Endeavor), Requirements (Value), Way of Working, Work → TOO BROAD
-  - Action: Subdivide by alpha relationship clusters
+**For each identified primary alpha:**
 
-**Step 3: Subdivision Strategy - Alpha Relationship Clusters (1-level deep)**
+1. **Read baseline alpha's `relatesTo` array** to understand its relationships
+2. **Include directly related alphas** (1-level deep from primary)
+   - Production relationships (produces, generates, creates)
+   - Enablement relationships (enables, supports, facilitates)
+   - Governance relationships (governed by, constrains, guides)
+   - Information flow relationships (provides, informs, validates)
+3. **Stop at 1 level** - related alphas' further relationships belong to their own practices
+4. **Expected coverage:** 1 primary alpha + 3-6 related alphas = **broad, loosely related coverage**
 
-When broad coverage is detected:
+**Example: Platform-Focused Practice**
+```
+Primary Alpha: Platform
+Related Alphas (from Platform.relatesTo):
+├─ built by → Team (include - enablement)
+├─ hosts → Platform Asset (include - production)
+├─ exposes → Platform Consumption Interface (include - production)
+├─ governed by → Platform Governance (include - governance)
+└─ requires → Requirements (OPTIONAL - if source has significant requirements content)
 
-1. **Identify primary alpha focuses** from source content
-   - Which alphas are central to different parts of the methodology?
-   - Example: Platform engineering content → Platform alpha cluster
-   - Example: Team design content → Team alpha cluster
-   - Example: Value realization content → Requirements/Stakeholder alpha cluster
+Result: Practice covers 4-6 alphas with Platform as coherent center
+```
 
-2. **For each primary alpha, analyze 1-level relationships:**
-   - Read baseline alpha's `relatesTo` array
-   - Include directly related alphas (production, enablement, governance)
-   - **Stop at 1 level** - don't recursively traverse the entire graph
-   
-   Example for Platform alpha:
-   ```
-   Platform (primary)
-   ├─ produces → Platform Asset (include)
-   ├─ produces → Platform Capability (include)
-   ├─ governed by → Platform Governance (include)
-   └─ enables → Software System (STOP - 1 level limit, separate practice)
-   ```
+**Example: Team-Focused Practice**
+```
+Primary Alpha: Team
+Related Alphas (from Team.relatesTo):
+├─ performs → Work (include - production)
+├─ applies → Way Of Working (include - enablement)
+├─ manages → Platform Risk And Compliance (include - governance)
+└─ built from → Stakeholders (OPTIONAL - if source covers recruitment/formation)
 
-3. **Create practice boundaries using 1-level clusters:**
-   - Practice 1: Platform + Platform Asset + Platform Capability + Platform Governance (cluster around Platform)
-   - Practice 2: Team + Persona + Team Contract (cluster around Team)
-   - Practice 3: Requirements + Stakeholder + Commitment (cluster around Requirements)
+Result: Practice covers 3-5 alphas with Team as coherent center
+```
 
-4. **Validate separation makes sense:**
-   - Each practice has coherent value proposition
-   - Practices can be adopted independently
-   - Cross-practice coordination via patterns (orchestration practice if needed)
-   - No practice is "everything else" (avoid catch-all practices)
+**Step 3: Validate practice coherence**
+
+Each practice should:
+- ✓ Have ONE clear primary alpha focus
+- ✓ Cover 3-7 alphas total (1 primary + 2-6 related)
+- ✓ Show broad coverage of loosely related concerns (not narrow specialization)
+- ✓ Have coherent value proposition centered on primary alpha
+- ✓ Can be adopted independently
+- ✗ NOT be "everything else" catch-all (must have identifiable primary alpha)
+
+**Step 4: Cross-practice coordination**
+
+When practices need coordination:
+
+**Option A: Method-level patterns** (if coordination is simple)
+- Define patterns in method JSON that reference multiple practice alphas
+- Use `practiceDependencyNames` to load alphas from other practices
+
+**Option B: Orchestration Practice** (if coordination is complex - see Orchestration Exception below)
+- Create separate practice focused on coordination
+- Lists other practices as dependencies
+- Contains primarily: aliases (unifying terminology), patterns (coordinating lifecycle), minimal alphas
+- Does NOT redefine alphas from dependent practices
+- Focuses on integration, not content duplication
+
+**ORCHESTRATION PRACTICE EXCEPTION:**
+
+**When to Create:** Source methodology describes an overarching lifecycle or coordination framework that ties together multiple domain practices
+
+**Structure:**
+- **Primary Focus:** Coordination and integration patterns
+- **Dependencies:** Lists all practices it coordinates via `practiceDependencyNames`
+- **Content:**
+  - **Aliases:** Unifying terminology across dependent practices
+  - **Patterns:** Lifecycle patterns referencing alphas from multiple dependent practices
+  - **Minimal Alphas:** ONLY if coordination requires new tracking concepts (e.g., "Integration Checkpoint", "Cross-Team Dependency")
+  - **NO redeclaration:** Does NOT redefine alphas from dependent practices
+- **Example:** SDLC Orchestration practice coordinating Development, Deployment, Operations practices
+
+**Orchestration vs Regular Practice:**
+- **Regular Practice:** Primary alpha + related alphas (content-focused)
+- **Orchestration Practice:** Dependencies + patterns + aliases (coordination-focused)
+
+**Anti-Pattern:**
+- ❌ Orchestration practice with 20+ alphas and no dependencies (should be regular practices)
+- ❌ Orchestration practice duplicating content from dependent practices
+- ❌ Creating orchestration practice when simple method-level patterns would suffice
 
 **Examples:**
 
-**Correct - Focused Practice (PASS):**
-- Source: OpenShift Platform Administration
-- Baseline Coverage: Platform, Platform Asset, Platform Capability, Platform Governance (4 alphas, 1 focus)
-- Relationship Depth: All within 1-level cluster of Platform
-- Decision: **Single Practice** ✓
+**Example 1: Platform-Focused Practice (CORRECT)**
+- **Source:** OpenShift Platform Administration
+- **Primary Alpha:** Platform (Solution focus)
+- **Related Alphas (from Platform.relatesTo):** 
+  - Platform Asset (hosts)
+  - Platform Consumption Interface (exposes)
+  - Platform Governance (governed by)
+  - Team (built by)
+- **Total Coverage:** 5 alphas (1 primary + 4 related)
+- **Coherence:** All content centers on platform infrastructure with broad coverage of related concerns
+- **Decision:** ✓ **Single Practice** - Platform is clear primary, related alphas provide broad loosely-related coverage
 
-**Correct - Focused Practice with Cross-Focus (PASS):**
-- Source: Platform Team Topology Design
-- Baseline Coverage: Team, Persona, Team Contract, Platform (4 alphas, 2 focuses)
-- Relationship Depth: Team cluster (3) + Platform (1-level relation: "Team operates Platform")
-- Decision: **Single Practice** ✓ (coherent around team-platform relationship)
+**Example 2: Team-Focused Practice (CORRECT)**
+- **Source:** Team Topologies
+- **Primary Alpha:** Team (Endeavor focus)
+- **Related Alphas (from Team.relatesTo):**
+  - Work (performs)
+  - Way Of Working (applies)
+  - Platform (built by relationship reversed - Team builds Platform)
+  - Organizational Change (enabled by)
+- **Total Coverage:** 5 alphas (1 primary + 4 related)
+- **Coherence:** Team design as primary with broad coverage of team context (work, practices, change)
+- **Decision:** ✓ **Single Practice** - Team is clear primary, covers loosely-related organizational concerns
 
-**Incorrect - Broad Coverage (SUBDIVIDE):**
-- Source: SAFe Agile Framework
-- Baseline Coverage: Work, Team, Requirements, Solution, Portfolio, Stakeholder, Commitment, Way of Working (8+ alphas, all 3 focuses)
-- Relationship Depth: Covers 3+ distinct 1-level clusters with no unifying theme
-- Decision: **Method with 3-4 Practices** (subdivide by focus and alpha clusters)
-  - Practice 1: Portfolio & Investment (Portfolio, Stakeholder, Commitment cluster)
-  - Practice 2: Solution Engineering (Solution, Requirements cluster)
-  - Practice 3: Team Delivery (Team, Work, Way of Working cluster)
-  - Practice 4: SAFe Orchestration (patterns coordinating across practices)
+**Example 3: Multi-Practice Method (CORRECT)**
+- **Source:** SAFe Agile Framework
+- **Analysis:** Broad coverage without single primary alpha focus
+- **Decision:** Method with 3 focused practices + 1 orchestration practice
 
-**Incorrect - "Everything Else" Anti-Pattern (AVOID):**
-- Practice 1: Platform Engineering (Platform cluster)
-- Practice 2: Team Design (Team cluster)
-- Practice 3: Requirements & Solution & Stakeholders & Work & ... (WRONG - catch-all)
-- **Fix:** Identify coherent cluster for Practice 3 or merge into Practice 1/2 if truly supporting
+  **Practice 1: Portfolio Management** (Value focus)
+  - Primary Alpha: Opportunity
+  - Related: Platform Value And Economics (justifies), Stakeholders (identified by), Requirements (drives)
+  - Coverage: 4 alphas focused on business value and investment
+  
+  **Practice 2: Solution Delivery** (Solution focus)
+  - Primary Alpha: Platform Asset
+  - Related: Requirements (addresses), Platform (consumes), Platform Consumption Interface (deployed via)
+  - Coverage: 4 alphas focused on solution development
+  
+  **Practice 3: Agile Team Operations** (Endeavor focus)
+  - Primary Alpha: Team
+  - Related: Work (performs), Way Of Working (applies), Organizational Change (enabled by)
+  - Coverage: 4 alphas focused on team execution
+  
+  **Practice 4: SAFe Lifecycle Orchestration** (Orchestration)
+  - Dependencies: Portfolio Management, Solution Delivery, Agile Team Operations
+  - Content: Aliases (SAFe terminology), Patterns (PI Planning cycle coordinating all practices)
+  - Minimal Alphas: Only if unique coordination concepts needed
+  - NO redeclaration of practice alphas
 
-**Key Principles:**
+**Example 4: "Everything Else" Anti-Pattern (INCORRECT)**
+- **Source:** Platform Engineering Handbook
+- **Attempted Structure:**
+  - Practice 1: Platform Infrastructure (Platform primary + Platform Asset, Platform Governance)
+  - Practice 2: Platform Adoption (Stakeholders primary + Requirements, Opportunity)
+  - Practice 3: Everything Else (Team, Work, Way Of Working, Organizational Change, Platform Consumption Interface, Platform Value And Economics)
+  
+- **Problem:** Practice 3 has NO clear primary alpha - it's a catch-all for leftover content
+- **Fix:** Identify primary alphas for Practice 3 content:
+  - Is there significant team/org content? → Create "Team & Organization" practice with Team as primary
+  - Is there consumption interface content? → Merge into Practice 1 (Platform.exposes relationship)
+  - Is there value/economics content? → Merge into Practice 2 (Opportunity.justifies relationship)
 
-1. **Prefer focus over breadth** - Practices should go deep in focused areas, not shallow across everything
-2. **Use 1-level relationship analysis** - Prevents both over-fragmentation and mega-practices
-3. **Validate independent value** - Each practice should deliver standalone value
-4. **Use orchestration for coordination** - Method-level patterns or orchestration practices coordinate across focused practices
+**Example 5: Orchestration Practice (CORRECT)**
+- **Source:** DevOps Lifecycle Framework
+- **Structure:** Method with 4 practices
+  - Development Practice (Platform Asset primary)
+  - Deployment Practice (Platform Consumption Interface primary)
+  - Operations Practice (Platform primary)
+  - **DevOps Orchestration Practice (Orchestration)**
+    - Dependencies: Development, Deployment, Operations practices
+    - Aliases: "Continuous Delivery" → Deployment workflows, "SRE" → Operations personas
+    - Patterns: "DevOps Infinity Loop" pattern coordinating alphas from all 3 dependent practices
+    - Minimal Alphas: "Deployment Pipeline" (new coordination concept not in dependents)
+
+**Key Decision Principles:**
+
+1. **Primary Alpha Focus** - Every regular practice MUST have ONE identifiable primary alpha
+2. **Broad Loosely-Related Coverage** - Include related alphas (3-7 total) for comprehensive value delivery
+3. **1-Level Relationship Depth** - Use `relatesTo` to determine related alphas, stop at 1 level
+4. **Avoid Catch-Alls** - If you can't identify a primary alpha, the practice needs restructuring
+5. **Orchestration Exception** - Use orchestration practices for cross-practice coordination (aliases, patterns, dependencies)
+6. **Independent Value** - Each practice should deliver standalone value when adopted
 
 ---
 
