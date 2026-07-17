@@ -89,6 +89,18 @@ You have access to the following resources via the Read tool:
 }
 ```
 
+**Parent Practice Mode:** When extending a parent practice (instead of mapping directly to a baseline):
+- `baselinePracticeName`: Set to the value **inherited** from the parent practice's `baselinePracticeName` (NOT the parent practice name itself)
+- `practiceDependencyNames`: Auto-populated with the parent practice name(s) provided in Step 0.25
+- All `contributesTo` references should primarily target parent practice alphas using canonical names
+```json
+{
+  "baselinePracticeName": "Platform Adoption Essentials",  // inherited from parent
+  "practiceDependencyNames": ["Red Hat OpenShift Foundations"],  // parent practice names
+  ...
+}
+```
+
 **For Method:**
 ```json
 {
@@ -664,6 +676,11 @@ If generating Method JSON:
   "narratives": [...]  // Method-level narratives
 }
 ```
+
+**Parent Practice Mode:** When extending a parent practice:
+- Method-level `baselinePracticeName`: Inherited from parent practice
+- Method-level `practiceDependencyNames`: Parent practice name(s) from Step 0.25
+- Each embedded practice inherits the same `baselinePracticeName` and `practiceDependencyNames`
 
 #### 3.14 Verify Complete Structure
 

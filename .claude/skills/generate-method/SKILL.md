@@ -100,11 +100,17 @@ In plan mode:
    - All provided PDFs, URLs, markdown files
    - Take comprehensive notes
 
-2. **Identify baseline practice:**
-   - Ask user which baseline to use
-   - Default suggestion: `deps/platform-adoption-kernel.json`
-   - Validate baseline file exists and is valid JSON
-   - **After validating, proceed to Step 0.5: Baseline Dependency Resolution**
+2. **Identify baseline or parent practice:**
+   - Ask user which baseline OR parent practice/method to use
+   - Default suggestion: `deps/platform-adoption-kernel.json` (baseline)
+   - Validate file exists and is valid JSON
+   - **Detect input type:**
+     ```bash
+     python3 utils/resolve-parent-practice.py <file.json> --check-only
+     ```
+     - If `inputKind: "practiceBaseline"` → Standard baseline flow (proceed to Step 0.5)
+     - If `inputKind: "practice"` or `"method"` → **Parent practice mode** (proceed to Step 0.25)
+   - Report detected input type and key details to user
 
 3. **Initial structure assessment (preliminary only):**
    - **Note:** Final practice delineation happens in Step 1.5 (Delineation Gate) before Phase 2 delegation
@@ -127,11 +133,60 @@ In plan mode:
 
 ---
 
+### Step 0.25: Parent Practice Resolution (Parent Practice Mode Only)
+
+**Objective:** When the user provides an existing practice or method (instead of a baseline), resolve it into an effective parent and locate the actual baseline.
+
+**When this step is needed:** Only when Step 0 detected `inputKind: "practice"` or `"method"`. If the input is a `practiceBaseline`, skip this step entirely.
+
+**Process:**
+
+1. **Extract baseline practice name from the parent:**
+   The `--check-only` output from Step 0 includes `baselinePracticeName`. This is the actual baseline that the parent practice extends.
+
+2. **Locate the actual baseline file:**
+   - Ask user for the baseline file path corresponding to the reported `baselinePracticeName`
+   - Default suggestion: check `deps/` directory for matching files
+   - Validate the baseline file exists and its `name` property matches `baselinePracticeName`
+
+3. **Create effective parent:**
+   ```bash
+   python3 utils/resolve-parent-practice.py <parent.json> -o <output-dir>/_effective-parent.json
+   ```
+   
+   The utility:
+   - For a **practice**: Outputs the practice directly as the effective parent
+   - For a **method**: Unions all embedded practices' elements (alphas, activitySpaces, workProducts, patterns, etc.) using name-keyed merge
+   - Applies `practiceElementAliases` as `_aliasContext` annotations (canonical names preserved in all structural positions)
+   
+   Report the effective parent composition to the user (alpha count, practice names, etc.).
+
+4. **Record key variables for subsequent steps:**
+   - `parentPracticePath` = path to user-provided practice/method
+   - `effectiveParentPath` = `<output-dir>/_effective-parent.json`
+   - `parentPracticeNames` = list from report's `parentPracticeNames` (candidate pool for `practiceDependencyNames` — filtered later based on actual references)
+   - `actualBaselinePath` = path to the actual baseline JSON (for Step 0.5 and validation)
+
+5. **Proceed to Step 0.5** with `actualBaselinePath` — the actual baseline still needs dependency resolution.
+
+**User Feedback:**
+- "Detected parent practice: '<name>' (extends baseline '<baselinePracticeName>')"
+- "Parent practice contains N alphas, M activitySpaces, K workProducts"
+- "For methods: Merged N practices into composite parent: [practice name list]"
+- "Using effective parent for analysis/mapping. Actual baseline '<name>' for validation."
+- "practiceDependencyNames will be determined per-practice based on actual element references (not all parent practice names)"
+
+**CRITICAL:** All structural references in the generated JSON (`contributesTo`, `alphaName`, `stateName`, etc.) MUST use canonical names. If the effective parent has `_aliasContext`, aliases inform semantic understanding only — they do NOT appear in generated JSON output.
+
+---
+
 ### Step 0.5: Baseline Dependency Resolution
 
 **Objective:** Detect and resolve baseline dependencies to create a complete "effective baseline" that contains all inherited elements with domain-specific alias context.
 
-**When this step is needed:** Only when the user-provided baseline JSON has a non-empty `baselinePracticeNames` array. If the baseline has no dependencies, skip this step and use the provided baseline file as-is for all subsequent steps.
+**When this step is needed:** Only when the baseline JSON has a non-empty `baselinePracticeNames` array. If the baseline has no dependencies, skip this step and use the baseline file as-is for all subsequent steps.
+
+**Note:** In parent practice mode, this step operates on `actualBaselinePath` (the baseline referenced by the parent practice), not the user-provided file.
 
 **Process:**
 
@@ -379,24 +434,10 @@ No conversational context is required - only file contents.
 After generating `01-analysis-report.md`, IMMEDIATELY validate completeness before proceeding to Phase 2:
 
 ```bash
-# Count sections in analysis report
-grep "^## " practices/<name>/01-analysis-report.md | wc -l
-# Should show: 8 sections (Outcomes, Concerns, Progressive States, Work Products, Activities, Competencies, Personas, Workflows)
-
-# Verify each required section exists
-grep "^## 1. Outcomes$" practices/<name>/01-analysis-report.md
-grep "^## 2. Concerns$" practices/<name>/01-analysis-report.md  
-grep "^## 3. Progressive States$" practices/<name>/01-analysis-report.md
-grep "^## 4. Activities$" practices/<name>/01-analysis-report.md
-grep "^## 5. Competencies$" practices/<name>/01-analysis-report.md
-grep "^## 6. Personas$" practices/<name>/01-analysis-report.md
-grep "^## 7. Persona Groups$" practices/<name>/01-analysis-report.md
-grep "^## 8. Workflows$" practices/<name>/01-analysis-report.md
-
-# Count items in critical sections
-grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
-# Should show ≥5 concerns, ≥5 activities, ≥3 work products
+python3 utils/validate-phase-output.py practices/<name>/01-analysis-report.md --phase 1
 ```
+
+This checks: 8 required sections exist (Outcomes through Workflows), section count ≥8, numbered subsection count ≥5. Output is structured JSON with pass/fail per check.
 
 **If ANY section is missing:**
 1. Identify which sections are incomplete
@@ -420,14 +461,28 @@ grep "^### [0-9]" practices/<name>/01-analysis-report.md | wc -l
 
 1. **Load baseline practice JSON** (use effective baseline from Step 0.5 if dependencies were resolved, otherwise use the user-provided baseline directly):
    ```bash
-   jq '.alphas[] | {name, description, focusName, relatesTo, _domainAlias}' <effective-baseline-or-baseline.json>
+   python3 utils/inspect-practice-json.py <effective-baseline-or-baseline.json> --extract alphas
    ```
    If the effective baseline has `_aliasContext`, review domain aliases to understand the baseline's domain-specific terminology. Use canonical names for structural decisions, but let domain aliases inform your semantic understanding of each alpha's role.
 
-2. **Map Phase 1 concerns to baseline alphas:**
+   **Parent Practice Mode:** Also load the effective parent JSON:
+   ```bash
+   python3 utils/inspect-practice-json.py <effective-parent.json> --extract alphas
+   ```
+   Build a combined alpha index: parent practice alphas are the **primary mapping targets**; baseline alphas provide ontology context and support redeclarations of baseline-level concepts.
+
+2. **Map Phase 1 concerns to alphas:**
+   
+   **Standard baseline mode:**
    - Which baseline alphas does the content enrich (redeclarations)?
    - Which baseline alphas need specialization (new alphas with `contributesTo`)?
    - Count total baseline alpha coverage (both redeclarations + contributesTo targets)
+   
+   **Parent practice mode:**
+   - Which **parent practice** alphas does the content enrich (redeclarations of parent practice alphas)?
+   - Which **parent practice** alphas need further specialization (new alphas with `contributesTo` pointing to parent practice alphas)?
+   - Which **baseline** alphas are directly relevant but NOT already covered by the parent practice? (these can still be redeclared or specialized directly)
+   - Count total alpha coverage using parent practice alphas as the primary set
 
 3. **Analyze coverage pattern:**
    - **Focused** (3-7 alphas in 1-2 focuses) → Likely single practice
@@ -478,7 +533,9 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 **Process for Single Practice:**
 
 1. Read `prompts/phase-2-mapping.md`, analysis report, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies), semantics.md
+   - **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. The effective parent's alphas are the primary mapping targets; baseline alphas provide ontology context. If the effective parent has `_aliasContext`, use aliases for semantic understanding but always use canonical names in structural references.
 2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
+   - **Parent practice mode:** Document which parent practice alphas are being extended and which (if any) baseline alphas are being addressed directly.
 3. Map concerns to alphas (redeclaration vs specialization)
 3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
    - As you name Alphas, WorkProducts, Activities, Personas, Patterns, Assets: verify each name is GLOBALLY UNIQUE
@@ -521,6 +578,7 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 2. **Each agent prompt must include:**
    - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
    - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies), `references/semantics.md`, `prompts/phase-2-mapping.md`
+   - **Parent practice mode:** Also include the effective parent JSON path (`_effective-parent.json`). Add to agent prompt: "You are extending a parent practice, not mapping directly to the baseline. The effective parent's alphas are your primary `contributesTo` targets. Use canonical names for all structural references. The actual baseline provides ontology context and validation targets. IMPORTANT: `practiceDependencyNames` must only include parent practices whose unique alphas (those NOT in the effective baseline) are actually referenced via `contributesTo`. Do NOT include a parent practice just because its redeclared baseline alphas are referenced."
    - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline includes domain-specific aliases (e.g., 'Platform' is known as 'Automation Platform' in this domain). Use domain terms for semantic understanding but always use canonical names in structural references."
    - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
@@ -864,7 +922,7 @@ From `references/semantics.md`:
 
 - **EXACT COMPETENCY LEVEL NAMES:** All `competencyLevelName` values MUST exactly match CompetencyLevel.name from baseline practice for the specific competency
   - **Level names vary by competency** - each competency defines its own level progression
-  - **Extract baseline competency levels dynamically:** `jq '.competencies[] | {name, levels: [.levels[].name]}' <baseline-practice.json>`
+  - **Extract baseline competency levels:** `python3 utils/inspect-practice-json.py <baseline-practice.json> --check competencies`
   - Example (Platform Adoption Essentials - Analysis competency): "Basic", "Applies", "Masters", "Adapts", "Innovating"
   - Common errors: "Advanced" (check baseline for actual name), "Expert" (check baseline), "Intermediate" (check baseline), "Beginner" (check baseline)
   - **Validate all competencyLevelName values in Phase 2 mapping guide against baseline competency levels**
@@ -1325,38 +1383,14 @@ Pattern: Platform Evolution Journey (5 views)
 After generating `02-mapping-guide.md`, IMMEDIATELY validate completeness before proceeding to Phase 3:
 
 ```bash
-# Count major sections in mapping guide  
-grep "^## " practices/<name>/02-mapping-guide.md | wc -l
-# Should show: 7-9 sections (Keywords, Terminology Aliases, Alphas, Work Products, Activities, Patterns, Citations, Validation Checklist)
+python3 utils/validate-phase-output.py practices/<name>/02-mapping-guide.md --phase 2
+```
 
-# Verify critical sections exist
-grep "^## Keywords$" practices/<name>/02-mapping-guide.md
-grep "^## Terminology Aliases$" practices/<name>/02-mapping-guide.md
-grep "^## Alphas$" practices/<name>/02-mapping-guide.md
-grep "^## Work Products$" practices/<name>/02-mapping-guide.md
-grep "^## Activities$" practices/<name>/02-mapping-guide.md  
-grep "^## Patterns$" practices/<name>/02-mapping-guide.md
-grep "^## Citations$" practices/<name>/02-mapping-guide.md
+This checks: 7 required sections exist (Keywords, Terminology Aliases, Alphas, Work Products, Activities, Patterns, Citations), element counts (activities ≥5, work products ≥3, alphas ≥3, patterns ≥1), and extracts competency level names found in the mapping guide. Output is structured JSON with pass/fail per check.
 
-# Count mapped elements
-grep "^### Activity" practices/<name>/02-mapping-guide.md | wc -l
-# Should match or exceed Activity count from Phase 1 (typically 5-15)
-
-grep "^### " practices/<name>/02-mapping-guide.md | grep -i "work product" | wc -l
-# Should match Work Product count from Phase 1 (typically 5-10)
-
-grep "^### Alpha:" practices/<name>/02-mapping-guide.md | wc -l
-# Should show 3-8 alphas (redeclarations + specializations)
-
-grep "^### Pattern:" practices/<name>/02-mapping-guide.md | wc -l
-# Should show ≥1 pattern
-
-# CRITICAL: Validate competency level names against baseline
-# Extract all competency level names from mapping guide (activities and personas)
-grep -i "competency level\|recommended.*level" practices/<name>/02-mapping-guide.md | grep -oE '(Basic|Applies|Masters|Adapts|Innovating|Advanced|Expert|Intermediate|Beginner|Novice|Proficient)' | sort -u
-# Compare against baseline competency levels
-jq '.competencies[] | {name, levels: [.levels[].name]}' <baseline-practice.json>
-# ANY level name not in baseline = ERROR requiring fix
+**If competency level names are reported**, validate them against the baseline:
+```bash
+python3 utils/inspect-practice-json.py <baseline-practice.json> --check competencies
 ```
 
 **If ANY section is missing or incomplete:**
@@ -1389,29 +1423,15 @@ jq '.competencies[] | {name, levels: [.levels[].name]}' <baseline-practice.json>
 
 **Post-Assembly Verification Checklist (for methods):**
 
-After assembling method JSON, verify BEFORE validation:
+After assembling method JSON, verify BEFORE full validation:
 
 ```bash
-# Check kind property exists at root
-jq '.kind' practices/<method-name>/<method-name>.json
-# Should output: "method"
-
-# Check all practices have kind property
-jq '.practices[] | {name, kind}' practices/<method-name>/<method-name>.json
-# Each practice should have: "kind": "practice"
-# If any show "kind": null, fix with:
-jq '.practices = [.practices[] | if .kind == null then . + {kind: "practice"} else . end]' <file>.json > <file>-fixed.json
-
-# Check required root properties
-jq '{kind, name, description, baselinePracticeName, hasNarratives: (.narratives | length)}' practices/<method-name>/<method-name>.json
-# All should be present and non-null
-# hasNarratives should be >= 1 (method-level narrative)
+python3 utils/inspect-practice-json.py practices/<method-name>/<method-name>.json --check kind,required
 ```
 
-If `kind` is missing, add it:
-```bash
-jq '. + {kind: "method"}' <file>.json > <file>-fixed.json
-```
+This checks: `kind: "method"` at root, `kind: "practice"` in each embedded practice, and required root properties (name, description, baselinePracticeName, narratives).
+
+If `kind` is missing, add it using the Edit tool to insert `"kind": "method"` at the root level of the JSON file.
 
 If `narratives` is missing, review Phase 1 analysis for overarching lifecycle and add method narrative.
 
@@ -1433,11 +1453,14 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
      "kind": "practice",  // CRITICAL: Required at root level
      "name": "Practice Name",
      "description": "...",
+     "baselinePracticeName": "...",  // Inherited from parent practice in parent practice mode
+     "practiceDependencyNames": ["..."],  // Only parent practices with actually-referenced unique alphas
      ...
    }
    ```
+   - **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice's `baselinePracticeName` (NOT the parent practice name). Set `practiceDependencyNames` using the filtering rule (see "Determining practiceDependencyNames" below).
 3. Include aliases array from mapping guide
-4. Validate and fix until 0 errors
+4. Validate and fix until 0 errors (always validate against the **actual baseline**, not the parent practice)
 
 **Process for Multi-Practice Method:**
 
@@ -1454,6 +1477,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 
 2. **Each agent prompt must include:**
    - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies)
+   - **Parent practice mode:** Include in the agent prompt: "Set `baselinePracticeName` to '<inherited baseline name>' (inherited from parent practice). `contributesTo` targets reference parent practice alphas using canonical names. Set `practiceDependencyNames` to ONLY those parent practices whose unique alphas (not in baseline) are actually referenced via `contributesTo` — see 'Determining practiceDependencyNames' section."
    - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline uses domain aliases for semantic context. All structural references in the JSON (contributesTo, alphaName, stateName, etc.) MUST use canonical names, not alias names."
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
@@ -1473,7 +1497,8 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
        "kind": "method",
        "name": "Method Name",
        "description": "...",
-       "baselinePracticeName": "Platform Adoption Essentials",
+       "baselinePracticeName": "Platform Adoption Essentials",  // In parent practice mode: inherited from parent's baselinePracticeName
+       "practiceDependencyNames": ["..."],  // In parent practice mode: only parent practices with referenced unique alphas (see "Determining practiceDependencyNames")
        "narratives": [
          {
            "name": "Method Lifecycle Narrative",
@@ -1499,7 +1524,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - **CRITICAL:** Ensure `"kind": "method"` is at root level (required discriminator property)
    - **CRITICAL:** Add method-level narrative from Phase 1 analysis (usually "The Cycle" or similar framework)
    - Merge citations from all practices (deduplicate)
-   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` - check with: `jq '.practices[] | {name, kind}'`
+   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` - check with: `python3 utils/inspect-practice-json.py <file>.json --check kind`
    - If any practice has `"kind": null`, the individual practice JSON generation omitted it - add it during assembly
 
 **Step 3C: Validation and Fixes**
@@ -1554,7 +1579,7 @@ From `deps/language.schema.json`:
 - ✓ **Required discriminator properties (CHECK FIRST, BEFORE schema validation):**
   - ✓ Practice JSON: `"kind": "practice"` at root level
   - ✓ Method JSON: `"kind": "method"` at root level AND `"kind": "practice"` in each practices array element
-  - ✓ Verify with: `jq '.kind' <file>.json` (practice) or `jq '{kind, practices: [.practices[] | {name, kind}]}' <file>.json` (method)
+  - ✓ Verify with: `python3 utils/inspect-practice-json.py <file>.json --check kind`
 - ✓ Schema validation: 0 errors
 - ✓ Baseline validation: 0 errors
 - ✓ Internal integrity: 0 errors
@@ -1564,8 +1589,7 @@ From `deps/language.schema.json`:
   - ✓ **All PracticeElement names MUST be globally unique across the entire practice**
   - ✓ This includes: Alphas, WorkProducts, Activities, Personas, Patterns, PatternViews, ActivitySpaces, Assets
   - ✓ **NO name may appear in more than one element type** (e.g., cannot have both Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
-  - ✓ Verify with: `jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' <file>.json`
-  - ✓ Empty array `[]` = all names unique (PASS), non-empty array = duplicates found requiring renaming (FAIL)
+  - ✓ Verify with: `python3 utils/inspect-practice-json.py <file>.json --check uniqueness`
   - ✓ **If duplicates found:** Rename elements to disambiguate
     - Common pattern: Add element-type suffix to most specific element
     - Example: Alpha "Inference Service Configuration" + WorkProduct "Inference Service Configuration" → rename WorkProduct to "Inference Service Configuration File"
@@ -1584,11 +1608,9 @@ From `deps/language.schema.json`:
   - ✓ No missing cells in pattern matrix
 - ✓ **Competency level names match baseline (CRITICAL - Run BEFORE schema validation):**
   - ✓ **All competencyLevelName values MUST exactly match CompetencyLevel.name from baseline practice**
-  - ✓ Extract practice level names: `jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName, .personas[].competencies[]?.competencyLevelName] | unique | sort'`
-  - ✓ Extract baseline level names: `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
-  - ✓ Compare: every practice level name must exist in baseline level names
+  - ✓ Validate with: `python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies`
   - ✓ Common errors: "Advanced" (not in baseline), "Expert" (not in baseline), "Intermediate" (not in baseline)
-  - ✓ **If mismatches found:** Replace invalid names with exact baseline names (see fix procedure above)
+  - ✓ **If mismatches found:** Fix with: `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix`
 
 **User Feedback:**
 - "Generating JSON from mapping guide..."
@@ -1604,57 +1626,22 @@ From `deps/language.schema.json`:
 After generating `<name>.json`, IMMEDIATELY validate completeness before reporting success:
 
 ```bash
-# Verify discriminator property exists
-jq '.kind' practices/<name>/<name>.json
-# Must output: "practice" (or "method")
+python3 utils/inspect-practice-json.py practices/<name>/<name>.json --baseline <baseline-practice.json>
+```
 
-# Count major arrays in JSON
-jq '{
-  alphas: (.alphas | length),
-  workProducts: (.workProducts | length),  
-  activities: (.activities | length),
-  patterns: (.patterns | length),
-  citations: (.citations | length)
-}' practices/<name>/<name>.json
+This runs all quality gate checks in a single command:
+- **kind**: Discriminator property present (`practice`/`method`); for methods, checks each embedded practice
+- **counts**: Element counts meet minimums (alphas ≥3, workProducts ≥3, activities ≥5, patterns ≥1, citations ≥3)
+- **uniqueness**: PracticeElement names globally unique across all element types (no name collisions)
+- **competencies**: All `competencyLevelName` values match baseline competency levels
+- **properties**: Activities have required properties (activitySpaceName, assetNames, contributesTo); alphas have icon assets
+- **required**: Root-level required properties present (name, description, baselinePracticeName, narratives)
 
-# Expected minimums:
-# alphas: ≥3 (baseline redeclarations + new alphas)
-# workProducts: ≥3 (baseline enrichments + new work products from Phase 2)
-# activities: ≥5 (should match Activity count from Phase 2 mapping guide)
-# patterns: ≥1 (every practice needs at least one pattern)
-# citations: ≥3 (authoritative sources)
+Output is structured JSON with pass/fail per check and details on failures.
 
-# Verify activities array is NOT empty
-jq '.activities | length' practices/<name>/<name>.json
-# If this returns 0, CRITICAL ERROR - must regenerate activities from mapping guide
-
-# Verify work products array is NOT empty  
-jq '.workProducts | length' practices/<name>/<name>.json
-# If this returns 0, CRITICAL ERROR - must regenerate work products from mapping guide
-
-# Verify all activities have required properties
-jq '[.activities[] | {name, hasActivitySpace: (.activitySpaceName != null), hasAssets: ((.assetNames | length) > 0), hasContributesTo: ((.contributesTo | length) > 0)}]' practices/<name>/<name>.json
-# All activities must have: activitySpaceName, assetNames (≥1), contributesTo (≥1)
-
-# Verify all alphas have icon assets
-jq '[.alphas[] | {name, iconCount: ([.assetNames[]? | select(.type == "icon")] | length)}]' practices/<name>/<name>.json
-# All alphas must have iconCount ≥ 1
-
-# CRITICAL: Verify PracticeElement name global uniqueness (NO duplicates across all element types)
-jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' practices/<name>/<name>.json
-# MUST output: [] (empty array) for all names unique
-# If non-empty: Shows duplicates that MUST be renamed
-
-# CRITICAL: Verify competency level names match baseline practice
-# Extract all used competency level names from activities
-jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName] | unique | sort' practices/<name>/<name>.json > /tmp/practice-levels.json
-# Extract all used competency level names from personas
-jq '[.personas[].competencies[]?.competencyLevelName] | unique | sort' practices/<name>/<name>.json >> /tmp/practice-levels-personas.json
-# Combine and deduplicate
-jq -s 'add | unique | sort' /tmp/practice-levels.json /tmp/practice-levels-personas.json
-# Compare against baseline competency levels
-jq '[.competencies[].levels[].name] | unique | sort' <baseline-practice.json>
-# ANY level name in practice but not in baseline = ERROR requiring fix
+To run a specific check only:
+```bash
+python3 utils/inspect-practice-json.py practices/<name>/<name>.json --baseline <baseline-practice.json> --check competencies
 ```
 
 **If validation reveals missing content:**
@@ -1686,7 +1673,7 @@ jq '[.competencies[].levels[].name] | unique | sort' <baseline-practice.json>
 - The uniqueness check found duplicate names across element types
 - Example: Alpha "Platform Configuration" AND WorkProduct "Platform Configuration" (INVALID)
 - **Fix procedure:**
-  1. Identify which element types share the name (from jq output showing count > 1)
+  1. Identify which element types share the name (from `inspect-practice-json.py --check uniqueness` output)
   2. Determine which element is most abstract/fundamental (usually Alpha)
   3. Rename the more specific element with disambiguating suffix
      - WorkProducts: Add "File", "Document", "Specification", "Template" suffix
@@ -1703,24 +1690,19 @@ jq '[.competencies[].levels[].name] | unique | sort' <baseline-practice.json>
 - The competency level validation found level names not in baseline practice
 - Example: Using "Advanced" when baseline has "Masters", or "Expert" when baseline has "Innovating"
 - **Fix procedure:**
-  1. Extract baseline competency level names: `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
-  2. Build mapping of invalid → valid names:
-     - Common mappings for Platform Adoption Essentials:
-       - "Advanced" → "Masters"
-       - "Expert" → "Innovating"
-       - "Intermediate" → "Applies"
-       - "Beginner" or "Novice" → "Basic"
-     - For other baselines: inspect actual level names and map accordingly
-  3. Replace invalid level names in JSON:
-     - In activities: `.activities[].recommendedCompetencyLevels[].competencyLevelName`
-     - In personas: `.personas[].competencies[].competencyLevelName`
-  4. Use jq or Edit tool to perform replacements:
+  1. Dry run to see invalid levels and suggested replacements:
      ```bash
-     # Example: Replace "Advanced" with "Masters"
-     jq '(.activities[].recommendedCompetencyLevels[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"' <file>.json
-     jq '(.personas[].competencies[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"' <file>.json
+     python3 utils/fix-competency-levels.py <file>.json <baseline>.json
      ```
-  5. Re-run competency level validation to verify all names now match baseline
+  2. Apply fixes (common mappings like "Advanced"→"Masters" are applied automatically):
+     ```bash
+     python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix
+     ```
+     For unmapped levels, provide explicit mappings: `--map "CustomLevel=ValidLevel"`
+  3. Re-run competency level validation to verify all names now match baseline:
+     ```bash
+     python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies
+     ```
 
 **DO NOT report Phase 3 complete until:**
 - ✓ activities.length matches Phase 2 Activity count (typically 5-15)
@@ -1854,6 +1836,101 @@ Child baselines often define `practiceElementAliases` that map generic parent te
 - Baseline dependency chains are resolved automatically
 - Domain-specific terminology improves semantic quality of analysis and mapping
 
+### Parent Practice Extension Mode
+
+As an alternative to providing a baseline practice, users can provide an existing **practice** or **method** as the mapping target. The skill treats the provided practice/method as a "parent practice" — the new practice extends the parent's alphas rather than mapping directly to the baseline.
+
+**When to use:**
+- Creating a practice that builds on top of an existing practice (e.g., a specialized deployment practice extending a general platform engineering practice)
+- Creating a practice that extends a method's capabilities (e.g., adding AI inference to an OpenShift method)
+- The source methodology is a specialization or extension of content already captured in an existing practice
+
+**How it works:**
+
+1. **Detection:** `utils/resolve-parent-practice.py --check-only` classifies the input as `practiceBaseline`, `practice`, or `method`
+2. **Parent Resolution:** For methods, all embedded practices are merged into a composite "effective parent" via name-keyed union
+3. **Baseline Inheritance:** The actual baseline is inherited from the parent's `baselinePracticeName`
+4. **Mapping:** During analysis and mapping, parent practice alphas are the primary `contributesTo` targets
+5. **JSON Output:** The generated practice sets:
+   - `baselinePracticeName` = inherited from parent (NOT the parent practice name)
+   - `practiceDependencyNames` = only those parent practices whose unique alphas are actually referenced (see "Determining practiceDependencyNames")
+   - Alpha `contributesTo` targets = parent practice alphas (or baseline alphas where appropriate)
+
+**Alpha hierarchy:**
+
+```
+Baseline Alpha (e.g., "Platform")
+  └── Parent Practice Alpha (e.g., "Platform Infrastructure")
+       └── New Practice Alpha (e.g., "AI Inference Platform")
+           contributesTo: "Platform Infrastructure"  (parent practice alpha)
+```
+
+**Canonical names:** All structural references use canonical names. If the parent practice has `practiceElementAliases`, they are surfaced as `_aliasContext` annotations for semantic understanding — they do NOT appear in generated JSON output.
+
+**Worked example:**
+
+```
+Input: practices/red-hat-openshift-foundations/red-hat-openshift-foundations.json (method)
+  → inputKind: "method"
+  → baselinePracticeName: "Platform Adoption Essentials"
+  → parentPracticeNames: ["Platform Operations", "Security & Compliance", ...]
+
+Output practice:
+  {
+    "kind": "practice",
+    "name": "OpenShift AI Inference",
+    "baselinePracticeName": "Platform Adoption Essentials",  // inherited
+    "practiceDependencyNames": ["Observability"],  // ONLY practices with referenced unique alphas
+    "alphas": [
+      {
+        "name": "Inference Endpoint",
+        "contributesTo": "Platform"  // baseline alpha — does NOT create a dependency
+      },
+      {
+        "name": "Inference Monitoring",
+        "contributesTo": "Observability Stack"  // unique to Observability practice — DOES create dependency
+      }
+    ]
+  }
+```
+
+### Determining practiceDependencyNames (Parent Practice Mode)
+
+**Rule:** A practice should only declare a dependency on a parent practice if it actually references an alpha that is **uniquely defined** in that parent practice — i.e., an alpha that exists in the parent but NOT in the effective baseline. Baseline alphas that are merely **redeclared** by a parent practice do NOT create a dependency.
+
+**Algorithm (apply per practice after Phase 3 JSON generation):**
+
+1. **Collect `contributesTo` targets** from all alphas in the practice
+2. **Filter out practice-local targets** (alphas defined within the same practice)
+3. **For each remaining target**, classify it:
+   - **Baseline alpha**: exists in the effective baseline → no dependency created
+   - **Parent-only alpha**: exists in the effective parent but NOT in the effective baseline → creates dependency on whichever parent practice defines it
+4. **Map parent-only alphas to their owning parent practice** (for methods: check which embedded practice defines the alpha)
+5. **Set `practiceDependencyNames`** to the deduplicated list of parent practices that own at least one referenced parent-only alpha. If no parent-only alphas are referenced, set to `[]`.
+
+**Verification command:**
+```bash
+# Show parent-only alphas and their owning practices
+python3 utils/resolve-practice-dependencies.py \
+  --parent _effective-parent.json \
+  --baseline _effective-baseline.json \
+  --parent-method <parent-method.json>
+
+# Also compute dependencies for a specific practice
+python3 utils/resolve-practice-dependencies.py \
+  --parent _effective-parent.json \
+  --baseline _effective-baseline.json \
+  --parent-method <parent-method.json> \
+  --practice <practice.json>
+```
+
+**Why this matters:** Blindly including all parent practice names inflates the dependency graph and creates false coupling. A practice that only contributes to baseline alphas (e.g., "Platform", "Way Of Working") has no structural dependency on the parent practices that redeclare those alphas.
+
+**Example:**
+- Practice alpha "AI Model" has `contributesTo: "Platform Asset"` → "Platform Asset" is a baseline alpha → no dependency
+- Practice alpha "Inference Monitoring" has `contributesTo: "Observability Stack"` → "Observability Stack" is NOT in baseline, defined in parent's "Observability" practice → dependency on "Observability"
+- Result: `practiceDependencyNames: ["Observability"]`
+
 ### Clean Three-Phase Structure
 
 Unlike the complex v1 pipeline (Phase 1 → 1.5 → 2 → 2.5 → 2.6 → 2.7 → 2.8), this uses:
@@ -1954,7 +2031,7 @@ Single validation script replaces multiple utilities:
   - **Fix:** Flip perspective - alpha should declare what it provides TO others, not what it needs FROM others
   - "Platform enables Software System" not "Software System depends on Platform"
 - ❌ **Using invalid competency level names** - Using descriptive names instead of exact baseline CompetencyLevel.name values
-  - **Fix:** Extract valid level names from baseline: `jq '.competencies[] | {name, levels: [.levels[].name]}'`
+  - **Fix:** Extract valid level names from baseline: `python3 utils/inspect-practice-json.py <baseline>.json --check competencies`
   - Use EXACT level names from baseline (case-sensitive)
   - Common errors: "Advanced" (check baseline), "Expert" (check baseline), "Intermediate" (check baseline)
   - For Platform Adoption Essentials: use "Basic", "Applies", "Masters", "Adapts", "Innovating"
@@ -2014,7 +2091,7 @@ Single validation script replaces multiple utilities:
 - ❌ Not reading language.schema.json before generating
 - ❌ **PracticeElement name collisions** - CRITICAL ERROR - Using same name for different element types
   - **Problem:** Alpha "Platform Configuration" + WorkProduct "Platform Configuration" = INVALID (names must be globally unique)
-  - **Detection:** Run `jq '[(.alphas[]?.name // empty), (.workProducts[]?.name // empty), (.activities[]?.name // empty), (.personas[]?.name // empty), (.patterns[]?.name // empty), (.assets[]?.name // empty)] | group_by(.) | map({name: .[0], count: length}) | map(select(.count > 1))' <file>.json`
+  - **Detection:** Run `python3 utils/inspect-practice-json.py <file>.json --check uniqueness`
   - **Fix:** Rename more specific element with disambiguating suffix:
     - WorkProduct collision: Add "File", "Document", "Template" (e.g., "Platform Configuration" → "Platform Configuration File")
     - Activity collision: Add verb prefix (e.g., "Platform" → "Configure Platform")
@@ -2024,7 +2101,7 @@ Single validation script replaces multiple utilities:
 - ❌ **Missing `kind` property at root level** - MOST COMMON ERROR
   - **Fix Practice JSON:** Add `"kind": "practice"` at root level (conventionally first property for readability)
   - **Fix Method JSON:** Add `"kind": "method"` at root level
-  - **Check EVERY practice in method:** `jq '.practices[] | {name, kind}'` - ALL must show "practice", not null
+  - **Check EVERY practice in method:** `python3 utils/inspect-practice-json.py <file>.json --check kind` - ALL must show "practice", not null
   - This MUST be checked BEFORE schema validation (some schemas allow it to be missing but consumers fail)
   - **Note:** Property order doesn't affect JSON validity, but discriminators are conventionally placed first
 - ❌ Checklist items as strings instead of objects
@@ -2037,12 +2114,11 @@ Single validation script replaces multiple utilities:
   - Example: Use "Platform" in alphaName, not "Automation Platform" (even if alias exists)
 - ❌ **Invalid competency level names in JSON** - Using level names not in baseline practice
   - **Problem:** competencyLevelName values don't match baseline CompetencyLevel.name values
-  - **Detection:** `jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName, .personas[].competencies[]?.competencyLevelName] | unique | sort'` and compare to `jq '[.competencies[].levels[].name] | unique | sort' <baseline>.json`
-  - **Fix:** Replace invalid level names with exact baseline names
-    - Extract valid names from baseline for each competency
-    - Use jq to replace invalid names: `jq '(.activities[].recommendedCompetencyLevels[]? | select(.competencyLevelName == "Advanced") | .competencyLevelName) = "Masters"'`
+  - **Detection:** `python3 utils/fix-competency-levels.py <file>.json <baseline>.json` (dry run shows invalid levels and suggested replacements)
+  - **Fix:** `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix`
+    - For unmapped levels, provide explicit mappings: `--map "Advanced=Masters" --map "Expert=Innovating"`
     - Common replacements for Platform Adoption Essentials: "Advanced"→"Masters", "Expert"→"Innovating", "Intermediate"→"Applies", "Beginner"→"Basic"
-  - **Validate:** Re-run detection after fixes to ensure all level names now match baseline
+  - **Validate:** `python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies`
 - ❌ Wrong competency reference format ({competencyName, level} instead of {competencyName, competencyLevelName})
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities

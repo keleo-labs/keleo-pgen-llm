@@ -63,7 +63,7 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 **User must provide:**
 1. **Existing JSON file(s)**: One or more practice/method JSON files to update
-2. **Baseline practice**: Current baseline practice JSON (e.g., `deps/platform-adoption-kernel.json`)
+2. **Baseline practice OR parent practice/method**: Either a baseline practice JSON (e.g., `deps/platform-adoption-kernel.json`) or an existing practice/method to extend (see "Parent Practice Mode" below)
 3. **Update mode**: Full reanalysis OR remap & regenerate
 4. **Source materials** (if full reanalysis): Original methodology documentation
 
@@ -73,9 +73,9 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ### Step 0: Read Existing Content
 
-1. **Read existing JSON file(s)**
+1. **Read existing JSON file(s) and analyze structure:**
    ```bash
-   jq '.' practices/<name>/<name>.json
+   python3 utils/inspect-practice-json.py practices/<name>/<name>.json
    ```
 
 2. **Analyze current structure:**
@@ -85,15 +85,31 @@ This skill updates existing Practice or Method JSON files to align with the late
    - How many practices (if Method)?
    - What citations exist?
 
-3. **Read current baseline practice:**
-   ```bash
-   jq '.alphas[] | {name, relatesTo}' <baseline-practice.json>
-   ```
+3. **Read current baseline or parent practice:**
+   - Validate file exists and is valid JSON
+   - **Detect input type:**
+     ```bash
+     python3 utils/resolve-parent-practice.py <file.json> --check-only
+     ```
+     - If `inputKind: "practiceBaseline"` → Standard baseline flow (proceed to step 4)
+     - If `inputKind: "practice"` or `"method"` → **Parent practice mode** (proceed to step 3.5)
+
+3.5. **Parent Practice Resolution (parent practice mode only):**
+   - Extract `baselinePracticeName` from the check-only output
+   - Locate the actual baseline file (ask user if needed)
+   - Create effective parent:
+     ```bash
+     python3 utils/resolve-parent-practice.py <parent.json> -o practices/<name>/_effective-parent.json
+     ```
+   - Record: `parentPracticePath`, `effectiveParentPath`, `parentPracticeNames`, `actualBaselinePath`
+   - Report detected mode and parent practice details to user
+   - Continue to step 4 using `actualBaselinePath` as the baseline
 
 4. **Check baseline for dependencies and resolve:**
    ```bash
    python3 utils/resolve-baseline.py <baseline-practice.json> --check-only -o /dev/null
    ```
+   **Note:** In parent practice mode, operate on `actualBaselinePath` (the baseline referenced by the parent practice), not the user-provided file.
    
    If `hasDependencies: true`: 
    - Report dependency names to user and ask for file paths
@@ -108,7 +124,7 @@ This skill updates existing Practice or Method JSON files to align with the late
    - Use `_effective-baseline.json` for all analysis/mapping phases
    - Use the **original** baseline for validation
    
-   If `hasDependencies: false`: use the provided baseline file directly.
+   If `hasDependencies: false`: use the baseline file directly.
 
 5. **Identify what has changed since original generation:**
    - New baseline alphas or relationships?
@@ -161,8 +177,9 @@ Which update mode would you like to use?
 
 1. **Extract citation URLs/sources from existing JSON:**
    ```bash
-   jq '.citations[] | {author: .narrativeContexts[0].context, title: .narrativeContexts[2].context, source: .narrativeContexts[3].context}' <file>.json
+   python3 utils/extract-practice-content.py <file>.json
    ```
+   The `citations` array in the output contains author, title, source, and date for each citation.
 
 2. **Ask user for source materials:**
    ```
@@ -200,6 +217,7 @@ Which update mode would you like to use?
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
+- **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill:**
@@ -221,7 +239,7 @@ Which update mode would you like to use?
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names)
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
 
 **Apply ALL latest validations from generate-method skill:**
@@ -239,98 +257,17 @@ Which update mode would you like to use?
 
 **Step 2A: Extract Existing Content as Phase 1 Analysis**
 
-**Reverse-engineer JSON to analysis format:**
+**Reverse-engineer JSON to analysis format using the extraction utility:**
 
-1. **Extract practice metadata:**
-   ```bash
-   jq '{name, description, focuses: [.alphas[] | .focusName] | unique}' <file>.json
-   ```
+```bash
+python3 utils/extract-practice-content.py practices/<name>/<name>.json --output practices/<name>/01-analysis-report.md
+```
 
-2. **Extract concerns (alphas):**
-   ```bash
-   jq '.alphas[] | {name, description, states: [.states[] | {name, description}]}' <file>.json
-   ```
+This extracts all practice elements (metadata, alphas with states, work products with LODs, activities with competencies, personas, patterns with views, citations) and generates a Phase 1 analysis report markdown file. For methods, it merges all embedded practices into a single document.
 
-3. **Extract work products:**
-   ```bash
-   jq '.workProducts[] | {name, description, levels: [.levelsOfDetail[] | {name, description}]}' <file>.json
-   ```
-
-4. **Extract activities:**
-   ```bash
-   jq '.activities[] | {name, description, competencies: .requiredCompetencies}' <file>.json
-   ```
-
-5. **Extract personas:**
-   ```bash
-   jq '.personas[] | {name, description, competencies: [.competencies[] | .competencyName]}' <file>.json
-   ```
-
-6. **Extract patterns:**
-   ```bash
-   jq '.patterns[] | {name, description, views: [.patternViews[] | .name]}' <file>.json
-   ```
-
-7. **Extract citations:**
-   ```bash
-   jq '.citations[]' <file>.json
-   ```
-
-**Generate Phase 1 Analysis Report:**
-
-Create `practices/<name>/01-analysis-report.md` with extracted content:
-
-```markdown
-# Analysis Report: <Practice Name>
-
-## 1. Outcomes
-
-[Extract from practice description and narratives]
-
-## 2. Concerns
-
-[Extract from alphas array]
-
-### <Alpha Name>
-
-**Description:** <Alpha description>
-
-**Progressive States:**
-1. <State 1>: <Description>
-2. <State 2>: <Description>
-...
-
-## 3. Progressive States
-
-[Consolidated from all alphas]
-
-## 4. Work Products
-
-[Extract from workProducts array]
-
-## 5. Activities
-
-[Extract from activities array]
-
-## 6. Competencies
-
-[Extract from activities.requiredCompetencies and personas.competencies]
-
-## 7. Personas
-
-[Extract from personas array]
-
-## 8. Persona Groups
-
-[Extract from personaGroups array if present]
-
-## 9. Workflows
-
-[Extract from patterns array - reverse engineer from pattern views]
-
-## 10. Citations
-
-[Extract from citations array]
+Without `--output`, prints a structured JSON summary to stdout for review:
+```bash
+python3 utils/extract-practice-content.py practices/<name>/<name>.json
 ```
 
 **User Feedback:**
@@ -345,6 +282,7 @@ Create `practices/<name>/01-analysis-report.md` with extracted content:
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
+- **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill to extracted content:**
@@ -377,7 +315,7 @@ Create `practices/<name>/01-analysis-report.md` with extracted content:
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names)
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
 
 **Apply ALL latest validations from generate-method skill:**
@@ -389,26 +327,13 @@ Create `practices/<name>/01-analysis-report.md` with extracted content:
 
 **Comparison Report:**
 
-Generate a diff showing changes:
+Generate a structured diff showing changes:
 
 ```bash
-# Extract key metrics from old and new JSON
-echo "=== COMPARISON REPORT ==="
-echo "Old JSON:"
-jq '{alphas: (.alphas | length), workProducts: (.workProducts | length), activities: (.activities | length), patterns: (.patterns | length)}' <old-file>.json
-
-echo "New JSON:"
-jq '{alphas: (.alphas | length), workProducts: (.workProducts | length), activities: (.activities | length), patterns: (.patterns | length)}' <new-file>.json
-
-# Show competency level changes
-echo "=== Competency Level Changes ==="
-jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName] | unique | sort' <old-file>.json
-jq '[.activities[].recommendedCompetencyLevels[]?.competencyLevelName] | unique | sort' <new-file>.json
-
-# Show alias additions
-echo "=== Aliases ==="
-jq '[.aliases[] | {elementType, name, aliasName}]' <new-file>.json
+python3 utils/compare-practice-json.py <old-file>.json <new-file>.json
 ```
+
+This compares element counts (alphas, workProducts, activities, patterns, citations, personas, assets), diffs competency level names, lists aliases in the new file, and reports added/removed elements by name. Output is structured JSON.
 
 ---
 
@@ -534,17 +459,10 @@ The updated JSON is schema-compliant and ready for use."
 **IMPORTANT:** Before overwriting existing files, create backups:
 
 ```bash
-# Create backup directory with timestamp
-BACKUP_DIR="practices/<name>/backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$BACKUP_DIR"
-
-# Backup existing files
-cp practices/<name>/<name>.json "$BACKUP_DIR/"
-cp practices/<name>/01-analysis-report.md "$BACKUP_DIR/" 2>/dev/null || true
-cp practices/<name>/02-mapping-guide.md "$BACKUP_DIR/" 2>/dev/null || true
-
-echo "Backed up existing files to $BACKUP_DIR"
+python3 utils/backup-practice.py practices/<name>/
 ```
+
+This creates a `backup-YYYYMMDD-HHMMSS/` directory inside the practice folder and copies all JSON and markdown files. Output is structured JSON reporting the backup location and files copied.
 
 **Tell user about backup location** before starting update process.
 

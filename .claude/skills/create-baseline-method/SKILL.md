@@ -11,8 +11,45 @@
 This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).
 
 **Key Distinction:**
-- **Baseline Practices** (this skill): Define foundational ontology (root alphas, competencies, focuses, narrativeTypes, activitySpaces)
+- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
 - **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with contributesTo), activities, workProducts, patterns
+
+### Alpha Instances in Baselines
+
+Baseline alphas are intentionally broad to support reuse across multiple extension practices. **Alpha Instances** illustrate how a broad alpha applies within the baseline's specific domain without narrowing the alpha itself.
+
+**When to use Alpha Instances vs Aliases vs New Alphas:**
+
+| Technique | Use When | Example |
+|---|---|---|
+| **Alpha Instance** | The parent alpha is correct but has multiple domain-specific manifestations worth naming | Stakeholders → instances: "Application Developer", "Platform Engineer", "Budget Owner" |
+| **Alias** | The parent alpha maps 1:1 to a domain term that is universally used in the domain | Platform → "Internal Developer Platform" |
+| **New Alpha** | A genuinely new root-level concern exists that is present in every implementation of this domain | A concern not covered by any parent alpha, even with domain-specific interpretation |
+| **Redeclaration** | The parent alpha is correct but needs domain-specific states, checklists, or narratives | Platform alpha redeclared with IDP-specific maturity states |
+
+**Alpha Instance structure** (in the baseline JSON):
+```json
+{
+  "alphaInstances": [
+    {
+      "name": "Application Developer",
+      "description": "Engineers who build and deploy applications on the platform",
+      "alphaName": "Stakeholders"
+    },
+    {
+      "name": "Platform Engineer",
+      "description": "Engineers who build and maintain the platform itself",
+      "alphaName": "Stakeholders"
+    }
+  ]
+}
+```
+
+**Guidelines:**
+- Instances are examples, not subdivisions — they show how the alpha manifests in practice
+- Each instance references its parent alpha via `alphaName`
+- Instances can be used for any alpha where the domain has well-known specific manifestations
+- Document instances during Phase 1.5 distillation when mapping concerns to parent alphas
 
 ## Four-Phase Workflow
 
@@ -185,6 +222,8 @@ These documents must be readable for all phases:
    - Merge similar concerns to higher abstractions
    - Define universal progressive states (5-7 per concern)
    - Document relationships (produces, governed by, uses)
+   - **When extending a parent baseline:** Map concerns against parent alphas to determine what is a redeclaration (with domain-specific content) vs. a genuinely new alpha
+   - **Identify Alpha Instances:** Where a parent alpha is broad by design and has multiple well-known domain-specific manifestations, document these as Alpha Instances rather than creating new alphas or narrowing aliases
 
 4. **Distill Activity Types** (6-12 execution boundaries):
    - Generalize Phase 1 activities to high-level work types

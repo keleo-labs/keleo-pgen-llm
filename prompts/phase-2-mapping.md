@@ -27,6 +27,14 @@ You have access to the following resources via the Read tool:
    - Example: `deps/platform-adoption-kernel.json`
    - Defines canonical framework (alphas, activity spaces, competencies, etc.)
 
+2b. **Parent Practice JSON** (optional, alternative to direct baseline mapping)
+   - When provided, this is an existing practice or method that the new practice extends
+   - The parent practice's alphas become the **primary mapping targets** (not the baseline's)
+   - The baseline is still loaded for ontology context and validation, but `contributesTo` targets primarily reference parent practice alphas
+   - `baselinePracticeName` is inherited from the parent practice's own `baselinePracticeName`
+   - `practiceDependencyNames` is auto-populated with the parent practice name(s)
+   - All structural references (`contributesTo`, `alphaName`, etc.) use canonical names — if `_aliasContext` is present, aliases inform semantic understanding only
+
 3. **references/semantics.md**
    - Comprehensive semantic guidance for Practice Language
    - Rules for alpha handling (redeclaration vs specialization)
@@ -50,10 +58,23 @@ You have access to the following resources via the Read tool:
    - Extract all alphas with their `focusName` and `relatesTo` arrays
    - Note the focus areas (e.g., Value, Solution, Endeavor)
 
-2. **Map Phase 1 concerns to baseline alphas:**
+   **Parent practice mode:** Also read the effective parent JSON. The parent's alphas are the **primary mapping targets**. Build a combined alpha index:
+   - Parent practice alphas: primary `contributesTo` targets for new alphas
+   - Baseline alphas: ontology context for concerns orthogonal to the parent practice
+   - If the effective parent has `_aliasContext`, use aliases for semantic understanding but canonical names for all structural decisions
+
+2. **Map Phase 1 concerns to alphas:**
+   
+   **Standard baseline mode:**
    - Which baseline alphas does the content enrich? (redeclarations — adding checklists/narratives to existing alphas)
    - Which baseline alphas need specialization? (new alphas with `contributesTo` pointing to baseline alphas)
    - Count total baseline alpha coverage (redeclarations + contributesTo targets)
+   
+   **Parent practice mode:**
+   - Which **parent practice** alphas does the content enrich? (redeclarations of parent practice alphas)
+   - Which **parent practice** alphas need further specialization? (new alphas with `contributesTo` pointing to parent practice alphas)
+   - Which **baseline** alphas are directly relevant but NOT already covered by the parent practice? (these can still be redeclared/specialized directly)
+   - Count total alpha coverage using parent practice alphas as the primary set
 
 3. **Analyze coverage pattern:**
    - **Focused** (3-6 alphas in 1-2 focuses) → Likely single practice
@@ -393,18 +414,25 @@ Narrative: [from Phase 1 narrative]
 
 **Valid contributesTo Targets:**
 
-1. **Baseline Practice Alpha** (most common):
+1. **Baseline Practice Alpha** (most common in standard mode):
    - Reference: Alpha name from the baseline practice JSON
    - Example: `"contributesTo": "Platform"` (where Platform is in baseline)
    - Use when: Specializing a universally applicable baseline concept
 
-2. **Practice-Local Alpha** (internal hierarchy):
+2. **Parent Practice Alpha** (primary target in parent practice mode):
+   - Reference: Alpha name from the effective parent JSON (canonical name, NOT alias)
+   - Example: `"contributesTo": "Platform Infrastructure"` (where Platform Infrastructure is in the parent practice)
+   - Use when: The new practice extends an existing practice's capabilities
+   - **Auto-populated**: Parent practice name(s) are added to `practiceDependencyNames` automatically
+   - **In parent practice mode, this is the preferred target** — use baseline alphas only for concerns orthogonal to the parent practice
+
+3. **Practice-Local Alpha** (internal hierarchy):
    - Reference: Another new alpha defined earlier in THIS practice
    - Example: Alpha "Platform Service" → `"contributesTo": "Platform Capability"` (where Platform Capability is another new alpha in this practice)
    - Use when: Building multi-level specialization (Alpha C → Alpha B → Alpha A → Baseline)
    - **REQUIREMENT**: The referenced alpha must be defined EARLIER in the mapping guide and must itself have valid contributesTo
 
-3. **External Practice Alpha** (cross-practice dependency):
+4. **External Practice Alpha** (cross-practice dependency):
    - Reference: Alpha from another practice (e.g., Team Topologies, AWS Well-Architected)
    - Example: `"contributesTo": "Team Interaction"` (where Team Interaction is from the Team Topologies practice)
    - Use when: This practice depends on concepts from another practice
