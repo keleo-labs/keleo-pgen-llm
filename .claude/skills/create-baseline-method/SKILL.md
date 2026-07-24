@@ -90,21 +90,46 @@ This skill orchestrates a 4-phase pipeline:
 
 ### Baseline Dependency Resolution (Parent Baselines)
 
-**When this step is needed:** When creating a baseline that extends one or more existing baselines (the new baseline will declare `baselinePracticeNames` in its output JSON).
+**When this step is needed:** When creating a baseline that extends one or more existing baselines (the new baseline will declare `baselinePracticeNames` in its output JSON). This includes when the user explicitly states the baseline extends another, or when it is inferred from the source materials.
 
 **Process:**
 
-1. **If user indicates this baseline extends other baseline(s):**
-   - Ask for file path(s) of parent baseline(s)
-   - The new baseline's JSON will declare these in `baselinePracticeNames`
+1. **Auto-discover parent baselines by name:**
+   If the user indicates this baseline extends other baseline(s) (by providing a name or path):
+   - If user provides a **name** (no `/`, doesn't end in `.json`), resolve it:
+     ```bash
+     python3 utils/discover-dependencies.py --resolve "Parent Baseline Name"
+     ```
+     - `found` → use the resolved path
+     - `not_found` → ask user for the file path
+     - `ambiguous` → present candidates to user
 
-2. **Check each parent for transitive dependencies:**
+2. **Resolve transitive dependencies in a single step:**
+   For each resolved parent baseline, check for transitive dependencies:
    ```bash
-   python3 utils/resolve-baseline.py <parent-baseline.json> --check-only -o /dev/null
+   python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive
    ```
-   If any parent has `baselinePracticeNames`, ask the user for those transitive dependency files. Continue until all roots are reached.
+   This scans `baselines/`, `practices/`, and `deps/` directories and recursively resolves all `baselinePracticeNames` in the chain. Ask user only for any `not_found` dependencies.
 
-3. **Create effective parent baseline using the resolver utility:**
+3. **Confirm all resolved dependencies with user:**
+   Present ALL parent baselines and their transitive deps in a single summary:
+   ```
+   === Dependency Resolution ===
+
+   Parent Baselines:
+     1. [baselinePractice] "<parent-name>"
+        Path: <resolved-path>
+        Transitive:
+          1a. [baselinePractice] "<grandparent-name>"
+              Path: <resolved-path>
+
+   All dependencies resolved. Please confirm or correct:
+   - "ok" to proceed
+   - "1=/correct/path.json" to correct a path
+   ```
+   **Wait for user confirmation before proceeding.**
+
+4. **Create effective parent baseline using the resolver utility:**
    ```bash
    python3 utils/resolve-baseline.py \
      <parent-baseline.json> \
@@ -188,11 +213,11 @@ These documents must be readable for all phases:
 
 **Output:** `baselines/<name>/01-analysis-report.md` (~30-50K words)
 
-**Validation:**
-- ✓ All 4 perspectives represented
-- ✓ 12 required sections present (skip Practice Hierarchy for baselines)
-- ✓ Rich citations and source references
-- ✓ Universal terminology preferred
+**Phase 1 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 1 --summary
+```
+Fix any FAIL assertions before proceeding.
 
 ## Phase 1.5: Distillation (CRITICAL NEW PHASE)
 
@@ -243,14 +268,11 @@ These documents must be readable for all phases:
 
 **This becomes the PRIMARY input for Phase 2.**
 
-**Validation:**
-- ✓ Focuses clearly defined (2-4 focus areas)
-- ✓ Essential concerns distilled (8-15, not more than 15)
-- ✓ Activity types generalized (6-12, not more than 12)
-- ✓ Universal competencies identified (5-10 with 5 levels each)
-- ✓ Narrative frameworks defined (3-5)
-- ✓ All terminology is neutral, framework-level
-- ✓ All elements are generally applicable
+**Phase 1.5 Validation (run before proceeding to Phase 2):**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 1.5 --summary
+```
+Fix any FAIL assertions before proceeding to Phase 2.
 
 ## Phase 2: Baseline Mapping
 
@@ -307,14 +329,11 @@ These documents must be readable for all phases:
 
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
-**Validation:**
-- ✓ All Phase 1.5 elements transformed
-- ✓ Alphas have NO contributesTo, ALL have relatesTo
-- ✓ ActivitySpaces cover all alpha states
-- ✓ All competencies have exactly 5 levels
-- ✓ All narrative types have sequential elements
-- ✓ Baseline-level narrative present
-- ✓ All cross-references valid
+**Phase 2 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 2 --summary
+```
+Fix any FAIL assertions before proceeding to Phase 3.
 
 ## Phase 3: Baseline JSON Generation
 
@@ -359,6 +378,9 @@ These documents must be readable for all phases:
    - All contributesTo.alphaName/stateName references exist
    - All requiredCompetencies references exist in competencies
    - All narrativeTypeName references exist in narrativeTypes
+   - Element-specific narratives embedded on alphas/activitySpaces/competencies (NOT top-level)
+   - All narratives have citationNames arrays referencing relevant citations
+   - No narrative name or description references narrative type template names
 
 5. **Write Final JSON**:
    ```
@@ -381,13 +403,24 @@ These documents must be readable for all phases:
 
 **Output:** `baselines/<name>/<name>.json` (schema-compliant)
 
-**Validation:**
-- ✓ `"kind": "practiceBaseline"` discriminator present
-- ✓ Focuses, competencies, activitySpaces, narrativeTypes all defined
-- ✓ Alphas have NO contributesTo, all have relatesTo
-- ✓ All cross-references valid
-- ✓ Validation script reports `"valid": true`
-- ✓ 0 schema errors, 0 baseline errors, 0 integrity errors
+**Phase 3 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
+```
+For child baselines extending a parent:
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ \
+  --parent <parent-baseline.json> --schema deps/language.schema.json --summary
+```
+Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
+
+**Inspection and fix utilities (never use `python3 -c` or `bash -c`):**
+- Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
+- Resolve all dependencies: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
+- List available files: `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)
+- Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure`
+- Structural inspection: `python3 utils/extract-reference-names.py <file>.json --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details`
+- Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only`
 
 ## Token Budget Management
 
@@ -506,45 +539,17 @@ Starting Phase 3 JSON Generation. Reading:
 
 ## Quality Gates
 
-### After Phase 1:
-- [ ] 12 required sections present (skip Practice Hierarchy)
-- [ ] All 4 perspectives represented
-- [ ] Universal terminology preferred
-- [ ] Rich citations and source references
+Run the full eval harness after each phase and at completion:
 
-### After Phase 1.5:
-- [ ] 2-4 focuses defined with rationale
-- [ ] 8-15 essential concerns distilled
-- [ ] 6-12 activity types generalized
-- [ ] 5-10 competencies with 5 levels
-- [ ] 3-5 narrative frameworks
-- [ ] Neutral, framework-level terminology
+```bash
+# Phase-specific validation (during workflow)
+python3 utils/eval-skill-output.py baselines/<name>/ --phase <1|1.5|2|3> --summary
 
-### After Phase 2:
-- [ ] All Phase 1.5 elements mapped
-- [ ] Alphas have NO contributesTo, all have relatesTo
-- [ ] ActivitySpaces cover all alpha states
-- [ ] All competencies have 5 levels
-- [ ] Baseline-level narrative present
-- [ ] All cross-references valid
+# Full validation (at completion)
+python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
+```
 
-### After Phase 3:
-- [ ] Valid JSON syntax
-- [ ] `"kind": "practiceBaseline"` present
-- [ ] Focuses, competencies, activitySpaces, narrativeTypes defined
-- [ ] Alphas have NO contributesTo, all have relatesTo
-- [ ] Validation script: `"valid": true`
-- [ ] 0 errors (schema, baseline, integrity)
-
-## Success Criteria
-
-✅ 4 files generated in `baselines/<name>/` directory
-✅ All phase prompts followed exactly
-✅ Phase 1.5 successfully identifies essential elements and Focuses
-✅ Baseline JSON passes schema validation
-✅ Baseline JSON passes internal integrity validation
-✅ All cross-references resolve correctly
-✅ Generated baseline can be used by /generate-method as parent baseline
+**Success criteria:** `error_pass_rate: 1.0` on full validation. All 4 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
 
 ## Deliverables
 

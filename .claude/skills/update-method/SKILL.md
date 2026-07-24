@@ -32,142 +32,175 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ## Workflow Overview
 
-**Two Update Modes:**
+**Three Update Modes (auto-detected):**
 
-1. **Full Reanalysis** (Phase 1 → 2 → 3): Revisit source materials, update citations, complete rework
-2. **Remap & Regenerate** (Phase 2 → 3): Use existing content, apply latest mapping guidance, regenerate JSON
-
-## Critical Process: Ask User for Update Mode
-
-**MANDATORY FIRST STEP:** After reading existing JSON, ask the user which update mode to use:
-
-**Option 1: Full Reanalysis**
-- Revisit original source materials
-- Update citations to latest authoritative sources
-- Complete Phase 1 analysis with latest domain framework
-- Apply latest Phase 2 mapping guidance (primary alpha focus, competency levels, etc.)
-- Generate fresh JSON with all fixes
-
-**Option 2: Remap & Regenerate**
-- Extract existing content as Phase 1 analysis
-- Apply latest Phase 2 mapping guidance without revisiting sources
-- Generate updated JSON with latest schema/baseline
-
-**When to recommend each:**
-- **Full Reanalysis**: Baseline practice changed significantly, citations are outdated, or major structural changes needed
-- **Remap & Regenerate**: Minor fixes (competency levels, aliases, pattern completeness), schema updates, baseline refinements
-
----
+1. **Auto-Fix** — All issues are programmatically fixable. Run fix utilities and validate. No phase re-execution needed.
+2. **Remap & Regenerate** (Phase 2 → 3) — Use existing content, apply latest mapping guidance, regenerate JSON
+3. **Full Reanalysis** (Phase 1 → 2 → 3) — Revisit source materials, update citations, complete rework
 
 ## Input Requirements
 
 **User must provide:**
-1. **Existing JSON file(s)**: One or more practice/method JSON files to update
-2. **Baseline practice OR parent practice/method**: Either a baseline practice JSON (e.g., `deps/platform-adoption-kernel.json`) or an existing practice/method to extend (see "Parent Practice Mode" below)
-3. **Update mode**: Full reanalysis OR remap & regenerate
-4. **Source materials** (if full reanalysis): Original methodology documentation
+1. **Existing JSON file(s)**: One or more practice/method/baseline JSON files to update
+2. **Baseline practice** (for extension practices): Either a baseline JSON or parent practice/method
+3. **Source materials** (only if full reanalysis): Original methodology documentation
 
 ---
 
 ## Execution Workflow
 
-### Step 0: Read Existing Content
+### Step 0: Assess (Single Command)
 
-1. **Read existing JSON file(s) and analyze structure:**
+Run the consolidated assessment utility — this replaces ALL manual inspection steps:
+
+```bash
+python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json
+```
+
+For extension practices with a baseline:
+```bash
+python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema deps/language.schema.json
+```
+
+This single command:
+- Detects `kind` (practice / method / practiceBaseline)
+- Counts all elements
+- Checks structure completeness (focuses, activitySpaces, competencies for baselines; activities, workProducts, patterns for practices)
+- Validates PracticeElement name uniqueness
+- Checks relationship types
+- Validates competency level names against baseline
+- Checks narrative citation references (narratives should link to citations via `citationNames`)
+- Assesses checklist name/description quality (truncation, echo, duplication)
+- Reports asset coverage by element type (NarrativeTypes, Focuses should have icon assets)
+- Runs schema validation
+- Produces `recommendations.suggestedUpdateMode` ("auto-fix" / "remap" / "full-reanalysis")
+
+Add `--online` to also validate URL-based asset reachability:
+```bash
+python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json --online
+```
+
+**Route based on `kind`:**
+- `practiceBaseline` → **Baseline Update Path** (Step 0B)
+- `practice` or `method` → **Extension Practice Path** (Step 0C)
+
+### Step 0B: Baseline Update Path
+
+**For baselines (`kind: practiceBaseline`):**
+
+1. **Check assessment output** — read `recommendations.suggestedUpdateMode`:
+   - `"auto-fix"` → proceed to **Step 1A: Auto-Fix** (no user interaction needed)
+   - `"remap"` or `"full-reanalysis"` → ask user for update mode (Step 1B)
+
+2. **Validation uses baseline-specific scripts:**
    ```bash
-   python3 utils/inspect-practice-json.py practices/<name>/<name>.json
+   python3 utils/validate-baseline-json.py <baseline.json> deps/language.schema.json
    ```
 
-2. **Analyze current structure:**
-   - Is this a Practice or Method?
-   - What alphas are covered?
-   - What is the primary alpha? (may not be explicit in older versions)
-   - How many practices (if Method)?
-   - What citations exist?
+3. **Output directory:** `baselines/<name>/` (NOT `practices/`)
 
-3. **Read current baseline or parent practice:**
-   - Validate file exists and is valid JSON
-   - **Detect input type:**
-     ```bash
-     python3 utils/resolve-parent-practice.py <file.json> --check-only
-     ```
-     - If `inputKind: "practiceBaseline"` → Standard baseline flow (proceed to step 4)
-     - If `inputKind: "practice"` or `"method"` → **Parent practice mode** (proceed to step 3.5)
+4. **Baseline-specific phase prompts** (if remap/reanalysis needed):
+   - Phase 1: `prompts/phase-1-baseline-analysis.md`
+   - Phase 1.5: `prompts/phase-1.5-baseline-distillation.md`
+   - Phase 2: `prompts/phase-2-baseline-mapping.md`
+   - Phase 3: `prompts/phase-3-baseline-json.md`
 
-3.5. **Parent Practice Resolution (parent practice mode only):**
-   - Extract `baselinePracticeName` from the check-only output
-   - Locate the actual baseline file (ask user if needed)
-   - Create effective parent:
+### Step 0C: Extension Practice Path
+
+**For practices/methods (`kind: practice` or `method`):**
+
+1. **Auto-discover and resolve all dependencies:**
+   ```bash
+   python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive
+   ```
+   This scans `baselines/`, `practices/`, and `deps/` directories, extracts `baselinePracticeName` and `practiceDependencyNames` from the existing JSON, and recursively resolves all baseline dependencies.
+   - If any dependencies are `not_found`: ask user for the file paths
+   - If any are `ambiguous`: present candidates to user
+
+2. **Confirm resolved dependencies with user:**
+   Present all resolved dependencies before proceeding:
+   ```
+   === Dependency Resolution ===
+
+   Practice: "<name>" (<kind>)
+     Path: <file.json>
+
+   Resolved Dependencies:
+     1. [baselinePractice] "<baseline-name>"
+        Path: <resolved-path>
+
+   All dependencies resolved. Please confirm or correct:
+   - "ok" to proceed
+   - "1=/correct/path.json" to correct a path
+   ```
+   **Wait for user confirmation before proceeding.**
+
+3. **Create effective baseline/parent if needed:**
+   - If practice has parent (not just baseline) → create effective parent:
      ```bash
      python3 utils/resolve-parent-practice.py <parent.json> -o practices/<name>/_effective-parent.json
      ```
-   - Record: `parentPracticePath`, `effectiveParentPath`, `parentPracticeNames`, `actualBaselinePath`
-   - Report detected mode and parent practice details to user
-   - Continue to step 4 using `actualBaselinePath` as the baseline
-
-4. **Check baseline for dependencies and resolve:**
-   ```bash
-   python3 utils/resolve-baseline.py <baseline-practice.json> --check-only -o /dev/null
-   ```
-   **Note:** In parent practice mode, operate on `actualBaselinePath` (the baseline referenced by the parent practice), not the user-provided file.
-   
-   If `hasDependencies: true`: 
-   - Report dependency names to user and ask for file paths
-   - Recursively check transitive dependencies
-   - Create effective baseline:
+   - If baseline has transitive dependencies:
      ```bash
-     python3 utils/resolve-baseline.py \
-       <baseline-practice.json> \
-       <dependency-1.json> [<dependency-2.json> ...] \
-       -o practices/<name>/_effective-baseline.json
+     python3 utils/resolve-baseline.py <baseline.json> <dep1.json> [<dep2.json> ...] -o practices/<name>/_effective-baseline.json
      ```
-   - Use `_effective-baseline.json` for all analysis/mapping phases
-   - Use the **original** baseline for validation
-   
-   If `hasDependencies: false`: use the baseline file directly.
 
-5. **Identify what has changed since original generation:**
-   - New baseline alphas or relationships?
-   - New competency levels?
-   - Schema property changes?
-   - New semantic requirements (primary alpha focus, aliases, pattern completeness)?
-   - Baseline dependencies: [list if `baselinePracticeNames` present, "none" otherwise]
+4. **Check assessment output** — read `recommendations.suggestedUpdateMode`:
+   - `"auto-fix"` → proceed to **Step 1A: Auto-Fix**
+   - `"remap"` → proceed to **Step 1B** recommending Mode 2
+   - `"full-reanalysis"` → proceed to **Step 1B** recommending Mode 1
 
-### Step 1: Ask User for Update Mode
+### Step 1A: Auto-Fix (No User Interaction)
 
-**Present options to user:**
+**When `suggestedUpdateMode: "auto-fix"`** — all issues are programmatically fixable.
+
+1. **Backup first:**
+   ```bash
+   python3 utils/backup-practice.py <directory>/
+   ```
+
+2. **Run common fix utility (baselines and extension practices):**
+   ```bash
+   python3 utils/fix-common-issues.py <file.json> --fix
+   ```
+   Add `--normalize-relationships` if relationship type warnings were detected.
+   Add `--fix-truncated-names` if checklist truncation issues were detected.
+   Add `--fix-schema` for schema violations (tags nesting, persona groups, persona properties, techniqueNarratives).
+   Add `--fix-contributesto-arrays` to convert contributesTo arrays to strings.
+   Add `--all` to enable all optional fixes.
+
+3. **For extension practices — fix competency levels if needed:**
+   ```bash
+   python3 utils/fix-competency-levels.py <file.json> <baseline.json> --fix
+   ```
+
+4. **Re-assess to confirm fixes:**
+   ```bash
+   python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json
+   ```
+
+5. **Report results** — show what was fixed, confirm 0 errors.
+
+**If re-assessment still shows errors → fall through to Step 1B.**
+
+### Step 1B: Choose Update Mode (User Interaction)
+
+**Only ask user when auto-fix is insufficient.** Present the assessment results and recommended mode:
 
 ```
-I've read the existing practice/method JSON. Please select an update mode:
+Assessment found issues requiring manual intervention:
+[List non-auto-fixable issues from assessment]
 
-**Option 1: Full Reanalysis**
-- I'll revisit the original source materials
-- Update citations to latest authoritative sources
-- Complete fresh Phase 1 analysis
-- Apply latest mapping guidance (primary alpha focus, competency validation, etc.)
-- Generate completely refreshed JSON
+Recommended mode: [remap/full-reanalysis] — [modeReason from assessment]
 
-**Recommended when:**
-- Baseline practice has changed significantly
-- Citations are outdated
-- Major structural changes needed (e.g., practice splitting, primary alpha refocus)
-- Source materials available
+Options:
+1. Remap & Regenerate (Phase 2 → 3) — preserves existing analysis
+2. Full Reanalysis (Phase 1 → 2 → 3) — revisits source materials
 
-**Option 2: Remap & Regenerate**
-- I'll extract existing content as Phase 1 analysis
-- Apply latest Phase 2 mapping guidance
-- Regenerate JSON with latest schema/baseline requirements
-
-**Recommended when:**
-- Minor fixes needed (competency levels, aliases, pattern matrices)
-- Schema or baseline refinements
-- Source materials not available
-- Preserving existing analysis is priority
-
-Which update mode would you like to use?
+Which mode?
 ```
 
-**Wait for user response before proceeding.**
+**Wait for user response, then proceed to Mode 1 or Mode 2 below.**
 
 ---
 
@@ -204,7 +237,9 @@ Which update mode would you like to use?
 
 **Update-specific additions:**
 - **Update citations:** Search for latest authoritative sources (official docs, recent editions)
-- **Output:** `practices/<name>/01-analysis-report.md` (OVERWRITE existing if present)
+- **Output directory:** `practices/<name>/` for extension practices, `baselines/<name>/` for baselines
+- **Output:** `<dir>/01-analysis-report.md` (OVERWRITE existing if present)
+- **Baselines only:** Also run Phase 1.5 distillation after Phase 1 (output: `<dir>/01.5-distilled-essentials.md`)
 - **Comparison:** Note major differences from existing JSON content, inform user if significant restructuring needed
 
 **Validation:** Apply Phase 1 Completion Validation from generate-method skill (lines 304-340)
@@ -330,10 +365,10 @@ python3 utils/extract-practice-content.py practices/<name>/<name>.json
 Generate a structured diff showing changes:
 
 ```bash
-python3 utils/compare-practice-json.py <old-file>.json <new-file>.json
+python3 utils/diff-practice-json.py <old-file>.json <new-file>.json --json
 ```
 
-This compares element counts (alphas, workProducts, activities, patterns, citations, personas, assets), diffs competency level names, lists aliases in the new file, and reports added/removed elements by name. Output is structured JSON.
+This compares scalar fields, element counts across all sections, diffs competency level names, lists aliases, and reports added/removed elements by name. Use `--changes-only` for human-readable output showing only changed sections.
 
 ---
 
@@ -367,35 +402,9 @@ This compares element counts (alphas, workProducts, activities, patterns, citati
 
 **When updating practices, ensure these latest requirements from generate-method are met:**
 
-### Reference: generate-method Quality Gates
+### Quality Requirements
 
-**Apply ALL quality gates and validation checks from generate-method skill:**
-
-- **Primary Alpha Focus** (generate-method lines 2092-2217, CLAUDE.md lines 150-192)
-  - See "Practice vs Method Handling" section in generate-method skill
-  
-- **Competency Level Validation** (generate-method lines 733-738, 1220-1237, 1461-1556)
-  - See "Critical Mapping Rules" in generate-method skill
-  
-- **Terminology Aliases** (generate-method lines 410-728)
-  - See "Terminology Aliasing" section in generate-method skill
-  
-- **Pattern Completeness** (generate-method lines 878-1133)
-  - See "Pattern Completeness Requirements" section in generate-method skill
-  
-- **Alpha Relationships** (generate-method lines 737-763)
-  - See "Semantic Relationships" in Critical Mapping Rules
-  
-- **Discriminator Property** (generate-method lines 1406, 1421-1424)
-  - See "Critical JSON Rules" in generate-method skill
-  
-- **PracticeElement Name Uniqueness** (generate-method lines 1430-1440, 1502-1506)
-  - See "Quality Gates" in generate-method skill
-  
-- **Schema Compliance** (generate-method lines 1419-1467)
-  - See "Quality Gates" and validation checklist in generate-method skill
-
-**Complete Checklist:** Use generate-method Phase 2 Quality Gates (lines 1135-1183) and Phase 3 Quality Gates (lines 1419-1467)
+All quality requirements from the `generate-method` skill apply. Use the eval harness to validate rather than manual checklists — see Post-Update Validation below.
 
 ---
 
@@ -459,29 +468,29 @@ The updated JSON is schema-compliant and ready for use."
 **IMPORTANT:** Before overwriting existing files, create backups:
 
 ```bash
-python3 utils/backup-practice.py practices/<name>/
+python3 utils/backup-practice.py <directory>/
 ```
 
-This creates a `backup-YYYYMMDD-HHMMSS/` directory inside the practice folder and copies all JSON and markdown files. Output is structured JSON reporting the backup location and files copied.
-
-**Tell user about backup location** before starting update process.
+This creates a `backup-YYYYMMDD-HHMMSS/` directory inside the practice/baseline folder and copies all JSON and markdown files. Output is structured JSON reporting the backup location and files copied.
 
 ---
 
-## Validation Checklist
+## Post-Update Validation
 
-After update, verify:
+After any update, run the eval harness to confirm clean state:
 
-- [ ] Discriminator property present (`kind`)
-- [ ] Primary alpha identified and documented
-- [ ] Competency level names match baseline
-- [ ] Aliases array populated (3-8 entries)
-- [ ] Pattern matrices complete (N×M)
-- [ ] PracticeElement names globally unique
-- [ ] Schema validation: 0 errors
-- [ ] Baseline validation: 0 errors
-- [ ] Internal integrity: 0 errors
-- [ ] Comparison report generated
+**For extension practices:**
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ \
+  --baseline <baseline.json> --schema deps/language.schema.json --summary
+```
+
+**For baselines:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
+```
+
+**Expected result:** `error_pass_rate: 1.0`. Warning assertions are advisory — address where practical.
 
 ---
 
@@ -551,13 +560,186 @@ After update, verify:
 4. Create orchestration practice if needed
 5. Generate separate practice JSONs
 
+### Scenario 5: Quality Improvements (Checklist Names, Asset Coverage, Citations)
+
+**Symptoms:**
+- Checklist names are sentence fragments or truncated at 50 characters
+- NarrativeTypes/Focuses lack icon assets
+- Narratives don't reference citations via `citationNames`
+
+**Update Mode:** Auto-fix first (citations, truncation stopgap), then Remap if quality issues remain
+
+**Process:**
+1. Run assessment — detects quality issues
+2. Auto-fix: narrative citations linked, truncated names expanded
+3. Re-assess: if echo/duplicate names or asset gaps remain → remap
+4. Remap: rewrite checklist names as noun phrases, add Font Awesome icons
+5. Re-assess to confirm clean state
+
+### Scenario 6: Citation Name Format (Author-Date → Work Title)
+
+**Symptoms:**
+- Assessment flags `citation-name-format` warnings
+- Citation names use author-date shorthand (e.g., `"Teece (2007)"`) instead of work titles
+
+**Update Mode:** Auto-fix using existing utilities (no remap needed)
+
+**Process:**
+1. Inspect citation metadata to determine correct titles:
+   ```bash
+   python3 utils/extract-reference-names.py <file.json> --sections citations --citation-details
+   ```
+2. For each flagged citation, determine the correct work title from the `description` and `source` fields
+3. Apply renames using `fix-citation-names.py`:
+   ```bash
+   python3 utils/fix-citation-names.py <file.json> --rename "Teece (2007)=Dynamic Capabilities and Strategic Management" --rename "Osterwalder (2010)=Business Model Generation"
+   ```
+   Or for many renames, create a rename map JSON file and use `--map`:
+   ```bash
+   python3 utils/fix-citation-names.py <file.json> --map <rename-map.json>
+   ```
+   Rename map format: `{"renames": [{"old": "Author (Year)", "new": "Work Title"}, ...]}`
+4. Re-assess to confirm `citation-name-format` warnings are resolved
+
+---
+
+## Remap Phase: Checklist Name Quality
+
+When assessment flags `checklist-quality` issues with names that echo or duplicate their descriptions, the remap phase must rewrite checklist names to proper noun-phrase labels.
+
+**Current (bad) patterns:**
+- Sentence fragment: `"Pests and diseases identified accurately using field guides"`
+- Truncated at 50 chars: `"Surveillance protocols established for high-risk p"`
+- Duplicate of description: name == description verbatim
+
+**Target pattern:**
+- Short Title Case noun phrase: `"Pest & Disease Identification Accuracy"`
+
+**Rules for checklist name rewriting:**
+1. Names MUST be short noun phrases in Title Case (3-8 words)
+2. Names MUST NOT be sentences or verb-led phrases
+3. Names MUST NOT duplicate or echo the description
+4. Names SHOULD capture WHAT is being checked, not HOW
+5. Descriptions remain as full sentences explaining the criterion — do not modify descriptions
+
+**Transformation examples:**
+
+| Original Name | Rewritten Name |
+|---|---|
+| Taxonomic keys used correctly | Taxonomic Key Accuracy |
+| Cultivar authenticity verified | Cultivar Authenticity Verification |
+| Light-photosynthesis relationship understood | Light-Photosynthesis Competency |
+| Populations quantified using standard metrics | Population Quantification Standards |
+| Structural load analysis completed | Structural Load Analysis |
+| Inspections scheduled weekly or more frequently du... | Inspection Scheduling Frequency |
+| Surveillance protocols established for high-risk p... | High-Risk Pathway Surveillance |
+
+**Process during remap:**
+1. Read all checklist items across all alphas and states
+2. For each item where name echoes/duplicates description: rewrite name as a Title Case noun phrase
+3. Ensure names remain unique within each state's checklist
+4. Preserve descriptions unchanged (they provide the detailed criterion)
+5. Apply consistently across all alphas — don't fix some and leave others
+
+---
+
+## Remap Phase: Asset Coverage
+
+When assessment flags `asset-coverage` issues, the remap phase must add icon assets for element types with coverage gaps (typically NarrativeTypes and Focuses).
+
+**Font Awesome 6 Free icon selection guidance:**
+
+All icons use these standard fields:
+- `fontFamily`: `"Font Awesome 6 Free"`
+- `fontWeight`: `"900"` (solid style)
+- Asset `type`: `"font-character"`
+- Naming convention: `<kebab-case-element-name>-icon`
+
+**AssetReference on elements:**
+```json
+"assetNames": [{"assetName": "<asset-name>-icon", "type": "icon"}]
+```
+
+**Process during remap:**
+1. For each NarrativeType without `assetNames`:
+   a. Choose an appropriate Font Awesome icon based on the narrative type's name/purpose
+   b. Create an Asset definition in the top-level `assets[]` array
+   c. Add `assetNames` to the NarrativeType element
+2. Repeat for each Focus without `assetNames`
+3. Verify all `assetName` references resolve to entries in `assets[]`
+
+**Common icon suggestions (adapt to domain):**
+
+| Element Type / Name | Suggested `fontCharacter` |
+|---|---|
+| NarrativeType "Hero's Journey" | `fa-route` |
+| NarrativeType "STAR" | `fa-star` |
+| NarrativeType "Three-Act Structure" | `fa-theater-masks` |
+| NarrativeType "StoryBrand" | `fa-bullhorn` |
+| NarrativeType "Seasonal Progression" | `fa-calendar-alt` |
+| NarrativeType "Citation Standard" | `fa-quote-right` |
+| Focus "Value" / business-oriented | `fa-chart-line` |
+| Focus "Solution" / technical | `fa-cogs` |
+| Focus "Endeavor" / organizational | `fa-people-group` |
+| Focus (biological/natural) | `fa-dna` |
+| Focus (operations/production) | `fa-industry` |
+| Focus (professional/practice) | `fa-user-tie` |
+
+**Asset definition example:**
+```json
+{
+  "name": "heros-journey-narrative-type-icon",
+  "type": "font-character",
+  "description": "Hero's Journey narrative type icon",
+  "fontFamily": "Font Awesome 6 Free",
+  "fontCharacter": "fa-route",
+  "fontWeight": "900"
+}
+```
+
 ---
 
 ## Key Principles
 
-1. **Preserve Content** - Retain all valuable analysis, activities, narratives unless superseded
-2. **Apply Latest Guidance** - Use current generate-method best practices
-3. **Validate Rigorously** - Ensure schema, baseline, and internal integrity
-4. **Report Changes** - Show user what was updated and why
-5. **Backup First** - Never overwrite without backup
-6. **User Choice** - Let user decide between full reanalysis and remap/regenerate
+1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
+2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.
+   - Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
+   - Resolve all dependencies: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
+   - List available files: `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)
+   - Narrative inspection: `python3 utils/extract-reference-names.py <file>.json --sections narratives` (top-level) or `--narrative-placement` (all elements) or `--narrative-content` (with descriptions and first context)
+   - Aliases/citations/types: `python3 utils/extract-reference-names.py <file>.json --sections aliases narrativeTypes citations`
+   - Baseline/parent narrative types and elements: `python3 utils/extract-reference-names.py <baseline-or-parent>.json --sections narrativeTypes` (shows type names with their narrative elements)
+   - Specific narrative type definitions (full JSON): `python3 utils/extract-reference-names.py <file>.json --sections narrativeTypes --narrative-type-names "STAR" "Technique"` (dumps complete JSON for named types)
+   - Find all references to an element: `python3 utils/extract-reference-names.py <file>.json --find-refs "Platform"` (searches alphas, activities, workProducts, patterns, aliases)
+   - Narrative contexts by element: `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls"` (all contexts for a specific narrative element)
+   - Long narrative contexts: `python3 utils/extract-reference-names.py <file>.json --long-contexts` (contexts exceeding 3 sentences, truncated)
+   - Long contexts with full text: `python3 utils/extract-reference-names.py <file>.json --long-contexts --full-text` (full context text, no truncation)
+   - Context element with full text: `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls" --full-text` (full text, no truncation)
+   - Parent practice activity narratives: `python3 utils/extract-reference-names.py <parent>.json --sections activities --activity-details` (shows narrative types and elements per activity)
+   - Full assessment: `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json]`
+   - Compare two versions: `python3 utils/diff-practice-json.py old.json new.json` (structural diff: count deltas, added/removed elements)
+   - Compare (changes only): `python3 utils/diff-practice-json.py old.json new.json --changes-only`
+   - Assessment with parent: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <parent>.json` (merges parent elements into baseline for validation)
+   - Assessment summary: `python3 utils/assess-practice.py <file>.json --summary` (counts by severity/category, suggested mode)
+   - Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only` (filter to only severity=error issues)
+   - Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure` (type and count/length for each key)
+   - Cross-practice method audit: `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json` (alpha refs, duplicates, persona consistency)
+   - Add missing alpha redeclaration: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" [--fix]`
+   - Remap alpha references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old Alpha" "New Alpha" --state-map '{"OldState":"NewState"}' [--fix]`
+   - Remove alpha and references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remove-alpha "Alpha Name" [--fix]`
+   - Assemble method with merged assets: `python3 utils/assemble-method-json.py --name "Name" --baseline-name "Baseline" --practices p1.json p2.json -o method.json --merge-assets`
+   - JSON patching — set key: `python3 utils/patch-practice-json.py <target>.json --set-key assets --patch-file assets.json`
+   - JSON patching — merge at root: `python3 utils/patch-practice-json.py <target>.json --patch-file patch.json`
+   - JSON patching — append to array: `python3 utils/patch-practice-json.py <target>.json --append-key assets --patch-file more-assets.json`
+   - JSON patching — named element: `python3 utils/patch-practice-json.py <target>.json --element-path "alphas[Platform]" --patch-file patch.json`
+   - JSON patching — field match: `python3 utils/patch-practice-json.py <target>.json --element-path "activities[My Activity].narratives[0].narrativeContexts[narrativeElementName=Common Pitfalls]" --patch-file patch.json`
+   - JSON patching — create new: `python3 utils/patch-practice-json.py <new>.json --patch-file skeleton.json --create`
+   - JSON patching — delete key: `python3 utils/patch-practice-json.py <target>.json --delete-key kind`
+   - JSON patching — deep replace: `python3 utils/patch-practice-json.py <target>.json --replace "old text" "new text"`
+   - JSON patching — bulk replace: `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
+   - JSON patching — preview: add `--dry-run` to any patch command
+   - These commands work on ANY JSON file — practice, method, baseline, `_effective-baseline.json`, or `_effective-parent.json`
+3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
+4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
+5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.
+6. **Report Changes** — Show what was fixed and what remains.

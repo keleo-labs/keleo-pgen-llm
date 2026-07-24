@@ -4,6 +4,10 @@
 import argparse
 import json
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils._shared import load_json
 
 
 def extract_metadata(data):
@@ -237,12 +241,7 @@ def main():
     )
     args = parser.parse_args()
 
-    try:
-        with open(args.file) as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(json.dumps({"error": str(e)}))
-        sys.exit(1)
+    data = load_json(args.file)
 
     if data.get("kind") == "method" and "practices" in data:
         practices = data.get("practices", [])

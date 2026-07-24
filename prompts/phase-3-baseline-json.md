@@ -242,6 +242,21 @@ From mapping guide Alphas section:
             "Checklist item 3 from mapping guide criteria"
           ]
         }
+      ],
+      "narratives": [
+        {
+          "name": "Subject-matter focused name (NOT 'Alpha Name Narrative')",
+          "description": "What this narrative covers (NOT 'The X narrative for the Y alpha')",
+          "narrativeTypeName": "Narrative type name from Step 4",
+          "narrativeContexts": [
+            {
+              "seq": 1,
+              "narrativeElementName": "Element name from narrative type",
+              "context": "2-3 sentences of direct content"
+            }
+          ],
+          "citationNames": ["Citation Name 1", "Citation Name 2"]
+        }
       ]
     }
   ]
@@ -286,7 +301,8 @@ From mapping guide ActivitySpaces section:
       "requiredCompetencies": [
         "Competency name 1 (must exist in Step 5 competencies array)",
         "Competency name 2"
-      ]
+      ],
+      "narratives": [...]  // Optional — same structure as alpha narratives
     }
   ]
 }
@@ -302,41 +318,46 @@ From mapping guide ActivitySpaces section:
 
 **Add to JSON skeleton.**
 
-### Step 8: Build Narratives Array
+### Step 8: Build Baseline-Level Narratives
 
-**Transform mapping guide Narratives to JSON structure.**
+**Add ONLY baseline-level narratives to the top-level `narratives[]` array.**
 
-From mapping guide Narratives section:
+Element-specific narratives (for alphas, activitySpaces, etc.) should already be embedded on those elements' own `narratives[]` property in Steps 6-7. The top-level `narratives[]` array is reserved for narratives that describe the baseline practice itself.
+
+From mapping guide Narratives section (baseline-level entries only):
 
 ```json
 {
   "narratives": [
     {
-      "targetElementName": "Element name (baseline | alpha name | activitySpace name | competency name)",
-      "narrativeTypeName": "Narrative type name (must exist in Step 4 narrativeTypes)",
+      "name": "Subject-matter title for baseline narrative",
+      "description": "What the baseline narrative covers",
+      "narrativeTypeName": "Narrative type from Step 4",
       "narrativeContexts": [
         {
-          "narrativeElementName": "Element name from narrative type",
-          "contextText": "2-3 sentences mapping target to this element"
+          "seq": 1,
+          "narrativeElementName": "Element from narrative type",
+          "context": "2-3 sentences of direct content (NO self-references)"
         }
-      ]
+      ],
+      "citationNames": ["Citation Name 1"]
     }
   ]
 }
 ```
 
-**targetElementName Values:**
-- Baseline itself: Use baseline practice name (e.g., "Partner Ecosystem Essentials")
-- Alpha: Use alpha name (e.g., "Partner Value")
-- AlphaState: Use `"AlphaName.StateName"` format (e.g., "Partner Value.Optimized")
-- ActivitySpace: Use activity space name (e.g., "Establish Value Proposition")
-- Competency: Use competency name (e.g., "Partnership Management")
+**Narrative Placement Rules:**
+- **Baseline-level narratives** (describing the practice as a whole) go in the top-level `narratives[]` array (this step)
+- **Alpha narratives** go in each alpha's `narratives[]` property (Step 6)
+- **ActivitySpace narratives** go in each activitySpace's `narratives[]` property (Step 7)
 
 **Quality Checks:**
 - ✓ Baseline-level narrative present (REQUIRED)
+- ✓ Narrative names describe subject matter (NOT "X Narrative" or "The Y narrative for Z")
+- ✓ Narrative descriptions explain content (NOT "The STAR/Three-Act/ABT narrative for...")
+- ✓ All narratives have `citationNames` referencing relevant citations from Step 9
 - ✓ All `narrativeTypeName` references exist in Step 4 narrativeTypes
 - ✓ All `narrativeElementName` references exist in the narrative type's narrativeElements
-- ✓ All `targetElementName` values reference valid elements (baseline, alphas, activitySpaces, competencies)
 - ✓ narrativeContexts provide substantive content (not generic placeholders)
 
 **Add to JSON skeleton.**
@@ -379,6 +400,7 @@ Citations use the "Citation Standard" narrative type with Author/Date/Title/Sour
 **Quality Checks:**
 - ✓ All citations use `"narrativeTypeName": "Citation Standard"`
 - ✓ Each citation has Author, Date, Title, Source elements
+- ✓ The citation `name` field MUST be the **title of the work** (e.g., "Team Topologies", "Accelerate"), NOT an author-date shorthand like "Skelton and Pais (2019)" or "Forsgren et al. (2018)". Authors have their own element.
 - ✓ Dates in consistent format (YYYY-MM-DD or YYYY)
 - ✓ Sources include URLs, DOIs, or ISBN when available
 

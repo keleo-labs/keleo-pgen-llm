@@ -191,13 +191,15 @@ For each practice identified in Phase 1:
 For each citation from Phase 1:
 - Extract to standard Citation format:
   ```
-  Name: Exact source title
+  Name: Exact source title (e.g., "Business Model Generation", NOT "Osterwalder (2010)")
   Description: 1 sentence summary
   Authors: [array of author names]
   Date: Publication year
   Source: Publisher/journal
   URL: Retrieval URL (if applicable)
   ```
+
+**CRITICAL — Citation Name Rule:** The `Name` MUST be the **title of the work**, NOT an author-date shorthand. Author names belong only in the Authors field.
 
 **CRITICAL:** Citations have NO narratives property (metadata only)
 

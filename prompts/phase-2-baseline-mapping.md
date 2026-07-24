@@ -362,39 +362,66 @@ Total: [X narrative types]
 1. **Baseline-Level Narrative** (REQUIRED)
    - Overall baseline practice journey
    - Use macro-level narrative type (Hero's Journey, custom journey)
+   - **Placement**: Top-level `narratives[]` array in JSON output
 
 2. **Alpha-Level Narratives** (optional, for key alphas)
    - Alpha progression story
    - Use appropriate narrative type (STAR, Three-Act, etc.)
+   - **Placement**: Embedded on the alpha's own `narratives[]` property
 
 3. **Alpha State Narratives** (optional, for critical states)
    - State achievement story
    - Use micro-narrative type (ABT)
+   - **Placement**: Embedded on the alpha state's own `narratives[]` property
 
 4. **ActivitySpace Narratives** (optional, for complex activity spaces)
    - Activity space execution story
    - Use tactical narrative type (STAR)
+   - **Placement**: Embedded on the activitySpace's own `narratives[]` property
 
 5. **Competency Narratives** (optional)
    - Competency development journey
    - Use progression narrative
+   - **Placement**: Embedded on the competency's own `narratives[]` property
+
+**PLACEMENT RULE:** Element-specific narratives are embedded on the element's own `narratives[]` property in the JSON output, NOT in a flat top-level narratives array. Only the baseline-level narrative goes in the top-level `narratives[]` array. The Target field below indicates where Phase 3 should place each narrative.
 
 **Narrative Structure:**
 
 ```markdown
-### Narrative: [Target element name]
+### Narrative: [Descriptive name for the narrative subject]
 - **Target**: [baseline | Alpha: [name] | AlphaState: [alpha].[state] | ActivitySpace: [name] | Competency: [name]]
+  - `Target: baseline` → goes in top-level `narratives[]`
+  - `Target: Alpha: [name]` → goes in that alpha's `narratives[]` property
+  - `Target: ActivitySpace: [name]` → goes in that activitySpace's `narratives[]` property
+  - `Target: Competency: [name]` → goes in that competency's `narratives[]` property
 - **Narrative Type**: [Name from Step 7]
+- **Citation Names**: [list of Citation.name values referenced in this narrative's content]
 - **Element Mapping**:
   - **[Narrative Element 1]**: [2-3 sentences mapping target to this element]
   - **[Narrative Element 2]**: [2-3 sentences mapping target to this element]
   - **[Narrative Element 3]**: [2-3 sentences mapping target to this element]
 ```
 
+**CRITICAL: Narrative Naming Rules**
+- Narrative names MUST describe the subject matter, NOT reference the narrative type
+  - WRONG: "Digital Strategy Narrative", "The STAR Narrative for Business Model"
+  - CORRECT: "From Reactive to Adaptive Strategy", "Pipeline to Platform Transition"
+- Narrative descriptions MUST describe what the narrative covers, NOT the narrative template
+  - WRONG: "The STAR narrative for the Business Model alpha."
+  - CORRECT: "How organizations evolve from pipeline models to platform economics through structured experimentation."
+- Narrative contexts MUST contain direct content, NOT self-references
+  - WRONG: "In this Hero's Journey narrative, organizations embark on..."
+  - CORRECT: "Organizations face accelerating competitive pressure from platform-native competitors..."
+
 **Quality Checks:**
 - ✓ Baseline-level narrative present (REQUIRED)
 - ✓ All referenced narrative types exist in Step 7
 - ✓ Element mappings provide substantive context (not generic)
+- ✓ All narratives include Citation Names referencing relevant citations
+- ✓ Narrative names describe subject matter, not narrative type
+- ✓ Narrative descriptions and contexts contain direct content, not self-references
+- ✓ Element-specific narratives are marked with correct Target for embedding on the element
 
 **Output Format:**
 
@@ -402,6 +429,8 @@ Total: [X narrative types]
 ## Narratives
 
 Total: [X narratives]
+- Top-level (baseline): [Y]
+- Element-embedded: [Z] (alphas, activitySpaces, competencies)
 
 [Narrative sections as described above]
 ```
@@ -413,7 +442,7 @@ Total: [X narratives]
 Use **Citation Standard** narrative type:
 
 ```markdown
-### Citation: [Author Last Name] ([Year])
+### Citation: [Full Title of Work]
 - **Target**: [baseline | specific element]
 - **Narrative Type**: Citation Standard
 - **Element Mapping**:
@@ -422,6 +451,8 @@ Use **Citation Standard** narrative type:
   - **Title**: [Full title]
   - **Source**: [Publisher, journal, URL, or DOI]
 ```
+
+**CRITICAL — Citation Name Rule:** The citation heading (and resulting `name` field) MUST be the **title of the work** (e.g., "Business Model Generation", "Dynamic Capabilities and Strategic Management"), NOT an author-date shorthand (e.g., "Osterwalder (2010)", "Teece (2007)"). Author names belong in the Author element only.
 
 **Quality Checks:**
 - ✓ Prioritize authoritative sources (primary methodology creators)

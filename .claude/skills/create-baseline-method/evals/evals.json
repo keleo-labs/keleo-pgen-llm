@@ -1,0 +1,35 @@
+{
+  "skill_name": "create-baseline-method",
+  "schema": "deps/language.schema.json",
+  "evals": [
+    {
+      "id": 1,
+      "name": "horticulture-essentials",
+      "prompt": "Create a baseline practice for horticulture management.",
+      "expected_output": "Baseline practice with custom focuses, 8-15 foundational alphas, 6-12 activity spaces, 5-10 competencies.",
+      "directory": "baselines/horticulture-essentials"
+    },
+    {
+      "id": 2,
+      "name": "digital-transformation-essentials",
+      "prompt": "Create a baseline practice for digital transformation.",
+      "expected_output": "Baseline practice covering digital transformation concerns with custom focus areas.",
+      "directory": "baselines/digital-transformation-essentials"
+    },
+    {
+      "id": 3,
+      "name": "infrastructure-automation-essentials",
+      "prompt": "Create a baseline practice for infrastructure automation.",
+      "expected_output": "Baseline practice with infrastructure automation domain-specific focuses and alphas.",
+      "directory": "baselines/infrastructure-automation-essentials"
+    },
+    {
+      "id": 4,
+      "name": "idp-essentials",
+      "prompt": "Create a baseline practice for IDP extending Platform Adoption Essentials.",
+      "expected_output": "Child baseline extending PAK with IDP-specific focuses, alphas, and competencies.",
+      "directory": "baselines/idp-essentials",
+      "parent": "deps/platform-adoption-kernel.json"
+    }
+  ]
+}

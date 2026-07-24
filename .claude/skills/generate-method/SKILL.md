@@ -102,11 +102,18 @@ In plan mode:
 
 2. **Identify baseline or parent practice:**
    - Ask user which baseline OR parent practice/method to use
-   - Default suggestion: `deps/platform-adoption-kernel.json` (baseline)
-   - Validate file exists and is valid JSON
+   - User can provide either a **file path** or a **name** (e.g., "Platform Adoption Essentials")
+   - **Auto-discover by name:** If user provides a name (no `/`, doesn't end in `.json`), resolve it:
+     ```bash
+     python3 utils/discover-dependencies.py --resolve "Name Provided By User"
+     ```
+     - `found` → use the resolved path
+     - `ambiguous` → present candidates to user, let them choose
+     - `not_found` → ask user for the file path
+   - **If path provided directly:** validate file exists and is valid JSON
    - **Detect input type:**
      ```bash
-     python3 utils/resolve-parent-practice.py <file.json> --check-only
+     python3 utils/resolve-parent-practice.py <resolved-path.json> --check-only
      ```
      - If `inputKind: "practiceBaseline"` → Standard baseline flow (proceed to Step 0.5)
      - If `inputKind: "practice"` or `"method"` → **Parent practice mode** (proceed to Step 0.25)
@@ -145,18 +152,28 @@ In plan mode:
    The `--check-only` output from Step 0 includes `baselinePracticeName`. This is the actual baseline that the parent practice extends.
 
 2. **Locate the actual baseline file:**
-   - Ask user for the baseline file path corresponding to the reported `baselinePracticeName`
-   - Default suggestion: check `deps/` directory for matching files
+   - Auto-discover the baseline by name:
+     ```bash
+     python3 utils/discover-dependencies.py --resolve "<baselinePracticeName from step 1>"
+     ```
+     - `found` → use the resolved path
+     - `not_found` → ask user for the file path
+     - `ambiguous` → present candidates to user
    - Validate the baseline file exists and its `name` property matches `baselinePracticeName`
 
 3. **Create effective parent:**
    ```bash
+   # Single parent
    python3 utils/resolve-parent-practice.py <parent.json> -o <output-dir>/_effective-parent.json
+
+   # Multiple parents (later files take precedence on name conflicts)
+   python3 utils/resolve-parent-practice.py <parent1.json> <parent2.json> -o <output-dir>/_effective-parent.json
    ```
    
    The utility:
    - For a **practice**: Outputs the practice directly as the effective parent
    - For a **method**: Unions all embedded practices' elements (alphas, activitySpaces, workProducts, patterns, etc.) using name-keyed merge
+   - **Multiple inputs**: Resolves each individually, then merges all into a combined effective parent
    - Applies `practiceElementAliases` as `_aliasContext` annotations (canonical names preserved in all structural positions)
    
    Report the effective parent composition to the user (alpha count, practice names, etc.).
@@ -190,31 +207,39 @@ In plan mode:
 
 **Process:**
 
-1. **Check for dependencies:**
+1. **Auto-discover all dependencies (including transitive):**
    ```bash
-   python3 utils/resolve-baseline.py <baseline-practice.json> --check-only -o /dev/null
+   python3 utils/discover-dependencies.py --resolve-from <baseline-practice.json> --transitive
    ```
-   This reports whether the baseline has `baselinePracticeNames` and lists any dependencies and aliases.
-   - If `hasDependencies: false`: **Skip this step.** Use the provided baseline file directly.
-   - If `hasDependencies: true`: Continue to step 2.
+   This scans `baselines/`, `practices/`, and `deps/` directories, reads `baselinePracticeNames` from the baseline and any transitive parents, and resolves them all by matching the JSON `name` property.
+   - If `summary.total: 0`: **Skip this step.** Use the provided baseline file directly.
+   - If all dependencies are `found`: proceed to confirmation step.
+   - If any are `not_found` or `ambiguous`: handle before confirming.
 
-2. **Report dependencies and ask user for files:**
-   The check-only output lists `dependencyNames`. Present them to the user:
-   ```
-   The baseline practice "<name>" declares dependencies on other baselines:
-   - <dependency-name-1>
-   - <dependency-name-2>
-   
-   Since there is no practice library, I need the JSON files for each dependency.
-   Please provide the file path for each:
-   1. <dependency-name-1>: ?
-   2. <dependency-name-2>: ?
-   ```
-   
-   **Wait for user to provide file paths before proceeding.**
+2. **Handle unresolved or ambiguous dependencies:**
+   - For `not_found` dependencies: ask the user for the file path
+   - For `ambiguous` dependencies: present candidates to user, let them choose
+   - Re-run discovery after user provides corrections to confirm resolution
 
-3. **Recursively check transitive dependencies:**
-   For each dependency file the user provides, run `--check-only` to see if it has its own `baselinePracticeNames`. If so, ask the user for those files too. Continue until all baselines in the chain have no further dependencies.
+3. **Confirm all resolved dependencies with user:**
+   Present ALL dependencies in a single summary before proceeding:
+   ```
+   === Dependency Resolution ===
+
+   Baseline: "<name>" (<kind>)
+     Path: <path>
+
+   Resolved Dependencies:
+     1. [baselinePractice] "<name>"
+        Path: <resolved-path>
+     2. [baselinePractice] "<transitive-name>" (transitive)
+        Path: <resolved-path>
+
+   All dependencies resolved. Please confirm or correct:
+   - "ok" to proceed
+   - "1=/correct/path.json" to correct a path
+   ```
+   **Wait for user confirmation before proceeding.**
 
 4. **Create effective baseline using the resolver utility:**
    ```bash
@@ -236,15 +261,7 @@ In plan mode:
 5. **Set effective baseline path:**
    For ALL subsequent steps (Step 1.5 through Step 3), use `<output-dir>/_effective-baseline.json` wherever the baseline file path is referenced for analysis and mapping. For **validation** (running `validate-practice-json.py`), always use the **original user-provided baseline file** — canonical names in the generated JSON must match the actual baseline, not the effective baseline annotations.
 
-**User Feedback:**
-- "Checking baseline for dependencies..."
-- "Baseline '<name>' depends on: [list]. Please provide file paths for each."
-- "Resolved dependency chain: Root → Layer1 → Leaf"
-- "Created effective baseline with N alphas (K aliased), M activitySpaces, J competencies"
-- "Domain terminology: 'Platform' → 'Automation Platform', 'Engineering' → 'Automation Engineering', etc."
-- "Using effective baseline for analysis/mapping phases. Canonical names will be used in generated JSON."
-
-**CRITICAL:** If ANY dependency file cannot be provided by the user, STOP and discuss alternatives. Do NOT proceed with an incomplete baseline — this will cause mapping errors and validation failures.
+**CRITICAL:** If ANY dependency file cannot be resolved or provided by the user, STOP and discuss alternatives. Do NOT proceed with an incomplete baseline — this will cause mapping errors and validation failures.
 
 **CRITICAL:** Extension practices MUST use canonical element names (from `practiceElementName`) in all structural references (`contributesTo`, `alphaName`, `stateName`, `competencyName`, etc.), not alias names (`aliasName`). The alias context helps the LLM understand domain semantics during analysis and mapping, but the generated JSON output always uses canonical names.
 
@@ -415,41 +432,19 @@ No conversational context is required - only file contents.
    - ~30-50K words structured markdown
    - Complete, no placeholders
 
-**Quality Gates:**
-- ✓ All four perspectives represented
-- ✓ Clear traceability: Outcomes → Concerns → States → Work Products → Activities
-- ✓ **Concern relationships documented:** Production, enablement, governance, information flows identified
-- ✓ Progressive states reflect source's natural maturity (not forced template)
-- ✓ Rich activity narratives with citations
-- ✓ Preliminary practice structure noted (final boundaries deferred to Phase 2)
+**Phase 1 Validation:**
+
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ --phase 1 --summary
+```
+
+Fix any FAIL assertions before proceeding to Step 1.5. If sections are missing, re-read source materials and generate missing content.
 
 **User Feedback:** Brief progress updates
 
 - "Analyzing source materials using four-perspective framework..."
 - "Extracted N concerns across M perspectives..."
 - "Phase 1 complete: Analysis report generated at practices/<name>/01-analysis-report.md"
-
-**CRITICAL: Phase 1 Completion Validation (REQUIRED)**
-
-After generating `01-analysis-report.md`, IMMEDIATELY validate completeness before proceeding to Phase 2:
-
-```bash
-python3 utils/validate-phase-output.py practices/<name>/01-analysis-report.md --phase 1
-```
-
-This checks: 8 required sections exist (Outcomes through Workflows), section count ≥8, numbered subsection count ≥5. Output is structured JSON with pass/fail per check.
-
-**If ANY section is missing:**
-1. Identify which sections are incomplete
-2. Review Phase 1 prompt requirements  
-3. Re-read source materials for missing content
-4. Generate missing sections BEFORE proceeding to Phase 2
-
-**Common Phase 1 Omissions:**
-- Activities section empty or with only 1-2 activities (should have 5-15)
-- Work products section missing or incomplete (should have 5-10)
-- Competencies section sparse (should have 5-10 domain-specific competencies)
-- Workflows section empty (should have 2-5 workflow patterns)
 
 ### Step 1.5: Practice Delineation Gate (Main Agent Only)
 
@@ -461,15 +456,19 @@ This checks: 8 required sections exist (Outcomes through Workflows), section cou
 
 1. **Load baseline practice JSON** (use effective baseline from Step 0.5 if dependencies were resolved, otherwise use the user-provided baseline directly):
    ```bash
-   python3 utils/inspect-practice-json.py <effective-baseline-or-baseline.json> --extract alphas
+   python3 utils/extract-reference-names.py <effective-baseline-or-baseline.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details
    ```
+   This shows all structural elements: focuses, alphas (with states, contributesTo, relatesTo), activitySpaces, competencies (with levels), and narrativeTypes (with elements).
+   
    If the effective baseline has `_aliasContext`, review domain aliases to understand the baseline's domain-specific terminology. Use canonical names for structural decisions, but let domain aliases inform your semantic understanding of each alpha's role.
 
    **Parent Practice Mode:** Also load the effective parent JSON:
    ```bash
-   python3 utils/inspect-practice-json.py <effective-parent.json> --extract alphas
+   python3 utils/extract-reference-names.py <effective-parent.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details
    ```
    Build a combined alpha index: parent practice alphas are the **primary mapping targets**; baseline alphas provide ontology context and support redeclarations of baseline-level concepts.
+   
+   **IMPORTANT:** Never use inline `python3 -c` scripts to inspect JSON structure. Use `extract-reference-names.py` with appropriate `--sections` and detail flags (`--alpha-details`, `--citation-details`, `--activity-details`, `--narrative-details`).
 
 2. **Map Phase 1 concerns to alphas:**
    
@@ -922,7 +921,7 @@ From `references/semantics.md`:
 
 - **EXACT COMPETENCY LEVEL NAMES:** All `competencyLevelName` values MUST exactly match CompetencyLevel.name from baseline practice for the specific competency
   - **Level names vary by competency** - each competency defines its own level progression
-  - **Extract baseline competency levels:** `python3 utils/inspect-practice-json.py <baseline-practice.json> --check competencies`
+  - **Extract baseline competency levels:** `python3 utils/extract-reference-names.py <baseline-practice.json> --sections competencies`
   - Example (Platform Adoption Essentials - Analysis competency): "Basic", "Applies", "Masters", "Adapts", "Innovating"
   - Common errors: "Advanced" (check baseline for actual name), "Expert" (check baseline), "Intermediate" (check baseline), "Beginner" (check baseline)
   - **Validate all competencyLevelName values in Phase 2 mapping guide against baseline competency levels**
@@ -970,11 +969,28 @@ From `references/semantics.md`:
 
 **CRITICAL: Narrative Content Rules**
 
-- **NEVER reference the narrative name, type, or framework within the narrative itself**
-- Narrative name/description are metadata - they identify the narrative structure externally
+- **NEVER reference the narrative type or framework in names, descriptions, OR contexts**
+- Narrative names MUST describe subject matter, NOT reference the template type
+  - WRONG: "Business Model Narrative", "The STAR Narrative for Platform"
+  - CORRECT: "Pipeline to Platform Transition", "Architectural Modernization Path"
+- Narrative descriptions MUST explain what the narrative covers, NOT the template structure
+  - WRONG: "The STAR narrative for the Business Model alpha."
+  - CORRECT: "How organizations evolve from pipeline models to platform economics through structured experimentation."
 - Narrative contexts contain the actual story content - they should NOT mention the narrative type
 - **WRONG**: "In this Hero's Journey narrative, organizations embark on..." or "This narrative describes..."
 - **CORRECT**: "Organizations operate with fragmented infrastructure..." (direct story content)
+
+**CRITICAL: Narrative Placement Rules**
+
+- Element-specific narratives MUST be embedded on their element's `narratives[]` property
+- Only practice/method-level narratives go in the top-level `narratives[]` array
+- WRONG: All narratives in a flat top-level array with ad-hoc element references
+- CORRECT: Alpha narratives on the alpha object, activity narratives on the activity object
+
+**CRITICAL: Narrative Citation Rules**
+
+- All narratives MUST include `citationNames` array referencing relevant citations
+- Citations provide provenance for the claims and frameworks referenced in the narrative
 
 From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
 
@@ -1065,6 +1081,9 @@ Practice Narrative:
 - [ ] All narrative contexts are 1-3 sentences (NOT paragraphs)
 - [ ] **Narrative contexts contain direct content (NO self-references to narrative type/name)**
 - [ ] Citations referenced in citationNames arrays
+- [ ] Narrative names describe subject matter (NOT "X Narrative" or template type references)
+- [ ] Narrative descriptions explain content (NOT "The STAR/ABT/Three-Act narrative for...")
+- [ ] Element-specific narratives placed on their elements, not in top-level array
 
 **CRITICAL: Pattern Completeness Requirements**
 
@@ -1328,110 +1347,22 @@ Pattern: Platform Evolution Journey (5 views)
 - Natural progression across all views ✓
 - **PASS - Pattern is complete and well-distributed**
 
-**Quality Gates:**
-- ✓ All Phase 1 concerns mapped to alphas
-- ✓ All new alphas have contributesTo
-- ✓ **Keywords identified (target: 10-20 terms)**
-  - ✓ Synonyms, acronyms, abbreviations, search terms
-  - ✓ Domain-specific product names and jargon
-- ✓ **Terminology aliases identified (target: 3-8 aliases)**
-  - ✓ ONE alias per PracticeElement (no duplicates for same element)
-  - ✓ Aliases prioritize specialized alphas and instances
-  - ✓ Domain canonical terms mapped (not multiple synonyms/acronyms)
-  - ✓ Synonyms/acronyms in keywords, not aliases
-  - ✓ Rationale provided for each alias
-- ✓ **All Phase 1 concern relationships mapped to alpha relatesTo arrays**
-- ✓ **relatesTo relationships use directionality pattern (provider perspective)**
-- ✓ All baseline references are exact canonical names
-- ✓ Tags use orthogonal structure
-- ✓ **Alpha-state-activity coverage validated:**
-  - ✓ Every alpha state (beyond initial) has ≥1 activity with contributesTo
-  - ✓ Gap analysis matrix created showing 100% coverage
-  - ✓ Inferred activities documented with rationale (source, parent alpha, or baseline pattern)
-  - ✓ Inferred activities have complete properties (contributesTo, worksOn, competencies, narrative)
-- ✓ **Pattern completeness validated:**
-  - ✓ Each alpha in pattern has state in EVERY PatternView (complete matrix)
-  - ✓ Final PatternView includes ALL pattern alphas (no omissions)
-  - ✓ States progress logically across views (early → late)
-  - ✓ Pattern matrix dimensions: N alphas × M views = N×M total alphaState entries
-  - ✓ **State distribution quality (Pass 4):**
-    - ✓ No alpha has more than 2 states in a single PatternView (prefer 1)
-    - ✓ If 3+ states detected → pattern views subdivided into finer granularity
-    - ✓ No alpha suddenly appears late with advanced state
-    - ✓ Late-appearing alphas backfilled with progressive states in earlier views
-- ✓ Validation checklist completely satisfied
+**Phase 2 Validation:**
+
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ --phase 2 --summary
+```
+
+Fix any FAIL assertions before proceeding to Phase 3. If sections are missing, read Phase 1 analysis for unmapped content and generate missing sections.
 
 **User Feedback:**
 - "Reading analysis report and loading baseline practice..."
-- "Identifying terminology aliases for domain alignment..."
 - "Mapping N concerns to alphas using redeclaration/specialization framework..."
 - "Conducting alpha-state-activity gap analysis..."
-- "Evaluating initial states: A null-point, B prepared positions requiring bootstrap activities..."
-- "Identified X alpha states requiring activities, Y covered, Z gaps - inferring missing activities..."
-- "Gap analysis complete: 100% alpha state coverage achieved (including B bootstrap activities)"
+- "Gap analysis complete: 100% alpha state coverage achieved"
 - "Constructing patterns using four-pass approach..."
-- "Pass 1: Extracted pattern structure from source (M views, N alphas)"
-- "Pass 2: Backfilled missing alpha states for complete matrix"
-- "Pass 3: Evaluated related alphas from practice/dependencies"
-- "Pass 4: Validated state distribution - detected K alphas with excessive states, subdivided views"
-- "Pass 4: Backfilled L late-appearing alphas with progressive states in earlier views"
 - "Pattern validation complete: N×M matrix with 1-2 states per alpha per view"
-- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md (includes N aliases, Z inferred activities, complete patterns)"
-
-**CRITICAL: Phase 2 Completion Validation (REQUIRED)**
-
-After generating `02-mapping-guide.md`, IMMEDIATELY validate completeness before proceeding to Phase 3:
-
-```bash
-python3 utils/validate-phase-output.py practices/<name>/02-mapping-guide.md --phase 2
-```
-
-This checks: 7 required sections exist (Keywords, Terminology Aliases, Alphas, Work Products, Activities, Patterns, Citations), element counts (activities ≥5, work products ≥3, alphas ≥3, patterns ≥1), and extracts competency level names found in the mapping guide. Output is structured JSON with pass/fail per check.
-
-**If competency level names are reported**, validate them against the baseline:
-```bash
-python3 utils/inspect-practice-json.py <baseline-practice.json> --check competencies
-```
-
-**If ANY section is missing or incomplete:**
-1. Identify which sections are missing
-2. Review Phase 2 prompt requirements
-3. Read Phase 1 analysis for content that wasn't mapped
-4. Generate missing sections BEFORE proceeding to Phase 3
-
-**If competency level name mismatches found:**
-1. Extract valid level names for each competency from baseline
-2. Review mapping guide and replace invalid level names with correct baseline names
-3. Common fixes:
-   - "Advanced" → "Masters" (for most competencies in Platform Adoption Essentials)
-   - "Expert" → "Innovating"
-   - "Intermediate" → "Applies"
-   - "Beginner" or "Novice" → "Basic"
-
-**Common Phase 2 Omissions:**
-- **Activities section missing entirely** (CRITICAL - causes Phase 3 JSON to have 0 activities)
-- **Work Products section incomplete** (missing new work products beyond baseline)
-- Keywords or Terminology Aliases sections empty
-- Patterns section with incomplete matrices
-- Activities section with only 2-3 activities when Phase 1 identified 10+
-
-**Phase 2 Recovery Actions:**
-- If Activities missing: Generate complete Activities section from Phase 1 activities list
-- If Work Products incomplete: Generate New Work Products section from Phase 1 work products
-- If Patterns incomplete: Apply THREE-PASS pattern construction for complete matrix
-- If Keywords/Aliases empty: Review source terminology and apply decision tree
-
-**Post-Assembly Verification Checklist (for methods):**
-
-After assembling method JSON, verify BEFORE full validation:
-
-```bash
-python3 utils/inspect-practice-json.py practices/<method-name>/<method-name>.json --check kind,required
-```
-
-This checks: `kind: "method"` at root, `kind: "practice"` in each embedded practice, and required root properties (name, description, baselinePracticeName, narratives).
-
-If `kind` is missing, add it using the Edit tool to insert `"kind": "method"` at the root level of the JSON file.
+- "Phase 2 complete: Mapping guide generated at practices/<name>/02-mapping-guide.md"
 
 If `narratives` is missing, review Phase 1 analysis for overarching lifecycle and add method narrative.
 
@@ -1524,21 +1455,12 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - **CRITICAL:** Ensure `"kind": "method"` is at root level (required discriminator property)
    - **CRITICAL:** Add method-level narrative from Phase 1 analysis (usually "The Cycle" or similar framework)
    - Merge citations from all practices (deduplicate)
-   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` - check with: `python3 utils/inspect-practice-json.py <file>.json --check kind`
+   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` — verified by `python3 utils/assess-practice.py <file>.json`
    - If any practice has `"kind": null`, the individual practice JSON generation omitted it - add it during assembly
 
 **Step 3C: Validation and Fixes**
 
-5. **Pre-validation checks (BEFORE running validator):**
-   - ✓ Verify `"kind": "method"` exists at root level
-   - ✓ Verify `"kind": "practice"` exists in each embedded practice
-   - ✓ Verify `name` and `description` exist at root level
-   - ✓ Verify `baselinePracticeName` exists at root level
-   - ✓ Verify `practices` array exists and has expected count
-   - ✓ **Verify `narratives` array exists with method-level narrative** (from Phase 1 overarching lifecycle)
-   - ✓ **Verify `citationNames` match actual citation `name` values** (use exact citation names, not kebab-case IDs)
-   
-6. **Validate method JSON** (always use the **original user-provided baseline**, not the effective baseline — generated JSON uses canonical names):
+5. **Validate method JSON** (always use the **original user-provided baseline**, not the effective baseline — generated JSON uses canonical names):
    ```bash
    python3 utils/validate-practice-json.py \
      practices/<method-name>/<method-name>.json \
@@ -1546,13 +1468,22 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
      deps/language.schema.json
    ```
 
-7. **Fix errors:**
-   - Schema violations (property names, types)
-   - **Missing `kind` property** (add "kind": "method" at root, "kind": "practice" in practices)
-   - **Citation name mismatches** (replace kebab-case IDs with exact citation names from citations array)
-   - Cross-practice references (if any)
-   - Missing properties
-   - Iterate until 0 errors
+6. **Audit cross-practice references** (methods only):
+   ```bash
+   python3 utils/audit-method-references.py \
+     practices/<method-name>/<method-name>.json \
+     --baseline <effective-baseline.json>
+   ```
+
+7. **Fix errors** — iterate until 0 errors. Common alpha-level fixes:
+   ```bash
+   # Add missing baseline alpha redeclaration
+   python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" --fix
+   # Remap references from one alpha to another
+   python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old" "New" --state-map '{"OldState":"NewState"}' --fix
+   # Quick error check after fixes
+   python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --errors-only
+   ```
 
 **Critical: Multi-Agent Benefits for Phase 3**
 - ✅ Each practice generated independently (no shared token budget)
@@ -1574,142 +1505,24 @@ From `deps/language.schema.json`:
 - **LOD contributesTo:** REQUIRED on every LevelOfDetail
 - **Tags structure:** Nested object {domainTags, lifecycleTags, organizationalTags}, NOT flat array
 
-**Quality Gates:**
-- ✓ Valid JSON syntax (jq empty passes)
-- ✓ **Required discriminator properties (CHECK FIRST, BEFORE schema validation):**
-  - ✓ Practice JSON: `"kind": "practice"` at root level
-  - ✓ Method JSON: `"kind": "method"` at root level AND `"kind": "practice"` in each practices array element
-  - ✓ Verify with: `python3 utils/inspect-practice-json.py <file>.json --check kind`
-- ✓ Schema validation: 0 errors
-- ✓ Baseline validation: 0 errors
-- ✓ Internal integrity: 0 errors
-- ✓ All Phase 2 content in JSON
-- ✓ No floating alphas
-- ✓ **PracticeElement name global uniqueness (CRITICAL - Run BEFORE schema validation):**
-  - ✓ **All PracticeElement names MUST be globally unique across the entire practice**
-  - ✓ This includes: Alphas, WorkProducts, Activities, Personas, Patterns, PatternViews, ActivitySpaces, Assets
-  - ✓ **NO name may appear in more than one element type** (e.g., cannot have both Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
-  - ✓ Verify with: `python3 utils/inspect-practice-json.py <file>.json --check uniqueness`
-  - ✓ **If duplicates found:** Rename elements to disambiguate
-    - Common pattern: Add element-type suffix to most specific element
-    - Example: Alpha "Inference Service Configuration" + WorkProduct "Inference Service Configuration" → rename WorkProduct to "Inference Service Configuration File"
-    - Example: Alpha "Platform" + Activity "Platform" → rename Activity to "Build Platform" or "Deploy Platform"
-    - Update ALL references to renamed element (alphaName, workProductName, activityName in contributesTo/worksOn/etc.)
-- ✓ **Aliases array populated from mapping guide:**
-  - ✓ 3-8 aliases (ONE per element, no duplicates)
-  - ✓ Aliases prioritize specialized alphas and instances
-  - ✓ elementType and name use canonical baseline names
-  - ✓ aliasName contains domain-specific canonical term
-  - ✓ Aliases NOT used in structural references (alphaName, activitySpaceName, etc.)
-- ✓ **Pattern matrix completeness:**
-  - ✓ Count pattern dimensions: N alphas appearing across all views
-  - ✓ Verify total alphaState entries = N × M (where M = number of PatternViews)
-  - ✓ Check final PatternView contains all N alphas
-  - ✓ No missing cells in pattern matrix
-- ✓ **Competency level names match baseline (CRITICAL - Run BEFORE schema validation):**
-  - ✓ **All competencyLevelName values MUST exactly match CompetencyLevel.name from baseline practice**
-  - ✓ Validate with: `python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies`
-  - ✓ Common errors: "Advanced" (not in baseline), "Expert" (not in baseline), "Intermediate" (not in baseline)
-  - ✓ **If mismatches found:** Fix with: `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix`
+**Phase 3 Validation:**
+
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ \
+  --baseline <baseline-practice.json> --schema deps/language.schema.json --summary
+```
+
+Fix all FAIL assertions with `error` severity. Warning assertions are advisory — address where practical. Re-run until `error_pass_rate: 1.0`.
+
+**Common fix tools:**
+- `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix` — fix competency level name mismatches
+- `python3 utils/assess-practice.py <file.json> --baseline <baseline.json>` — detailed issue report for targeted fixes
 
 **User Feedback:**
 - "Generating JSON from mapping guide..."
-- "Validating competency level names against baseline..."
-- "Verifying discriminator property: kind='practice'..."
-- "Verifying required properties (name, description, baselinePracticeName)..."
 - "Running validation (schema, baseline, integrity)..."
 - "Found N errors in category X, applying fixes..."
 - "Validation passed! Generated schema-compliant JSON at practices/<name>/<name>.json"
-
-**CRITICAL: Phase 3 Completion Validation (REQUIRED)**
-
-After generating `<name>.json`, IMMEDIATELY validate completeness before reporting success:
-
-```bash
-python3 utils/inspect-practice-json.py practices/<name>/<name>.json --baseline <baseline-practice.json>
-```
-
-This runs all quality gate checks in a single command:
-- **kind**: Discriminator property present (`practice`/`method`); for methods, checks each embedded practice
-- **counts**: Element counts meet minimums (alphas ≥3, workProducts ≥3, activities ≥5, patterns ≥1, citations ≥3)
-- **uniqueness**: PracticeElement names globally unique across all element types (no name collisions)
-- **competencies**: All `competencyLevelName` values match baseline competency levels
-- **properties**: Activities have required properties (activitySpaceName, assetNames, contributesTo); alphas have icon assets
-- **required**: Root-level required properties present (name, description, baselinePracticeName, narratives)
-
-Output is structured JSON with pass/fail per check and details on failures.
-
-To run a specific check only:
-```bash
-python3 utils/inspect-practice-json.py practices/<name>/<name>.json --baseline <baseline-practice.json> --check competencies
-```
-
-**If validation reveals missing content:**
-
-**CRITICAL ERROR: activities.length = 0**
-- Go back to Phase 2 mapping guide
-- Read Activities section (should have 5-15 activities)
-- Generate activities JSON array from mapping guide
-- Insert activities array into JSON
-- Re-validate
-
-**CRITICAL ERROR: workProducts.length = 0**
-- Go back to Phase 2 mapping guide  
-- Read Work Products section
-- Generate work products JSON array from mapping guide
-- Insert work products array into JSON
-- Re-validate
-
-**CRITICAL ERROR: Missing activity properties**
-- All activities MUST have: activitySpaceName, focusName, assetNames, contributesTo, worksOn, requiredCompetencies, recommendedCompetencyLevels
-- If any missing, regenerate activity objects with complete structure
-
-**CRITICAL ERROR: Alphas missing icon assets**
-- Every alpha MUST have at least one icon-type AssetReference
-- Add Font Awesome icon AssetReferences to alphas
-- Add corresponding font-character Asset definitions to assets array
-
-**CRITICAL ERROR: PracticeElement name collisions**
-- The uniqueness check found duplicate names across element types
-- Example: Alpha "Platform Configuration" AND WorkProduct "Platform Configuration" (INVALID)
-- **Fix procedure:**
-  1. Identify which element types share the name (from `inspect-practice-json.py --check uniqueness` output)
-  2. Determine which element is most abstract/fundamental (usually Alpha)
-  3. Rename the more specific element with disambiguating suffix
-     - WorkProducts: Add "File", "Document", "Specification", "Template" suffix
-     - Activities: Add verb prefix like "Build", "Deploy", "Configure", "Validate"
-     - Patterns: Add "Pattern", "Journey", "Lifecycle" suffix
-  4. Update ALL references to renamed element throughout JSON:
-     - workProductName in activities.worksOn
-     - activityName in various references
-     - patternName in references
-     - assetName in assetNames arrays
-  5. Re-run uniqueness check to verify fix
-
-**CRITICAL ERROR: Invalid competency level names**
-- The competency level validation found level names not in baseline practice
-- Example: Using "Advanced" when baseline has "Masters", or "Expert" when baseline has "Innovating"
-- **Fix procedure:**
-  1. Dry run to see invalid levels and suggested replacements:
-     ```bash
-     python3 utils/fix-competency-levels.py <file>.json <baseline>.json
-     ```
-  2. Apply fixes (common mappings like "Advanced"→"Masters" are applied automatically):
-     ```bash
-     python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix
-     ```
-     For unmapped levels, provide explicit mappings: `--map "CustomLevel=ValidLevel"`
-  3. Re-run competency level validation to verify all names now match baseline:
-     ```bash
-     python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies
-     ```
-
-**DO NOT report Phase 3 complete until:**
-- ✓ activities.length matches Phase 2 Activity count (typically 5-15)
-- ✓ workProducts.length matches Phase 2 Work Product count (typically 3-10)  
-- ✓ All activities have complete properties (activitySpaceName, assetNames, contributesTo)
-- ✓ All alphas have icon AssetReferences
-- ✓ Validation passes with 0 errors
 
 ---
 
@@ -1789,6 +1602,65 @@ Read validation output and apply fixes:
 
 ## Key Principles
 
+### No Inline Scripts
+
+**All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.**
+
+Common utilities for JSON inspection:
+- **Structural inspection:** `python3 utils/extract-reference-names.py <file.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details`
+- **Citation inspection:** `python3 utils/extract-reference-names.py <file.json> --sections citations --citation-details`
+- **Activity inspection:** `python3 utils/extract-reference-names.py <file.json> --sections activities --activity-details`
+- **Work product inspection:** `python3 utils/extract-reference-names.py <file.json> --sections workProducts`
+- **Narrative inspection (top-level):** `python3 utils/extract-reference-names.py <file.json> --sections narratives`
+- **Narrative placement (all elements):** `python3 utils/extract-reference-names.py <file.json> --narrative-placement`
+- **Narrative content preview:** `python3 utils/extract-reference-names.py <file.json> --narrative-content` (descriptions + first context snippet)
+- **Aliases/types/citations:** `python3 utils/extract-reference-names.py <file.json> --sections aliases narrativeTypes citations`
+- **Element template (raw JSON):** `python3 utils/extract-reference-names.py <file.json> --sample activities` (also: alphas, workProducts, patterns, etc.)
+- **Discover dependency by name:** `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by practice/baseline name)
+- **Resolve all dependencies:** `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
+- **List available files:** `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)
+- **Dependency analysis:** `python3 utils/resolve-practice-dependencies.py --parent <parent.json> --baseline <baseline.json> --practice <practice.json> --per-alpha`
+- **Baseline/parent narrative types:** `python3 utils/extract-reference-names.py <baseline-or-parent>.json --sections narrativeTypes` (type names with narrative elements)
+- **Specific narrative type definitions (full JSON):** `python3 utils/extract-reference-names.py <file>.json --sections narrativeTypes --narrative-type-names "STAR" "Technique" "PDCA"` (dumps complete JSON objects for named types)
+- **Find all references to an element:** `python3 utils/extract-reference-names.py <file>.json --find-refs "Platform"` (searches alphas, activities, workProducts, patterns, aliases for all references to a named element)
+- **Narrative contexts by element:** `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls"` (shows all contexts for a specific narrative element across all narratives)
+- **Long narrative contexts:** `python3 utils/extract-reference-names.py <file>.json --long-contexts` (lists contexts exceeding 3 sentences, sorted by length, truncated)
+- **Long contexts with full text:** `python3 utils/extract-reference-names.py <file>.json --long-contexts --full-text` (full context text, no truncation)
+- **Context element with full text:** `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls" --full-text` (full text, no truncation)
+- **Pattern details with narratives:** `python3 utils/extract-reference-names.py <file>.json --sections patterns --narrative-content`
+- **Parent activity narratives:** `python3 utils/extract-reference-names.py <parent>.json --sections activities --activity-details` (narrative types and elements per activity)
+- **Baseline/parent summary:** `python3 utils/extract-reference-names.py <baseline-or-parent>.json` (summary, focuses, alphas, activitySpaces, competencies, narrativeTypes)
+- **Cross-reference validation:** `python3 utils/assess-practice.py <file.json>` (internal crossrefs: activity→alpha/state, worksOn→workProduct/LOD, involves→personaGroup, citationNames, pattern evidenceBy→workProduct/LOD, narrative types)
+- **Baseline reference validation:** `python3 utils/assess-practice.py <file.json> --baseline <baseline.json>` (focuses, activitySpaces, competencies, competency levels, narrative types, contributesTo targets, alias targets)
+- **Full assessment:** `python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema deps/language.schema.json`
+- **Compare two versions:** `python3 utils/diff-practice-json.py old.json new.json` (structural diff: count deltas, added/removed elements, keyword/tag changes)
+- **Compare (changes only):** `python3 utils/diff-practice-json.py old.json new.json --changes-only`
+- **Assessment with parent:** `python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --parent <parent.json>` (merges parent alphas/narrativeTypes/competencies/activitySpaces into baseline for validation)
+- **Assessment summary:** `python3 utils/assess-practice.py <file.json> --summary` (counts by severity/category, suggested mode — no full issue list)
+- **Errors-only assessment:** `python3 utils/assess-practice.py <file.json> --errors-only` (filter to only severity=error issues — useful in fix loops)
+- **Top-level structure overview:** `python3 utils/extract-reference-names.py <file>.json --structure` (shows type and count/length for each top-level key)
+- **Cross-practice method audit:** `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json` (checks alpha/state refs, duplicates, persona consistency across practices)
+- **Cross-practice audit (JSON):** `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json --json`
+- **Add missing alpha redeclaration:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" [--fix]`
+- **Remap alpha references:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old Alpha" "New Alpha" --state-map '{"OldState":"NewState"}' [--fix]`
+- **Remove alpha and references:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remove-alpha "Alpha Name" [--fix]`
+- **Assemble method with merged assets:** `python3 utils/assemble-method-json.py --name "Name" --baseline-name "Baseline" --practices p1.json p2.json -o method.json --merge-assets`
+- **Assemble method with narrative file:** `python3 utils/assemble-method-json.py ... --narrative-file narratives.json`
+
+JSON patching (write operations):
+- **Set a top-level key:** `python3 utils/patch-practice-json.py <target>.json --set-key assets --patch-file assets.json`
+- **Merge keys at root:** `python3 utils/patch-practice-json.py <target>.json --patch-file patch.json` (merges all keys from patch into target)
+- **Append to array:** `python3 utils/patch-practice-json.py <target>.json --append-key assets --patch-file more-assets.json`
+- **Patch a named element:** `python3 utils/patch-practice-json.py <target>.json --element-path "alphas[Platform]" --patch-file patch.json`
+- **Patch by field match:** `python3 utils/patch-practice-json.py <target>.json --element-path "activities[My Activity].narratives[0].narrativeContexts[narrativeElementName=Common Pitfalls]" --patch-file patch.json` (use `field=value` in brackets to match on any field)
+- **Create new file from patch:** `python3 utils/patch-practice-json.py <new>.json --patch-file skeleton.json --create`
+- **Delete a top-level key:** `python3 utils/patch-practice-json.py <target>.json --delete-key kind`
+- **Deep find-and-replace:** `python3 utils/patch-practice-json.py <target>.json --replace "old text" "new text"` (recursive through all string values)
+- **Bulk replacements:** `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
+- **Preview without writing:** Add `--dry-run` to any command above
+
+These commands work on ANY JSON file — practice, method, baseline, `_effective-baseline.json`, or `_effective-parent.json`. This rule applies to subagents too. If a subagent needs to inspect or modify JSON structure, it must use these utilities.
+
 ### Reference-Driven Architecture
 
 This skill does NOT embed knowledge. Instead:
@@ -1808,8 +1680,9 @@ This skill does NOT embed knowledge. Instead:
 
 The skill does NOT assume a specific baseline practice. Instead:
 
-- User provides baseline practice file path
-- Example provided: `deps/platform-adoption-kernel.json`
+- User provides a baseline name or file path
+- Auto-discovery scans `baselines/`, `practices/`, and `deps/` directories to resolve names to paths
+- All resolved dependencies are confirmed with user before proceeding
 - Validation script validates against provided baseline
 - Works with any baseline following Practice Language schema
 
@@ -1916,12 +1789,19 @@ python3 utils/resolve-practice-dependencies.py \
   --baseline _effective-baseline.json \
   --parent-method <parent-method.json>
 
-# Also compute dependencies for a specific practice
+# Compute dependencies for a specific practice
 python3 utils/resolve-practice-dependencies.py \
   --parent _effective-parent.json \
   --baseline _effective-baseline.json \
   --parent-method <parent-method.json> \
   --practice <practice.json>
+
+# Per-alpha detail: show each alpha's contributesTo target and origin classification
+python3 utils/resolve-practice-dependencies.py \
+  --parent _effective-parent.json \
+  --baseline _effective-baseline.json \
+  --practice <practice-or-method.json> \
+  --per-alpha
 ```
 
 **Why this matters:** Blindly including all parent practice names inflates the dependency graph and creates false coupling. A practice that only contributes to baseline alphas (e.g., "Platform", "Way Of Working") has no structural dependency on the parent practices that redeclare those alphas.
@@ -2031,7 +1911,7 @@ Single validation script replaces multiple utilities:
   - **Fix:** Flip perspective - alpha should declare what it provides TO others, not what it needs FROM others
   - "Platform enables Software System" not "Software System depends on Platform"
 - ❌ **Using invalid competency level names** - Using descriptive names instead of exact baseline CompetencyLevel.name values
-  - **Fix:** Extract valid level names from baseline: `python3 utils/inspect-practice-json.py <baseline>.json --check competencies`
+  - **Fix:** Extract valid level names from baseline: `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`
   - Use EXACT level names from baseline (case-sensitive)
   - Common errors: "Advanced" (check baseline), "Expert" (check baseline), "Intermediate" (check baseline)
   - For Platform Adoption Essentials: use "Basic", "Applies", "Masters", "Adapts", "Innovating"
@@ -2091,7 +1971,7 @@ Single validation script replaces multiple utilities:
 - ❌ Not reading language.schema.json before generating
 - ❌ **PracticeElement name collisions** - CRITICAL ERROR - Using same name for different element types
   - **Problem:** Alpha "Platform Configuration" + WorkProduct "Platform Configuration" = INVALID (names must be globally unique)
-  - **Detection:** Run `python3 utils/inspect-practice-json.py <file>.json --check uniqueness`
+  - **Detection:** Run `python3 utils/assess-practice.py <file>.json` (uniqueness check included)
   - **Fix:** Rename more specific element with disambiguating suffix:
     - WorkProduct collision: Add "File", "Document", "Template" (e.g., "Platform Configuration" → "Platform Configuration File")
     - Activity collision: Add verb prefix (e.g., "Platform" → "Configure Platform")
@@ -2101,7 +1981,7 @@ Single validation script replaces multiple utilities:
 - ❌ **Missing `kind` property at root level** - MOST COMMON ERROR
   - **Fix Practice JSON:** Add `"kind": "practice"` at root level (conventionally first property for readability)
   - **Fix Method JSON:** Add `"kind": "method"` at root level
-  - **Check EVERY practice in method:** `python3 utils/inspect-practice-json.py <file>.json --check kind` - ALL must show "practice", not null
+  - **Check EVERY practice in method:** `python3 utils/assess-practice.py <file>.json` - validates kind on root and all embedded practices
   - This MUST be checked BEFORE schema validation (some schemas allow it to be missing but consumers fail)
   - **Note:** Property order doesn't affect JSON validity, but discriminators are conventionally placed first
 - ❌ Checklist items as strings instead of objects
@@ -2118,7 +1998,7 @@ Single validation script replaces multiple utilities:
   - **Fix:** `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix`
     - For unmapped levels, provide explicit mappings: `--map "Advanced=Masters" --map "Expert=Innovating"`
     - Common replacements for Platform Adoption Essentials: "Advanced"→"Masters", "Expert"→"Innovating", "Intermediate"→"Applies", "Beginner"→"Basic"
-  - **Validate:** `python3 utils/inspect-practice-json.py <file>.json --baseline <baseline>.json --check competencies`
+  - **Validate:** `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json`
 - ❌ Wrong competency reference format ({competencyName, level} instead of {competencyName, competencyLevelName})
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities
@@ -3000,21 +2880,7 @@ Icons use web fonts (Font Awesome 6 Free, Material Icons) for zero distribution 
 }
 ```
 
-**Validation During Phase 3:**
-
-- [ ] **CRITICAL**: Using `assetNames` (plural array), NOT `assetName` (singular string)
-- [ ] **CRITICAL**: Each AssetReference has both `assetName` and `type` properties
-- [ ] **CRITICAL**: Every alpha has at least one icon-type AssetReference
-- [ ] **CRITICAL**: Every activity has at least one icon-type AssetReference
-- [ ] All icon assets use font-character type (Font Awesome/Material Icons)
-- [ ] Icon AssetReferences have `type: "icon"`
-- [ ] Diagram AssetReferences have `type: "diagram"` or `type: "illustrative"`
-- [ ] Template AssetReferences have `type: "template"`
-- [ ] External diagrams/templates use direct URLs to authoritative sources
-- [ ] Bundled assets only used when no external alternative exists
-- [ ] Asset descriptions clearly explain purpose and context
-- [ ] URLs point to stable, long-lived resources (official docs, GitHub, methodology sites)
-- [ ] All referenced assetName values exist in top-level assets array
+**Asset Validation:** Covered by `eval-skill-output.py` assertion `qual:asset-coverage` (checks icon asset presence on elements and assetName resolution).
 
 ### Using Delivered Artifacts
 

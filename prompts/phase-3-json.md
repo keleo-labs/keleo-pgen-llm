@@ -129,7 +129,9 @@ Add citations array (for both Practice and Method):
 ]
 ```
 
-**CRITICAL:** Citations have NO narratives property
+**CRITICAL:**
+- Citations have NO narratives property
+- The `name` field MUST be the **title of the work** (e.g., "Business Model Generation", "The Art of Action"), NOT an author-date shorthand like "Osterwalder (2010)" or "Bungay (2011)". Authors have their own `authors` field.
 
 #### 3.3 Assets (Optional)
 

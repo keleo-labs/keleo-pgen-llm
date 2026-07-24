@@ -20,6 +20,10 @@ import argparse
 import json
 import sys
 from collections import defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils._shared import load_json
 
 COMMON_MAPPINGS = {
     "Advanced": "Masters",
@@ -131,19 +135,8 @@ def main():
     )
     args = parser.parse_args()
 
-    try:
-        with open(args.file) as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(json.dumps({"error": f"Cannot read file: {e}"}))
-        sys.exit(1)
-
-    try:
-        with open(args.baseline) as f:
-            baseline_data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(json.dumps({"error": f"Cannot read baseline: {e}"}))
-        sys.exit(1)
+    data = load_json(args.file)
+    baseline_data = load_json(args.baseline)
 
     explicit_maps = {}
     for m in args.map:

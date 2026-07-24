@@ -32,43 +32,9 @@ import sys
 import copy
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from collections import OrderedDict
 
-
-def load_json(file_path: Path) -> Dict:
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(json.dumps({
-            "success": False,
-            "error": f"File not found: {file_path}"
-        }))
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(json.dumps({
-            "success": False,
-            "error": f"Invalid JSON in {file_path}: {e}"
-        }))
-        sys.exit(1)
-
-
-def merge_by_name(parent_list: List[Dict], child_list: List[Dict]) -> List[Dict]:
-    """Merge two lists of objects by 'name' key. Child overrides parent."""
-    merged = OrderedDict()
-    for item in (parent_list or []):
-        if 'name' in item:
-            merged[item['name']] = item
-    for item in (child_list or []):
-        if 'name' in item:
-            merged[item['name']] = item
-    return list(merged.values())
-
-
-MERGEABLE_ARRAYS = [
-    'focuses', 'alphas', 'activitySpaces', 'competencies',
-    'narrativeTypes', 'narratives', 'citations', 'assets'
-]
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils._shared import load_json, merge_by_name, MERGEABLE_ARRAYS
 
 
 def merge_baselines(parent: Dict, child: Dict) -> Dict:

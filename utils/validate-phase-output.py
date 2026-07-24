@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate completeness of Phase 1 analysis reports and Phase 2 mapping guides."""
+"""Validate completeness of Phase 1 analysis reports, Phase 1.5 distillation documents, and Phase 2 mapping guides."""
 
 import argparse
 import json
@@ -16,6 +16,16 @@ PHASE_1_REQUIRED_SECTIONS = [
     "## 6. Personas",
     "## 7. Persona Groups",
     "## 8. Workflows",
+]
+
+PHASE_1_5_REQUIRED_SECTIONS = [
+    "Executive Summary",
+    "Focus Areas",
+    "Essential Concerns (Future Baseline Alphas)",
+    "Generalizable Activity Types (Future ActivitySpaces)",
+    "Universal Competencies",
+    "Narrative Frameworks (Future NarrativeTypes)",
+    "Distillation Statistics",
 ]
 
 PHASE_2_REQUIRED_SECTIONS = [
@@ -59,6 +69,94 @@ def validate_phase_1(content, lines):
         "actual": len(numbered_items),
         "minimums": ">=5 concerns, >=5 activities, >=3 work products",
         "pass": len(numbered_items) >= 5,
+    })
+
+    return checks
+
+
+def validate_phase_1_5(content, lines):
+    checks = []
+
+    for section in PHASE_1_5_REQUIRED_SECTIONS:
+        found = section in content
+        checks.append({
+            "check": f"section_exists:{section}",
+            "pass": found,
+        })
+
+    concerns = re.findall(r"^### Concern \d+:\s*(.+)$", content, re.MULTILINE)
+    checks.append({
+        "check": "concern_count",
+        "description": "Essential concerns (future alphas)",
+        "actual": len(concerns),
+        "expected": "8-15",
+        "names": concerns,
+        "pass": 8 <= len(concerns) <= 15,
+    })
+
+    activity_types = re.findall(
+        r"^### Activity Type \d+:\s*(.+)$", content, re.MULTILINE
+    )
+    checks.append({
+        "check": "activity_type_count",
+        "description": "Generalizable activity types (future ActivitySpaces)",
+        "actual": len(activity_types),
+        "expected": "6-12",
+        "names": activity_types,
+        "pass": 6 <= len(activity_types) <= 12,
+    })
+
+    competencies = re.findall(
+        r"^### Competency \d+:\s*(.+)$", content, re.MULTILINE
+    )
+    checks.append({
+        "check": "competency_count",
+        "description": "Universal competencies",
+        "actual": len(competencies),
+        "expected": "5-10",
+        "names": competencies,
+        "pass": 5 <= len(competencies) <= 10,
+    })
+
+    std_levels = ["Basic", "Applies", "Masters", "Adapts", "Innovating"]
+    for level in std_levels:
+        count = len(re.findall(rf"\*\*{level}\*\*:", content))
+        checks.append({
+            "check": f"competency_level:{level}",
+            "description": f"Occurrences of **{level}**: (expect {len(competencies)} — one per competency)",
+            "actual": count,
+            "expected": len(competencies),
+            "pass": count == len(competencies),
+        })
+
+    narratives = re.findall(
+        r"^### Narrative \d+:\s*(.+)$", content, re.MULTILINE
+    )
+    checks.append({
+        "check": "narrative_count",
+        "description": "Narrative frameworks (future NarrativeTypes)",
+        "actual": len(narratives),
+        "expected": "3-5",
+        "names": narratives,
+        "pass": 3 <= len(narratives) <= 5,
+    })
+
+    focuses = re.findall(r"^### Focus \d+:\s*(.+)$", content, re.MULTILINE)
+    checks.append({
+        "check": "focus_count",
+        "description": "Focus areas",
+        "actual": len(focuses),
+        "expected": "2-4",
+        "names": focuses,
+        "pass": 2 <= len(focuses) <= 4,
+    })
+
+    has_coverage = "Activity Type Coverage Validation" in content or \
+                   "Coverage Validation" in content
+    checks.append({
+        "check": "coverage_table",
+        "description": "Activity type coverage validation table present",
+        "pass": has_coverage,
     })
 
     return checks
@@ -141,10 +239,10 @@ def main():
     parser.add_argument("file", help="Path to markdown file to validate")
     parser.add_argument(
         "--phase",
-        type=int,
-        choices=[1, 2],
+        type=float,
+        choices=[1, 1.5, 2],
         required=True,
-        help="Phase number (1=analysis report, 2=mapping guide)",
+        help="Phase number (1=analysis report, 1.5=distillation, 2=mapping guide)",
     )
     args = parser.parse_args()
 
@@ -159,6 +257,8 @@ def main():
 
     if args.phase == 1:
         checks = validate_phase_1(content, lines)
+    elif args.phase == 1.5:
+        checks = validate_phase_1_5(content, lines)
     else:
         checks = validate_phase_2(content, lines)
 

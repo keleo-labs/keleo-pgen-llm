@@ -10,12 +10,16 @@ Usage:
     python3 utils/resolve-parent-practice.py <input.json> --check-only
     python3 utils/resolve-parent-practice.py <input.json> -o <output.json>
 
+    # Merge multiple parent sources (later files override earlier on name conflicts)
+    python3 utils/resolve-parent-practice.py parent1.json parent2.json -o combined.json
+
 The script:
 1. Reads the input JSON and classifies it by schema discrimination
 2. For a practice: outputs the practice directly as the effective parent
 3. For a method: unions all embedded practices' elements (name-keyed merge)
 4. Applies practiceElementAliases as _aliasContext annotations (canonical names preserved)
 5. Reports parent practice names, baselinePracticeName, element counts
+6. Multiple inputs: resolves each, then merges (later inputs take precedence)
 
 Exit codes:
     0 - Success
@@ -29,60 +33,9 @@ import sys
 import copy
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from collections import OrderedDict
 
-
-def load_json(file_path: Path) -> Dict:
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(json.dumps({
-            "success": False,
-            "error": f"File not found: {file_path}"
-        }))
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(json.dumps({
-            "success": False,
-            "error": f"Invalid JSON in {file_path}: {e}"
-        }))
-        sys.exit(1)
-
-
-def detect_kind(data: Dict) -> str:
-    """Classify JSON by schema discrimination rules (same as language.schema.json)."""
-    if any(key in data for key in ('practices', 'practiceNames', 'baselinePractice')):
-        return "method"
-    if 'baselinePracticeName' in data:
-        return "practice"
-    return "practiceBaseline"
-
-
-def merge_by_name(base_list: List[Dict], overlay_list: List[Dict]) -> List[Dict]:
-    """Merge two lists of objects by 'name' key. Overlay overrides base."""
-    merged = OrderedDict()
-    for item in (base_list or []):
-        if 'name' in item:
-            merged[item['name']] = item
-    for item in (overlay_list or []):
-        if 'name' in item:
-            if item['name'] in merged:
-                existing = merged[item['name']]
-                combined = copy.deepcopy(existing)
-                combined.update(copy.deepcopy(item))
-                merged[item['name']] = combined
-            else:
-                merged[item['name']] = copy.deepcopy(item)
-    return list(merged.values())
-
-
-MERGEABLE_ARRAYS = [
-    'focuses', 'alphas', 'activitySpaces', 'competencies',
-    'narrativeTypes', 'narratives', 'citations', 'assets',
-    'workProducts', 'patterns', 'personas', 'personaGroups',
-    'alphaInstances', 'workProductInstances',
-]
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from utils._shared import load_json, detect_kind, merge_by_name, MERGEABLE_ARRAYS
 
 
 def merge_practices(practices: List[Dict]) -> Dict:
@@ -282,6 +235,57 @@ def resolve_parent(data: Dict, kind: str) -> tuple:
     return effective, report
 
 
+def merge_effective_parents(documents: List[Dict]) -> tuple:
+    """Merge multiple resolved effective parent documents.
+
+    Later documents take precedence on name conflicts.
+    Returns (merged_document, report_dict).
+    """
+    merged = {}
+    source_names = []
+
+    for doc in documents:
+        name = doc.get("name", "")
+        if name:
+            source_names.append(name)
+
+        for key in MERGEABLE_ARRAYS:
+            doc_items = doc.get(key, [])
+            merged_items = merged.get(key, [])
+            if doc_items or merged_items:
+                merged[key] = merge_by_name(merged_items, doc_items)
+
+        if "_aliasContext" in doc:
+            if "_aliasContext" not in merged:
+                merged["_aliasContext"] = copy.deepcopy(doc["_aliasContext"])
+            else:
+                existing = merged["_aliasContext"]
+                incoming = doc["_aliasContext"]
+                if "aliases" in incoming:
+                    existing.setdefault("aliases", []).extend(
+                        copy.deepcopy(incoming["aliases"])
+                    )
+
+    merged["name"] = " + ".join(source_names) if source_names else ""
+    merged["description"] = f"Merged effective parent from: {', '.join(source_names)}"
+
+    report = {
+        "success": True,
+        "mergedFrom": source_names,
+        "effectiveParent": {
+            "name": merged["name"],
+            "alphaCount": len(merged.get("alphas", [])),
+            "activitySpaceCount": len(merged.get("activitySpaces", [])),
+            "workProductCount": len(merged.get("workProducts", [])),
+            "activityCount": len(merged.get("activities", [])),
+            "patternCount": len(merged.get("patterns", [])),
+            "assetCount": len(merged.get("assets", [])),
+            "aliasCount": len(merged.get("practiceElementAliases", [])),
+        },
+    }
+    return merged, report
+
+
 def main():
     import argparse
 
@@ -289,8 +293,8 @@ def main():
         description="Detect input kind and resolve parent practice/method into effective parent"
     )
     parser.add_argument(
-        "input",
-        help="Path to the input practice, method, or baseline JSON"
+        "input", nargs="+",
+        help="Path(s) to input JSON. Multiple files are resolved individually then merged.",
     )
     parser.add_argument(
         "-o", "--output",
@@ -303,7 +307,46 @@ def main():
     )
 
     args = parser.parse_args()
-    input_path = Path(args.input)
+
+    if len(args.input) > 1:
+        if args.check_only:
+            print(json.dumps({
+                "success": False,
+                "error": "--check-only is not supported with multiple inputs"
+            }))
+            sys.exit(1)
+        if not args.output:
+            print(json.dumps({
+                "success": False,
+                "error": "Output path (-o) is required when merging multiple inputs"
+            }))
+            sys.exit(1)
+
+        resolved = []
+        for input_file in args.input:
+            data = load_json(Path(input_file))
+            kind = detect_kind(data)
+            if kind == "practiceBaseline":
+                print(json.dumps({
+                    "success": False,
+                    "error": f"{input_file} is a practiceBaseline — cannot merge baselines here"
+                }))
+                sys.exit(1)
+            effective, _ = resolve_parent(data, kind)
+            resolved.append(effective)
+
+        merged, report = merge_effective_parents(resolved)
+
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(merged, f, indent=2, ensure_ascii=False)
+
+        report["outputPath"] = str(output_path)
+        print(json.dumps(report, indent=2))
+        return
+
+    input_path = Path(args.input[0])
     data = load_json(input_path)
     kind = detect_kind(data)
 
