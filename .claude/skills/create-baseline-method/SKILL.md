@@ -350,19 +350,23 @@ Fix any FAIL assertions before proceeding to Phase 3.
    Read references/semantics.md
    ```
 
-2. **Generate Baseline JSON Skeleton**:
+2. **Read schema version** from `deps/language.schema.json` `$comment` field (format: `schemaVersion:X.Y.Z`).
+
+3. **Generate Baseline JSON Skeleton**:
    ```json
    {
      "kind": "practiceBaseline",
      "name": "...",
      "description": "...",
-     "version": "1.0",
+     "schemaVersion": "1.0.0",
+     "version": "1.0.0",
      "authors": [...],
      "keywords": [...]
    }
    ```
+   Set `schemaVersion` from the schema `$comment`. Set `version` to `"1.0.0"` (three-part semver). If extending a parent baseline (`baselinePracticeNames`), add `dependencyVersions` with caret range for each parent.
 
-3. **Build Top-Level Arrays**:
+4. **Build Top-Level Arrays**:
    - **focuses** - From mapping guide (2-4 focuses)
    - **narrativeTypes** - With narrativeElements (3-5 types)
    - **competencies** - With competencyLevels (5 levels each)
@@ -372,7 +376,7 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - **citations** - Using Citation Standard
    - **assets** - Icons, diagrams, templates
 
-4. **Validate Cross-References**:
+5. **Validate Cross-References**:
    - All focusName references exist in focuses
    - All relatesTo.alphaName references exist in alphas
    - All contributesTo.alphaName/stateName references exist
@@ -383,12 +387,12 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - No narrative name or description references narrative type template names
    - Narrative contexts are self-contained — coherent without element headings (element names are authoring scaffolding, not shown to readers)
 
-5. **Write Final JSON**:
+6. **Write Final JSON**:
    ```
    Write baselines/<name>/<name>.json
    ```
 
-6. **Validate with Script**:
+7. **Validate with Script**:
    ```bash
    # If extending parent baseline(s), pass effective parent for cross-reference validation:
    python3 utils/validate-baseline-json.py \

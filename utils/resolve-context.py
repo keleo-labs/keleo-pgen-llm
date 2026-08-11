@@ -42,7 +42,7 @@ from utils._shared import (
     detect_kind,
     load_all_from_keleo,
     load_json,
-    merge_by_name_annotated,
+    merge_by_name,
     MERGEABLE_ARRAYS,
 )
 
@@ -165,7 +165,7 @@ def merge_tier(accumulated, entries):
             acc_items = accumulated.get(key, [])
             if items or acc_items:
                 acc_source = accumulated.get("_merge_source", "")
-                accumulated[key] = merge_by_name_annotated(
+                accumulated[key] = merge_by_name(
                     acc_items, items, acc_source, source_name
                 )
         accumulated["_merge_source"] = source_name

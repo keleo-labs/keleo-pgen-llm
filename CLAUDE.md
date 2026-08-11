@@ -273,6 +273,8 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **WorkProducts** | Defined in practice | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
+| **schemaVersion** | Optional (auto-set by skills) | Optional (auto-set by skills) |
+| **dependencyVersions** | Entries for baselinePracticeName + practiceDependencyNames | Entries for baselinePracticeNames (if any) |
 
 ### Baseline Output Location
 
@@ -351,6 +353,36 @@ These constraints apply to **extension practices** created with `/generate-metho
 - Activity names must be specific and different from their ActivitySpace names
 - Minimum requirements: Alphas need ≥3 states, WorkProducts need ≥2 levels of detail
 - Narratives use structured frameworks with sequential contexts mapped to narrative elements
+
+### Versioning
+
+The Practice Language uses three versioning mechanisms:
+
+**Schema Version (`schemaVersion`):**
+- The schema declares its version in `$comment: "schemaVersion:X.Y.Z"` at root level
+- Documents declare which schema version they target via optional `schemaVersion` property (pattern `^\d+\.\d+\.\d+$`)
+- Available on Practice, PracticeBaseline, Method, ChangeRequest, ChangeSet, Project
+- **Required** on PackageManifest
+- Skills auto-read the schema version and set it on generated documents
+
+**Document Version (`version`):**
+- Required on Practice and PracticeBaseline; optional on Method and Project
+- Recommended format: three-part semver (`1.0.0`); shortened forms (`1.0`) are valid but discouraged
+- New documents start at `1.0.0`
+- Updates increment based on scope: patch (auto-fix), minor (remap/reanalysis)
+
+**Dependency Version Constraints (`dependencyVersions`):**
+- Optional array of `DocumentVersionConstraint` on Practice, PracticeBaseline, Method, Project
+- Each entry: `{"documentName": "<name>", "versionRange": "<semver range>"}`
+- `documentName` must match a declared dependency (`baselinePracticeName`, `practiceDependencyNames` entry, `practiceNames` entry, `baselinePracticeNames` entry)
+- `versionRange` uses npm/node-semver syntax (`^2.0.0`, `>=1.0.0 <3.0.0`, `~1.2.0`)
+- Version mismatches produce **warnings** by default, not errors
+- Skills auto-populate from resolved dependency versions using caret ranges
+
+**Package Dependencies (`PackageDependency`):**
+- Package-level dependencies in `PackageManifest.dependencies`
+- Each entry: `{"packageName": "<name>", "versionRange": "<range>", "documentNames": [...]}`
+- Auto-built by `package-keleo.py` from document-level `dependencyVersions`
 
 ### Gherkin-Inspired Structured Guidance
 

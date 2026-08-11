@@ -154,6 +154,25 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
    - `"remap"` → proceed to **Step 1B** recommending Mode 2
    - `"full-reanalysis"` → proceed to **Step 1B** recommending Mode 1
 
+### Version Incrementing
+
+When updating an existing document, increment its `version` based on the update mode:
+
+| Update Mode | Version Bump | Rationale |
+|---|---|---|
+| **Auto-Fix** | `patch` (e.g. 1.0.0 → 1.0.1) | Structural fixes, no content changes |
+| **Remap & Regenerate** | `minor` (e.g. 1.0.0 → 1.1.0) | Remapped content, new guidance applied |
+| **Full Reanalysis** | `minor` (e.g. 1.0.0 → 1.1.0) | Content reworked from source materials |
+
+**Process:**
+1. Read the existing `version` from the JSON file being updated
+2. Increment using the appropriate bump level
+3. Update `updatedAt` to current date
+4. Update `schemaVersion` to match current schema `$comment` (may have changed since document was authored)
+5. Refresh `dependencyVersions` — re-read each dependency's current `version` and update the caret range
+
+Use `python3 -c "from utils._shared import increment_version; print(increment_version('1.0.0', 'patch'))"` to compute the new version if needed, or set it directly.
+
 ### Step 1A: Auto-Fix (No User Interaction)
 
 **When `suggestedUpdateMode: "auto-fix"`** — all issues are programmatically fixable.

@@ -75,7 +75,12 @@ You have access to the following resources via the Read tool:
 {
   "name": "practice-name",
   "description": "Single sentence from mapping guide",
+  "schemaVersion": "<from schema $comment, e.g. 1.0.0>",
+  "version": "1.0.0",
   "baselinePracticeName": "Platform Adoption Essentials",
+  "dependencyVersions": [
+    {"documentName": "Platform Adoption Essentials", "versionRange": "^1.0.0"}
+  ],
   "tags": {
     "domainTags": [...],
     "lifecycleTags": [...],
@@ -84,19 +89,28 @@ You have access to the following resources via the Read tool:
   "keywords": [...],
   "authors": [...],
   "createdAt": "YYYY-MM-DD",
-  "updatedAt": "YYYY-MM-DD",
-  "version": "1.0.0"
+  "updatedAt": "YYYY-MM-DD"
 }
 ```
+
+**Versioning rules:**
+- `schemaVersion`: Read from the schema's `$comment` field (`schemaVersion:X.Y.Z`). Always set this.
+- `version`: `"1.0.0"` for new documents. Use three-part semver.
+- `dependencyVersions`: One entry per dependency name (`baselinePracticeName`, each `practiceDependencyNames` entry). Use caret range (`^`) pinned to the dependency's current `version`.
 
 **Parent Practice Mode:** When extending a parent practice (instead of mapping directly to a baseline):
 - `baselinePracticeName`: Set to the value **inherited** from the parent practice's `baselinePracticeName` (NOT the parent practice name itself)
 - `practiceDependencyNames`: Auto-populated with the parent practice name(s) provided in Step 0.25
+- `dependencyVersions`: Include entries for BOTH the inherited baseline AND each practice dependency
 - All `contributesTo`/`mapsTo` references should primarily target parent practice alphas using canonical names
 ```json
 {
   "baselinePracticeName": "Platform Adoption Essentials",  // inherited from parent
   "practiceDependencyNames": ["Red Hat OpenShift Foundations"],  // parent practice names
+  "dependencyVersions": [
+    {"documentName": "Platform Adoption Essentials", "versionRange": "^1.0.0"},
+    {"documentName": "Red Hat OpenShift Foundations", "versionRange": "^1.0.0"}
+  ],
   ...
 }
 ```
@@ -106,7 +120,12 @@ You have access to the following resources via the Read tool:
 {
   "name": "method-name",
   "description": "Single sentence from mapping guide",
+  "schemaVersion": "<from schema $comment>",
+  "version": "1.0.0",
   "baselinePracticeName": "Platform Adoption Essentials",
+  "dependencyVersions": [
+    {"documentName": "Platform Adoption Essentials", "versionRange": "^1.0.0"}
+  ],
   "practices": []  // Will be populated with Practice objects
 }
 ```

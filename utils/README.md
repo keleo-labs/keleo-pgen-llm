@@ -67,7 +67,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Module | Purpose |
 |--------|---------|
-| `_shared.py` | Shared utilities: `load_json`, `load_json_pair`, `merge_by_name`, `merge_by_name_annotated`, `detect_kind`, `load_json_from_keleo`, `load_all_from_keleo`, `MERGEABLE_ARRAYS`. Not a CLI tool. |
+| `_shared.py` | Shared utilities: `load_json`, `load_json_pair`, `merge_by_name` (with optional `_contributingPracticeName` provenance), `detect_kind`, `load_json_from_keleo`, `load_all_from_keleo`, `get_schema_version`, `increment_version`, `build_dependency_versions`, `MERGEABLE_ARRAYS`. Not a CLI tool. |
 
 ## Typical Workflow
 

@@ -1360,29 +1360,36 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 **Process for Single Practice:**
 
 1. Read `prompts/phase-3-json.md`, mapping guide, schema, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies). If the effective baseline has `_aliasContext`, note that all structural references MUST use canonical names.
-2. Generate complete practice JSON with **REQUIRED discriminator property**:
+2. **Read schema version** from `deps/language.schema.json` `$comment` field (format: `schemaVersion:X.Y.Z`).
+3. Generate complete practice JSON with **REQUIRED discriminator property**:
    ```json
    {
      "kind": "practice",  // CRITICAL: Required at root level
      "name": "Practice Name",
      "description": "...",
+     "schemaVersion": "1.0.0",  // From schema $comment
+     "version": "1.0.0",  // Three-part semver
      "baselinePracticeName": "...",  // Inherited from parent practice in parent practice mode
      "practiceDependencyNames": ["..."],  // Only parent practices with actually-referenced unique alphas
+     "dependencyVersions": [  // One entry per declared dependency
+       {"documentName": "...", "versionRange": "^1.0.0"}
+     ],
      ...
    }
    ```
+   - **Versioning:** Set `schemaVersion` from schema `$comment`. Set `version` to `"1.0.0"` for new documents. Populate `dependencyVersions` with a caret range (`^X.Y.Z`) pinned to each dependency's current `version` — one entry for `baselinePracticeName` and one per `practiceDependencyNames` entry.
    - **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice's `baselinePracticeName` (NOT the parent practice name). Set `practiceDependencyNames` using the filtering rule (see "Determining practiceDependencyNames" below).
-3. Include aliases array from mapping guide
-4. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
+4. Include aliases array from mapping guide
+5. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
    ```bash
    python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
-5. **Resolve transitive dependencies** — `.keleo` bundles must include ALL dependency documents (baselines + practices), not the merged effective context:
+6. **Resolve transitive dependencies** — `.keleo` bundles must include ALL dependency documents (baselines + practices), not the merged effective context:
    ```bash
    python3 utils/discover-dependencies.py --resolve-from practices/<name>/<name>.json --transitive
    ```
    Resolve any ambiguous dependencies (prefer `deps/` or `baselines/` or `practices/` paths over `.keleo`-embedded copies). Collect the full list of resolved file paths.
-6. **Package into .keleo** (NEVER use `python3 -c`, heredocs, or shell loops):
+7. **Package into .keleo** (NEVER use `python3 -c`, heredocs, or shell loops). The packager auto-reads `schemaVersion` from the schema and auto-builds package dependencies from document `dependencyVersions`:
    ```bash
    python3 utils/package-keleo.py \
      --name "<practice-name>" \
@@ -1417,7 +1424,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
-   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression."
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies."
 
 3. **Agents run concurrently**, each producing one practice JSON file
 

@@ -77,7 +77,8 @@ You have access to the following resources via the Read tool:
   "kind": "practiceBaseline",
   "name": "practice-name-from-mapping-guide",
   "description": "Single sentence from mapping guide",
-  "version": "1.0",
+  "schemaVersion": "<from schema $comment, e.g. 1.0.0>",
+  "version": "1.0.0",
   "authors": ["From mapping guide"],
   "createdAt": "YYYY-MM-DDTHH:MM:SSZ",
   "updatedAt": "YYYY-MM-DDTHH:MM:SSZ",
@@ -85,10 +86,16 @@ You have access to the following resources via the Read tool:
 }
 ```
 
+**Versioning rules:**
+- `schemaVersion`: Read from the schema's `$comment` field (`schemaVersion:X.Y.Z`). Always set this.
+- `version`: `"1.0.0"` for new baselines. Use three-part semver.
+- If extending another baseline (`baselinePracticeNames`), add `dependencyVersions` with caret range for each parent baseline.
+
 **CRITICAL Pre-Generation Checks:**
 - ✓ `"kind": "practiceBaseline"` discriminator property present
 - ✓ NO `"baselinePracticeName"` property (unless extending another baseline)
-- ✓ Version is "1.0" for initial baseline
+- ✓ Version is `"1.0.0"` for initial baseline (three-part semver)
+- ✓ `schemaVersion` matches schema `$comment`
 - ✓ Dates in ISO 8601 format with timezone (Z for UTC)
 
 ### Step 3: Build Focuses Array
@@ -600,7 +607,8 @@ Before writing the final JSON file, validate:
   "kind": "practiceBaseline",
   "name": "...",
   "description": "...",
-  "version": "1.0",
+  "schemaVersion": "...",
+  "version": "1.0.0",
   "authors": [...],
   "createdAt": "YYYY-MM-DDTHH:MM:SSZ",
   "updatedAt": "YYYY-MM-DDTHH:MM:SSZ",

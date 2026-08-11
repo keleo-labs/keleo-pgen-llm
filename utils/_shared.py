@@ -57,37 +57,17 @@ MERGEABLE_ARRAYS = [
 ]
 
 
-def merge_by_name(base_list, overlay_list):
-    """Merge two lists of objects by 'name' key. Overlay overrides base."""
-    merged = OrderedDict()
-    for item in (base_list or []):
-        if "name" in item:
-            merged[item["name"]] = item
-    for item in (overlay_list or []):
-        if "name" in item:
-            if item["name"] in merged:
-                existing = merged[item["name"]]
-                combined = copy.deepcopy(existing)
-                combined.update(copy.deepcopy(item))
-                merged[item["name"]] = combined
-            else:
-                merged[item["name"]] = copy.deepcopy(item)
-    return list(merged.values())
+def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None):
+    """Merge two lists of objects by 'name' key. Overlay overrides base.
 
-
-def merge_by_name_annotated(base_list, overlay_list, base_source, overlay_source):
-    """Merge two lists by 'name', stamping _contributingPracticeName on each element.
-
-    Same semantics as merge_by_name (overlay wins on conflict).
+    When source names are provided, stamps _contributingPracticeName on each
+    element for provenance tracking.
     """
-    base_names = {item["name"] for item in (base_list or []) if "name" in item}
-    overlay_names = {item["name"] for item in (overlay_list or []) if "name" in item}
-
     merged = OrderedDict()
     for item in (base_list or []):
         if "name" in item:
             entry = copy.deepcopy(item)
-            if "_contributingPracticeName" not in entry:
+            if base_source is not None and "_contributingPracticeName" not in entry:
                 entry["_contributingPracticeName"] = base_source
             merged[item["name"]] = entry
     for item in (overlay_list or []):
@@ -96,11 +76,13 @@ def merge_by_name_annotated(base_list, overlay_list, base_source, overlay_source
                 existing = merged[item["name"]]
                 combined = copy.deepcopy(existing)
                 combined.update(copy.deepcopy(item))
-                combined["_contributingPracticeName"] = overlay_source
+                if overlay_source is not None:
+                    combined["_contributingPracticeName"] = overlay_source
                 merged[item["name"]] = combined
             else:
                 entry = copy.deepcopy(item)
-                entry["_contributingPracticeName"] = overlay_source
+                if overlay_source is not None:
+                    entry["_contributingPracticeName"] = overlay_source
                 merged[item["name"]] = entry
     return list(merged.values())
 
@@ -192,3 +174,84 @@ def detect_kind(data):
     if "baselinePracticeName" in data:
         return "practice"
     return "practiceBaseline"
+
+
+def get_schema_version(schema_path=None):
+    """Extract schemaVersion from the schema's $comment field.
+
+    Returns the version string (e.g. '1.0.0') or None if not found.
+    """
+    if schema_path is None:
+        schema_path = Path(__file__).resolve().parent.parent / "deps" / "language.schema.json"
+    try:
+        data = load_json(schema_path, exit_on_error=False)
+        comment = data.get("$comment", "")
+        if comment.startswith("schemaVersion:"):
+            return comment.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    return None
+
+
+def increment_version(version_str, bump="patch"):
+    """Increment a semver version string.
+
+    Args:
+        version_str: Current version (e.g. '1.0.0', '1.0', '2').
+        bump: 'patch', 'minor', or 'major'.
+
+    Returns:
+        Incremented three-part semver string.
+    """
+    parts = (version_str or "1.0.0").split(".")
+    while len(parts) < 3:
+        parts.append("0")
+    major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+
+    if bump == "major":
+        major += 1
+        minor = 0
+        patch = 0
+    elif bump == "minor":
+        minor += 1
+        patch = 0
+    else:
+        patch += 1
+
+    return f"{major}.{minor}.{patch}"
+
+
+def build_dependency_versions(data):
+    """Build dependencyVersions array from a document's declared dependencies.
+
+    Scans the document's dependency declarations (baselinePracticeName,
+    practiceDependencyNames, practiceNames) and builds version constraint
+    entries using caret ranges from resolved dependency versions.
+
+    Args:
+        data: The document dict.
+
+    Returns:
+        List of DocumentVersionConstraint dicts, or empty list.
+    """
+    constraints = []
+    seen = set()
+
+    dep_names = []
+    bpn = data.get("baselinePracticeName")
+    if bpn:
+        dep_names.append(bpn)
+    dep_names.extend(data.get("practiceDependencyNames", []))
+    dep_names.extend(data.get("practiceNames", []))
+    for bpn_entry in data.get("baselinePracticeNames", []):
+        dep_names.append(bpn_entry)
+
+    for name in dep_names:
+        if name and name not in seen:
+            seen.add(name)
+            constraints.append({
+                "documentName": name,
+                "versionRange": "",
+            })
+
+    return constraints

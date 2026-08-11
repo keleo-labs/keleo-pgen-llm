@@ -47,7 +47,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import detect_kind, load_json
+from utils._shared import detect_kind, get_schema_version, load_json
 
 
 def dedup_by_name(items):
@@ -185,14 +185,46 @@ def convert_embedded_method(method_data, baseline_data):
     return documents, externalized
 
 
-def build_manifest(package_identity, documents_meta, dependencies=None):
-    """Build a PackageManifest dict."""
+def collect_package_dependencies(documents):
+    """Build PackageDependency entries from document dependencyVersions.
+
+    Groups document-level version constraints by documentName and produces
+    package-level dependency entries with the tightest versionRange found.
+    """
+    dep_map = OrderedDict()
+    doc_names = {doc.get("name") for doc in documents if doc.get("name")}
+
+    for doc in documents:
+        for dv in doc.get("dependencyVersions", []):
+            dep_name = dv.get("documentName", "")
+            version_range = dv.get("versionRange", "")
+            if dep_name and dep_name not in doc_names and dep_name not in dep_map:
+                dep_map[dep_name] = version_range
+
+    return [
+        OrderedDict([("packageName", name), ("versionRange", vr)])
+        for name, vr in dep_map.items()
+        if vr
+    ]
+
+
+def build_manifest(package_identity, documents_meta, documents=None, dependencies=None):
+    """Build a PackageManifest dict.
+
+    Auto-reads schemaVersion from the schema $comment. When documents are
+    provided and no explicit dependencies are given, auto-builds package
+    dependencies from document-level dependencyVersions.
+    """
     manifest = OrderedDict()
-    manifest["schemaVersion"] = "1.0.0"
+    manifest["schemaVersion"] = get_schema_version() or "1.0.0"
     manifest["package"] = package_identity
     manifest["documents"] = documents_meta
     if dependencies:
         manifest["dependencies"] = dependencies
+    elif documents:
+        auto_deps = collect_package_dependencies(documents)
+        if auto_deps:
+            manifest["dependencies"] = auto_deps
     return manifest
 
 
@@ -314,7 +346,7 @@ def run_bundle(args):
         package_identity["license"] = args.license
 
     asset_files = collect_file_assets(documents, source_dirs)
-    manifest = build_manifest(package_identity, documents_meta)
+    manifest = build_manifest(package_identity, documents_meta, documents=documents)
 
     create_package(args.output, manifest, documents_with_paths, asset_files)
 
@@ -324,7 +356,10 @@ def run_bundle(args):
         type_counts[t] = type_counts.get(t, 0) + 1
 
     print(f"Package '{args.name}' v{args.version} created successfully.")
+    print(f"  schemaVersion: {manifest.get('schemaVersion', '?')}")
     print(f"  Documents: {len(documents_meta)} ({', '.join(f'{v} {k}' for k, v in type_counts.items())})")
+    if manifest.get("dependencies"):
+        print(f"  Dependencies: {len(manifest['dependencies'])} package(s)")
     if asset_files:
         print(f"  Assets: {len(asset_files)} files bundled")
     print(f"  Output: {args.output}")
@@ -391,15 +426,18 @@ def run_convert(args):
     package_identity["description"] = args.description or externalized.get("description", "")
 
     asset_files = collect_file_assets(documents, source_dirs)
-    manifest = build_manifest(package_identity, documents_meta)
+    manifest = build_manifest(package_identity, documents_meta, documents=documents)
 
     create_package(args.output, manifest, documents_with_paths, asset_files)
 
     practice_count = sum(1 for dm in documents_meta if dm["documentType"] == "practice")
     print(f"Converted embedded method to .keleo package.")
+    print(f"  schemaVersion: {manifest.get('schemaVersion', '?')}")
     print(f"  Method: {externalized.get('name', '?')}")
     print(f"  Practices extracted: {practice_count}")
     print(f"  Baseline: {externalized.get('baselinePracticeName', '?')}")
+    if manifest.get("dependencies"):
+        print(f"  Dependencies: {len(manifest['dependencies'])} package(s)")
     if asset_files:
         print(f"  Assets: {len(asset_files)} files bundled")
     print(f"  Output: {args.output}")
