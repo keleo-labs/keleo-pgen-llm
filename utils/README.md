@@ -42,6 +42,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type) | `python3 utils/transform-alphas.py <file>.json [--fix]` |
 | `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
+| `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions | `python3 utils/apply-versioning.py [--all] [--fix]` |
 
 ## Packaging
 

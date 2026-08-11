@@ -3,12 +3,12 @@
   "name": "Partner Ecosystem Essentials",
   "baselinePracticeName": "Red Hat Sales Essentials",
   "description": "A minimal baseline practice for engaging with partner ecosystems, covering partner lifecycle management, value realization, capability building, trust cultivation, and governance.",
-  "version": "2.0",
+  "version": "2.0.0",
   "authors": [
     "Ed Seymour"
   ],
   "createdAt": "2026-06-15T00:00:00Z",
-  "updatedAt": "2026-06-24T00:00:00Z",
+  "updatedAt": "2026-08-11",
   "keywords": [
     "partner ecosystem",
     "alliance management",
@@ -1400,5 +1400,6 @@
       "fontCharacter": "fa-shield-heart",
       "fontWeight": "900"
     }
-  ]
+  ],
+  "schemaVersion": "1.0.0"
 }
