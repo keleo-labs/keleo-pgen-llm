@@ -26,24 +26,56 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import load_json_pair, detect_kind
+from _shared import load_json_pair, detect_kind, load_json_from_keleo
 
-DEFAULT_SEARCH_DIRS = ["baselines", "practices", "deps"]
+DEFAULT_SEARCH_DIRS = ["baselines", "practices", "deps", "bundles"]
 
 
 def build_index(search_dirs):
-    """Scan directories for JSON files and build a name-to-entries index.
+    """Scan directories for JSON files and .keleo bundles, building a name-to-entries index.
 
     Returns:
-        (index, skipped) where index is {name: [{path, kind, name}]} and
+        (index, skipped) where index is {name: [{path, kind, name, ...}]} and
         skipped is a list of paths that could not be indexed.
     """
+    import zipfile as _zf
+
     index = defaultdict(list)
     skipped = []
 
     for search_dir in search_dirs:
         search_path = Path(search_dir)
         if not search_path.is_dir():
+            continue
+
+        if search_path.name == "bundles":
+            for keleo_file in search_path.glob("*.keleo"):
+                try:
+                    with _zf.ZipFile(keleo_file, "r") as zf:
+                        if "manifest.json" not in zf.namelist():
+                            skipped.append(str(keleo_file))
+                            continue
+                        manifest = json.loads(zf.read("manifest.json"))
+                        for doc in manifest.get("documents", []):
+                            doc_name = doc.get("documentName")
+                            doc_type = doc.get("documentType", "")
+                            if not doc_name:
+                                continue
+                            kind_map = {
+                                "practiceBaseline": "practiceBaseline",
+                                "practice": "practice",
+                                "method": "method",
+                            }
+                            kind = kind_map.get(doc_type, doc_type)
+                            index[doc_name].append({
+                                "name": doc_name,
+                                "path": f"{keleo_file}::{doc.get('path', '')}",
+                                "kind": kind,
+                                "keleo_path": str(keleo_file),
+                                "zip_path": doc.get("path", ""),
+                            })
+                except (_zf.BadZipFile, json.JSONDecodeError):
+                    skipped.append(str(keleo_file))
             continue
 
         json_files = []
@@ -79,12 +111,32 @@ def build_index(search_dirs):
     return dict(index), skipped
 
 
-def resolve_name(name, index):
-    """Resolve a single name against the index."""
+def load_resolved_json(entry):
+    """Load JSON for a resolved index entry, handling .keleo archives."""
+    if "keleo_path" in entry:
+        return load_json_from_keleo(
+            entry["keleo_path"],
+            document_name=entry.get("name"),
+        )
+    return load_json_pair(entry["path"])
+
+
+def resolve_name(name, index, prefer_filesystem=False):
+    """Resolve a single name against the index.
+
+    If prefer_filesystem is True and multiple candidates exist, prefer
+    non-keleo (filesystem) entries over keleo-sourced entries.
+    """
     entries = index.get(name, [])
     if len(entries) == 1:
         return {"name": name, "status": "found", **entries[0]}
     elif len(entries) > 1:
+        if prefer_filesystem:
+            fs_entries = [e for e in entries if "keleo_path" not in e]
+            if len(fs_entries) == 1:
+                return {"name": name, "status": "found", **fs_entries[0]}
+            if fs_entries:
+                return {"name": name, "status": "ambiguous", "candidates": fs_entries}
         return {"name": name, "status": "ambiguous", "candidates": entries}
     else:
         return {"name": name, "status": "not_found"}
@@ -126,8 +178,18 @@ def extract_dependency_names(data, kind):
     return deps
 
 
-def resolve_transitive(file_path, index, visited=None):
+def _load_for_transitive(match, file_path_fallback):
+    """Load JSON data from a resolved match entry or a filesystem path."""
+    if "keleo_path" in match:
+        return load_resolved_json(match)
+    return load_json_pair(file_path_fallback)
+
+
+def resolve_transitive(file_path_or_entry, index, visited=None):
     """Recursively resolve transitive baseline dependencies.
+
+    file_path_or_entry can be a filesystem path (str/Path) or a resolved
+    index entry dict (with optional keleo_path).
 
     Only baselinePracticeNames are resolved transitively.
     practiceDependencyNames are reported but not recursed into.
@@ -135,7 +197,10 @@ def resolve_transitive(file_path, index, visited=None):
     if visited is None:
         visited = set()
 
-    data, err = load_json_pair(file_path)
+    if isinstance(file_path_or_entry, dict):
+        data, err = load_resolved_json(file_path_or_entry)
+    else:
+        data, err = load_json_pair(file_path_or_entry)
     if err:
         return []
 
@@ -165,7 +230,7 @@ def resolve_transitive(file_path, index, visited=None):
 
         if match["status"] == "found" and role != "practiceDependency":
             dep_result["transitiveDependencies"] = resolve_transitive(
-                match["path"], index, visited
+                match, index, visited
             )
 
         results.append(dep_result)
@@ -239,6 +304,36 @@ def cmd_resolve_from(file_path, index, transitive=False):
     }
 
 
+def cmd_dependents(target_name, index):
+    """Find all practices/methods that depend on the named baseline or practice."""
+    dependents = []
+
+    for name, entries in index.items():
+        for entry in entries:
+            if "keleo_path" in entry:
+                continue
+            data, err = load_json_pair(entry["path"])
+            if err:
+                continue
+            kind = detect_kind(data)
+            dep_names = extract_dependency_names(data, kind)
+            for dep_name, role in dep_names:
+                if dep_name == target_name:
+                    dependents.append({
+                        "name": name,
+                        "path": entry["path"],
+                        "kind": kind,
+                        "role": role,
+                    })
+                    break
+
+    return {
+        "target": target_name,
+        "dependents": dependents,
+        "count": len(dependents),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Discover and resolve Practice Language JSON dependencies"
@@ -251,6 +346,10 @@ def main():
     group.add_argument(
         "--resolve-from", metavar="FILE",
         help="Extract dependency names from a JSON file and resolve them"
+    )
+    group.add_argument(
+        "--dependents", metavar="NAME",
+        help="Find all practices/methods depending on a named baseline or practice"
     )
     group.add_argument(
         "--list", action="store_true",
@@ -272,6 +371,8 @@ def main():
         result = cmd_list(index, skipped)
     elif args.resolve:
         result = cmd_resolve(args.resolve, index)
+    elif args.dependents:
+        result = cmd_dependents(args.dependents, index)
     elif args.resolve_from:
         if not Path(args.resolve_from).is_file():
             print(json.dumps({"error": f"File not found: {args.resolve_from}"}))

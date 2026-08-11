@@ -62,6 +62,13 @@ For extension practices with a baseline:
 python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema deps/language.schema.json
 ```
 
+For practices with cross-practice dependencies (alphas that `contributesTo`/`mapsTo` targets in other practices):
+```bash
+python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema deps/language.schema.json \
+  --parent <dependency-practice-1.json> --parent <dependency-practice-2.json>
+```
+The `--parent` flag merges each dependency's elements (alphas, work products, personas, personaGroups, activities, citations, narrativeTypes, competencies, activitySpaces) into the baseline for cross-reference validation, eliminating false positive errors for cross-practice references. Use one `--parent` per `practiceDependencyNames` entry.
+
 This single command:
 - Detects `kind` (practice / method / practiceBaseline)
 - Counts all elements
@@ -135,15 +142,12 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
    ```
    **Wait for user confirmation before proceeding.**
 
-3. **Create effective baseline/parent if needed:**
-   - If practice has parent (not just baseline) → create effective parent:
+3. **Create effective context if needed:**
+   - Collect all context sources (baseline, parent practices/methods, .keleo bundles):
      ```bash
-     python3 utils/resolve-parent-practice.py <parent.json> -o practices/<name>/_effective-parent.json
+     python3 utils/resolve-context.py <baseline.json> [<parent.json>] [<bundle.keleo>] --transitive -o practices/<name>/_effective-context.json
      ```
-   - If baseline has transitive dependencies:
-     ```bash
-     python3 utils/resolve-baseline.py <baseline.json> <dep1.json> [<dep2.json> ...] -o practices/<name>/_effective-baseline.json
-     ```
+   - The effective context merges all sources with `_contributingPracticeName` provenance annotations
 
 4. **Check assessment output** — read `recommendations.suggestedUpdateMode`:
    - `"auto-fix"` → proceed to **Step 1A: Auto-Fix**
@@ -167,6 +171,8 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
    Add `--fix-truncated-names` if checklist truncation issues were detected.
    Add `--fix-schema` for schema violations (tags nesting, persona groups, persona properties, techniqueNarratives).
    Add `--fix-contributesto-arrays` to convert contributesTo arrays to strings.
+   Add `--fix-narrative-placement` to move top-level narratives to matching element's narratives[].
+   Add `--fix-pattern-completeness` to add carry-forward alpha states to incomplete pattern views.
    Add `--all` to enable all optional fixes.
 
 3. **For extension practices — fix competency levels if needed:**
@@ -176,8 +182,10 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
 
 4. **Re-assess to confirm fixes:**
    ```bash
-   python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json
+   python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema deps/language.schema.json \
+     [--parent <dep-practice.json> ...]
    ```
+   Include `--parent` for each practice dependency to avoid false positives on cross-practice alpha references.
 
 5. **Report results** — show what was fixed, confirm 0 errors.
 
@@ -236,7 +244,7 @@ Which mode?
 - Process: See generate-method SKILL.md "Step 1: Phase 1 - Analysis" (lines 258-340)
 
 **Update-specific additions:**
-- **Update citations:** Search for latest authoritative sources (official docs, recent editions)
+- **Update citations:** Search for latest authoritative sources (official docs, recent editions). Enrich all citations with `url` fields — use user-provided URLs, official websites, DOI references (`https://doi.org/10.xxxx/xxxxx`), or publisher pages. Only omit when no stable link exists.
 - **Output directory:** `practices/<name>/` for extension practices, `baselines/<name>/` for baselines
 - **Output:** `<dir>/01-analysis-report.md` (OVERWRITE existing if present)
 - **Baselines only:** Also run Phase 1.5 distillation after Phase 1 (output: `<dir>/01.5-distilled-essentials.md`)
@@ -252,7 +260,7 @@ Which mode?
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
+- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill:**
@@ -317,7 +325,7 @@ python3 utils/extract-practice-content.py practices/<name>/<name>.json
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
+- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
 
 **Apply ALL latest guidance from generate-method skill to extracted content:**
@@ -388,11 +396,11 @@ This compares scalar fields, element counts across all sections, diffs competenc
    - Run update workflow (Mode 1 or Mode 2) per practice
    - Generate individual practice JSON or mapping sections
 
-3. **Reassemble Method JSON:**
-   - Combine updated practices into method structure
-   - Update method-level narratives if needed
-   - Merge citations (deduplicate)
-   - Validate method JSON
+3. **Package Method into `.keleo`:**
+   - Package updated practices + baseline into `.keleo` archive using `package-keleo.py`
+   - The packager generates an externalized method JSON with `practiceNames` references
+   - Method-level narratives and merged citations are included automatically
+   - Validate individual practice JSONs before packaging
 
 ---
 
@@ -440,7 +448,8 @@ Provide progress updates:
 - "Extracting existing content as Phase 1 analysis..."
 - "Applying latest mapping guidance: primary alpha focus, competency validation..."
 - "Generating updated JSON with latest schema requirements..."
-- "Validation passed! Updated practice generated at practices/<name>/<name>.json"
+- "Packaging into .keleo archive..."
+- "Validation passed! Updated practice packaged at bundles/<name>.keleo"
 
 ### Completion Report
 
@@ -482,8 +491,10 @@ After any update, run the eval harness to confirm clean state:
 **For extension practices:**
 ```bash
 python3 utils/eval-skill-output.py practices/<name>/ \
-  --baseline <baseline.json> --schema deps/language.schema.json --summary
+  --baseline <baseline.json> --schema deps/language.schema.json --summary \
+  [--parent <dep-practice.json> ...]
 ```
+Include `--parent` for each `practiceDependencyNames` entry whose elements (alphas, work products, personas, etc.) are referenced by the practice.
 
 **For baselines:**
 ```bash
@@ -491,6 +502,50 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 ```
 
 **Expected result:** `error_pass_rate: 1.0`. Warning assertions are advisory — address where practical.
+
+### Post-Update Packaging
+
+After validation passes, resolve transitive dependencies and package the updated output into a `.keleo` archive. **Never use `_effective-context.json` as a document** — it is a build artifact for semantic context during generation, not a distributable document.
+
+**Step 1: Resolve transitive dependencies:**
+```bash
+python3 utils/discover-dependencies.py --resolve-from <practice-or-baseline>.json --transitive
+```
+Resolve any ambiguous dependencies (prefer `deps/`, `baselines/`, or `practices/` paths over `.keleo`-embedded copies). Collect all resolved file paths.
+
+**Step 2: Package with all dependencies in topological order** (baselines first, then practices in dependency order, entry-point last):
+
+**For extension practices:**
+```bash
+python3 utils/package-keleo.py \
+  --name "<practice-name>" --version "1.0.0" \
+  --description "<practice description>" \
+  --documents <baseline>.json [<transitive-dep>.json ...] practices/<name>/<name>.json \
+  -o bundles/<name>.keleo --verify
+```
+
+**For methods (multiple practices):**
+```bash
+python3 utils/package-keleo.py \
+  --name "<method-name>" --version "1.0.0" \
+  --description "<method description>" \
+  --documents <baseline>.json [<transitive-dep>.json ...] \
+              practices/<method-name>/practice-1.json \
+              practices/<method-name>/practice-2.json \
+  --method-name "<Method Name>" \
+  --method-description "<method description>" \
+  --method-narrative-file practices/<method-name>/_method-narrative.json \
+  -o bundles/<method-name>.keleo --verify
+```
+
+**For baselines (with parent baseline):**
+```bash
+python3 utils/package-keleo.py \
+  --name "<baseline-name>" --version "1.0.0" \
+  --description "<baseline description>" \
+  --documents [<parent-baseline>.json] baselines/<name>/<name>.json \
+  -o bundles/<name>.keleo --verify
+```
 
 ---
 
@@ -601,6 +656,70 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
    Rename map format: `{"renames": [{"old": "Author (Year)", "new": "Work Title"}, ...]}`
 4. Re-assess to confirm `citation-name-format` warnings are resolved
 
+### Scenario 7: Add Gherkin-Inspired Structured Guidance
+
+**Symptoms:**
+- Practice/baseline lacks `background`, `test`, or `examples` properties
+- States have complex prerequisites not captured structurally
+- Checklist items need verification scenarios
+- Activities have non-obvious triggers or decision points
+
+**Update Mode:** Remap & Regenerate (Mode 2)
+
+**Process:**
+1. Read `references/semantics.md` Section 5.3 (Gherkin-Inspired Test Model) and Section 8.1.1 (Gherkin on Activities)
+2. Review existing states for complex prerequisites → add `background` with `given`, `alphaStates`, `workProductLevels`
+3. Review checklist items for verification logic → add `test` (Given/When/Then) and `examples` (concrete scenarios)
+4. Review activities for triggers/decision points → add `test.when` and `test.then` (complementing structural `contributesTo`/`worksOn`)
+5. For baselines: use sparingly — practice layer is the natural place for detailed Gherkin
+6. For LODs: add `background` where work product maturity depends on alpha state prerequisites
+7. Regenerate JSON and validate
+
+**Key Rules:**
+- `test` extends PracticeElement — requires `name` and `description` fields
+- `examples` is an array of Test objects (not strings)
+- `background` is an object (not string/array) with optional `given`, `alphaStates`, `workProductLevels`
+- `test.then` should complement (not duplicate) structural `contributesTo`/`worksOn`
+- Incremental adoption is valid — any combination of background/test/examples can be used independently
+
+### Scenario 8: Convert Existing Output to `.keleo` Package
+
+**Symptoms:**
+- Existing practice/baseline/method JSON files without `.keleo` packaging
+- Embedded method JSON that should use externalized `practiceNames` references
+- Need to bundle practice + baseline into a distributable package
+
+**Update Mode:** No phase re-execution needed — packaging only
+
+**Process for embedded method JSON:**
+```bash
+python3 utils/package-keleo.py \
+  --from-embedded <method>.json \
+  --baseline <baseline>.json \
+  -o bundles/<method-name>.keleo --verify
+```
+This extracts embedded practices into separate documents, creates an externalized method JSON with `practiceNames` string references, and bundles everything into a `.keleo` archive.
+
+**Process for standalone practice + baseline:**
+First resolve transitive dependencies (`python3 utils/discover-dependencies.py --resolve-from <practice>.json --transitive`), then include all resolved documents:
+```bash
+python3 utils/package-keleo.py \
+  --name "<practice-name>" --version "1.0.0" \
+  --description "<description>" \
+  --documents <baseline>.json [<transitive-deps>.json ...] <practice>.json \
+  -o bundles/<practice-name>.keleo --verify
+```
+
+**Process for standalone baseline:**
+If the baseline has `baselinePracticeName`, include the parent baseline:
+```bash
+python3 utils/package-keleo.py \
+  --name "<baseline-name>" --version "1.0.0" \
+  --description "<description>" \
+  --documents [<parent-baseline>.json] <baseline>.json \
+  -o bundles/<baseline-name>.keleo --verify
+```
+
 ---
 
 ## Remap Phase: Checklist Name Quality
@@ -699,6 +818,58 @@ All icons use these standard fields:
 
 ---
 
+## Feature: Update Process Integrity
+
+Validates that the update workflow follows correct assessment-first, backup-safe patterns.
+
+### Scenario: Assessment before update (@rule:process-401)
+- Given: An existing JSON file is provided for update
+- When: The update workflow begins
+- Then: assess-practice.py is run first to determine suggestedUpdateMode
+- And: The update mode is auto-fix, remap, or full-reanalysis based on assessment output
+
+### Scenario: Backup before overwrite (@rule:process-402)
+- Given: The update will overwrite existing files
+- When: Any mode (auto-fix, remap, or full-reanalysis) begins
+- Then: backup-practice.py has created a timestamped backup of the directory
+- And: The backup contains all JSON and markdown files
+
+### Scenario: Auto-fix mode applied when sufficient (@rule:process-403)
+- Given: Assessment output shows suggestedUpdateMode is "auto-fix"
+- When: The update mode is determined
+- Then: Fix utilities are run without user interaction
+- And: Re-assessment confirms 0 errors before reporting success
+
+### Scenario: Dependency resolution before update (@rule:process-404)
+- Given: An extension practice is being updated
+- When: Step 0C begins
+- Then: discover-dependencies.py resolves all baselinePracticeName and practiceDependencyNames
+- And: Resolved dependencies are confirmed with the user before proceeding
+
+### Scenario: Content preservation during remap (@rule:process-405)
+- Given: The update uses remap mode (Phase 2 → 3)
+- When: Existing content is extracted and remapped
+- Then: All valid existing alphas, activities, work products, and narratives are preserved
+- And: Only superseded or invalid content is replaced
+
+### Scenario: Post-update validation required (@rule:process-406)
+- Given: An update has completed (any mode)
+- When: The workflow is finishing
+- Then: eval-skill-output.py is run with error_pass_rate checked
+- And: The result is reported to the user with any remaining warnings
+
+### Scenario: Comparison report after update (@rule:process-407)
+- Given: A remap or full-reanalysis update has completed
+- When: The new JSON is generated
+- Then: diff-practice-json.py shows what changed vs the original
+- And: The user sees added, removed, and modified elements
+
+### Scenario: User confirms update mode when auto-fix insufficient (@rule:process-408)
+- Given: Assessment shows non-auto-fixable issues
+- When: Step 1B presents mode options
+- Then: The user is asked to choose between remap and full-reanalysis
+- And: The recommended mode and reason from assessment are presented
+
 ## Key Principles
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
@@ -719,7 +890,7 @@ All icons use these standard fields:
    - Full assessment: `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json]`
    - Compare two versions: `python3 utils/diff-practice-json.py old.json new.json` (structural diff: count deltas, added/removed elements)
    - Compare (changes only): `python3 utils/diff-practice-json.py old.json new.json --changes-only`
-   - Assessment with parent: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <parent>.json` (merges parent elements into baseline for validation)
+   - Assessment with parent: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <parent>.json` (merges parent's alphas, work products, personas, activities, etc. into baseline for cross-reference validation)
    - Assessment summary: `python3 utils/assess-practice.py <file>.json --summary` (counts by severity/category, suggested mode)
    - Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only` (filter to only severity=error issues)
    - Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure` (type and count/length for each key)
@@ -727,7 +898,13 @@ All icons use these standard fields:
    - Add missing alpha redeclaration: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" [--fix]`
    - Remap alpha references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old Alpha" "New Alpha" --state-map '{"OldState":"NewState"}' [--fix]`
    - Remove alpha and references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remove-alpha "Alpha Name" [--fix]`
-   - Assemble method with merged assets: `python3 utils/assemble-method-json.py --name "Name" --baseline-name "Baseline" --practices p1.json p2.json -o method.json --merge-assets`
+   - Batch alpha transform (dry-run): `python3 utils/transform-alphas.py <practice>.json --spec '[{"alpha":"Old","rename":"New","setMapsTo":"Parent","stateMap":{"S1":"T1"}}]'`
+   - Batch alpha transform (apply): `python3 utils/transform-alphas.py <practice>.json --spec-file transforms.json --fix`
+   - Transform spec supports: `rename`, `setMapsTo`, `setContributesTo`, `stateMap` (1:1 or many:1 merge), `addStates` (new states with checklist)
+   - Resolve transitive deps: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (find all baselines + practices in dependency tree)
+   - Package into .keleo: `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json [transitive-deps.json ...] p1.json p2.json --method-name "Method Name" -o bundles/name.keleo --verify` (list ALL transitive deps, never use `_effective-context.json`)
+   - Convert embedded method to .keleo: `python3 utils/package-keleo.py --from-embedded method.json --baseline baseline.json -o bundles/method.keleo --verify`
+   - Verify existing package: `python3 utils/package-keleo.py --verify-only bundles/name.keleo`
    - JSON patching — set key: `python3 utils/patch-practice-json.py <target>.json --set-key assets --patch-file assets.json`
    - JSON patching — merge at root: `python3 utils/patch-practice-json.py <target>.json --patch-file patch.json`
    - JSON patching — append to array: `python3 utils/patch-practice-json.py <target>.json --append-key assets --patch-file more-assets.json`
@@ -738,8 +915,29 @@ All icons use these standard fields:
    - JSON patching — deep replace: `python3 utils/patch-practice-json.py <target>.json --replace "old text" "new text"`
    - JSON patching — bulk replace: `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
    - JSON patching — preview: add `--dry-run` to any patch command
-   - These commands work on ANY JSON file — practice, method, baseline, `_effective-baseline.json`, or `_effective-parent.json`
+   - These commands work on ANY JSON file — practice, method, baseline, `_effective-context.json`
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.
 6. **Report Changes** — Show what was fixed and what remains.
+
+---
+
+## Post-Completion Review (MANDATORY)
+
+**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
+
+1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
+   - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list
+   - Inline `python3 -c` or `bash -c` scripts that should have been reusable utils
+   - Shell patterns (heredocs, loops, process substitution) that triggered prompts
+   - External tool calls (e.g., `unzip`, `zip`, `curl`) that could be absorbed into existing utils
+
+2. **Identify missing utils**: Did you have to write any ad-hoc logic that could be generalised into a reusable utility script in `utils/`?
+
+3. **Propose fixes** (present to user, don't apply unilaterally):
+   - **Permission gaps**: Suggest adding auto-allow entries to `.claude/settings.json`
+   - **Missing utils**: Propose new utility scripts or extensions to existing ones
+   - **Skill improvements**: Suggest skill instruction updates to prevent the ad-hoc pattern in future runs
+
+4. **Report**: Briefly tell the user what you found and what you'd recommend changing. If nothing was found, say so — a clean session is a good signal.

@@ -1,0 +1,731 @@
+{
+  "skill": "generate-method",
+  "source": ".claude/skills/generate-method/SKILL.md",
+  "features": [
+    "Alpha Relationship Integrity",
+    "Narrative Quality",
+    "Element Naming",
+    "Coverage Completeness",
+    "Terminology Aliasing",
+    "Structural Integrity",
+    "Process Compliance"
+  ],
+  "scenarios": [
+    {
+      "id": "semantic-001",
+      "name": "No floating alphas",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A new alpha is defined that does not exist in the baseline"
+      ],
+      "when": [
+        "Phase 3 generates the alpha JSON"
+      ],
+      "then": [
+        "The alpha has exactly one of `contributesTo` or `mapsTo`",
+        "The target resolves to a baseline, practice-local, or dependency alpha"
+      ],
+      "line": 875,
+      "assess_categories": [
+        "practice-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-002",
+      "name": "contributesTo and mapsTo are mutually exclusive",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A new alpha declares a parent relationship"
+      ],
+      "when": [
+        "The alpha JSON is generated"
+      ],
+      "then": [
+        "The alpha has `contributesTo` or `mapsTo` but never both"
+      ],
+      "line": 881,
+      "assess_categories": [
+        "integrity"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-003",
+      "name": "mapsTo variants match parent states exactly",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A new alpha has `mapsTo` pointing to a parent alpha"
+      ],
+      "when": [
+        "The alpha's states are generated"
+      ],
+      "then": [
+        "The state names and sequence exactly match the parent alpha's states"
+      ],
+      "line": 886,
+      "assess_categories": [
+        "integrity"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-010",
+      "name": "mapsTo variant names omit parent type",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A new alpha has `mapsTo` pointing to a parent alpha"
+      ],
+      "when": [
+        "The alpha name is chosen"
+      ],
+      "then": [
+        "The alpha name does not contain the parent alpha's name",
+        "The alias name (if present) does not contain the parent alpha's name"
+      ],
+      "line": 891,
+      "assess_categories": [
+        "mapsto-naming"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-005",
+      "name": "Redeclared alphas have no contributesTo or mapsTo",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "An alpha name matches a baseline or parent practice alpha"
+      ],
+      "when": [
+        "The alpha is included in the practice JSON"
+      ],
+      "then": [
+        "The alpha has neither `contributesTo` nor `mapsTo`",
+        "Only practice-specific checklists, narratives, and Gherkin guidance are added"
+      ],
+      "line": 897,
+      "assess_categories": [
+        "redeclaration-compliance"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-006",
+      "name": "Competency level names match baseline exactly",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "An activity or persona references a competency level"
+      ],
+      "when": [
+        "The `competencyLevelName` value is set"
+      ],
+      "then": [
+        "The value exactly matches a CompetencyLevel.name from the baseline for that competency",
+        "Level names are extracted with `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`"
+      ],
+      "line": 903,
+      "assess_categories": [
+        "competency-levels"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-007",
+      "name": "relatesTo only on new alphas",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "An alpha is a redeclaration of a baseline alpha"
+      ],
+      "when": [
+        "The alpha JSON is generated"
+      ],
+      "then": [
+        "No `relatesTo` array is added (baseline relationships are inherited)"
+      ],
+      "line": 909,
+      "assess_categories": [
+        "baseline-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-008",
+      "name": "relatesTo entries have required fields",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A new alpha defines `relatesTo` relationships"
+      ],
+      "when": [
+        "The relatesTo array is generated"
+      ],
+      "then": [
+        "Every entry has `relationship`, `alphaName`, and `direction` fields",
+        "`direction` is one of `outgoing`, `incoming`, or `mutual`"
+      ],
+      "line": 914,
+      "assess_categories": [
+        "integrity"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-009",
+      "name": "contributesToState references valid parent state",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "A state on a new alpha declares `contributesToState`"
+      ],
+      "when": [
+        "The state JSON is generated"
+      ],
+      "then": [
+        "The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`"
+      ],
+      "line": 920,
+      "assess_categories": [
+        "contributes-to-state"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-011",
+      "name": "Baseline references are case-sensitive",
+      "feature": "Alpha Relationship Integrity",
+      "given": [
+        "The practice references baseline elements (alphas, focuses, activitySpaces, competencies)"
+      ],
+      "when": [
+        "Symbolic reference values are set"
+      ],
+      "then": [
+        "Every reference exactly matches the baseline element's `name` (case-sensitive)"
+      ],
+      "line": 925,
+      "assess_categories": [
+        "baseline-ref-focus",
+        "baseline-ref-alpha",
+        "baseline-ref-activityspace",
+        "baseline-ref-competency",
+        "baseline-ref-narrativetype"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "narrative-001",
+      "name": "Narratives are structured objects",
+      "feature": "Narrative Quality",
+      "given": [
+        "A narrative is defined on any element or at practice level"
+      ],
+      "when": [
+        "The narrative JSON is generated"
+      ],
+      "then": [
+        "The narrative has `narrativeTypeName` and `narrativeContexts` array",
+        "Each context has `seq`, `narrativeElementName`, and `context` fields"
+      ],
+      "line": 958,
+      "assess_categories": [
+        "narrative-structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "narrative-003",
+      "name": "Narrative names describe subject matter",
+      "feature": "Narrative Quality",
+      "given": [
+        "A narrative has a `name` and `description`"
+      ],
+      "when": [
+        "The narrative JSON is generated"
+      ],
+      "then": [
+        "The name describes the subject matter, not the template type",
+        "The description explains what the narrative covers, not the framework structure",
+        "Contexts contain direct story content without mentioning the narrative type"
+      ],
+      "line": 964,
+      "assess_categories": [
+        "narrative-self-reference"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "narrative-005",
+      "name": "Narrative contexts are self-contained",
+      "feature": "Narrative Quality",
+      "given": [
+        "A narrative has contexts with `narrativeElementName` labels"
+      ],
+      "when": [
+        "The context strings are generated"
+      ],
+      "then": [
+        "Each context is coherent without its element heading visible",
+        "Bare lists include a framing introduction sentence"
+      ],
+      "line": 971,
+      "assess_categories": [
+        "narrative-self-containment"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "narrative-002",
+      "name": "Narratives placed on correct elements",
+      "feature": "Narrative Quality",
+      "given": [
+        "A narrative describes a specific alpha, activity, or work product"
+      ],
+      "when": [
+        "The narrative is attached in the JSON"
+      ],
+      "then": [
+        "Element-specific narratives are on the element's `narratives[]` property",
+        "Only practice/method-level narratives go in the top-level `narratives[]` array"
+      ],
+      "line": 977,
+      "assess_categories": [
+        "narrative-placement"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "narrative-006",
+      "name": "All narratives have citation references",
+      "feature": "Narrative Quality",
+      "given": [
+        "A narrative is defined"
+      ],
+      "when": [
+        "The narrative JSON is generated"
+      ],
+      "then": [
+        "The narrative includes a `citationNames` array with at least one citation reference"
+      ],
+      "line": 983,
+      "assess_categories": [
+        "narrative-citations"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-001",
+      "name": "Descriptions are single sentences under word limit",
+      "feature": "Element Naming",
+      "given": [
+        "An element has a `description` field"
+      ],
+      "when": [
+        "The description is generated"
+      ],
+      "then": [
+        "Element descriptions are at most 20 words",
+        "State and LOD descriptions are at most 12 words"
+      ],
+      "line": 992,
+      "assess_categories": [
+        "description-length"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-002",
+      "name": "Checklist names are noun-phrase labels",
+      "feature": "Element Naming",
+      "given": [
+        "A checklist item on an alpha state has `name` and `description`"
+      ],
+      "when": [
+        "The checklist JSON is generated"
+      ],
+      "then": [
+        "The name is a short noun phrase (not truncated from the description)",
+        "The name is not identical to the description"
+      ],
+      "line": 998,
+      "assess_categories": [
+        "checklist-quality"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-003",
+      "name": "Global name uniqueness across element types",
+      "feature": "Element Naming",
+      "given": [
+        "Multiple PracticeElement types are defined (alphas, workProducts, activities, personas, patterns)"
+      ],
+      "when": [
+        "All element names are collected"
+      ],
+      "then": [
+        "No name appears in more than one element type"
+      ],
+      "line": 1004,
+      "assess_categories": [
+        "uniqueness"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-004",
+      "name": "LOD names describe content maturity",
+      "feature": "Element Naming",
+      "given": [
+        "A work product has levels of detail"
+      ],
+      "when": [
+        "LOD names are chosen"
+      ],
+      "then": [
+        "Names describe artifact content maturity (e.g., \"Outline\", \"Comprehensive\", \"Automated\")",
+        "Names do not use generic labels (\"Level 1\", \"Basic\") or concern progression terms (\"Established\", \"Optimized\")"
+      ],
+      "line": 1009,
+      "assess_categories": [
+        "lod-naming"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-005",
+      "name": "Activity names differ from ActivitySpace names",
+      "feature": "Element Naming",
+      "given": [
+        "An activity is assigned to an ActivitySpace"
+      ],
+      "when": [
+        "The activity name is chosen"
+      ],
+      "then": [
+        "The activity name is distinct from the ActivitySpace name"
+      ],
+      "line": 1015,
+      "assess_categories": [
+        "activity-name-distinctness"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-001",
+      "name": "Alpha state minimum",
+      "feature": "Coverage Completeness",
+      "given": [
+        "An alpha is defined in the practice"
+      ],
+      "when": [
+        "States are assigned to the alpha"
+      ],
+      "then": [
+        "The alpha has at least 3 states"
+      ],
+      "line": 1024,
+      "assess_categories": [
+        "alpha-state-minimum"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-002",
+      "name": "Work product LOD minimum",
+      "feature": "Coverage Completeness",
+      "given": [
+        "A work product is defined in the practice"
+      ],
+      "when": [
+        "Levels of detail are assigned"
+      ],
+      "then": [
+        "The work product has at least 2 levels of detail"
+      ],
+      "line": 1029,
+      "assess_categories": [
+        "workproduct-lod-minimum"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-003",
+      "name": "Alpha states have supporting LODs",
+      "feature": "Coverage Completeness",
+      "given": [
+        "An alpha state exists on a new (non-baseline) alpha"
+      ],
+      "when": [
+        "Work product LODs are checked"
+      ],
+      "then": [
+        "At least one LOD has `contributesTo` targeting the alpha state"
+      ],
+      "line": 1034,
+      "assess_categories": [
+        "evidence-coverage"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-004",
+      "name": "Patterns cover all practice alphas",
+      "feature": "Coverage Completeness",
+      "given": [
+        "A pattern is defined in the practice"
+      ],
+      "when": [
+        "PatternViews are checked"
+      ],
+      "then": [
+        "Every practice alpha appears in at least one PatternView",
+        "Each alpha appears in every view (backfilled if needed)"
+      ],
+      "line": 1039,
+      "assess_categories": [
+        "pattern-coverage"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-005",
+      "name": "Alpha states have supporting activities",
+      "feature": "Coverage Completeness",
+      "given": [
+        "An alpha state beyond the initial state exists on a new alpha"
+      ],
+      "when": [
+        "Activity contributesTo references are checked"
+      ],
+      "then": [
+        "At least one activity has `contributesTo` targeting the alpha state"
+      ],
+      "line": 1045,
+      "assess_categories": [
+        "activity-state-gap"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "aliasing-001",
+      "name": "One alias per element maximum",
+      "feature": "Terminology Aliasing",
+      "given": [
+        "The practice defines terminology aliases"
+      ],
+      "when": [
+        "Aliases are assigned to baseline elements"
+      ],
+      "then": [
+        "Each baseline element has at most one alias"
+      ],
+      "line": 1054,
+      "assess_categories": [
+        "alias-uniqueness"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "aliasing-002",
+      "name": "Alias names excluded from structural references",
+      "feature": "Terminology Aliasing",
+      "given": [
+        "An alias maps a baseline name to a domain-specific name"
+      ],
+      "when": [
+        "The practice JSON uses symbolic references (alphaName, contributesTo, activitySpaceName, etc.)"
+      ],
+      "then": [
+        "Only canonical baseline names appear in structural reference fields",
+        "Alias names never appear in structural reference fields"
+      ],
+      "line": 1059,
+      "assess_categories": [
+        "alias-isolation"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "aliasing-003",
+      "name": "Keyword count within range",
+      "feature": "Terminology Aliasing",
+      "given": [
+        "The practice defines a keywords array"
+      ],
+      "when": [
+        "Keywords are generated"
+      ],
+      "then": [
+        "The array contains between 10 and 20 keywords"
+      ],
+      "line": 1065,
+      "assess_categories": [
+        "keyword-count"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-001",
+      "name": "JSON has correct kind discriminator",
+      "feature": "Structural Integrity",
+      "given": [
+        "Phase 3 generates a JSON file"
+      ],
+      "when": [
+        "The JSON is validated"
+      ],
+      "then": [
+        "The `kind` property is \"practice\" for single practices, \"method\" for multi-practice methods"
+      ],
+      "line": 1074,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-002",
+      "name": "All required sections present in JSON",
+      "feature": "Structural Integrity",
+      "given": [
+        "Phase 3 generates a practice JSON"
+      ],
+      "when": [
+        "The JSON is validated"
+      ],
+      "then": [
+        "alphas, activities, workProducts, patterns, and citations arrays are present and non-empty"
+      ],
+      "line": 1079,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-003",
+      "name": "Pattern cross-references resolve",
+      "feature": "Structural Integrity",
+      "given": [
+        "A pattern references alpha names and state names in patternViews"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline",
+        "Every stateName resolves to a valid state on that alpha"
+      ],
+      "line": 1084,
+      "assess_categories": [
+        "crossref-pattern"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-004",
+      "name": "Activity-alpha cross-references resolve",
+      "feature": "Structural Integrity",
+      "given": [
+        "An activity has contributesTo entries referencing alphas and states"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state"
+      ],
+      "line": 1090,
+      "assess_categories": [
+        "crossref-activity-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-005",
+      "name": "Activity-work product cross-references resolve",
+      "feature": "Structural Integrity",
+      "given": [
+        "An activity has worksOn entries referencing work products and LODs"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Every workProductName and levelOfDetailName in worksOn resolves to defined elements"
+      ],
+      "line": 1095,
+      "assess_categories": [
+        "crossref-activity-wp"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "process-001",
+      "name": "Phase 1 completed before Phase 2",
+      "feature": "Process Compliance",
+      "given": [
+        "The three-phase pipeline is being executed"
+      ],
+      "when": [
+        "Phase 2 mapping begins"
+      ],
+      "then": [
+        "01-analysis-report.md exists with all 8 required sections",
+        "Analysis has sufficient depth (5+ numbered subsections and 3+ source references)"
+      ],
+      "line": 1104,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-002",
+      "name": "Phase 2 completed before Phase 3",
+      "feature": "Process Compliance",
+      "given": [
+        "The three-phase pipeline is being executed"
+      ],
+      "when": [
+        "Phase 3 JSON generation begins"
+      ],
+      "then": [
+        "02-mapping-guide.md exists with all 7 required sections",
+        "At least 3 alphas, 5 activities, and 1 pattern are mapped"
+      ],
+      "line": 1110,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-003",
+      "name": "Validation run after JSON generation",
+      "feature": "Process Compliance",
+      "given": [
+        "Phase 3 has generated a JSON file"
+      ],
+      "when": [
+        "The phase is marked complete"
+      ],
+      "then": [
+        "validate-practice-json.py has been run with 0 schema errors",
+        "assess-practice.py has been run with 0 error-severity issues"
+      ],
+      "line": 1116,
+      "assess_categories": [],
+      "automatable": false
+    }
+  ],
+  "stats": {
+    "total_scenarios": 36,
+    "total_features": 7,
+    "automatable": 33,
+    "manual_only": 3,
+    "by_category": {
+      "aliasing": 3,
+      "coverage": 5,
+      "naming": 5,
+      "narrative": 5,
+      "process": 3,
+      "semantic": 10,
+      "structural": 5
+    }
+  }
+}

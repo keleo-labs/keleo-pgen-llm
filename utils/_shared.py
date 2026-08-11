@@ -7,6 +7,7 @@ Internal module — not a CLI tool. Import from individual scripts:
 import copy
 import json
 import sys
+import zipfile
 from collections import OrderedDict
 from pathlib import Path
 
@@ -74,6 +75,112 @@ def merge_by_name(base_list, overlay_list):
     return list(merged.values())
 
 
+def merge_by_name_annotated(base_list, overlay_list, base_source, overlay_source):
+    """Merge two lists by 'name', stamping _contributingPracticeName on each element.
+
+    Same semantics as merge_by_name (overlay wins on conflict).
+    """
+    base_names = {item["name"] for item in (base_list or []) if "name" in item}
+    overlay_names = {item["name"] for item in (overlay_list or []) if "name" in item}
+
+    merged = OrderedDict()
+    for item in (base_list or []):
+        if "name" in item:
+            entry = copy.deepcopy(item)
+            if "_contributingPracticeName" not in entry:
+                entry["_contributingPracticeName"] = base_source
+            merged[item["name"]] = entry
+    for item in (overlay_list or []):
+        if "name" in item:
+            if item["name"] in merged:
+                existing = merged[item["name"]]
+                combined = copy.deepcopy(existing)
+                combined.update(copy.deepcopy(item))
+                combined["_contributingPracticeName"] = overlay_source
+                merged[item["name"]] = combined
+            else:
+                entry = copy.deepcopy(item)
+                entry["_contributingPracticeName"] = overlay_source
+                merged[item["name"]] = entry
+    return list(merged.values())
+
+
+def load_json_from_keleo(keleo_path, document_name=None, document_type=None):
+    """Load a JSON document from a .keleo ZIP archive.
+
+    Returns (data, None) on success or (None, error_string) on failure.
+    If document_name is provided, matches against manifest documentName.
+    If document_type is provided, filters by documentType.
+    If neither is provided, returns the entry-point document.
+    """
+    try:
+        with zipfile.ZipFile(keleo_path, "r") as zf:
+            if "manifest.json" not in zf.namelist():
+                return None, f"No manifest.json in {keleo_path}"
+            manifest = json.loads(zf.read("manifest.json"))
+            documents = manifest.get("documents", [])
+            if not documents:
+                return None, f"No documents in manifest of {keleo_path}"
+
+            target = None
+            for doc in documents:
+                if document_name and doc.get("documentName") == document_name:
+                    if document_type is None or doc.get("documentType") == document_type:
+                        target = doc
+                        break
+                elif document_type and doc.get("documentType") == document_type:
+                    target = doc
+                    break
+
+            if target is None:
+                for doc in documents:
+                    if doc.get("entryPoint"):
+                        target = doc
+                        break
+
+            if target is None:
+                target = documents[0]
+
+            zip_path = target.get("path", "")
+            if zip_path not in zf.namelist():
+                return None, f"Document path {zip_path} not found in {keleo_path}"
+
+            data = json.loads(zf.read(zip_path))
+            return data, None
+    except zipfile.BadZipFile:
+        return None, f"Invalid ZIP archive: {keleo_path}"
+    except json.JSONDecodeError as e:
+        return None, f"Invalid JSON in {keleo_path}: {e}"
+
+
+def load_all_from_keleo(keleo_path):
+    """Load all JSON documents from a .keleo ZIP archive.
+
+    Returns (list_of_dicts, None) on success or (None, error_string) on failure.
+    """
+    try:
+        with zipfile.ZipFile(keleo_path, "r") as zf:
+            if "manifest.json" not in zf.namelist():
+                return None, f"No manifest.json in {keleo_path}"
+            manifest = json.loads(zf.read("manifest.json"))
+            documents = manifest.get("documents", [])
+            if not documents:
+                return None, f"No documents in manifest of {keleo_path}"
+
+            result = []
+            for doc_entry in documents:
+                zip_path = doc_entry.get("path", "")
+                if zip_path not in zf.namelist():
+                    continue
+                data = json.loads(zf.read(zip_path))
+                result.append(data)
+            return result, None
+    except zipfile.BadZipFile:
+        return None, f"Invalid ZIP archive: {keleo_path}"
+    except json.JSONDecodeError as e:
+        return None, f"Invalid JSON in {keleo_path}: {e}"
+
+
 def collect_element_names(data, element_type):
     """Collect all names from an element type across root and embedded practices."""
     names = set()
@@ -106,11 +213,11 @@ def collect_alpha_state_names(data):
 
 def detect_kind(data):
     """Classify JSON by schema discrimination rules."""
+    kind = data.get("kind", "")
+    if kind in ("practice", "method", "practiceBaseline"):
+        return kind
     if any(key in data for key in ("practices", "practiceNames", "baselinePractice")):
         return "method"
     if "baselinePracticeName" in data:
         return "practice"
-    kind = data.get("kind", "")
-    if kind in ("practice", "method", "practiceBaseline"):
-        return kind
     return "practiceBaseline"

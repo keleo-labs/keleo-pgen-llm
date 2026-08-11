@@ -5,6 +5,7 @@
 # Uncomment the following lines if you don't want to track generated practice files:
 practices/*
 baselines/*
+reviews/*
 practice-resources/*
 archive
 

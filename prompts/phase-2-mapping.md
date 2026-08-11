@@ -30,14 +30,14 @@ You have access to the following resources via the Read tool:
 2b. **Parent Practice JSON** (optional, alternative to direct baseline mapping)
    - When provided, this is an existing practice or method that the new practice extends
    - The parent practice's alphas become the **primary mapping targets** (not the baseline's)
-   - The baseline is still loaded for ontology context and validation, but `contributesTo` targets primarily reference parent practice alphas
+   - The baseline is still loaded for ontology context and validation, but `contributesTo`/`mapsTo` targets primarily reference parent practice alphas
    - `baselinePracticeName` is inherited from the parent practice's own `baselinePracticeName`
    - `practiceDependencyNames` is auto-populated with the parent practice name(s)
-   - All structural references (`contributesTo`, `alphaName`, etc.) use canonical names — if `_aliasContext` is present, aliases inform semantic understanding only
+   - All structural references (`contributesTo`, `mapsTo`, `alphaName`, etc.) use canonical names — if `_aliasContext` is present, aliases inform semantic understanding only
 
 3. **references/semantics.md**
    - Comprehensive semantic guidance for Practice Language
-   - Rules for alpha handling (redeclaration vs specialization)
+   - Rules for alpha handling (redeclaration vs specialization vs variant mapping)
    - Orthogonal tagging taxonomy
    - Checklist standards
    - Narrative management
@@ -54,27 +54,28 @@ You have access to the following resources via the Read tool:
 
 **Step 0.1: Load Baseline and Count Alpha Coverage**
 
-1. **Read baseline practice JSON completely** (path provided by user):
-   - Extract all alphas with their `focusName` and `relatesTo` arrays
+1. **Read effective context JSON completely** (path provided by user):
+   - Extract all alphas with their `focusName`, `relatesTo` arrays, and `_contributingPracticeName`
    - Note the focus areas (e.g., Value, Solution, Endeavor)
+   - Read `_provenance.tiers` to classify element sources: baselines vs practices vs methods
 
-   **Parent practice mode:** Also read the effective parent JSON. The parent's alphas are the **primary mapping targets**. Build a combined alpha index:
-   - Parent practice alphas: primary `contributesTo` targets for new alphas
-   - Baseline alphas: ontology context for concerns orthogonal to the parent practice
-   - If the effective parent has `_aliasContext`, use aliases for semantic understanding but canonical names for all structural decisions
+   **Using provenance for mapping decisions:**
+   - Elements where `_contributingPracticeName` points to a name in `_provenance.tiers.baselines` are **baseline elements** (ontology context, redeclaration targets)
+   - Elements where `_contributingPracticeName` points to a name in `_provenance.tiers.practices` are **practice elements** (primary `contributesTo`/`mapsTo` targets)
+   - If the context has `_aliasContext`, use aliases for semantic understanding but canonical names for all structural decisions
 
 2. **Map Phase 1 concerns to alphas:**
    
-   **Standard baseline mode:**
+   **Baseline-only context** (all elements from baselines):
    - Which baseline alphas does the content enrich? (redeclarations — adding checklists/narratives to existing alphas)
-   - Which baseline alphas need specialization? (new alphas with `contributesTo` pointing to baseline alphas)
-   - Count total baseline alpha coverage (redeclarations + contributesTo targets)
+   - Which baseline alphas need specialization or variant mapping? (new alphas with `contributesTo` or `mapsTo` pointing to baseline alphas)
+   - Count total baseline alpha coverage (redeclarations + contributesTo/mapsTo targets)
    
-   **Parent practice mode:**
-   - Which **parent practice** alphas does the content enrich? (redeclarations of parent practice alphas)
-   - Which **parent practice** alphas need further specialization? (new alphas with `contributesTo` pointing to parent practice alphas)
-   - Which **baseline** alphas are directly relevant but NOT already covered by the parent practice? (these can still be redeclared/specialized directly)
-   - Count total alpha coverage using parent practice alphas as the primary set
+   **Mixed context** (elements from both baselines and practices):
+   - Which **practice-sourced** alphas does the content enrich? (redeclarations of practice alphas)
+   - Which **practice-sourced** alphas need further specialization or variant mapping? (new alphas with `contributesTo` or `mapsTo` pointing to practice alphas)
+   - Which **baseline-sourced** alphas are directly relevant but NOT already covered by practice elements? (these can still be redeclared/specialized directly)
+   - Count total alpha coverage using practice-sourced alphas as the primary set
 
 3. **Analyze coverage pattern:**
    - **Focused** (3-6 alphas in 1-2 focuses) → Likely single practice
@@ -137,6 +138,11 @@ At the TOP of the mapping guide output (after Metadata, before Baseline Practice
 1. **Read `practices/<practice-name>/01-analysis-report.md`**
    - Review all extracted concerns, work products, activities, competencies, personas, workflows
    - Review preliminary practice structure (will be validated/overridden by Step 0 delineation)
+   - **Note Gherkin seed material** from Phase 1 — these fields directly feed Gherkin constructs:
+     - Concern **Concreteness Tests** (Given/When/Then) → seed state `background`, checklist `test`, activity `test`
+     - State **Prerequisites** → seed `background.given` and `background.alphaStates`
+     - Activity **Triggers** → seed `test.when`
+     - Activity **Observable Results** → seed `test.then`
 
 2. **Read the baseline practice JSON** (path provided by user)
    - **CRITICAL:** Read BOTH names AND descriptions for semantic understanding
@@ -154,10 +160,10 @@ At the TOP of the mapping guide output (after Metadata, before Baseline Practice
      - Section 3.1.2: Orthogonal Tagging Taxonomy
      - Section 3.3: Checklists and Dynamic State-Gating
      - Section 4: Alpha-State Trajectory (especially 4.1: Baseline Isolation Rules)
-     - Section 5: Work Product Elements
+     - Section 5: Work Product Elements (including 5.3: Gherkin-Inspired Test Model)
      - Section 6: Execution Boundaries and Organizational Roles
      - Section 7: Narrative Management
-     - Section 8: Lifecycle Orchestration (Patterns)
+     - Section 8: Lifecycle Orchestration (Patterns), especially 8.1.1: Gherkin on Activities
      - Section 9.2.5: Redeclaration vs Specialization Decision Framework
 
 ### Step 2: Map Metadata (For Each Practice)
@@ -196,10 +202,18 @@ For each citation from Phase 1:
   Authors: [array of author names]
   Date: Publication year
   Source: Publisher/journal
-  URL: Retrieval URL (if applicable)
+  URL: Retrieval URL (REQUIRED where possible)
   ```
 
 **CRITICAL — Citation Name Rule:** The `Name` MUST be the **title of the work**, NOT an author-date shorthand. Author names belong only in the Authors field.
+
+**CRITICAL — Citation URL Rule:** Every citation SHOULD have a `url` field. Carry forward all URLs recorded in the Phase 1 analysis — including internal, intranet, and Google Docs/Sheets/Slides links:
+- **Phase 1 URLs** — Preserve URLs already recorded in the analysis report (highest priority)
+- **User-provided URLs** — Carry input source URLs directly into corresponding citations
+- **Official websites** — Framework/methodology homepages (e.g., `https://framework.scaledagile.com/`)
+- **DOI references** — Academic works use `https://doi.org/10.xxxx/xxxxx` format
+- **Publisher/standards pages** — Books use publisher catalog pages; standards use official body pages
+- Only omit `url` when no stable link exists. Never fabricate URLs. Internal/intranet URLs are valid.
 
 **CRITICAL:** Citations have NO narratives property (metadata only)
 
@@ -337,27 +351,44 @@ Create "Assets" section listing all identified visual artifacts:
 
 ### Step 4: Map Concerns to Alphas
 
-For EACH concern from Phase 1, apply the **Redeclaration vs Specialization Decision Framework** (semantics.md Section 9.2.5):
+For EACH concern from Phase 1, apply the **Redeclaration vs Specialization vs Variant Mapping Decision Framework** (semantics.md Section 4.4):
 
 **CRITICAL FIRST STEP: Semantic Comparison**
 
-Before deciding redeclaration vs specialization, compare source concern against baseline alpha DESCRIPTIONS (not just names):
+Before deciding redeclaration vs specialization vs variant mapping, compare source concern against baseline alpha DESCRIPTIONS (not just names):
 
 1. **Read baseline alpha description carefully** - What is the full scope and intent?
 2. **Read all baseline alpha state descriptions** - What progression is already defined?
 3. **Compare source concern's scope to baseline alpha's described scope**:
    - Does source concern fit entirely within baseline description's scope? → Consider redeclaration
    - Does source concern address narrower/specialized subset? → Consider specialization
-   - Does source concern address something semantically different? → New alpha (with contributesTo)
+   - Does source concern address something semantically different? → New alpha (with contributesTo or mapsTo)
 
 **Decision Questions:**
-1. Is this concern **generally applicable** (universal to all uses of baseline alpha as described)?
-   - YES → Redeclaration (enrich baseline alpha)
-   - NO → Specialization (new alpha with contributesTo)
+1. Is this concern **generally applicable** (universal to all uses of the parent alpha as described)?
+   - YES → Redeclaration (enrich parent alpha)
+   - NO → Go to question 2
 
-2. Does this concern use the **same state progression** as baseline alpha states describe?
-   - YES → Redeclaration
-   - NO → Specialization
+2. Does this concern use the **same state progression** as the parent alpha states describe?
+   - YES, and it IS-A variant of the parent (distinct named instance, same lifecycle) → **Variant Mapping** (new alpha with `mapsTo`)
+   - YES, but it is universal enrichment → Redeclaration
+   - NO → **Specialization** (new alpha with `contributesTo`)
+
+3. **Combinability Test (CRITICAL):** If multiple practices in this method each add checklists to this alpha, would combining them all into one alpha produce a coherent, non-conflicting result?
+   - YES (all additions are additive and universally applicable) → Redeclaration
+   - NO (additions are context-specific, conflicting, or only meaningful within one practice's scope) → Specialization or Variant Mapping
+
+   **The combinability test is the strongest signal.** Redeclaration enriches detail while remaining at the same scope — every checklist item added should be meaningful regardless of which practice context the alpha is viewed in. Specialization narrows scope to cover a specific concern — each specialization's checklists are only meaningful within that narrower context. Variant Mapping names a distinct variant that follows the parent's lifecycle with domain-specific checklists.
+
+4. **IS-A Test (for Variant Mapping):** Does the source concern represent a named variant that IS-A type of the parent?
+   - YES, with same states → **Variant Mapping** (`mapsTo`)
+   - NO, or needs different states → **Specialization** (`contributesTo`)
+
+   **Example:** Five Sales Play practices each adding play-specific checklists to a "Sales Play" alpha → WRONG (redeclaration). Combining them produces a single alpha with AI-specific, IT-ops-specific, and infrastructure-specific checklists jumbled together. Instead, each should use `mapsTo`: "AI-Ready Enterprise" mapsTo "Sales Play", "IT Operations Efficiency" mapsTo "Sales Play", etc. Each variant follows the same state progression (Selected → Activated → Executing → Measured → Optimized) with domain-specific checklists. On merge, variants appear within the parent alpha's `variants` array.
+
+   **Counter-example (Redeclaration):** A single practice adding general security governance checklists to a "Platform" alpha's existing states → CORRECT (redeclaration). The security checklists are universally applicable to any platform context and enhance the alpha's detail without narrowing its scope.
+
+   **Counter-example (Specialization):** "Platform Capability" contributesTo "Platform" → CORRECT (specialization). Platform capabilities have their own distinct lifecycle (Identified → Designed → Implemented → Published → Adopted) different from Platform states.
 
 **Example Decision Process:**
 ```
@@ -392,12 +423,22 @@ States: [EXACT baseline states with ADDED checklists]
   State 1:
     Name: [baseline state name]
     Description: [baseline state description]
+    Background: [populate from Phase 1 state Prerequisites — translate to structured form]
+      Given: [from Phase 1 Prerequisites: contextual conditions and natural-language preconditions]
+      Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
+      Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
     Checklists: [baseline checklists + NEW practice-specific checklists from Phase 1 criteria]
+      Each checklist item may include:
+        Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
+          Given: [preconditions for this checklist item]
+          When: [trigger or condition to verify]
+          Then: [expected outcomes]
+        Examples: [optional - array of concrete scenario Tests]
   State 2: ...
 Narrative: [NEW practice-specific context]
 ```
 
-**Specialization (New Alpha):**
+**Specialization (New Alpha with `contributesTo`):**
 ```
 Alpha Name: [NEW descriptive name from Phase 1 concern]
 Description: [From Phase 1 concern description]
@@ -407,32 +448,112 @@ States: [NEW states from Phase 1 progressive states]
   State 1:
     Name: [from Phase 1]
     Description: [from Phase 1]
+    contributesToState: [optional - parent alpha state this contributes to]
+    Background: [populate from Phase 1 state Prerequisites — translate to structured form]
+      Given: [from Phase 1 Prerequisites: contextual conditions and natural-language preconditions]
+      Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
+      Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
     Checklists: [from Phase 1 criteria]
+      Each checklist item may include:
+        Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
+        Examples: [optional - array of concrete scenario Tests]
   State 2: ...
 Narrative: [from Phase 1 narrative]
 ```
 
-**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` pointing to a valid parent alpha (NO FLOATING ALPHAS)
+**Variant Mapping (New Alpha with `mapsTo`):**
+```
+Alpha Name: [NEW descriptive variant name — e.g., "AI-Ready Enterprise"]
+Description: [Domain-specific description of this variant]
+Focus Name: [Value | Solution | Endeavor based on perspective]
+mapsTo: [parent alpha name this is a variant of - REQUIRED!]
+States: [EXACT SAME states as the parent alpha — names and sequence MUST match]
+  State 1:
+    Name: [EXACT parent state name]
+    Description: [parent state description]
+    contributesToState: [optional — takes equivalence semantics in mapsTo context]
+    Background: [variant-specific prerequisites]
+    Checklists: [domain-specific checklists for this variant]
+      Each checklist item may include:
+        Test: [optional - variant-specific verification]
+        Examples: [optional - variant-specific scenarios]
+  State 2: ...
+Narrative: [variant-specific narrative]
+```
 
-**Valid contributesTo Targets:**
+**When to use `mapsTo` vs `contributesTo`:**
+
+| Signal | `mapsTo` (Variant Mapping) | `contributesTo` (Specialization) |
+|--------|---------------------------|----------------------------------|
+| State progression | SAME as parent (exact state names) | DIFFERENT from parent (new states) |
+| Semantic relationship | IS-A variant (e.g., "AI-Ready Enterprise" IS a "Sales Play") | Sub-concern feeding into parent |
+| On merge | Appears in parent's `variants` array | Appears as child in hierarchy |
+| Checklists | Domain-specific, variant-appropriate | Scope-specific, narrowed concern |
+| Multiple instances | Multiple variants in parallel (each a named type) | Typically fewer, more structural |
+| Mutually exclusive with | `contributesTo` | `mapsTo` |
+
+**State-Level Parent Mapping (`contributesToState`):**
+
+When a new alpha has `contributesTo` or `mapsTo`, individual states can optionally declare which parent alpha state they contribute to via `contributesToState`. For `contributesTo` alphas, this creates fine-grained contribution tracking. For `mapsTo` alphas, this takes on equivalence semantics (states map 1:1 to parent states).
+
+- Not every state needs a mapping — gaps are expected and valid
+- The value must be a valid state name on the parent alpha (the one referenced by `contributesTo` or `mapsTo`)
+- Multiple child states may map to the same parent state
+- Use when there is a clear correspondence between reaching a child state and progressing toward a parent state
+
+**Example (Specialization):**
+```
+Alpha: Platform Capability
+contributesTo: Platform
+States:
+  - Name: Identified
+    contributesToState: Recognized  (maps to Platform.Recognized)
+  - Name: Specified
+    (no contributesToState — no clear parent correspondence)
+  - Name: Implemented
+    contributesToState: Operational  (maps to Platform.Operational)
+```
+
+**Example (Variant Mapping):**
+```
+Alpha: AI-Ready Enterprise
+mapsTo: Sales Play
+States:
+  - Name: Selected           (EXACT match to Sales Play.Selected)
+    Checklists: [AI maturity assessed, AI use cases identified]
+  - Name: Activated          (EXACT match to Sales Play.Activated)
+    Checklists: [AI demo environment prepared, AI ROI model presented]
+  - Name: Executing          (EXACT match to Sales Play.Executing)
+    Checklists: [AI pilot deployed, AI adoption metrics tracked]
+  - Name: Measured           (EXACT match to Sales Play.Measured)
+    Checklists: [AI business impact quantified, AI expansion plan documented]
+  - Name: Optimized          (EXACT match to Sales Play.Optimized)
+    Checklists: [AI portfolio optimized, AI best practices shared across plays]
+```
+
+**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` OR `mapsTo` pointing to a valid parent alpha (NO FLOATING ALPHAS). `contributesTo` and `mapsTo` are mutually exclusive — never set both on the same alpha.
+
+**Valid `contributesTo` / `mapsTo` Targets:**
+
+All targets below apply to BOTH `contributesTo` and `mapsTo`. The choice between them depends on the relationship type (specialization vs variant mapping), not the target location.
 
 1. **Baseline Practice Alpha** (most common in standard mode):
    - Reference: Alpha name from the baseline practice JSON
-   - Example: `"contributesTo": "Platform"` (where Platform is in baseline)
-   - Use when: Specializing a universally applicable baseline concept
+   - Example: `"contributesTo": "Platform"` or `"mapsTo": "Sales Play"` (where the target is in baseline)
+   - Use when: Specializing or creating a variant of a universally applicable baseline concept
 
-2. **Parent Practice Alpha** (primary target in parent practice mode):
-   - Reference: Alpha name from the effective parent JSON (canonical name, NOT alias)
-   - Example: `"contributesTo": "Platform Infrastructure"` (where Platform Infrastructure is in the parent practice)
+2. **Practice-Sourced Alpha** (primary target when context includes practices):
+   - Reference: Alpha name from effective context where `_contributingPracticeName` points to a practice (canonical name, NOT alias)
+   - Example: `"contributesTo": "Platform Infrastructure"` or `"mapsTo": "Technology Decision Point"` (where the target is practice-sourced)
    - Use when: The new practice extends an existing practice's capabilities
-   - **Auto-populated**: Parent practice name(s) are added to `practiceDependencyNames` automatically
-   - **In parent practice mode, this is the preferred target** — use baseline alphas only for concerns orthogonal to the parent practice
+   - **Auto-populated**: Contributing practice name(s) are added to `practiceDependencyNames` automatically
+   - **When context includes practices, these are the preferred targets** — use baseline-sourced alphas only for concerns orthogonal to existing practices
 
 3. **Practice-Local Alpha** (internal hierarchy):
    - Reference: Another new alpha defined earlier in THIS practice
    - Example: Alpha "Platform Service" → `"contributesTo": "Platform Capability"` (where Platform Capability is another new alpha in this practice)
    - Use when: Building multi-level specialization (Alpha C → Alpha B → Alpha A → Baseline)
-   - **REQUIREMENT**: The referenced alpha must be defined EARLIER in the mapping guide and must itself have valid contributesTo
+   - **REQUIREMENT**: The referenced alpha must be defined EARLIER in the mapping guide and must itself have valid `contributesTo` or `mapsTo`
 
 4. **External Practice Alpha** (cross-practice dependency):
    - Reference: Alpha from another practice (e.g., Team Topologies, AWS Well-Architected)
@@ -442,7 +563,7 @@ Narrative: [from Phase 1 narrative]
 
 **When Using External Practice References:**
 
-If any alpha uses contributesTo referencing an external practice, you MUST:
+If any alpha uses `contributesTo` or `mapsTo` referencing an external practice, you MUST:
 
 1. **Document the dependency** in practice metadata:
 
@@ -469,9 +590,9 @@ If any alpha uses contributesTo referencing an external practice, you MUST:
    ]
    ```
 
-**Semantic Validation for contributesTo Decisions:**
+**Semantic Validation for `contributesTo` / `mapsTo` Decisions:**
 
-For EACH new alpha (specialization), validate the contributesTo choice using the **State Alignment Heuristic** (semantics.md Section 9.2.5):
+For EACH new alpha (specialization or variant), validate the relationship choice using the **State Alignment Heuristic** (semantics.md Section 9.2.5):
 
 1. **List candidate parent alphas** that could semantically relate to this new alpha:
    - **Baseline alphas** (from baseline practice JSON)
@@ -485,26 +606,32 @@ For EACH new alpha (specialization), validate the contributesTo choice using the
    - Calculate alignment score: matches / total states
 
 3. **Apply decision rule:**
-   - ≥70% alignment → Strong match, use this parent (high confidence)
-   - 50-69% alignment → Moderate match, likely correct (verify with description fit)
+   - ≥90% alignment (near-exact state match) → Strong signal for **`mapsTo`** (variant mapping) — verify IS-A semantics
+   - ≥70% alignment → Strong match for `contributesTo` (high confidence), or `mapsTo` if states are exact
+   - 50-69% alignment → Moderate match, likely `contributesTo` (verify with description fit)
    - 30-49% alignment → Weak match, review decision carefully
    - <30% alignment → No meaningful alignment, try different parent or reconsider as redeclaration
 
-4. **Choose parent with highest alignment score**
+4. **Choose parent and relationship type:**
    - If highest score is from baseline alpha → use baseline reference
    - If highest score is from practice-local alpha → use practice-local reference (creates internal hierarchy)
    - If highest score is from external practice alpha → use external reference (creates practice dependency)
+   - **Then decide `contributesTo` vs `mapsTo`:**
+     - States match exactly AND concept IS-A variant of parent → `mapsTo`
+     - States differ OR concept is a sub-concern feeding into parent → `contributesTo`
 
 **Document validation in mapping guide:**
 ```
 Alpha: [New Alpha Name]
-contributesTo: [Chosen Parent Alpha]
+contributesTo: [Chosen Parent Alpha]    # OR mapsTo: [Chosen Parent Alpha]
+Relationship type: specialization | variant mapping
 
 State Alignment Validation:
 - Parent states: [list parent alpha states]
 - New alpha states: [list new alpha states]
 - Semantic matches: [list matching states with explanation]
 - Alignment score: [X/Y states = Z%]
+- Relationship justification: [why contributesTo vs mapsTo — for mapsTo: confirm IS-A semantics and exact state match]
 - Decision rationale: [why this parent is semantically appropriate]
 
 Alternative considered: [other parent alpha and why rejected]
@@ -531,23 +658,41 @@ Alternative considered: Platform - rejected due to 0% state alignment (Platform 
 
 **Validation Checklist for New Alphas:**
 
-- [ ] contributesTo field present and references valid parent alpha (baseline, practice-local, or external)
+- [ ] `contributesTo` OR `mapsTo` field present and references valid parent alpha (baseline, practice-local, or external)
+- [ ] `contributesTo` and `mapsTo` are NOT both set on the same alpha (mutually exclusive)
+- [ ] **If `mapsTo`:** States EXACTLY match the target alpha (same names, same sequence)
+- [ ] **If `mapsTo`:** IS-A semantics confirmed (this alpha IS a variant of the parent)
 - [ ] State alignment calculated and ≥50%
 - [ ] If alignment <70%, description alignment also verified
 - [ ] If alignment <50%, decision justified or alpha reconsidered as redeclaration
 - [ ] Alternative parents considered and documented (baseline, practice-local, external options)
-- [ ] Decision rationale provided explaining semantic fit
+- [ ] Decision rationale provided explaining semantic fit and relationship type choice
 - [ ] **If external practice reference:** Practice dependency documented in metadata
-- [ ] **If practice-local reference:** Parent alpha is defined earlier in mapping guide with valid contributesTo chain
+- [ ] **If practice-local reference:** Parent alpha is defined earlier in mapping guide with valid `contributesTo` or `mapsTo` chain
 
 **Semantic Relationships (relatesTo):**
 
-The `relatesTo` property captures non-hierarchical relationships between alphas. Follow these rules from semantics.md Section 4.1:
+The `relatesTo` property captures non-hierarchical relationships between alphas. Each entry is an `AlphaRelationship` with required `relationship`, `alphaName`, and `direction` fields, plus an optional `description`.
 
 **CRITICAL DISTINCTION:**
 
 - **For baseline alpha redeclarations**: DO NOT add relatesTo (inherit baseline relationships automatically)
 - **For new alphas ONLY**: Define domain-specific relatesTo relationships
+
+**AlphaRelationship Fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `relationship` | Yes | Verb phrase describing the relationship type (e.g., "depends on", "produces") |
+| `alphaName` | Yes | Symbolic reference to the target alpha (must exist in baseline or practice) |
+| `direction` | Yes | `outgoing` (this alpha acts upon target), `incoming` (target acts upon this alpha), or `mutual` (symmetric) |
+| `description` | No | Human-readable explanation of why this relationship exists and what it means in context |
+
+**Direction Selection:**
+
+- **`outgoing`**: This alpha initiates the relationship — it depends on, produces, constrains, enables, or consumes the target. Most relationships are outgoing.
+- **`incoming`**: The target alpha acts upon this alpha — use for passive voice relationships like "is supported by", "is governed by", "is validated by".
+- **`mutual`**: Symmetric relationship applying in both directions — use sparingly for genuine peer relationships like "correlates with", "co-evolves with".
 
 **Using Baseline relatesTo for Analysis:**
 
@@ -561,9 +706,9 @@ The `relatesTo` property captures non-hierarchical relationships between alphas.
    ```text
    Baseline Alpha: Platform
    relatesTo:
-   - { relationship: "built by", alphaName: "Team" }
-   - { relationship: "hosts", alphaName: "Platform Asset" }
-   - { relationship: "governed by", alphaName: "Platform Governance" }
+   - { relationship: "built by", alphaName: "Team", direction: "incoming" }
+   - { relationship: "hosts", alphaName: "Platform Asset", direction: "outgoing" }
+   - { relationship: "governed by", alphaName: "Platform Governance", direction: "incoming" }
    
    Analysis Impact:
    - Practice must include Team activities that build/maintain platform
@@ -578,55 +723,68 @@ The `relatesTo` property captures non-hierarchical relationships between alphas.
 
 **Defining relatesTo for New Alphas:**
 
-Only for NEW alphas (specializations with contributesTo), define semantic relationships:
+Only for NEW alphas (with `contributesTo` or `mapsTo`), define semantic relationships:
 
-**Relationship Type Selection** (from semantics.md Section 4.1):
+**Relationship Type Selection** (from semantics.md Section 6.1):
 
 1. **Dependency Patterns** - "depends on", "requires", "validated by", "evidenced by"
+   - Direction: `outgoing` for "depends on"/"requires"; `incoming` for "validated by"/"evidenced by"
    - Use when: New alpha needs another alpha's output or state
    - Example: New alpha "Platform Capability" depends on "Requirements"
 
 2. **Production Patterns** - "produces", "delivers", "creates", "built by", "performed by"
+   - Direction: `outgoing` for "produces"/"delivers"/"creates"; `incoming` for "built by"/"performed by"
    - Use when: New alpha creates or is created by another alpha
    - Example: New alpha "Platform Service" produces "Platform Asset"
 
 3. **Guidance/Control Patterns** - "guides", "drives", "directs", "constrains", "governs", "enforces policies on"
+   - Direction: `outgoing` (this alpha guides/constrains the target)
    - Use when: New alpha influences or controls another alpha
    - Example: New alpha "Platform Standards" constrains "Platform Capability"
 
 4. **Information Flow Patterns** - "provides", "communicates value to", "provides feedback to"
+   - Direction: `outgoing` (this alpha sends information to the target)
    - Use when: New alpha transfers information or knowledge
    - Example: New alpha "Platform Metrics" provides feedback to "Team"
 
 5. **Enabling Patterns** - "enables", "facilitates", "supports", "enables access to", "exposes"
+   - Direction: `outgoing` (this alpha enables the target)
    - Use when: New alpha makes another alpha possible or easier
    - Example: New alpha "Developer Portal" enables access to "Platform"
 
 6. **Impact Patterns** - "influences", "impacts", "justifies", "demonstrates ROI for"
+   - Direction: `outgoing` (this alpha influences the target)
    - Use when: New alpha affects another alpha indirectly
    - Example: New alpha "Platform Cost Management" justifies "Platform Value And Economics"
 
 7. **Consumption Patterns** - "consumes", "hosts", "runs on", "realizes"
+   - Direction: `outgoing` for "consumes"/"runs on"; `outgoing` for "hosts" (this alpha hosts the target)
    - Use when: New alpha uses or is hosted by another alpha
    - Example: New alpha "Application Workload" consumes "Platform Capability"
+
+8. **Mutual Patterns** - "correlates with", "co-evolves with", "complements"
+   - Direction: `mutual` (symmetric relationship)
+   - Use sparingly for genuinely symmetric peer relationships
 
 **Relationship Discovery Process:**
 
 For each new alpha, ask:
 
-1. **What does this alpha depend on?** → "depends on" relationships
-2. **What does this alpha produce?** → "produces" relationships
-3. **What does this alpha guide or control?** → "guides" or "constrains" relationships
-4. **What information does this alpha provide?** → "provides" relationships
-5. **What does this alpha enable?** → "enables" relationships
-6. **What does this alpha influence indirectly?** → "influences" relationships
-7. **What does this alpha consume or use?** → "consumes" relationships
+1. **What does this alpha depend on?** → "depends on" (direction: `outgoing`)
+2. **What does this alpha produce?** → "produces" (direction: `outgoing`)
+3. **What does this alpha guide or control?** → "guides"/"constrains" (direction: `outgoing`)
+4. **What information does this alpha provide?** → "provides" (direction: `outgoing`)
+5. **What does this alpha enable?** → "enables" (direction: `outgoing`)
+6. **What does this alpha influence indirectly?** → "influences" (direction: `outgoing`)
+7. **What does this alpha consume or use?** → "consumes" (direction: `outgoing`)
+8. **What acts upon this alpha?** → passive verb (direction: `incoming`)
 
 **Relationship Validation Rules:**
 
 - Every alphaName in relatesTo MUST reference a valid alpha (baseline or practice-defined)
 - Use domain-specific verbs (NOT generic "relates to")
-- Relationships are unidirectional (if bidirectional intent, both alphas declare reciprocal relationships)
+- Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`)
+- Optionally include `description` to explain why the relationship exists
 - Typically 2-5 relationships per new alpha (avoid relationship bloat)
 - Prioritize relationships that inform practice activities and patterns
 
@@ -640,19 +798,23 @@ contributesTo: Platform
 relatesTo:
 - relationship: "depends on"
   alphaName: "Requirements"
-  rationale: Capabilities are scoped based on stakeholder requirements
+  direction: outgoing
+  description: Capabilities are scoped based on stakeholder requirements
   
 - relationship: "produces"
   alphaName: "Platform Asset"
-  rationale: Each capability produces consumable services/assets
+  direction: outgoing
+  description: Each capability produces consumable services/assets
   
 - relationship: "validated by"
   alphaName: "Platform Consumption Interface"
-  rationale: Capability usability proven through consumption interface adoption
+  direction: incoming
+  description: Capability usability proven through consumption interface adoption
   
 - relationship: "constrained by"
   alphaName: "Platform Governance"
-  rationale: Capabilities must comply with governance policies and guardrails
+  direction: incoming
+  description: Capabilities must comply with governance policies and guardrails
 
 States: [...]
 ```
@@ -663,20 +825,23 @@ States: [...]
 ### Alpha: [New Alpha Name]
 - Description: [...]
 - Focus Name: [Value | Solution | Endeavor]
-- contributesTo: [Parent Alpha]
+- contributesTo: [Parent Alpha]   # OR mapsTo: [Parent Alpha] (mutually exclusive)
 - relatesTo:
   - relationship: "[verb phrase]"
     alphaName: "[Alpha Name]"
-    rationale: [Why this relationship exists and how it informs the practice]
+    direction: [outgoing | incoming | mutual]
+    description: [Why this relationship exists and what it means in context]
   - relationship: "[verb phrase]"
     alphaName: "[Alpha Name]"
-    rationale: [...]
+    direction: [outgoing | incoming | mutual]
+    description: [...]
 ```
 
 **Validation Checklist for relatesTo:**
 
 - [ ] **Redeclarations have NO relatesTo** (inherit from baseline)
 - [ ] **New alphas define 2-5 relationships** (if semantically meaningful)
+- [ ] **Every relatesTo entry has `direction`** (outgoing, incoming, or mutual)
 - [ ] All alphaName references are valid (baseline or practice alphas)
 - [ ] Relationship verbs are domain-specific (not generic)
 - [ ] Rationale provided for each relationship
@@ -708,6 +873,10 @@ Levels of Detail: [map Phase 1 levels]
     Name: [descriptive only, NO "Level X:" prefix]
     Description: [single sentence, max 12 words]
     Seq: [1, 2, 3...]
+    Background: [optional - shared prerequisites for this LOD]
+      Given: [preconditions that should hold when LOD is reached]
+      Alpha States: [prerequisite alpha/state pairs]
+      Work Product Levels: [prerequisite work product/LOD pairs]
     Checklists: [3-5 one-sentence characteristics from Phase 1]
     Contributes To: [AlphaContribution objects - which alpha/state this LOD proves]
       - Alpha Name: [alpha]
@@ -789,6 +958,9 @@ Involves: [array of Persona Group names - from Phase 1 team mappings]
 Narrative: [from Phase 1 "How to Perform" section]
   - Use technique narrative type
   - Include citations to source material
+Test: [optional - seeded from Phase 1 Triggers and Observable Results]
+  When: [from Phase 1 "Triggers" — decision points, events, lifecycle moments]
+  Then: [from Phase 1 "Observable Results" — practitioner-meaningful outcomes beyond structural contributesTo]
 ```
 
 **CRITICAL:** Activity names must be specific and different from Activity Space names
@@ -888,6 +1060,15 @@ After completing initial activity mapping, systematically identify missing activ
    Description: [What this activity accomplishes - single sentence]
    Activity Space Name: [Baseline or practice activity space]
    Focus Name: [Value | Solution | Endeavor - match alpha focus]
+   Background: [optional - shared prerequisites for this activity]
+     Given: [preconditions that should hold before activity begins]
+     Alpha States: [prerequisite alpha/state pairs]
+     Work Product Levels: [prerequisite work product/LOD pairs]
+   Test: [optional - structured Given/When/Then execution scenario]
+     Given: [preconditions for the activity]
+     When: [triggers, decision points, or events that initiate]
+     Then: [expected outcomes beyond structural contributesTo/worksOn]
+   Examples: [optional - array of concrete scenario Tests]
    Contributes To:
      - Alpha Name: [target alpha]
        State Name: [target state this activity progresses toward]
@@ -1137,8 +1318,9 @@ Practice Element Aliases:
 
 **Before finalizing, check:**
 
-1. **All new alphas have contributesTo** (no floating alphas)
-2. **All baseline references use EXACT names** (case-sensitive)
+1. **All new alphas have `contributesTo` or `mapsTo`** (no floating alphas; mutually exclusive)
+2. **All `mapsTo` alphas have EXACT state names matching target alpha**
+3. **All baseline references use EXACT names** (case-sensitive)
 3. **Competency names are canonical** (not descriptions)
 4. **Tags use orthogonal structure** (domainTags, lifecycleTags, organizationalTags)
 5. **Descriptions are single sentences** (max 20 words for elements, max 12 for states/LODs)
@@ -1146,7 +1328,8 @@ Practice Element Aliases:
 7. **Work product LOD names have NO "Level X:" prefix**
 8. **All LODs have contributesTo array** (required field)
 9. **Narrative contexts are 1-3 sentences** (not paragraphs)
-10. **Citations have NO narratives property** (metadata only)
+10. **Narrative contexts are self-contained** — coherent without element headings (narrative element names are authoring scaffolding, not displayed to readers)
+11. **Citations have NO narratives property** (metadata only)
 11. **Delineation justified** - Mapping guide includes "Delineation Analysis" section; if alpha count >= 8 and all focuses represented, explicit justification for practice structure decision is provided
 
 ## Output Format
@@ -1284,6 +1467,12 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
   - **State: Architecture Selected**
     - **Description:** [baseline description]
     - **Seq:** 1
+    - **Background:** [optional]
+      - Given:
+        - Platform opportunity has been identified by stakeholders
+      - Alpha States:
+        - Alpha Name: Opportunity
+          State Name: Initiated
     - **Baseline Checklists:** [count]
     - **Added Checklists:**
       1. Cloud provider selected and approved
@@ -1420,6 +1609,20 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - **Description:** Define security controls and compliance architecture
 - **Activity Space Name:** Architect and Build the Foundation
 - **Focus Name:** Solution
+- **Background:** [optional]
+  - Given:
+    - Security requirements have been gathered from compliance and risk teams
+  - Alpha States:
+    - Alpha Name: Requirements
+      State Name: Bounded
+- **Test:** [optional]
+  - Given:
+    - Compliance framework requirements are documented
+  - When:
+    - Architecture review board convenes to evaluate security design
+  - Then:
+    - Security controls address all identified threat vectors
+    - Compliance gaps are documented with remediation timeline
 - **Contributes To:**
   - Alpha Name: Platform
     State Name: Architecture Selected
@@ -1534,7 +1737,8 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 
 ## Validation Checklist
 
-- [ ] All new alphas have contributesTo
+- [ ] All new alphas have `contributesTo` or `mapsTo` (mutually exclusive; no floating alphas)
+- [ ] All `mapsTo` alphas have exact state name matches with target alpha
 - [ ] All baseline references use exact canonical names
 - [ ] Competency names are exact baseline names (not descriptions)
 - [ ] Tags use orthogonal structure {domainTags, lifecycleTags, organizationalTags}
@@ -1547,6 +1751,11 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] Checklists are 5-7 items per state, 3-5 per LOD, one sentence each
 - [ ] Practice narrative uses baseline narrative type
 - [ ] All symbolic references are exact string matches
+- [ ] Gherkin structures (background, test, examples) used where verification logic adds value
+- [ ] Background.given preconditions are prose descriptions (not checklist assertions)
+- [ ] Test.when clauses on activities describe triggers/decision points (not state names)
+- [ ] Test.then clauses complement structural contributesTo (not duplicate it)
+- [ ] Examples provide concrete scenarios (not abstract restated rules)
 ```
 
 ## Quality Standards
@@ -1557,10 +1766,12 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - Competency names are exact baseline names (not descriptions)
 
 ### Redeclaration vs Specialization
-- **Test:** Is this generally applicable or practice-specific?
-- **Generally applicable** → Redeclaration (preserve baseline structure exactly)
-- **Practice-specific** → Specialization (new alpha with contributesTo)
-- **When in doubt** → Default to specialization
+- **Scope test:** Does the new content enhance detail at the SAME scope, or narrow scope to a specific concern?
+- **Same scope, more detail** → Redeclaration (preserve parent structure exactly, add universally applicable checklists)
+- **Narrowed scope, different states** → Specialization (new alpha with `contributesTo`)
+- **Named variant, same states** → Variant Mapping (new alpha with `mapsTo` — IS-A semantics, exact state match)
+- **Combinability test:** If multiple practices each add to this alpha, would merging all additions produce a coherent result? NO → Specialization or Variant Mapping
+- **When in doubt** → Default to specialization (`contributesTo`)
 
 ### Tagging Consistency
 - Always use orthogonal structure: {domainTags, lifecycleTags, organizationalTags}
@@ -1603,10 +1814,12 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 - ✓ All Phase 1 personas and teams mapped
 - ✓ All Phase 1 patterns mapped to baseline pattern structure
 - ✓ All baseline references are exact canonical names
-- ✓ No floating alphas (all new alphas have contributesTo)
+- ✓ No floating alphas (all new alphas have `contributesTo` or `mapsTo`)
 - ✓ Tags use orthogonal structure throughout
 - ✓ Validation checklist completely satisfied
 - ✓ Delineation Analysis section present with justified practice structure decision
 - ✓ If broad coverage (8+ alphas, all focuses), explicit justification provided for practice structure
+- ✓ Gherkin structures used selectively where verification logic adds value (see semantics.md Section 5.3.5)
+- ✓ Activities with complex triggers include test.when clauses (see semantics.md Section 8.1.1)
 
 This mapping guide will be used as input for Phase 3 (JSON Generation).

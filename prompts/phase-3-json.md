@@ -92,7 +92,7 @@ You have access to the following resources via the Read tool:
 **Parent Practice Mode:** When extending a parent practice (instead of mapping directly to a baseline):
 - `baselinePracticeName`: Set to the value **inherited** from the parent practice's `baselinePracticeName` (NOT the parent practice name itself)
 - `practiceDependencyNames`: Auto-populated with the parent practice name(s) provided in Step 0.25
-- All `contributesTo` references should primarily target parent practice alphas using canonical names
+- All `contributesTo`/`mapsTo` references should primarily target parent practice alphas using canonical names
 ```json
 {
   "baselinePracticeName": "Platform Adoption Essentials",  // inherited from parent
@@ -132,8 +132,25 @@ Add citations array (for both Practice and Method):
 **CRITICAL:**
 - Citations have NO narratives property
 - The `name` field MUST be the **title of the work** (e.g., "Business Model Generation", "The Art of Action"), NOT an author-date shorthand like "Osterwalder (2010)" or "Bungay (2011)". Authors have their own `authors` field.
+- The `url` field SHOULD be populated for every citation — carry forward URLs from the mapping guide (which inherits them from the analysis report). Internal, intranet, and Google Docs/Sheets/Slides URLs are valid and preferred when available. Use user-provided URLs, official websites, DOI references (`https://doi.org/10.xxxx/xxxxx`), or publisher pages. Only omit when no stable link exists.
 
-#### 3.3 Assets (Optional)
+#### 3.3 Acknowledgements (Optional)
+
+Add acknowledgements to recognize individuals, groups, or institutions that contributed to the methodology. Distinct from citations — acknowledgements attribute human contributions rather than published works.
+
+```json
+"acknowledgements": [
+  {
+    "name": "Person or Institution Name",
+    "description": "Brief description of their contribution",
+    "url": "https://optional-profile-or-contact-url"
+  }
+]
+```
+
+Include acknowledgements when the source methodology credits specific contributors, research groups, or supporting organizations.
+
+#### 3.4 Assets (Optional)
 
 If the mapping guide identifies visual assets, add assets array. **PRIORITIZE externally-referenceable assets:**
 
@@ -293,15 +310,19 @@ Add alphas array:
     "name": "Alpha Name",
     "description": "Single sentence",
     "focusName": "Value | Solution | Endeavor",
-    "contributesTo": "baseline-alpha-name",  // REQUIRED for new alphas
+    "contributesTo": "baseline-alpha-name",  // REQUIRED for specializations (mutually exclusive with mapsTo)
+    // OR: "mapsTo": "parent-alpha-name",    // REQUIRED for variant mappings (mutually exclusive with contributesTo)
     "relatesTo": [  // ONLY for new alphas (NOT redeclarations)
       {
         "relationship": "produces",
-        "alphaName": "Platform Asset"
+        "alphaName": "Platform Asset",
+        "direction": "outgoing",
+        "description": "Each capability produces consumable platform assets"
       },
       {
         "relationship": "depends on",
-        "alphaName": "Requirements"
+        "alphaName": "Requirements",
+        "direction": "outgoing"
       }
     ],
     "tags": {
@@ -314,11 +335,39 @@ Add alphas array:
         "name": "State Name",
         "description": "Single sentence (max 12 words)",
         "seq": 1,
+        "contributesToState": "Parent State Name",  // Optional - for alphas with contributesTo or mapsTo
+        "background": {  // Optional - shared prerequisites for this state
+          // NEVER reference the previous state of the SAME alpha — sequential progression is implicit in seq ordering
+          // NEVER reference the previous LOD of the SAME work product in workProductLevels
+          "given": ["Precondition that should hold when evaluating this state"],
+          "alphaStates": [
+            { "alphaName": "Other Alpha", "stateName": "State" }  // Cross-alpha dependencies ONLY
+          ],
+          "workProductLevels": [
+            { "workProductName": "Work Product", "levelOfDetailName": "Level" }
+          ]
+        },
         "checklist": [
           {
             "name": "Checklist item name",
             "description": "One sentence verification criterion",
             "seq": 1,
+            "test": {  // Optional - structured Given/When/Then verification
+              "name": "Verification scenario name",
+              "description": "What this test verifies",
+              "given": ["Specific precondition for this check"],
+              "when": ["Condition or trigger to evaluate"],
+              "then": ["Expected outcome"]
+            },
+            "examples": [  // Optional - concrete scenario Tests
+              {
+                "name": "Example scenario",
+                "description": "Concrete illustration",
+                "given": ["Specific setup"],
+                "when": ["Specific trigger"],
+                "then": ["Specific outcome"]
+              }
+            ],
             "evidencedBy": [
               {
                 "workProductName": "Work Product",
@@ -346,11 +395,14 @@ Add alphas array:
 
 **CRITICAL:**
 
-- New alphas MUST have `contributesTo` (NO FLOATING ALPHAS)
+- New alphas MUST have `contributesTo` OR `mapsTo` (NO FLOATING ALPHAS). These are mutually exclusive — never set both.
+- **`mapsTo` alphas**: States MUST exactly match the target alpha (same names, same sequence). Use for IS-A variants.
 - **relatesTo ONLY on new alphas**: Do NOT add relatesTo to baseline alpha redeclarations
   - Redeclarations inherit baseline relationships automatically
-  - Only new alphas (with contributesTo) should define relatesTo
+  - Only new alphas (with `contributesTo` or `mapsTo`) should define relatesTo
   - Copy relatesTo array exactly from mapping guide for new alphas
+  - Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`) — required by schema
+  - Optional `description` field explains why the relationship exists
   - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
 - Checklist items are objects {name, description, seq}, NOT strings
 - evidencedBy is optional array of WorkProductContribution
@@ -396,6 +448,17 @@ Add workProducts array:
         "name": "Level Name",  // NO "Level X:" prefix
         "description": "Single sentence (max 12 words)",
         "seq": 1,
+        "background": {  // Optional - shared prerequisites for this LOD
+          // NEVER reference the previous LOD of the SAME work product — sequential progression is implicit in seq ordering
+          // NEVER reference the previous state of the SAME alpha in alphaStates
+          "given": ["Precondition for reaching this level"],
+          "alphaStates": [
+            { "alphaName": "Alpha", "stateName": "State" }
+          ],
+          "workProductLevels": [
+            { "workProductName": "Other Work Product", "levelOfDetailName": "Level" }  // Cross-work-product dependencies ONLY
+          ]
+        },
         "checklist": [
           {
             "name": "Characteristic name",
@@ -503,6 +566,31 @@ Add activities array:
     "description": "Single sentence",
     "activitySpaceName": "Baseline Activity Space",
     "focusName": "Value | Solution | Endeavor",
+    "background": {  // Optional - shared prerequisites for this activity
+      "given": ["Precondition before activity begins"],
+      "alphaStates": [
+        { "alphaName": "Alpha", "stateName": "State" }
+      ],
+      "workProductLevels": [
+        { "workProductName": "Work Product", "levelOfDetailName": "Level" }
+      ]
+    },
+    "test": {  // Optional - structured execution scenario (see semantics.md Section 8.1.1)
+      "name": "Execution scenario name",
+      "description": "What triggers and outcomes this test captures",
+      "given": ["Preconditions for the activity"],
+      "when": ["Triggers, decision points, or events that initiate the activity"],
+      "then": ["Expected outcomes beyond structural contributesTo/worksOn"]
+    },
+    "examples": [  // Optional - concrete scenario Tests
+      {
+        "name": "Concrete scenario",
+        "description": "Specific illustration",
+        "given": ["Specific setup"],
+        "when": ["Specific trigger"],
+        "then": ["Specific outcome"]
+      }
+    ],
     "contributesTo": [
       {
         "alphaName": "Alpha",
@@ -624,6 +712,7 @@ Add patterns array:
 - PatternView.seq is REQUIRED
 - NO `workProducts` property on PatternView (not in schema)
 - activities are string names, not objects
+- **Each alpha MUST target at most 1 state per patternView** — if a phase advances an alpha through multiple states, split into sub-views using `Phase: Sub-step` naming (e.g., "Enable: Train", "Enable: Certify"). Each sub-view gets its own seq, activities, and narrative context.
 
 **Asset Linking:**
 
@@ -649,40 +738,70 @@ If mapping guide defines aliases:
 ]
 ```
 
-#### 3.13 Method Assembly (For Methods)
+**Alias rules:**
+- **Do NOT re-declare aliases from parent/dependency practices** — they are inherited through `practiceDependencyNames`
+- **Do NOT reuse a dependency alias name for a different target** — causes collision errors on merge
+- For **mapsTo variant** alphas, differentiate alias names from parent aliases (e.g., prefix with practice domain: "RHEL Deal Registration" not "Deal Registration")
+- Only create aliases for elements **this practice defines or redefines**
 
-If generating Method JSON:
+#### 3.13 Method Packaging (For Methods)
 
-1. Generate complete Practice JSON for EACH practice (following steps 3.1-3.12)
-2. Embed each practice in method's `practices` array:
+If generating a Method:
+
+1. Generate complete Practice JSON for EACH practice as **standalone files** (following steps 3.1-3.12)
+2. Each practice JSON is a self-contained document with `kind: "practice"`, `baselinePracticeName`, and all its own elements
+3. The method uses **externalized references** — `practiceNames` (string array) and `baselinePracticeName` (string) instead of embedded objects:
+
 ```json
 {
-  "name": "method-name",
+  "kind": "method",
+  "name": "Method Name",
   "description": "Method description",
   "baselinePracticeName": "Platform Adoption Essentials",
-  "practices": [
-    {
-      "name": "practice-1",
-      "description": "...",
-      "baselinePracticeName": "Platform Adoption Essentials",
-      "alphas": [...],
-      "workProducts": [...],
-      ...
-    },
-    {
-      "name": "practice-2",
-      ...
-    }
-  ],
-  "citations": [...],  // Merged from all practices
-  "narratives": [...]  // Method-level narratives
+  "practiceNames": ["Practice 1", "Practice 2"],
+  "citations": [...],    // Merged from all practices (deduplicated)
+  "narratives": [...],   // Method-level narratives
+  "alphaBindings": [...]  // Optional - cross-baseline alpha contributions (see below)
 }
 ```
+
+4. All documents (baseline JSON, practice JSONs, method JSON) are bundled into a `.keleo` package (ZIP archive with `manifest.json`). The packaging is handled by `utils/package-keleo.py`.
+
+**Schema rules for externalized methods:**
+- `baselinePracticeName` and `baselinePractice` (embedded object) are **mutually exclusive** — use only the string form for packaged methods
+- `practiceNames` must be present (even if empty) for the document to be classified as a Method by the schema discriminator
+- `practiceNames` and `practices` (embedded array) can coexist, but for `.keleo` packages use only `practiceNames`
 
 **Parent Practice Mode:** When extending a parent practice:
 - Method-level `baselinePracticeName`: Inherited from parent practice
 - Method-level `practiceDependencyNames`: Parent practice name(s) from Step 0.25
-- Each embedded practice inherits the same `baselinePracticeName` and `practiceDependencyNames`
+- Each standalone practice inherits the same `baselinePracticeName` and `practiceDependencyNames`
+
+**Cross-Baseline Alpha Bindings (`alphaBindings`):**
+
+When a method composes practices from different baseline families, add `alphaBindings` at the method level to declare cross-baseline contribution relationships:
+
+```json
+"alphaBindings": [
+  {
+    "baselineAlpha": {
+      "baselineName": "Target Baseline Name",
+      "alphaName": "Target Alpha Name"
+    },
+    "contributingAlphas": [
+      {
+        "baselineName": "Contributing Baseline Name",
+        "alphaName": "Contributing Alpha Name",
+        "stateContributions": [
+          { "fromState": "Contributing State", "toState": "Target State" }
+        ]
+      }
+    ]
+  }
+]
+```
+
+Only include `alphaBindings` when the method spans multiple baselines. `stateContributions` is optional — alpha-level binding without state mapping is valid. All baseline/alpha/state names must resolve to valid references.
 
 #### 3.14 Verify Complete Structure
 
@@ -727,13 +846,15 @@ Ensure valid JSON syntax (no trailing commas, proper quotes, balanced braces).
 
 ### Step 5: Run Validation Script
 
-Run the comprehensive validator:
+Run the comprehensive validator with the **leaf baseline** (not the effective context):
 ```bash
 python3 ../../utils/validate-practice-json.py \
   <practice-name>.json \
-  ../../deps/platform-adoption-kernel.json \
+  <leaf-baseline>.json \
   ../../deps/language.schema.json
 ```
+
+The validator auto-discovers `_effective-context.json` in the practice directory for cross-practice element resolution. Checks include schema compliance, baseline references, internal integrity, patternView ambiguity, and alias collision detection.
 
 **Output:** JSON report with categorized errors
 
@@ -751,7 +872,7 @@ Read validation output JSON and categorize errors:
 - Invalid competency names → Use exact baseline competency names
 - Invalid state names → Use valid state from target alpha
 - Invalid alpha references → Use exact baseline alpha names
-- Floating alphas → Add contributesTo
+- Floating alphas → Add `contributesTo` or `mapsTo`
 
 **Internal Integrity Errors:**
 - Broken work product references → Define work product or fix reference
@@ -770,7 +891,7 @@ Based on error category, apply fixes:
 **For Baseline Reference Errors:**
 - Map competency descriptions to exact baseline names
 - Correct state names to match alpha definitions
-- Add contributesTo to new alphas
+- Add `contributesTo` or `mapsTo` to new alphas
 - Use exact case-sensitive baseline references
 
 **For Internal Integrity Errors:**
@@ -853,15 +974,32 @@ Once validation passes, verify:
 ```
 
 ### 7. Floating Alphas
-❌ Wrong: New alpha without contributesTo
-✅ Right:
+❌ Wrong: New alpha without `contributesTo` or `mapsTo`
+✅ Right (Specialization):
 ```json
 {
-  "name": "New Alpha",
+  "name": "Platform Capability",
   "description": "...",
   "focusName": "Solution",
-  "contributesTo": "Platform",  // REQUIRED!
-  "states": [...]
+  "contributesTo": "Platform",  // Specialization — different states from parent
+  "states": [...]  // Own state progression
+}
+```
+✅ Right (Variant Mapping):
+```json
+{
+  "name": "AI-Ready Enterprise",
+  "description": "...",
+  "focusName": "Value",
+  "mapsTo": "Sales Play",  // Variant mapping — EXACT same states as parent
+  "states": [...]  // Must match Sales Play states exactly
+}
+```
+❌ Wrong: Both set on same alpha
+```json
+{
+  "contributesTo": "Platform",
+  "mapsTo": "Platform"  // INVALID — mutually exclusive!
 }
 ```
 
@@ -883,6 +1021,45 @@ Once validation passes, verify:
 ### 10. Work Product LOD Names
 ❌ Wrong: `"name": "Level 1: Basic"`
 ✅ Right: `"name": "Basic"`
+
+### 11. Gherkin Structures (background, test, examples)
+❌ Wrong: `background` as a string or array
+✅ Right: `background` is an object with optional `given`, `alphaStates`, `workProductLevels` arrays:
+```json
+"background": {
+  "given": ["Stakeholder needs have been documented"],
+  "alphaStates": [{ "alphaName": "Requirements", "stateName": "Bounded" }]
+}
+```
+❌ Wrong: `alphaStates` referencing the previous state of the SAME alpha (redundant — seq ordering is implicit):
+```json
+// On alpha "Platform", state "Operational" (seq: 3):
+"background": { "alphaStates": [{ "alphaName": "Platform", "stateName": "Provisioned" }] }  // BAD — same alpha
+```
+❌ Wrong: `workProductLevels` referencing the previous LOD of the SAME work product (redundant):
+```json
+// On work product "Architecture Document", LOD "Logical" (seq: 2):
+"background": { "workProductLevels": [{ "workProductName": "Architecture Document", "levelOfDetailName": "Descriptive" }] }  // BAD — same work product
+```
+✅ Right: Only cross-element dependencies in `alphaStates` and `workProductLevels`
+❌ Wrong: `test` as a string or using `test` on elements that don't support it
+✅ Right: `test` is a Test object (extends PracticeElement) — only on Checklist and Activity:
+```json
+"test": {
+  "name": "Verification scenario",
+  "description": "What this verifies",
+  "given": ["Precondition"],
+  "when": ["Trigger or condition"],
+  "then": ["Expected outcome"]
+}
+```
+❌ Wrong: `examples` as a flat string array
+✅ Right: `examples` is an array of Test objects:
+```json
+"examples": [
+  { "name": "Scenario 1", "description": "...", "given": ["..."], "when": ["..."], "then": ["..."] }
+]
+```
 
 ## Text Cleaning
 
@@ -918,12 +1095,13 @@ Once validation passes, verify:
 - Activity Space names: Exact matches
 
 ### Required Fields
-- contributesTo: REQUIRED on all new alphas, all LODs
+- `contributesTo` OR `mapsTo`: REQUIRED on all new alphas (mutually exclusive). `contributesTo`: REQUIRED on all LODs.
 - Both requiredCompetencies AND recommendedCompetencyLevels on activities
 - patternViews.seq: REQUIRED on all pattern views
 
 ### Prohibited Patterns
-- NO floating alphas (all new alphas have contributesTo)
+- NO floating alphas (all new alphas have `contributesTo` or `mapsTo`)
+- NO `contributesTo` AND `mapsTo` on same alpha (mutually exclusive)
 - NO markdown in JSON strings
 - NO practice metadata in descriptions
 - NO "Level X:" prefixes on LOD names
@@ -952,7 +1130,7 @@ For methods: `practices/<method-name>/<method-name>.json`
 - ✓ Baseline validation: 0 errors
 - ✓ Internal integrity validation: 0 errors
 - ✓ All Phase 2 mappings present in JSON
-- ✓ No floating alphas
+- ✓ No floating alphas (all new alphas have `contributesTo` or `mapsTo`)
 - ✓ All required fields present
 - ✓ All competency references use exact baseline names
 - ✓ All symbolic references are exact matches

@@ -1,6 +1,7 @@
 {
   "kind": "practiceBaseline",
   "name": "Partner Ecosystem Essentials",
+  "baselinePracticeName": "Red Hat Sales Essentials",
   "description": "A minimal baseline practice for engaging with partner ecosystems, covering partner lifecycle management, value realization, capability building, trust cultivation, and governance.",
   "version": "2.0",
   "authors": [
@@ -18,11 +19,11 @@
   ],
   "focuses": [
     {
-      "name": "Value",
+      "name": "Partner Value",
       "description": "Focuses on partner-driven business value, mutual benefits, and partnership ROI."
     },
     {
-      "name": "Engagement",
+      "name": "Partner Sales Execution",
       "description": "Governs partner relationship cultivation, trust building, and partnership governance."
     },
     {
@@ -82,7 +83,8 @@
           "description": "The outcome, impact, or value achieved.",
           "howToUse": "Summarize the measurable results, outcomes, or state changes achieved from the actions."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "The Hero's Journey",
@@ -108,7 +110,8 @@
           "description": "The new operational baseline and realized value.",
           "howToUse": "Describe the successful adoption, the accrual of benefits, and the new optimized way of working."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "The Three-Act Structure & StoryBrand",
@@ -129,7 +132,8 @@
           "description": "Execution and outcome.",
           "howToUse": "Describe the call to action for the consumer to adopt the plan, and the successful outcome of doing so."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Micro-Narratives (ABT)",
@@ -150,7 +154,8 @@
           "description": "The action taken or conclusion reached.",
           "howToUse": "State the specific action taken, decision made, or conclusion reached to resolve the conflict."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Lifecycle",
@@ -166,7 +171,8 @@
           "description": "An active stage of lifecycle execution.",
           "howToUse": "Detail the active state transitions, required work products, and activities for this specific phase of the lifecycle progression."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Essay Narrative",
@@ -192,7 +198,8 @@
           "description": "The closing section that synthesises the presented evidence and forms a direct response to the assignment title.",
           "howToUse": "Draw the threads of your argument together. Do not bring in new evidence in your concluding paragraphs or try to cram in ideas that you have not developed fully."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Report Narrative",
@@ -228,7 +235,8 @@
           "description": "Suggestions for a future course of action based on the evidence and conclusions.",
           "howToUse": "Make recommendations that solve problems or help to develop a new strategy. Make an effort to sound authoritative and certain in your choices."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "PDCA",
@@ -254,7 +262,8 @@
           "description": "Standardize or iterate based on learnings.",
           "howToUse": "Scale successful changes, adjust plan based on findings, repeat cycle."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Build-Measure-Learn",
@@ -275,7 +284,8 @@
           "description": "Analyze and decide next iteration.",
           "howToUse": "Synthesize findings, validate or invalidate hypothesis, pivot or persevere."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Design-Build-Run-Optimize",
@@ -301,7 +311,8 @@
           "description": "Continuous improvement and evolution.",
           "howToUse": "Tune performance, reduce costs, enhance capabilities based on operational insights."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     },
     {
       "name": "Crawl-Walk-Run",
@@ -322,7 +333,8 @@
           "description": "Mature, optimized operation.",
           "howToUse": "Full automation, enterprise scale, optimization focus, continuous evolution."
         }
-      ]
+      ],
+      "kind": "narrativeType"
     }
   ],
   "narratives": [
@@ -362,15 +374,17 @@
     {
       "name": "Partner Value",
       "description": "The mutual benefits, business outcomes, and measurable returns that justify and sustain partner ecosystem investment.",
-      "focusName": "Value",
+      "focusName": "Partner Value",
       "relatesTo": [
         {
-          "relationship": "drives",
-          "alphaName": "Partner Relationship"
+          "relationship": "produces",
+          "alphaName": "Partner Relationship",
+          "direction": "outgoing"
         },
         {
-          "relationship": "requires",
-          "alphaName": "Partner Capability"
+          "relationship": "uses",
+          "alphaName": "Partner Capability",
+          "direction": "outgoing"
         }
       ],
       "states": [
@@ -485,24 +499,28 @@
           "assetName": "partner-value-icon",
           "type": "icon"
         }
-      ]
+      ],
+      "kind": "alpha"
     },
     {
       "name": "Partner Relationship",
       "description": "The structured engagement and collaboration between the organization and its partner organizations, from initial contact through strategic alliance.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "relatesTo": [
         {
-          "relationship": "strengthened by",
-          "alphaName": "Partner Trust"
+          "relationship": "uses",
+          "alphaName": "Partner Trust",
+          "direction": "incoming"
         },
         {
           "relationship": "governed by",
-          "alphaName": "Partner Governance"
+          "alphaName": "Partner Governance",
+          "direction": "incoming"
         },
         {
           "relationship": "produces",
-          "alphaName": "Partner Value"
+          "alphaName": "Partner Value",
+          "direction": "outgoing"
         }
       ],
       "states": [
@@ -617,7 +635,8 @@
           "assetName": "partner-relationship-icon",
           "type": "icon"
         }
-      ]
+      ],
+      "kind": "alpha"
     },
     {
       "name": "Partner Capability",
@@ -625,8 +644,9 @@
       "focusName": "Go-to-Market",
       "relatesTo": [
         {
-          "relationship": "enables delivery of",
-          "alphaName": "Partner Value"
+          "relationship": "produces",
+          "alphaName": "Partner Value",
+          "direction": "outgoing"
         }
       ],
       "states": [
@@ -719,20 +739,23 @@
           "assetName": "partner-capability-icon",
           "type": "icon"
         }
-      ]
+      ],
+      "kind": "alpha"
     },
     {
       "name": "Partner Governance",
       "description": "The policies, structures, and operational controls that ensure partnership accountability and effective decision-making.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "relatesTo": [
         {
-          "relationship": "constrains",
-          "alphaName": "Partner Relationship"
+          "relationship": "governed by",
+          "alphaName": "Partner Relationship",
+          "direction": "outgoing"
         },
         {
-          "relationship": "protects",
-          "alphaName": "Partner Value"
+          "relationship": "governed by",
+          "alphaName": "Partner Value",
+          "direction": "outgoing"
         }
       ],
       "states": [
@@ -808,20 +831,23 @@
           "assetName": "partner-governance-icon",
           "type": "icon"
         }
-      ]
+      ],
+      "kind": "alpha"
     },
     {
       "name": "Partner Trust",
       "description": "The psychological safety, reliability, and mutual confidence that underpins effective partner collaboration.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "relatesTo": [
         {
-          "relationship": "strengthens",
-          "alphaName": "Partner Relationship"
+          "relationship": "produces",
+          "alphaName": "Partner Relationship",
+          "direction": "outgoing"
         },
         {
-          "relationship": "enables",
-          "alphaName": "Partner Value"
+          "relationship": "produces",
+          "alphaName": "Partner Value",
+          "direction": "outgoing"
         }
       ],
       "states": [
@@ -914,14 +940,15 @@
           "assetName": "partner-trust-icon",
           "type": "icon"
         }
-      ]
+      ],
+      "kind": "alpha"
     }
   ],
   "activitySpaces": [
     {
       "name": "Identify and Qualify Partners",
       "description": "Discover potential partners, assess strategic fit, and validate mutual value opportunities.",
-      "focusName": "Value",
+      "focusName": "Partner Value",
       "contributesTo": [
         {
           "alphaName": "Partner Value",
@@ -939,12 +966,13 @@
       "requiredCompetencies": [
         "Partner Strategic Alignment",
         "Partner Value Assessment"
-      ]
+      ],
+      "kind": "activitySpace"
     },
     {
       "name": "Manage Partner Relationships",
       "description": "Cultivate and sustain partner relationships through regular engagement, communication, and collaborative problem-solving.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "contributesTo": [
         {
           "alphaName": "Partner Relationship",
@@ -978,7 +1006,8 @@
       "requiredCompetencies": [
         "Partner Relationship Management",
         "Partner Trust Building"
-      ]
+      ],
+      "kind": "activitySpace"
     },
     {
       "name": "Build Partner Capabilities",
@@ -1005,12 +1034,13 @@
       "requiredCompetencies": [
         "Partner Relationship Management",
         "Partner Strategic Alignment"
-      ]
+      ],
+      "kind": "activitySpace"
     },
     {
       "name": "Govern Partner Ecosystem",
       "description": "Establish and maintain governance structures, policies, and accountability mechanisms for partnerships.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "contributesTo": [
         {
           "alphaName": "Partner Governance",
@@ -1028,12 +1058,13 @@
       "requiredCompetencies": [
         "Partner Governance",
         "Partner Strategic Alignment"
-      ]
+      ],
+      "kind": "activitySpace"
     },
     {
       "name": "Measure Partner Value",
       "description": "Track partnership performance, quantify outcomes, and optimize value realization for all parties.",
-      "focusName": "Value",
+      "focusName": "Partner Value",
       "contributesTo": [
         {
           "alphaName": "Partner Value",
@@ -1051,12 +1082,13 @@
       "requiredCompetencies": [
         "Partner Value Assessment",
         "Partner Governance"
-      ]
+      ],
+      "kind": "activitySpace"
     },
     {
       "name": "Build and Maintain Trust",
       "description": "Cultivate trust through transparency, reliability, shared values, and collaborative challenge resolution.",
-      "focusName": "Engagement",
+      "focusName": "Partner Sales Execution",
       "contributesTo": [
         {
           "alphaName": "Partner Trust",
@@ -1078,7 +1110,8 @@
       "requiredCompetencies": [
         "Partner Trust Building",
         "Partner Relationship Management"
-      ]
+      ],
+      "kind": "activitySpace"
     }
   ],
   "competencies": [
@@ -1268,7 +1301,9 @@
       "kind": "citation",
       "name": "TPI Building Blocks",
       "description": "The Partnering Initiative's foundational framework identifying four interconnected building blocks for effective partnerships.",
-      "authors": ["The Partnering Initiative"],
+      "authors": [
+        "The Partnering Initiative"
+      ],
       "date": "2024",
       "source": "thepartneringinitiative.org",
       "url": "https://thepartneringinitiative.org/knowledge-centre/introduction-to-partnerships/building-blocks-of-partnership/"
@@ -1277,7 +1312,9 @@
       "kind": "citation",
       "name": "TPI Lifecycle",
       "description": "The Partnering Initiative's four-stage partnership lifecycle model.",
-      "authors": ["The Partnering Initiative"],
+      "authors": [
+        "The Partnering Initiative"
+      ],
       "date": "2024",
       "source": "thepartneringinitiative.org",
       "url": "https://thepartneringinitiative.org/knowledge-centre/introduction-to-partnerships/partnership-lifecycle/"
@@ -1286,7 +1323,9 @@
       "kind": "citation",
       "name": "TPI Principles",
       "description": "The Partnering Initiative's three core principles: Equity, Transparency, and Mutual Benefit.",
-      "authors": ["The Partnering Initiative"],
+      "authors": [
+        "The Partnering Initiative"
+      ],
       "date": "2024",
       "source": "thepartneringinitiative.org",
       "url": "https://thepartneringinitiative.org/the-partnering-cycle-and-partnering-principles/"
@@ -1295,7 +1334,9 @@
       "kind": "citation",
       "name": "TPI Value Framework",
       "description": "The Partnering Initiative's partnership value framework including collaborative advantage and mutual benefit.",
-      "authors": ["The Partnering Initiative"],
+      "authors": [
+        "The Partnering Initiative"
+      ],
       "date": "2024",
       "source": "thepartneringinitiative.org",
       "url": "https://thepartneringinitiative.org/partnership-value-framework/"
@@ -1304,7 +1345,9 @@
       "kind": "citation",
       "name": "ASAP Handbook",
       "description": "The authoritative guide to alliance management practices and principles.",
-      "authors": ["Lloyd, Brian"],
+      "authors": [
+        "Lloyd, Brian"
+      ],
       "date": "2026",
       "source": "Association of Strategic Alliance Professionals",
       "url": "https://www.strategic-alliances.org/handbook"
@@ -1313,7 +1356,9 @@
       "kind": "citation",
       "name": "ASAP Lifecycle",
       "description": "ASAP's seven-phase alliance lifecycle framework.",
-      "authors": ["Association of Strategic Alliance Professionals"],
+      "authors": [
+        "Association of Strategic Alliance Professionals"
+      ],
       "date": "2024",
       "source": "strategic-alliances.org",
       "url": "https://www.strategic-alliances.org/alliance-lifecycle"

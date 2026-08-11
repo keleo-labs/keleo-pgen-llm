@@ -41,14 +41,17 @@ keleo-pgen-llm/
 │   └── <practice-name>/
 │       ├── 01-analysis-report.md
 │       ├── 02-mapping-guide.md
-│       └── <practice-name>.json
+│       └── <practice-name>.json           # Intermediate practice JSON
 ├── baselines/                              # Baseline practices output
 │   └── <baseline-name>/
 │       ├── 01-analysis-report.md
-│       ├── 01.5-distilled-essentials.md   # NEW: Distillation phase
+│       ├── 01.5-distilled-essentials.md   # Distillation phase
 │       ├── 02-mapping-guide.md
-│       └── <baseline-name>.json
+│       └── <baseline-name>.json           # Intermediate baseline JSON
+├── bundles/                                # Packaged .keleo output
+│   └── <name>.keleo                       # ZIP archive with manifest + documents
 ├── utils/
+│   ├── resolve-context.py                 # Unified context resolver (baselines + practices + .keleo → _effective-context.json)
 │   ├── validate-practice-json.py          # Extension practice validation
 │   └── validate-baseline-json.py          # Baseline practice validation
 └── CLAUDE.md                              # This file
@@ -60,7 +63,8 @@ All generated outputs for a practice are in `practices/<practice-name>/`:
 
 - **`01-analysis-report.md`** - Phase 1 output: Structured analysis of methodology (~30-50K words)
 - **`02-mapping-guide.md`** - Phase 2 output: Mapping to baseline practice (~40-60K words)
-- **`<practice-name>.json`** - Phase 3 output: Schema-compliant Practice JSON
+- **`<practice-name>.json`** - Phase 3 output: Schema-compliant Practice JSON (intermediate)
+- **`bundles/<practice-name>.keleo`** - Packaged output: Practice + baseline bundled in `.keleo` archive
 
 ### Generated Output Location (Method)
 
@@ -68,7 +72,8 @@ For multi-practice methods in `practices/<method-name>/`:
 
 - **`01-analysis-report.md`** - Phase 1 output covering all practices
 - **`02-mapping-guide.md`** - Phase 2 output mapping all practices
-- **`<method-name>.json`** - Phase 3 output: Schema-compliant Method JSON (with practices array)
+- **`<practice-name>.json`** - Per-practice standalone JSONs (intermediate)
+- **`bundles/<method-name>.keleo`** - Packaged output: Externalized method + practices + baseline in `.keleo` archive
 
 ## Architecture
 
@@ -102,12 +107,14 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
   - Primary alpha identification using baseline relatesTo relationships
   - Alpha-state-activity gap analysis ensures every alpha state has supporting activities
 
-**Phase 3: JSON Generation**
+**Phase 3: JSON Generation + Packaging**
 - Input: Mapping guide + schema + baseline practice
-- Process: Generate schema-compliant JSON with programmatic validation
-- Output: `<practice-name>.json` (schema-compliant)
+- Process: Generate schema-compliant JSON with programmatic validation, then package into `.keleo`
+- Output: `<practice-name>.keleo` (`.keleo` package bundling practice + baseline)
+- For methods: Externalized method JSON with `practiceNames` string references (no embedded objects)
 - Prompt: `prompts/phase-3-json.md`
-- Validation: `utils/validate-practice-json.py` (single unified validation script)
+- Validation: `utils/validate-practice-json.py` (individual JSONs before packaging)
+- Packaging: `utils/package-keleo.py` (creates `.keleo` archive with `manifest.json`)
 
 ### Key Improvements Over v1
 
@@ -121,13 +128,14 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 
 **Practice (Single):**
 - Single cohesive value stream
-- Generates 3 files in `practices/<practice-name>/`
-- Produces one Practice JSON object
+- Generates analysis, mapping, JSON, and `.keleo` package in `practices/<practice-name>/`
+- `.keleo` package in `bundles/` bundles practice JSON + baseline JSON
 
 **Method (Multi-Practice):**
 - Multiple distinct value streams or use cases
 - Each practice analyzed and mapped in single documents
-- Produces one Method JSON object with practices array
+- `.keleo` package in `bundles/` bundles externalized method JSON (with `practiceNames` string references) + individual practice JSONs + baseline JSON
+- Methods spanning multiple baselines can declare `alphaBindings` for cross-baseline contribution relationships
 
 ### Key Framework Concepts
 
@@ -181,7 +189,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 - **NarrativeTypes**: Reusable storytelling frameworks
 
 **Extension practices** (created with `/generate-method`) then specialize baselines by adding:
-- New alphas with `contributesTo` (specializations of baseline alphas)
+- New alphas with `contributesTo` (specializations with distinct state progression) or `mapsTo` (named variants with same states)
 - Concrete activities (mapped to baseline activitySpaces)
 - Work products with levels of detail
 - Lifecycle patterns coordinating alphas
@@ -230,7 +238,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 
 **Use `/generate-method` when:**
 - ✓ Creating a **practice that extends** an existing baseline
-- ✓ Defining **specialized alphas** with `contributesTo`
+- ✓ Defining **specialized alphas** with `contributesTo` or **variant alphas** with `mapsTo`
 - ✓ Adding **activities, work products, patterns** (not in baselines)
 - ✓ Source methodology is an **implementation** of a framework
 
@@ -252,14 +260,19 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **kind property** | `"practice"` or `"method"` | `"practiceBaseline"` |
 | **baselinePracticeName** | REQUIRED (references parent) | OPTIONAL (may reference parent baseline) |
 | **Focuses** | Referenced from baseline | DEFINED in baseline (2-4 focuses) |
-| **Alpha contributesTo** | REQUIRED on new alphas | NOT PRESENT (root-level) |
-| **Alpha relatesTo** | Optional | REQUIRED (show interconnections) |
+| **Alpha contributesTo / mapsTo** | REQUIRED on new alphas (mutually exclusive) | NOT PRESENT (root-level) |
+| **Alpha relatesTo** | Optional (new alphas only) | REQUIRED (show interconnections) |
+| **AlphaRelationship direction** | Required on all relatesTo entries | Required on all relatesTo entries |
+| **State contributesToState** | Optional (maps child state → parent state) | NOT PRESENT |
+| **Method alphaBindings** | N/A (practice) / Optional (method) | NOT PRESENT |
+| **Acknowledgements** | Optional | Optional |
 | **Competencies** | Referenced from baseline | DEFINED with 5 levels |
 | **ActivitySpaces** | Referenced from baseline | DEFINED in baseline |
 | **NarrativeTypes** | Referenced from baseline | DEFINED in baseline |
 | **Activities** | Defined in practice | NOT PRESENT |
 | **WorkProducts** | Defined in practice | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
+| **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
 
 ### Baseline Output Location
 
@@ -268,7 +281,8 @@ All files for a baseline are co-located in `baselines/<baseline-name>/`:
 - **`01-analysis-report.md`** - Phase 1 output: Comprehensive analysis (~30-50K words)
 - **`01.5-distilled-essentials.md`** - Phase 1.5 output: Essential elements (~15-25K words) **[NEW]**
 - **`02-mapping-guide.md`** - Phase 2 output: Baseline mapping (~40-60K words)
-- **`<baseline-name>.json`** - Phase 3 output: Schema-compliant baseline JSON
+- **`<baseline-name>.json`** - Phase 3 output: Schema-compliant baseline JSON (intermediate)
+- **`bundles/<baseline-name>.keleo`** - Packaged output: Baseline bundled in `.keleo` archive
 
 ## Important Constraints and Patterns
 
@@ -278,10 +292,17 @@ These constraints apply to **extension practices** created with `/generate-metho
 
 ### Alpha Handling
 - **Redeclaration**: Enriching baseline alphas with additional checklists/narratives while preserving exact baseline structure
-- **Specialization**: Creating new alphas that contribute to baseline alphas (e.g., "Platform Capability" → "Platform")
-  - **CRITICAL RULE - NO FLOATING ALPHAS**: ALL new alphas MUST have a `contributesTo` relationship pointing to a baseline alpha, practice-local alpha, OR external practice alpha
-  - Floating alphas (new alphas without `contributesTo`) are **strictly prohibited** by the Practice Language semantics
-  - **Cross-Practice References**: Alphas can contribute to alphas from other practices using `practiceDependencyNames`
+- **Specialization** (`contributesTo`): Creating new alphas with distinct state progression that contribute to baseline alphas (e.g., "Platform Capability" → "Platform")
+- **Variant Mapping** (`mapsTo`): Creating named variants of a parent alpha that follow the exact same state progression with domain-specific checklists (e.g., "AI-Ready Enterprise" → "Sales Play", specific TDPs → "Technical Decision Point", specific Sales Tactics → "Sales Tactic"). On merge, variants appear in the parent's `variants` array.
+  - `mapsTo` and `contributesTo` are **mutually exclusive** — never set both on the same alpha
+  - States MUST exactly match the target alpha (same names, same sequence)
+  - IS-A semantics: the variant IS a type of the parent
+  - **Naming convention**: Variant alpha names MUST NOT repeat the parent type name — `mapsTo` reads as "is a type of", so including the type is redundant (e.g., "AI-Ready Enterprise" not "AI-Ready Enterprise Play"; "Container Management" not "Container Management TDP"). Applies to both alpha names and alias names. Does NOT apply to `contributesTo` alphas.
+- **CRITICAL RULE - NO FLOATING ALPHAS**: ALL new alphas MUST have a `contributesTo` OR `mapsTo` relationship pointing to a baseline alpha, practice-local alpha, OR external practice alpha
+  - Floating alphas (new alphas without `contributesTo` or `mapsTo`) are **strictly prohibited** by the Practice Language semantics
+  - **Cross-Practice References**: Alphas can contribute to or map to alphas from other practices using `practiceDependencyNames`
+  - **State-Level Contributions**: Individual states on new alphas can optionally declare `contributesToState` (string) mapping to a parent alpha state — not every state needs a mapping. In a `mapsTo` context, `contributesToState` takes on equivalence semantics.
+- **`relatesTo` (AlphaRelationship)**: Required fields: `relationship` (verb), `alphaName` (target), `direction` (`outgoing` | `incoming` | `mutual`). Optional: `description` (why the relationship exists)
 - **Instances**: Tracking specific occurrences (e.g., "Security Team" and "Platform Team" as instances of "Team")
 - When multiple perspectives reference the same alpha, create a SINGLE merged redeclaration, not separate definitions
 
@@ -331,8 +352,22 @@ These constraints apply to **extension practices** created with `/generate-metho
 - Minimum requirements: Alphas need ≥3 states, WorkProducts need ≥2 levels of detail
 - Narratives use structured frameworks with sequential contexts mapped to narrative elements
 
+### Gherkin-Inspired Structured Guidance
+
+The schema supports optional Gherkin-inspired properties for structured verification and execution scenarios (see `references/semantics.md` Section 5.3 and 8.1.1):
+
+- **`background`** (on State, LevelOfDetail, ActivitySpace, Activity): Shared prerequisites — object with optional `given` (string[]), `alphaStates` (AlphaContribution[]), `workProductLevels` (WorkProductContribution[])
+- **`test`** (on Checklist, Activity): Structured Given/When/Then verification scenario — extends PracticeElement (has `name`, `description`) plus optional `given`, `when`, `then` (string[])
+- **`examples`** (on Checklist, Activity): Array of Test objects providing concrete scenarios
+- **Activity semantics**: `test.when` captures triggers/decision points; `test.then` complements structural `contributesTo`/`worksOn`
+- **Baseline guidance**: Use sparingly in baselines — the practice layer is the natural place for detailed Gherkin structure
+- **Incremental adoption**: Any combination can be used independently; partial use is valid
+
 ### Citations
 Every practice must include comprehensive citations using the "Citation Standard" narrative type with Author/Date/Title/Source elements. Prioritize authoritative sources (primary methodology creators).
+
+### Acknowledgements
+Optional `acknowledgements` array on Practice, PracticeBaseline, and Method. Recognizes individuals, groups, or institutions that contributed to the methodology. Distinct from citations — attributes human contributions rather than published works. Each entry has `name`, `description`, and optional `url`.
 
 ### Assets
 Visual assets (diagrams, templates, icons) can be referenced in practices and methods using the AssetReference structure:
@@ -390,9 +425,30 @@ Visual assets (diagrams, templates, icons) can be referenced in practices and me
 }
 ```
 
+### `.keleo` Packaging
+
+All skills output `.keleo` packages as their primary deliverable. A `.keleo` file is a ZIP archive (MIME: `application/vnd.keleo.package+zip`) containing:
+
+- **`manifest.json`** — Package manifest conforming to `language.schema.json#/$defs/PackageManifest`
+- **`documents/`** — Flat directory of Practice Language JSON files (baselines, practices, methods)
+- **`assets/`** — Optional directory for file-based assets (diagrams, templates, icons)
+
+Methods in `.keleo` packages use **externalized references**: `baselinePracticeName` (string) and `practiceNames` (string array) instead of embedded objects. The package's document inventory provides name resolution.
+
+**Packaging utility:** `utils/package-keleo.py` creates `.keleo` archives from constituent JSON files.
+
+### Schema Constructs Not Used by Current Skills
+
+The Practice Language schema includes constructs that are not directly relevant to the current skills but may inform future work:
+
+- **Project**: Root type for tracking real-world execution against a practice/method (team, plan, current/target state, checklists)
+- **ChangeRequest / ChangeSet**: PR-like change proposals for modifying practices/baselines/methods with review lifecycle
+
+See `references/semantics.md` Sections 12-13 for details.
+
 ## Dependencies
 
-This project requires the **keleo-studio** repository to be present at `../../keleo-studio/`. The schema and example files are accessed via symlinks in the `deps/` directory.
+This project requires the **keleo-language** repository to be present at `../../keleo-language/`. The schema, validation scripts, and semantic reference files are accessed via symlinks in the `deps/`, `references/`, and `utils/` directories.
 
 ## Development Workflow
 
@@ -431,10 +487,11 @@ This skill automates the four-phase baseline creation pipeline:
 - Defines focuses, competencies, activitySpaces, narrativeTypes
 - Outputs `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
-**5. Phase 3 - Baseline JSON:**
+**5. Phase 3 - Baseline JSON + Packaging:**
 - Generates `"kind": "practiceBaseline"` JSON
 - Validates with `utils/validate-baseline-json.py`
-- Outputs `baselines/<name>/<name>.json`
+- Packages into `.keleo` archive with `utils/package-keleo.py`
+- Outputs `bundles/<name>.keleo` (primary) and `baselines/<name>/<name>.json` (intermediate)
 
 **Output Location**: All files for a baseline are co-located in `baselines/<baseline-name>/`
 
@@ -465,10 +522,12 @@ This skill automates the three-phase pipeline:
 - Uses semantic guidance from `references/semantics.md`
 - Outputs `practices/<name>/02-mapping-guide.md` (~40-60K words)
 
-**4. Phase 3 - JSON Generation:**
+**4. Phase 3 - JSON Generation + Packaging:**
 - Generates schema-compliant JSON from mapping guide
 - Validates with `utils/validate-practice-json.py`
-- Outputs `practices/<name>/<practice-name>.json` or `<method-name>.json`
+- Packages into `.keleo` archive with `utils/package-keleo.py`
+- For methods: externalized method JSON with `practiceNames` string references (not embedded)
+- Outputs `bundles/<name>.keleo` (primary) and individual JSON files in `practices/<name>/` (intermediate)
 
 **Output Location**: All files for a practice are co-located in `practices/<practice-name>/`
 
@@ -488,9 +547,10 @@ If working manually outside the skill:
 5. Read `references/semantics.md` for semantic guidance
 6. Output: `02-mapping-guide.md`
 
-**Phase 3 - JSON Generation:**
+**Phase 3 - JSON Generation + Packaging:**
 7. Use `prompts/phase-3-json.md` to generate JSON
 8. Validate with `python3 utils/validate-practice-json.py <practice-name>.json`
+9. Package with `python3 utils/package-keleo.py --name <name> --version 1.0.0 --description "..." --documents <baseline>.json <practice>.json -o bundles/<name>.keleo`
 
 ## Working with Prompts
 
@@ -517,3 +577,4 @@ The Practice Language JSON Schema supports:
 - Dynamic state-gating with transition triggers
 - Evidence-based progression (WorkProducts proving Alpha states)
 - Multi-dimensional tagging (domain/lifecycle/organizational)
+- Gherkin-inspired structured guidance (background, test, examples) for verification and execution scenarios

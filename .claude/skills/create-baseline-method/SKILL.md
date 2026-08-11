@@ -12,7 +12,7 @@ This skill automates the creation of **baseline practice JSON** files - foundati
 
 **Key Distinction:**
 - **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
-- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with contributesTo), activities, workProducts, patterns
+- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns
 
 ### Alpha Instances in Baselines
 
@@ -64,7 +64,8 @@ This skill orchestrates a 4-phase pipeline:
 - `01-analysis-report.md` - Phase 1 output
 - `01.5-distilled-essentials.md` - Phase 1.5 output **(critical new phase)**
 - `02-mapping-guide.md` - Phase 2 output
-- `<baseline-name>.json` - Phase 3 output
+- `<baseline-name>.json` - Phase 3 output (intermediate)
+- `bundles/<baseline-name>.keleo` - Final packaged output
 
 ## Critical Process Requirements
 
@@ -129,14 +130,15 @@ This skill orchestrates a 4-phase pipeline:
    ```
    **Wait for user confirmation before proceeding.**
 
-4. **Create effective parent baseline using the resolver utility:**
+4. **Create effective context using the unified resolver:**
    ```bash
-   python3 utils/resolve-baseline.py \
+   python3 utils/resolve-context.py \
      <parent-baseline.json> \
      [<grandparent-1.json> ...] \
-     -o baselines/<name>/_effective-parent-baseline.json
+     --transitive \
+     -o baselines/<name>/_effective-context.json
    ```
-   The utility programmatically merges baselines in dependency order and applies `practiceElementAliases` as `_aliasContext` annotations with `_domainAlias` on each aliased element. If only one parent with no transitive dependencies, the utility copies it directly (alias annotations are still applied).
+   The utility classifies and merges all inputs in hierarchy order (root-first for baselines), stamps `_contributingPracticeName` on every element for provenance tracking, and applies `practiceElementAliases` as `_aliasContext` annotations. If a single baseline with no dependencies, it simply annotates the document.
 
 5. **Use effective parent baseline in all phases:**
    - **Phase 1.5:** Read effective parent to understand inherited elements and their domain terminology
@@ -165,7 +167,8 @@ baselines/
     ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
     ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
     ├── 02-mapping-guide.md          # Phase 2 output (~40-60K words)
-    └── <baseline-name>.json         # Phase 3 output (schema-compliant)
+    ├── <baseline-name>.json         # Phase 3 output (intermediate)
+    # .keleo package output goes to bundles/<baseline-name>.keleo
 ```
 
 ### Reference Documents Required
@@ -304,11 +307,13 @@ Fix any FAIL assertions before proceeding to Phase 2.
    - REQUIRED `relatesTo` arrays (from Phase 1.5 relationships)
    - 5-7 states per alpha with checklists
    - Assign to appropriate focus
+   - Optional `background` on states (use sparingly — practice layer adds detailed Gherkin; see semantics.md Section 5.3.5)
 
 5. **Transform Activity Types → ActivitySpaces**:
    - Each has `contributesTo` (points to alpha states)
    - Each has `requiredCompetencies`
    - Each assigned to a focus
+   - Optional `background` on activity spaces (shared prerequisites; use sparingly in baselines)
 
 6. **Transform Universal Competencies → Competencies**:
    - Each has exactly 5 competencyLevels
@@ -325,7 +330,9 @@ Fix any FAIL assertions before proceeding to Phase 2.
 
 9. **Map Citations** (using Citation Standard narrative type)
 
-10. **Define Assets** (icons, diagrams, templates)
+10. **Map Acknowledgements** (optional — recognize contributors, research groups, or supporting organizations that are not published sources)
+
+11. **Define Assets** (icons, diagrams, templates)
 
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
@@ -381,6 +388,7 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - Element-specific narratives embedded on alphas/activitySpaces/competencies (NOT top-level)
    - All narratives have citationNames arrays referencing relevant citations
    - No narrative name or description references narrative type template names
+   - Narrative contexts are self-contained — coherent without element headings (element names are authoring scaffolding, not shown to readers)
 
 5. **Write Final JSON**:
    ```
@@ -392,7 +400,7 @@ Fix any FAIL assertions before proceeding to Phase 3.
    # If extending parent baseline(s), pass effective parent for cross-reference validation:
    python3 utils/validate-baseline-json.py \
      baselines/<name>/<name>.json \
-     baselines/<name>/_effective-parent-baseline.json \
+     baselines/<name>/_effective-context.json \
      deps/language.schema.json
 
    # If standalone (no parents):
@@ -413,6 +421,27 @@ python3 utils/eval-skill-output.py baselines/<name>/ \
   --parent <parent-baseline.json> --schema deps/language.schema.json --summary
 ```
 Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
+
+**Step 5: Package into .keleo**
+
+After validation passes, package the baseline JSON into a `.keleo` archive. If the baseline has `baselinePracticeName` (extends a parent baseline), resolve transitive dependencies and include all parent baselines:
+```bash
+# Resolve dependencies (if baselinePracticeName is set):
+python3 utils/discover-dependencies.py --resolve-from baselines/<name>/<name>.json --transitive
+
+# Package with all dependencies in topological order (parent baselines first):
+python3 utils/package-keleo.py \
+  --name "<baseline-name>" \
+  --version "1.0.0" \
+  --description "<baseline description>" \
+  --documents [<parent-baseline>.json] \
+              baselines/<name>/<name>.json \
+  -o bundles/<name>.keleo \
+  --verify
+```
+Never use `_effective-context.json` as a document — it is a build artifact, not a distributable document.
+
+**Output:** `bundles/<name>.keleo` (packaged baseline with dependencies, verified inline)
 
 **Inspection and fix utilities (never use `python3 -c` or `bash -c`):**
 - Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
@@ -487,7 +516,7 @@ Starting Phase 3 JSON Generation. Reading:
 
 **Use /generate-method when:**
 - ✓ Creating a **practice that extends** an existing baseline
-- ✓ Defining **specialized alphas** with contributesTo
+- ✓ Defining **specialized alphas** with `contributesTo` or **variant alphas** with `mapsTo`
 - ✓ Adding **activities, work products, patterns** (not in baselines)
 - ✓ Source methodology is an **implementation** of a framework
 
@@ -502,6 +531,113 @@ Starting Phase 3 JSON Generation. Reading:
 | Team Topologies | create-baseline-method (foundational framework) |
 | Specific SDLC practice | /generate-method (extends appropriate baseline) |
 
+## Feature: Baseline Structural Integrity
+
+Validates that baseline JSON has correct shape, required top-level sections, and no practice-layer elements.
+
+### Scenario: Baseline kind discriminator (@rule:structural-201)
+- Given: Phase 3 generates a baseline JSON file
+- When: The JSON is validated
+- Then: The `kind` property is "practiceBaseline"
+
+### Scenario: All required baseline sections present (@rule:structural-202)
+- Given: Phase 3 generates a baseline JSON
+- When: The JSON is validated
+- Then: focuses, alphas, activitySpaces, competencies, and narrativeTypes arrays are present and non-empty
+
+### Scenario: No practice-layer elements in baseline (@rule:structural-203)
+- Given: A baseline practice is being generated
+- When: Phase 3 produces the JSON
+- Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
+- And: These elements belong in extension practices, not baselines
+
+### Scenario: Focus count within range (@rule:structural-204)
+- Given: A baseline defines focus areas
+- When: Phase 3 generates the JSON
+- Then: The focuses array contains 2-4 focus definitions
+
+### Scenario: Competency level count (@rule:structural-205)
+- Given: A baseline defines competencies
+- When: Phase 3 generates the JSON
+- Then: Each competency has exactly 5 competencyLevels
+
+### Scenario: NarrativeType element count (@rule:structural-206)
+- Given: A baseline defines narrative types
+- When: Phase 3 generates the JSON
+- Then: Each narrativeType has 3-7 narrativeElements with name, description, and howToUse
+
+## Feature: Baseline Alpha Semantics
+
+Validates that baseline alphas are root-level with correct relationship structure.
+
+### Scenario: No contributesTo on baseline alphas (@rule:semantic-201)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha does NOT have a `contributesTo` property
+- And: Baseline alphas are root-level and relate to each other via `relatesTo`
+
+### Scenario: All baseline alphas have relatesTo (@rule:semantic-202)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha has a non-empty `relatesTo` array showing inter-alpha relationships
+
+### Scenario: relatesTo entries have direction (@rule:semantic-203)
+- Given: A baseline alpha has relatesTo entries
+- When: Phase 3 generates the JSON
+- Then: Each relatesTo entry has `relationship`, `alphaName`, and `direction` (outgoing|incoming|mutual)
+
+### Scenario: ActivitySpaces contribute to alpha states (@rule:semantic-204)
+- Given: A baseline defines activitySpaces
+- When: Phase 3 generates the JSON
+- Then: Each activitySpace has a `contributesTo` array referencing alpha states
+- And: Every non-initial alpha state is targeted by at least one activitySpace
+
+### Scenario: Alpha state minimum for baselines (@rule:coverage-201)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha has 5-7 states representing progressive maturity
+
+## Feature: Baseline Naming and Quality
+
+Validates naming conventions and content quality for baseline elements.
+
+### Scenario: Vendor-neutral terminology (@rule:naming-201)
+- Given: Phase 1.5 distills essential concerns
+- When: Concerns are named and described
+- Then: Names use vendor-neutral, framework-level language
+- And: Implementation-specific terms (product names, tool names) are generalized
+
+### Scenario: Competency level names follow standard (@rule:naming-202)
+- Given: A baseline defines competencies with levels
+- When: Phase 3 generates the JSON
+- Then: Level names follow the standard progression: Basic, Applies, Masters, Adapts, Innovating
+
+### Scenario: Gherkin structures minimal in baselines (@rule:coverage-202)
+- Given: A baseline practice is being generated
+- When: Phase 3 produces the JSON
+- Then: background, test, and examples properties are used sparingly
+- And: Detailed Gherkin structure is deferred to the practice layer
+
+## Feature: Baseline Process Compliance
+
+Validates that the four-phase baseline pipeline is executed correctly.
+
+### Scenario: Phase 1.5 distillation completed (@rule:process-201)
+- Given: The four-phase baseline pipeline is being executed
+- When: Phase 2 mapping begins
+- Then: 01.5-distilled-essentials.md exists with 8-15 essential concerns and 2-4 focus areas
+
+### Scenario: Distillation uses Phase 1 as input (@rule:process-202)
+- Given: Phase 1.5 distillation begins
+- When: The agent reads source materials
+- Then: 01-analysis-report.md is the primary input, NOT the original source materials directly
+
+### Scenario: Baseline validation run after generation (@rule:process-203)
+- Given: Phase 3 has generated a baseline JSON
+- When: The phase is marked complete
+- Then: validate-baseline-json.py has been run with 0 schema errors
+- And: assess-practice.py confirms 0 error-severity issues
+
 ## Common Pitfalls
 
 ### Phase 1 Pitfalls
@@ -510,6 +646,7 @@ Starting Phase 3 JSON Generation. Reading:
 ❌ **Implementation details**: Focus on types of work, not tool-specific steps
 ❌ **Creating practice hierarchy**: Baselines are single cohesive frameworks
 ❌ **Role-focused competencies**: Extract skill categories, not job titles
+❌ **Citations missing URLs**: Every citation SHOULD have a `url` field — use user-provided URLs, official framework websites, DOI references (`https://doi.org/10.xxxx/xxxxx`) for academic works, or publisher catalog pages. Only omit when no stable public link exists. Never fabricate URLs.
 
 ### Phase 1.5 Pitfalls (NEW)
 
@@ -527,6 +664,7 @@ Starting Phase 3 JSON Generation. Reading:
 ❌ **Missing relatesTo**: All alphas should have inter-alpha relationships
 ❌ **Incomplete contributesTo coverage**: Every alpha state needs ≥1 activity space
 ❌ **Generic narratives**: Element mappings should be substantive
+❌ **Over-using Gherkin structures**: Baselines should keep background/test/examples minimal — the practice layer is the natural place for detailed Gherkin structure (semantics.md Section 5.3.5)
 
 ### Phase 3 Pitfalls
 
@@ -536,6 +674,7 @@ Starting Phase 3 JSON Generation. Reading:
 ❌ **Wrong competency level count**: Must be exactly 5 levels
 ❌ **Invalid cross-references**: All symbolic names must resolve
 ❌ **Trailing commas**: JSON doesn't allow trailing commas
+❌ **Wrong background structure**: `background` must be an object with optional `given`, `alphaStates`, `workProductLevels` arrays — not a string or flat array
 
 ## Quality Gates
 
@@ -549,7 +688,7 @@ python3 utils/eval-skill-output.py baselines/<name>/ --phase <1|1.5|2|3> --summa
 python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
 ```
 
-**Success criteria:** `error_pass_rate: 1.0` on full validation. All 4 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
+**Success criteria:** `error_pass_rate: 1.0` on full validation. All 5 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
 
 ## Deliverables
 
@@ -560,7 +699,8 @@ baselines/<baseline-name>/
 ├── 01-analysis-report.md        # ~30-50K words
 ├── 01.5-distilled-essentials.md # ~15-25K words
 ├── 02-mapping-guide.md          # ~40-60K words
-└── <baseline-name>.json         # Schema-compliant baseline JSON
+├── <baseline-name>.json         # Schema-compliant baseline JSON (intermediate)
+# .keleo package output: bundles/<baseline-name>.keleo
 ```
 
 **Validation:**
@@ -574,7 +714,7 @@ python3 utils/validate-baseline-json.py \
 # Validate baseline JSON (extending parent baselines)
 python3 utils/validate-baseline-json.py \
   baselines/<baseline-name>/<baseline-name>.json \
-  baselines/<baseline-name>/_effective-parent-baseline.json \
+  baselines/<baseline-name>/_effective-context.json \
   deps/language.schema.json
 
 # Expected output: {"valid": true, "errors": [], "warnings": []}
@@ -619,3 +759,24 @@ Generated baseline can be referenced by extension practices:
 - **Focus identification in Phase 1.5** allows baselines to define custom groupings beyond default Value/Solution/Endeavor
 - **Distillation in Phase 1.5** ensures baselines contain only universal, foundational elements suitable for broad reuse
 - Generated baselines become the **foundation for extension practices** created with `/generate-method`
+
+---
+
+## Post-Completion Review (MANDATORY)
+
+**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
+
+1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
+   - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list
+   - Inline `python3 -c` or `bash -c` scripts that should have been reusable utils
+   - Shell patterns (heredocs, loops, process substitution) that triggered prompts
+   - External tool calls (e.g., `unzip`, `zip`, `curl`) that could be absorbed into existing utils
+
+2. **Identify missing utils**: Did you have to write any ad-hoc logic that could be generalised into a reusable utility script in `utils/`?
+
+3. **Propose fixes** (present to user, don't apply unilaterally):
+   - **Permission gaps**: Suggest adding auto-allow entries to `.claude/settings.json`
+   - **Missing utils**: Propose new utility scripts or extensions to existing ones
+   - **Skill improvements**: Suggest skill instruction updates to prevent the ad-hoc pattern in future runs
+
+4. **Report**: Briefly tell the user what you found and what you'd recommend changing. If nothing was found, say so — a clean session is a good signal.

@@ -3,15 +3,23 @@
 
 Consolidates structural fixes detected by assess-practice.py:
 - Missing 'kind' discriminator property
+- Method-invalid properties (strips authors/version/etc. from method-kind docs)
 - Narrative structure (missing name/description from PracticeElement)
 - Citation structure (missing PracticeElement fields)
 - Empty contributesTo on baseline alphas (should not exist)
 - Narrative citation references (adds all citations to narratives)
+- focusName correction (aligns sub-alpha focus to contributesTo/mapsTo parent)
 - Truncated checklist names (replaces 50-char truncated names with full description)
 - Relationship type normalization
+- relatesTo rationale→description rename (rationale is not a schema field)
 - Schema violations: techniqueNarratives→narratives, tags nesting, teams→personaGroups
 - Persona property names (personaName→name, personaDescription→description)
 - contributesTo arrays→strings (schema defines as string, not array)
+- relatesTo direction inference (adds required 'direction' field based on relationship verb)
+- Gherkin structure (background/test/examples type coercion and placement validation)
+- Element-level kind discriminators (narrativeTypes, activitySpaces, etc.)
+- Alias isolation (replace alias names in structural references with canonical names)
+- mapsTo variant naming (strip parent type name from variant alpha names and update refs)
 
 Usage:
     # Dry run — show what would be fixed
@@ -19,6 +27,9 @@ Usage:
 
     # Apply fixes in-place
     python3 utils/fix-common-issues.py <file.json> --fix
+
+    # With baseline (enables focusName correction)
+    python3 utils/fix-common-issues.py <file.json> <baseline.json> --fix
 
     # Also normalize relationship types to standard set
     python3 utils/fix-common-issues.py <file.json> --fix --normalize-relationships
@@ -31,6 +42,21 @@ Usage:
 
     # Fix contributesTo arrays to strings
     python3 utils/fix-common-issues.py <file.json> --fix --fix-contributesto-arrays
+
+    # Fix Gherkin structure issues (background/test/examples)
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-gherkin
+
+    # Move top-level narratives to matching elements
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-narrative-placement
+
+    # Add carry-forward alpha states to incomplete pattern views
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-pattern-completeness
+
+    # Replace alias names in structural references with canonical names
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-alias-isolation
+
+    # Strip parent type name from mapsTo variant alpha names
+    python3 utils/fix-common-issues.py <file.json> <baseline.json> --fix --fix-mapsto-naming
 
     # Apply all optional fixes
     python3 utils/fix-common-issues.py <file.json> --fix --all
@@ -53,8 +79,13 @@ RELATIONSHIP_NORMALIZATIONS = {
     "governs": "governed by",
     "supports": "produces",
     "enables": "produces",
+    "enables delivery of": "produces",
     "provides": "produces",
     "enhances": "produces",
+    "strengthens": "produces",
+    "strengthened by": "uses",
+    "drives": "produces",
+    "constrains": "governed by",
     "protects": "governed by",
     "protected by": "governed by",
     "managed by": "governed by",
@@ -208,6 +239,38 @@ def fix_citations(data):
     return fixes
 
 
+COLLECTION_KIND_MAP = {
+    "narrativeTypes": "narrativeType",
+    "activitySpaces": "activitySpace",
+    "alphas": "alpha",
+    "activities": "activity",
+    "workProducts": "workProduct",
+    "patterns": "pattern",
+    "personas": "persona",
+    "personaGroups": "personaGroup",
+    "citations": "citation",
+}
+
+
+def fix_element_kind(data):
+    fixes = []
+    sources = [data] + data.get("practices", [])
+    for source in sources:
+        for coll_key, expected_kind in COLLECTION_KIND_MAP.items():
+            for i, elem in enumerate(source.get(coll_key, [])):
+                current = elem.get("kind")
+                if current != expected_kind:
+                    elem["kind"] = expected_kind
+                    elem_name = elem.get("name", f"[{i}]")
+                    fixes.append({
+                        "category": "element-kind",
+                        "path": f"{coll_key}['{elem_name}'].kind",
+                        "old": current,
+                        "new": expected_kind,
+                    })
+    return fixes
+
+
 def fix_contributes_to(data):
     fixes = []
     for i, alpha in enumerate(data.get("alphas", [])):
@@ -243,6 +306,61 @@ def fix_narrative_citations(data):
                 "path": f"narratives[{i}].citationNames",
                 "old": existing,
                 "new": f"{len(citation_names)} citation names added",
+            })
+    return fixes
+
+
+METHOD_INVALID_PROPERTIES = {"authors", "createdAt", "updatedAt", "version", "keywords"}
+
+
+def fix_method_properties(data):
+    """Strip properties that are invalid on method-kind documents."""
+    fixes = []
+    if data.get("kind") != "method":
+        return fixes
+    for prop in sorted(METHOD_INVALID_PROPERTIES):
+        if prop in data:
+            del data[prop]
+            fixes.append({
+                "category": "method-properties",
+                "path": prop,
+                "old": "(present)",
+                "new": "(removed — not valid on method-kind documents)",
+            })
+    return fixes
+
+
+def fix_focus_names(data, baseline=None):
+    """Correct focusName on sub-alphas to match their contributesTo parent's focus."""
+    fixes = []
+    if not baseline:
+        return fixes
+
+    baseline_alpha_focus = {}
+    for alpha in baseline.get("alphas", []):
+        baseline_alpha_focus[alpha["name"]] = alpha.get("focusName", "")
+
+    local_alpha_focus = {}
+    for alpha in data.get("alphas", []):
+        local_alpha_focus[alpha["name"]] = alpha.get("focusName", "")
+
+    for alpha in data.get("alphas", []):
+        parent = alpha.get("contributesTo") or alpha.get("mapsTo")
+        if not parent:
+            continue
+        expected_focus = baseline_alpha_focus.get(parent) or local_alpha_focus.get(parent)
+        if not expected_focus:
+            continue
+        current_focus = alpha.get("focusName", "")
+        if current_focus != expected_focus:
+            old = current_focus
+            alpha["focusName"] = expected_focus
+            fixes.append({
+                "category": "focus-name",
+                "path": f"alphas[{alpha['name']}].focusName",
+                "old": old,
+                "new": expected_focus,
+                "reason": f"contributesTo/mapsTo parent '{parent}' has focusName '{expected_focus}'",
             })
     return fixes
 
@@ -284,6 +402,173 @@ def fix_relationship_types(data):
                         "path": f"alphas[{i}].relatesTo[{j}].relationship",
                         "old": rel_type,
                         "new": normalized,
+                    })
+    return fixes
+
+
+DIRECTION_HEURISTICS = {
+    "produces": "outgoing",
+    "enables": "outgoing",
+    "constrains": "outgoing",
+    "guides": "outgoing",
+    "depends on": "outgoing",
+    "consumes": "outgoing",
+    "hosts": "outgoing",
+    "provides": "outgoing",
+    "validates": "outgoing",
+    "influences": "outgoing",
+    "requires": "outgoing",
+    "uses": "outgoing",
+    "supports": "outgoing",
+    "implements": "outgoing",
+    "governs": "outgoing",
+    "protects": "outgoing",
+    "justifies": "outgoing",
+    "enforces": "outgoing",
+    "informs": "outgoing",
+    "defines": "outgoing",
+    "drives": "outgoing",
+    "motivates": "outgoing",
+    "aligns": "outgoing",
+    "initiates": "outgoing",
+    "adapts": "outgoing",
+    "filters": "outgoing",
+    "identifies": "outgoing",
+    "realizes": "outgoing",
+    "establishes": "outgoing",
+    "evidences": "outgoing",
+    "measures": "outgoing",
+    "shapes": "outgoing",
+    "coordinates": "outgoing",
+    "exposes": "outgoing",
+    "monitors": "outgoing",
+    "optimizes": "outgoing",
+    "enhances": "outgoing",
+    "improves": "outgoing",
+    "mitigates": "outgoing",
+    "performs": "outgoing",
+    "applies": "outgoing",
+    "reduces": "outgoing",
+    "addresses": "outgoing",
+    "extends": "outgoing",
+    "remediates": "outgoing",
+    "integrates": "outgoing",
+    "generates": "outgoing",
+    "analyzes": "outgoing",
+    "triggers": "outgoing",
+    "executes": "outgoing",
+    "develops": "outgoing",
+    "tracks": "outgoing",
+    "demonstrates": "outgoing",
+    "allocates": "outgoing",
+    "packages": "outgoing",
+    "feeds": "outgoing",
+    "maintains": "outgoing",
+    "formalizes": "outgoing",
+    "funds": "outgoing",
+    "operationalizes": "outgoing",
+    "assesses": "outgoing",
+    "challenges": "outgoing",
+    "threatens": "outgoing",
+    "contributes to": "outgoing",
+    "governed by": "incoming",
+    "built by": "incoming",
+    "validated by": "incoming",
+    "supported by": "incoming",
+    "required by": "incoming",
+    "constrained by": "incoming",
+    "guided by": "incoming",
+    "managed by": "incoming",
+    "enabled by": "incoming",
+    "provided by": "incoming",
+    "protected by": "incoming",
+    "enhanced by": "incoming",
+    "optimized by": "incoming",
+    "informed by": "incoming",
+    "evidenced by": "incoming",
+    "justified by": "incoming",
+    "driven by": "incoming",
+    "influenced by": "incoming",
+    "produced by": "incoming",
+    "shaped by": "incoming",
+    "reinforced by": "incoming",
+    "monitored by": "incoming",
+    "decided by": "incoming",
+    "measured by": "incoming",
+    "performed by": "incoming",
+    "scoped by": "incoming",
+    "reviewed by": "incoming",
+    "realized by": "incoming",
+    "configured by": "incoming",
+    "hosted by": "incoming",
+    "secured by": "incoming",
+    "identified by": "incoming",
+    "executed by": "incoming",
+    "reduced by": "incoming",
+    "powered by": "incoming",
+    "established by": "incoming",
+    "complemented by": "incoming",
+    "referenced by": "incoming",
+    "runs on": "incoming",
+    "deployed on": "incoming",
+    "based on": "incoming",
+    "consumed via": "incoming",
+    "aligned with": "mutual",
+    "correlates with": "mutual",
+    "co-evolves with": "mutual",
+    "coordinates with": "mutual",
+    "integrates with": "mutual",
+    "shares knowledge with": "mutual",
+    "synchronizes": "mutual",
+    "complements": "mutual",
+}
+
+_INCOMING_SUFFIXES = (" by", " from", " via")
+
+
+def _infer_direction(verb):
+    if verb in DIRECTION_HEURISTICS:
+        return DIRECTION_HEURISTICS[verb]
+    v = verb.lower().strip()
+    if any(v.endswith(s) for s in _INCOMING_SUFFIXES):
+        return "incoming"
+    if " with " in v or v.endswith(" with"):
+        return "mutual"
+    return "outgoing"
+
+
+def fix_relates_to_rationale(data):
+    fixes = []
+    sources = [data] + data.get("practices", [])
+    for source in sources:
+        for i, alpha in enumerate(source.get("alphas", [])):
+            for j, rel in enumerate(alpha.get("relatesTo", [])):
+                if "rationale" in rel:
+                    rel["description"] = rel.pop("rationale")
+                    fixes.append({
+                        "category": "relates-to-rationale",
+                        "path": f"alphas[{i}].relatesTo[{j}]",
+                        "old": "rationale",
+                        "new": "description",
+                    })
+    return fixes
+
+
+def fix_relates_to_direction(data):
+    fixes = []
+    sources = [data] + data.get("practices", [])
+    for source in sources:
+        for i, alpha in enumerate(source.get("alphas", [])):
+            for j, rel in enumerate(alpha.get("relatesTo", [])):
+                if "direction" not in rel:
+                    verb = rel.get("relationship", "")
+                    inferred = _infer_direction(verb)
+                    rel["direction"] = inferred
+                    fixes.append({
+                        "category": "relates-to-direction",
+                        "path": f"alphas[{i}].relatesTo[{j}].direction",
+                        "old": "(missing)",
+                        "new": inferred,
                     })
     return fixes
 
@@ -391,11 +676,484 @@ def fix_contributesto_arrays(data):
     return fixes
 
 
+def _fix_background_type(obj, path):
+    """Fix background when it is a string or list instead of an object."""
+    fixes = []
+    bg = obj.get("background")
+    if bg is None or isinstance(bg, dict):
+        return fixes
+    if isinstance(bg, str):
+        obj["background"] = {"given": [bg]}
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.background",
+            "old": repr(bg),
+            "new": {"given": [bg]},
+        })
+    elif isinstance(bg, list):
+        obj["background"] = {"given": bg}
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.background",
+            "old": repr(bg),
+            "new": {"given": bg},
+        })
+    return fixes
+
+
+def _fix_test_type(obj, path):
+    """Fix test when it is a string or list instead of a Test object."""
+    fixes = []
+    test = obj.get("test")
+    if test is None or isinstance(test, dict):
+        return fixes
+    if isinstance(test, str):
+        new_val = {"name": "Verification", "description": test}
+        obj["test"] = new_val
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.test",
+            "old": repr(test),
+            "new": new_val,
+        })
+    elif isinstance(test, list):
+        new_val = {"name": "Verification", "description": "Verification scenario", "then": test}
+        obj["test"] = new_val
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.test",
+            "old": repr(test),
+            "new": new_val,
+        })
+    return fixes
+
+
+def _fix_examples_type(obj, path):
+    """Fix examples when it is a dict or string instead of an array of Test objects."""
+    fixes = []
+    ex = obj.get("examples")
+    if ex is None or isinstance(ex, list):
+        return fixes
+    if isinstance(ex, dict):
+        obj["examples"] = [ex]
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.examples",
+            "old": repr(ex),
+            "new": [ex],
+        })
+    elif isinstance(ex, str):
+        new_val = [{"name": "Example", "description": ex}]
+        obj["examples"] = new_val
+        fixes.append({
+            "category": "gherkin-structure",
+            "path": f"{path}.examples",
+            "old": repr(ex),
+            "new": new_val,
+        })
+    return fixes
+
+
+def _remove_gherkin_placement(obj, path, prop):
+    """Remove a Gherkin property that is on a wrong element."""
+    fixes = []
+    if prop in obj:
+        old_val = obj.pop(prop)
+        fixes.append({
+            "category": "gherkin-placement",
+            "path": f"{path}.{prop}",
+            "old": repr(old_val),
+            "new": "(removed — only valid on Checklist items and Activity)",
+        })
+    return fixes
+
+
+def fix_gherkin_structure(data):
+    """Fix Gherkin structural issues: type coercion and placement validation.
+
+    Fixes:
+    - background as string/list → wrap in object with 'given' key
+    - test as string/list → wrap in Test object
+    - examples as dict/string → wrap in array
+    - Remove test/examples from States and LevelsOfDetail (wrong placement)
+    """
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        # --- Alphas → States ---
+        for ai, alpha in enumerate(source.get("alphas", [])):
+            alpha_name = alpha.get("name", f"alpha[{ai}]")
+            for si, state in enumerate(alpha.get("states", [])):
+                state_name = state.get("name", f"state[{si}]")
+                state_path = f"alphas['{alpha_name}'].states['{state_name}']"
+
+                # Fix background type on states (valid location)
+                fixes.extend(_fix_background_type(state, state_path))
+
+                # Remove test/examples from states (wrong placement)
+                fixes.extend(_remove_gherkin_placement(state, state_path, "test"))
+                fixes.extend(_remove_gherkin_placement(state, state_path, "examples"))
+
+                # Fix test/examples type on checklist items (valid location)
+                for ci, cl in enumerate(state.get("checklist", [])):
+                    cl_name = cl.get("name", f"checklist[{ci}]")
+                    cl_path = f"{state_path}.checklist['{cl_name}']"
+                    fixes.extend(_fix_test_type(cl, cl_path))
+                    fixes.extend(_fix_examples_type(cl, cl_path))
+
+        # --- WorkProducts → LevelsOfDetail ---
+        for wi, wp in enumerate(source.get("workProducts", [])):
+            wp_name = wp.get("name", f"workProduct[{wi}]")
+            for li, lod in enumerate(wp.get("levelsOfDetail", [])):
+                lod_name = lod.get("name", f"lod[{li}]")
+                lod_path = f"workProducts['{wp_name}'].levelsOfDetail['{lod_name}']"
+
+                # Fix background type on levelsOfDetail (valid location)
+                fixes.extend(_fix_background_type(lod, lod_path))
+
+                # Remove test/examples from levelsOfDetail (wrong placement)
+                fixes.extend(_remove_gherkin_placement(lod, lod_path, "test"))
+                fixes.extend(_remove_gherkin_placement(lod, lod_path, "examples"))
+
+        # --- ActivitySpaces ---
+        for asi, aspace in enumerate(source.get("activitySpaces", [])):
+            aspace_name = aspace.get("name", f"activitySpace[{asi}]")
+            aspace_path = f"activitySpaces['{aspace_name}']"
+
+            # Fix background type on activitySpaces (valid location)
+            fixes.extend(_fix_background_type(aspace, aspace_path))
+
+        # --- Activities ---
+        for acti, activity in enumerate(source.get("activities", [])):
+            act_name = activity.get("name", f"activity[{acti}]")
+            act_path = f"activities['{act_name}']"
+
+            # Fix background type on activities (valid location)
+            fixes.extend(_fix_background_type(activity, act_path))
+
+            # Fix test/examples type on activities (valid location)
+            fixes.extend(_fix_test_type(activity, act_path))
+            fixes.extend(_fix_examples_type(activity, act_path))
+
+    return fixes
+
+
+def fix_narrative_placement(data):
+    """Move top-level narratives to matching element's narratives[] array."""
+    fixes = []
+    element_map = {}
+    for coll_key in ("alphas", "activitySpaces", "competencies"):
+        for elem in data.get(coll_key, []):
+            name = elem.get("name", "")
+            if name:
+                element_map[name.lower()] = (coll_key, elem)
+
+    sorted_names = sorted(element_map.keys(), key=len, reverse=True)
+
+    to_remove = []
+    for i, narrative in enumerate(data.get("narratives", [])):
+        narr_name = narrative.get("name", "").lower()
+        narr_desc = narrative.get("description", "").lower()
+        for elem_name_lower in sorted_names:
+            if elem_name_lower in narr_name or elem_name_lower in narr_desc:
+                coll_key, elem = element_map[elem_name_lower]
+                elem.setdefault("narratives", []).append(narrative)
+                to_remove.append(i)
+                fixes.append({
+                    "category": "narrative-placement",
+                    "path": f"narratives[{i}]",
+                    "old": f"top-level narrative '{narrative.get('name', '')}'",
+                    "new": f"moved to {coll_key}['{elem.get('name', '')}'].narratives",
+                })
+                break
+
+    for idx in reversed(to_remove):
+        data["narratives"].pop(idx)
+
+    if data.get("narratives") == []:
+        del data["narratives"]
+
+    return fixes
+
+
+def fix_pattern_completeness(data):
+    """Add carry-forward alpha states to pattern views missing practice alphas."""
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        alpha_first_state = {}
+        for alpha in source.get("alphas", []):
+            aname = alpha.get("name", "")
+            states = alpha.get("states", [])
+            if aname and states:
+                alpha_first_state[aname] = states[0].get("name", "")
+
+        all_alpha_names = set(alpha_first_state.keys())
+        if len(all_alpha_names) < 2:
+            continue
+
+        for pi, pattern in enumerate(source.get("patterns", [])):
+            pat_name = pattern.get("name", f"pattern[{pi}]")
+            views = pattern.get("patternViews", [])
+            views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
+
+            last_state = {}
+            for view in views_sorted:
+                view_seq = view.get("seq", "?")
+                view_alphas = set()
+                for astate in view.get("alphaStates", []):
+                    aname = astate.get("alphaName", "")
+                    sname = astate.get("stateName", "")
+                    view_alphas.add(aname)
+                    last_state[aname] = sname
+
+                missing = all_alpha_names - view_alphas
+                for aname in sorted(missing):
+                    carry = last_state.get(aname, alpha_first_state.get(aname, ""))
+                    if not carry:
+                        continue
+                    view.setdefault("alphaStates", []).append({
+                        "alphaName": aname,
+                        "stateName": carry,
+                    })
+                    last_state[aname] = carry
+                    fixes.append({
+                        "category": "pattern-completeness",
+                        "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                        "old": f"missing alpha '{aname}'",
+                        "new": f"carry-forward state '{carry}'",
+                    })
+
+    return fixes
+
+
+def _update_alpha_references(source, renames):
+    """Update all alpha name references in a source document. Returns list of fix dicts."""
+    fixes = []
+
+    for alpha in source.get("alphas", []):
+        alpha_name = alpha.get("name", "")
+        for rel in alpha.get("relatesTo", []):
+            old_target = rel.get("alphaName", "")
+            if old_target in renames:
+                rel["alphaName"] = renames[old_target]
+                fixes.append({
+                    "category": "alpha-rename-ref",
+                    "path": f"alphas['{alpha_name}'].relatesTo[].alphaName",
+                    "old": old_target,
+                    "new": renames[old_target],
+                })
+
+    for activity in source.get("activities", []):
+        act_name = activity.get("name", "")
+        for ct in activity.get("contributesTo", []):
+            old = ct.get("alphaName", "")
+            if old in renames:
+                ct["alphaName"] = renames[old]
+                fixes.append({
+                    "category": "alpha-rename-ref",
+                    "path": f"activities['{act_name}'].contributesTo[].alphaName",
+                    "old": old,
+                    "new": renames[old],
+                })
+        for wo in activity.get("worksOn", []):
+            old = wo.get("alphaName", "")
+            if old in renames:
+                wo["alphaName"] = renames[old]
+                fixes.append({
+                    "category": "alpha-rename-ref",
+                    "path": f"activities['{act_name}'].worksOn[].alphaName",
+                    "old": old,
+                    "new": renames[old],
+                })
+
+    for pattern in source.get("patterns", []):
+        pat_name = pattern.get("name", "")
+        for view in pattern.get("patternViews", []):
+            for astate in view.get("alphaStates", []):
+                old = astate.get("alphaName", "")
+                if old in renames:
+                    astate["alphaName"] = renames[old]
+                    fixes.append({
+                        "category": "alpha-rename-ref",
+                        "path": f"patterns['{pat_name}'].patternViews[].alphaStates[].alphaName",
+                        "old": old,
+                        "new": renames[old],
+                    })
+
+    for wp in source.get("workProducts", []):
+        wp_name = wp.get("name", "")
+        for lod in wp.get("levelsOfDetail", []):
+            for astate in lod.get("alphaStates", []):
+                old = astate.get("alphaName", "")
+                if old in renames:
+                    astate["alphaName"] = renames[old]
+                    fixes.append({
+                        "category": "alpha-rename-ref",
+                        "path": f"workProducts['{wp_name}'].levelsOfDetail[].alphaStates[].alphaName",
+                        "old": old,
+                        "new": renames[old],
+                    })
+
+    aliases_key = "practiceElementAliases" if "practiceElementAliases" in source else "aliases"
+    for alias in source.get(aliases_key, []):
+        old = alias.get("name", "")
+        if old in renames:
+            alias["name"] = renames[old]
+            fixes.append({
+                "category": "alpha-rename-ref",
+                "path": f"{aliases_key}[].name",
+                "old": old,
+                "new": renames[old],
+            })
+
+    return fixes
+
+
+def fix_alias_isolation(data):
+    """Replace alias names in structural references with canonical names."""
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        aliases_key = "practiceElementAliases" if "practiceElementAliases" in source else "aliases"
+        aliases = source.get(aliases_key, [])
+        alias_to_canonical = {}
+        for alias in aliases:
+            aname = alias.get("aliasName", "")
+            canonical = alias.get("name", "")
+            if aname and canonical:
+                alias_to_canonical[aname] = canonical
+
+        if not alias_to_canonical:
+            continue
+
+        for alpha in source.get("alphas", []):
+            alpha_name = alpha.get("name", "")
+            for field in ("contributesTo", "mapsTo"):
+                val = alpha.get(field, "")
+                if val in alias_to_canonical:
+                    alpha[field] = alias_to_canonical[val]
+                    fixes.append({
+                        "category": "alias-isolation",
+                        "path": f"alphas['{alpha_name}'].{field}",
+                        "old": val,
+                        "new": alias_to_canonical[val],
+                    })
+
+            for rel in alpha.get("relatesTo", []):
+                target = rel.get("alphaName", "")
+                if target in alias_to_canonical:
+                    rel["alphaName"] = alias_to_canonical[target]
+                    fixes.append({
+                        "category": "alias-isolation",
+                        "path": f"alphas['{alpha_name}'].relatesTo[].alphaName",
+                        "old": target,
+                        "new": alias_to_canonical[target],
+                    })
+
+        for activity in source.get("activities", []):
+            act_name = activity.get("name", "")
+
+            as_name = activity.get("activitySpaceName", "")
+            if as_name in alias_to_canonical:
+                activity["activitySpaceName"] = alias_to_canonical[as_name]
+                fixes.append({
+                    "category": "alias-isolation",
+                    "path": f"activities['{act_name}'].activitySpaceName",
+                    "old": as_name,
+                    "new": alias_to_canonical[as_name],
+                })
+
+            for ct in activity.get("contributesTo", []):
+                aname = ct.get("alphaName", "")
+                if aname in alias_to_canonical:
+                    ct["alphaName"] = alias_to_canonical[aname]
+                    fixes.append({
+                        "category": "alias-isolation",
+                        "path": f"activities['{act_name}'].contributesTo[].alphaName",
+                        "old": aname,
+                        "new": alias_to_canonical[aname],
+                    })
+
+    return fixes
+
+
+def fix_mapsto_naming(data, baseline=None):
+    """Strip parent type name from mapsTo variant alpha names and update all references."""
+    fixes = []
+    if data.get("kind") == "practiceBaseline":
+        return fixes
+
+    all_alphas = {}
+    for a in data.get("alphas", []):
+        all_alphas[a.get("name", "")] = a
+    if baseline:
+        for a in baseline.get("alphas", []):
+            all_alphas.setdefault(a.get("name", ""), a)
+
+    renames = {}
+
+    for alpha in data.get("alphas", []):
+        maps_to = alpha.get("mapsTo")
+        if not maps_to:
+            continue
+
+        alpha_name = alpha.get("name", "")
+        parent = all_alphas.get(maps_to)
+        if not parent:
+            continue
+
+        parent_name = parent.get("name", maps_to)
+        if parent_name.lower() not in alpha_name.lower():
+            continue
+
+        idx = alpha_name.lower().find(parent_name.lower())
+        new_name = (alpha_name[:idx] + alpha_name[idx + len(parent_name):]).strip(" -–—")
+        if not new_name:
+            continue
+
+        renames[alpha_name] = new_name
+
+    if not renames:
+        return fixes
+
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        for alpha in source.get("alphas", []):
+            old_name = alpha.get("name", "")
+            if old_name in renames:
+                alpha["name"] = renames[old_name]
+                fixes.append({
+                    "category": "mapsto-naming",
+                    "path": f"alphas['{old_name}'].name",
+                    "old": old_name,
+                    "new": renames[old_name],
+                })
+
+        fixes.extend(_update_alpha_references(source, renames))
+
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
     )
     parser.add_argument("file", help="Practice, method, or baseline JSON file")
+    parser.add_argument("baseline", nargs="?", default=None,
+                        help="Baseline JSON file (optional, enables focusName correction)")
     parser.add_argument(
         "--fix", action="store_true",
         help="Apply fixes in-place (default: dry run)"
@@ -417,6 +1175,26 @@ def main():
         help="Convert contributesTo arrays to strings"
     )
     parser.add_argument(
+        "--fix-gherkin", action="store_true",
+        help="Fix Gherkin structure issues (background/test/examples type and placement)"
+    )
+    parser.add_argument(
+        "--fix-narrative-placement", action="store_true",
+        help="Move top-level narratives to matching element's narratives[] array"
+    )
+    parser.add_argument(
+        "--fix-pattern-completeness", action="store_true",
+        help="Add carry-forward alpha states to pattern views missing practice alphas"
+    )
+    parser.add_argument(
+        "--fix-alias-isolation", action="store_true",
+        help="Replace alias names in structural references with canonical names"
+    )
+    parser.add_argument(
+        "--fix-mapsto-naming", action="store_true",
+        help="Strip parent type name from mapsTo variant alpha names"
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="Enable all optional fixes"
     )
@@ -428,13 +1206,24 @@ def main():
         print(json.dumps({"error": err}))
         sys.exit(1)
 
+    baseline = None
+    if args.baseline:
+        baseline, b_err = load_json_pair(Path(args.baseline))
+        if b_err:
+            print(json.dumps({"error": f"baseline: {b_err}"}))
+            sys.exit(1)
+
     all_fixes = []
 
     all_fixes.extend(fix_kind(data))
+    all_fixes.extend(fix_element_kind(data))
+    all_fixes.extend(fix_method_properties(data))
     all_fixes.extend(fix_narratives(data))
     all_fixes.extend(fix_citations(data))
     all_fixes.extend(fix_contributes_to(data))
     all_fixes.extend(fix_narrative_citations(data))
+    all_fixes.extend(fix_relates_to_rationale(data))
+    all_fixes.extend(fix_focus_names(data, baseline))
 
     if args.fix_truncated_names or args.all:
         all_fixes.extend(fix_truncated_names(data))
@@ -447,9 +1236,25 @@ def main():
         all_fixes.extend(fix_persona_groups(data))
         all_fixes.extend(fix_persona_properties(data))
         all_fixes.extend(fix_activity_technique_narratives(data))
+        all_fixes.extend(fix_relates_to_direction(data))
 
     if args.fix_contributesto_arrays or args.all:
         all_fixes.extend(fix_contributesto_arrays(data))
+
+    if args.fix_gherkin or args.all:
+        all_fixes.extend(fix_gherkin_structure(data))
+
+    if args.fix_narrative_placement or args.all:
+        all_fixes.extend(fix_narrative_placement(data))
+
+    if args.fix_pattern_completeness or args.all:
+        all_fixes.extend(fix_pattern_completeness(data))
+
+    if args.fix_alias_isolation or args.all:
+        all_fixes.extend(fix_alias_isolation(data))
+
+    if args.fix_mapsto_naming or args.all:
+        all_fixes.extend(fix_mapsto_naming(data, baseline))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

@@ -159,10 +159,11 @@ You have access to the following resources via the Read tool:
    - **Name**: 2-5 words, neutral framework-level terminology
    - **Description**: Single sentence, general applicability (avoid vendor/tool names)
    - **Focus Assignment**: Which focus area (from Step 2)
+   - **Concreteness Test**: Carry forward (and generalize) the Given/When/Then triplet from Phase 1. If Phase 1 concern was merged or renamed during distillation, write a new triplet for the distilled concern.
    - **Progressive States**: 5-7 universal maturity levels
      - Use Phase 1 state progressions as input
      - Generalize to remove practice-specific details
-     - Each state: Name, Description, 3-5 verification criteria
+     - Each state: Name, Description, Prerequisites (1-3 cross-concern preconditions carried from Phase 1, generalized — do NOT list the previous state of the same concern, sequential progression is implicit), 3-5 verification criteria
    - **Relationships to Other Concerns**: Document dependencies/relationships (will become relatesTo)
      - "produces" relationships (this concern enables another)
      - "governed by" relationships (this concern is constrained by another)
@@ -186,9 +187,13 @@ Total: [X concerns] across [Y focuses]
 ### Concern 1: [Name]
 - **Description**: [Single sentence, universal scope]
 - **Focus**: [Value | Solution | Engagement | etc.]
+- **Concreteness Test**:
+  - **Given** [precondition making this concern relevant]
+  - **When** [trigger or action that advances the concern]
+  - **Then** [observable outcome demonstrating progress]
 - **Progressive States**: 
-  1. **[State Name]**: [Description] — Criteria: [3-5 bullets]
-  2. **[State Name]**: [Description] — Criteria: [3-5 bullets]
+  1. **[State Name]**: [Description] — Prerequisites: [1-3 preconditions] — Criteria: [3-5 bullets]
+  2. **[State Name]**: [Description] — Prerequisites: [1-3 preconditions] — Criteria: [3-5 bullets]
   [... 5-7 states total]
 - **Relationships**:
   - Produces: [Concern names]

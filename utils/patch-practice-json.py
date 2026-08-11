@@ -37,6 +37,14 @@ Usage:
 
     # Bulk replacements from a JSON file (array of [old, new] pairs)
     python3 utils/patch-practice-json.py target.json --replace-file replacements.json
+
+    # Rename a named element and update all references throughout the JSON
+    python3 utils/patch-practice-json.py target.json \
+      --rename-in activities "Transition Programme Benefits" "Orchestrate Programme Benefits Transition"
+
+    # Provide inline JSON instead of a patch file or stdin
+    python3 utils/patch-practice-json.py target.json \
+      --set-key narratives --value '[{"name":"Citation Standard","narrativeTypeName":"Citation Standard"}]'
 """
 import argparse
 import json
@@ -113,6 +121,22 @@ def summarize_changes(key, value):
     return f"  {key}: set to {json.dumps(value)[:80]}"
 
 
+def _rename_focus_in(obj, old_focus, new_focus):
+    """Rename focus definitions and focusName references within a single document."""
+    count = 0
+    for focus in obj.get("focuses", []):
+        if focus.get("name") == old_focus:
+            focus["name"] = new_focus
+            count += 1
+    for collection_key in ("alphas", "activitySpaces", "activities", "workProducts",
+                           "patterns", "competencies"):
+        for elem in obj.get(collection_key, []):
+            if elem.get("focusName") == old_focus:
+                elem["focusName"] = new_focus
+                count += 1
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Patch a practice/baseline JSON file by merging content"
@@ -126,12 +150,18 @@ def main():
                         help="Append patch array items to an existing array at KEY")
     parser.add_argument("--element-path", "-e", metavar="PATH",
                         help="Merge patch into element at PATH (e.g., 'alphas[Platform]')")
-    parser.add_argument("--delete-key", "-d", metavar="KEY",
-                        help="Delete a top-level key (no patch input needed)")
+    parser.add_argument("--delete-key", "-d", nargs="+", metavar="KEY",
+                        help="Delete one or more top-level keys (no patch input needed)")
     parser.add_argument("--replace", nargs=2, metavar=("OLD", "NEW"),
                         help="Deep find-and-replace across all string values")
     parser.add_argument("--replace-file", metavar="FILE",
                         help="Bulk replacements from JSON file (array of [old, new] pairs)")
+    parser.add_argument("--rename-in", nargs=3, metavar=("COLLECTION", "OLD_NAME", "NEW_NAME"),
+                        help="Rename an element in a collection and update all references")
+    parser.add_argument("--rename-focus", nargs=2, metavar=("OLD", "NEW"),
+                        help="Rename a focus and update all focusName references (targeted, no deep replace)")
+    parser.add_argument("--value", metavar="JSON_STRING",
+                        help="Inline JSON value to use as patch (alternative to --patch-file or stdin)")
     parser.add_argument("--create", action="store_true",
                         help="Create target file if it doesn't exist")
     parser.add_argument("--dry-run", "-n", action="store_true",
@@ -140,15 +170,21 @@ def main():
                         help="Write to a different file instead of patching in place")
     args = parser.parse_args()
 
-    needs_patch = not (args.delete_key or args.replace or args.replace_file)
+    needs_patch = not (args.delete_key or args.replace or args.replace_file or args.rename_in or args.rename_focus)
 
     if needs_patch:
-        if args.patch_file:
+        if args.value:
+            try:
+                patch = json.loads(args.value)
+            except json.JSONDecodeError as exc:
+                print(f"Error: invalid JSON in --value: {exc}", file=sys.stderr)
+                sys.exit(1)
+        elif args.patch_file:
             patch = load_json(args.patch_file)
         elif not sys.stdin.isatty():
             patch = json.load(sys.stdin)
         else:
-            print("Error: provide --patch-file or pipe JSON to stdin", file=sys.stderr)
+            print("Error: provide --patch-file, --value, or pipe JSON to stdin", file=sys.stderr)
             sys.exit(1)
     else:
         patch = None
@@ -166,11 +202,12 @@ def main():
     changes = []
 
     if args.delete_key:
-        if args.delete_key in data:
-            del data[args.delete_key]
-            changes.append(f"  {args.delete_key}: deleted")
-        else:
-            changes.append(f"  {args.delete_key}: not present (no-op)")
+        for key in args.delete_key:
+            if key in data:
+                del data[key]
+                changes.append(f"  {key}: deleted")
+            else:
+                changes.append(f"  {key}: not present (no-op)")
 
     if args.replace:
         old_text, new_text = args.replace
@@ -192,6 +229,40 @@ def main():
                 sys.exit(1)
             data = deep_replace(data, pair[0], pair[1])
         changes.append(f"  replace-file: applied {len(replacements)} replacements")
+
+    if args.rename_in:
+        collection, old_name, new_name = args.rename_in
+        if collection not in data:
+            print(f"Error: collection '{collection}' not found in target", file=sys.stderr)
+            sys.exit(1)
+        items = data[collection]
+        if not isinstance(items, list):
+            print(f"Error: '{collection}' is not an array", file=sys.stderr)
+            sys.exit(1)
+        found = False
+        for item in items:
+            if isinstance(item, dict) and item.get("name") == old_name:
+                item["name"] = new_name
+                found = True
+                break
+        if not found:
+            print(f"Error: no element named '{old_name}' in {collection}", file=sys.stderr)
+            sys.exit(1)
+        data = deep_replace(data, old_name, new_name)
+        changes.append(
+            f"  rename-in {collection}: \"{old_name}\" -> \"{new_name}\" (all references updated)"
+        )
+
+    if args.rename_focus:
+        old_focus, new_focus = args.rename_focus
+        ref_count = _rename_focus_in(data, old_focus, new_focus)
+        for practice in data.get("practices", []):
+            ref_count += _rename_focus_in(practice, old_focus, new_focus)
+        if ref_count == 0:
+            print(f"Warning: no focusName references to '{old_focus}' found", file=sys.stderr)
+        changes.append(
+            f"  rename-focus: \"{old_focus}\" -> \"{new_focus}\" ({ref_count} references updated)"
+        )
 
     if needs_patch:
         if args.element_path:

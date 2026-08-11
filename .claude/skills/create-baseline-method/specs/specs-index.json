@@ -1,0 +1,346 @@
+{
+  "skill": null,
+  "source": ".claude/skills/create-baseline-method/SKILL.md",
+  "features": [
+    "Baseline Structural Integrity",
+    "Baseline Alpha Semantics",
+    "Baseline Naming and Quality",
+    "Baseline Process Compliance"
+  ],
+  "scenarios": [
+    {
+      "id": "structural-201",
+      "name": "Baseline kind discriminator",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "Phase 3 generates a baseline JSON file"
+      ],
+      "when": [
+        "The JSON is validated"
+      ],
+      "then": [
+        "The `kind` property is \"practiceBaseline\""
+      ],
+      "line": 538,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-202",
+      "name": "All required baseline sections present",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "Phase 3 generates a baseline JSON"
+      ],
+      "when": [
+        "The JSON is validated"
+      ],
+      "then": [
+        "focuses, alphas, activitySpaces, competencies, and narrativeTypes arrays are present and non-empty"
+      ],
+      "line": 543,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-203",
+      "name": "No practice-layer elements in baseline",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "A baseline practice is being generated"
+      ],
+      "when": [
+        "Phase 3 produces the JSON"
+      ],
+      "then": [
+        "The JSON does NOT contain activities, workProducts, or patterns arrays with content",
+        "These elements belong in extension practices, not baselines"
+      ],
+      "line": 548,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-204",
+      "name": "Focus count within range",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "A baseline defines focus areas"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "The focuses array contains 2-4 focus definitions"
+      ],
+      "line": 554,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-205",
+      "name": "Competency level count",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "A baseline defines competencies"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Each competency has exactly 5 competencyLevels"
+      ],
+      "line": 559,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "structural-206",
+      "name": "NarrativeType element count",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "A baseline defines narrative types"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Each narrativeType has 3-7 narrativeElements with name, description, and howToUse"
+      ],
+      "line": 564,
+      "assess_categories": [
+        "structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-201",
+      "name": "No contributesTo on baseline alphas",
+      "feature": "Baseline Alpha Semantics",
+      "given": [
+        "A baseline alpha is defined"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "The alpha does NOT have a `contributesTo` property",
+        "Baseline alphas are root-level and relate to each other via `relatesTo`"
+      ],
+      "line": 573,
+      "assess_categories": [
+        "baseline-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-202",
+      "name": "All baseline alphas have relatesTo",
+      "feature": "Baseline Alpha Semantics",
+      "given": [
+        "A baseline alpha is defined"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "The alpha has a non-empty `relatesTo` array showing inter-alpha relationships"
+      ],
+      "line": 579,
+      "assess_categories": [
+        "baseline-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-203",
+      "name": "relatesTo entries have direction",
+      "feature": "Baseline Alpha Semantics",
+      "given": [
+        "A baseline alpha has relatesTo entries"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Each relatesTo entry has `relationship`, `alphaName`, and `direction` (outgoing|incoming|mutual)"
+      ],
+      "line": 584,
+      "assess_categories": [
+        "integrity"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "semantic-204",
+      "name": "ActivitySpaces contribute to alpha states",
+      "feature": "Baseline Alpha Semantics",
+      "given": [
+        "A baseline defines activitySpaces"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Each activitySpace has a `contributesTo` array referencing alpha states",
+        "Every non-initial alpha state is targeted by at least one activitySpace"
+      ],
+      "line": 589,
+      "assess_categories": [
+        "crossref-activity-alpha"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-201",
+      "name": "Alpha state minimum for baselines",
+      "feature": "Baseline Alpha Semantics",
+      "given": [
+        "A baseline alpha is defined"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "The alpha has 5-7 states representing progressive maturity"
+      ],
+      "line": 595,
+      "assess_categories": [
+        "alpha-state-minimum"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "naming-201",
+      "name": "Vendor-neutral terminology",
+      "feature": "Baseline Naming and Quality",
+      "given": [
+        "Phase 1.5 distills essential concerns"
+      ],
+      "when": [
+        "Concerns are named and described"
+      ],
+      "then": [
+        "Names use vendor-neutral, framework-level language",
+        "Implementation-specific terms (product names, tool names) are generalized"
+      ],
+      "line": 604,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "naming-202",
+      "name": "Competency level names follow standard",
+      "feature": "Baseline Naming and Quality",
+      "given": [
+        "A baseline defines competencies with levels"
+      ],
+      "when": [
+        "Phase 3 generates the JSON"
+      ],
+      "then": [
+        "Level names follow the standard progression: Basic, Applies, Masters, Adapts, Innovating"
+      ],
+      "line": 610,
+      "assess_categories": [
+        "competency-levels"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "coverage-202",
+      "name": "Gherkin structures minimal in baselines",
+      "feature": "Baseline Naming and Quality",
+      "given": [
+        "A baseline practice is being generated"
+      ],
+      "when": [
+        "Phase 3 produces the JSON"
+      ],
+      "then": [
+        "background, test, and examples properties are used sparingly",
+        "Detailed Gherkin structure is deferred to the practice layer"
+      ],
+      "line": 615,
+      "assess_categories": [
+        "gherkin-structure"
+      ],
+      "automatable": true
+    },
+    {
+      "id": "process-201",
+      "name": "Phase 1.5 distillation completed",
+      "feature": "Baseline Process Compliance",
+      "given": [
+        "The four-phase baseline pipeline is being executed"
+      ],
+      "when": [
+        "Phase 2 mapping begins"
+      ],
+      "then": [
+        "01.5-distilled-essentials.md exists with 8-15 essential concerns and 2-4 focus areas"
+      ],
+      "line": 625,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-202",
+      "name": "Distillation uses Phase 1 as input",
+      "feature": "Baseline Process Compliance",
+      "given": [
+        "Phase 1.5 distillation begins"
+      ],
+      "when": [
+        "The agent reads source materials"
+      ],
+      "then": [
+        "01-analysis-report.md is the primary input, NOT the original source materials directly"
+      ],
+      "line": 630,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-203",
+      "name": "Baseline validation run after generation",
+      "feature": "Baseline Process Compliance",
+      "given": [
+        "Phase 3 has generated a baseline JSON"
+      ],
+      "when": [
+        "The phase is marked complete"
+      ],
+      "then": [
+        "validate-baseline-json.py has been run with 0 schema errors",
+        "assess-practice.py confirms 0 error-severity issues"
+      ],
+      "line": 635,
+      "assess_categories": [],
+      "automatable": false
+    }
+  ],
+  "stats": {
+    "total_scenarios": 17,
+    "total_features": 4,
+    "automatable": 13,
+    "manual_only": 4,
+    "by_category": {
+      "coverage": 2,
+      "naming": 2,
+      "process": 3,
+      "semantic": 4,
+      "structural": 6
+    }
+  }
+}

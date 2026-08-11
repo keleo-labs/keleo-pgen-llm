@@ -227,15 +227,23 @@ From mapping guide Alphas section:
       "focusName": "Focus name (must exist in Step 3 focuses array)",
       "relatesTo": [
         {
+          "relationship": "produces",
           "alphaName": "Target alpha name",
-          "relationship": "produces | governed by | uses",
-          "rationale": "Why this relationship exists"
+          "direction": "outgoing",
+          "description": "Why this relationship exists"
         }
       ],
       "states": [
         {
           "name": "State name from mapping guide",
           "description": "State description from mapping guide",
+          "background": {  // Optional — use sparingly in baselines; practice layer adds detailed Gherkin
+            // NEVER reference the previous state of the SAME alpha — sequential progression is implicit in seq ordering
+            "given": ["Precondition for this state"],
+            "alphaStates": [
+              { "alphaName": "Other Alpha", "stateName": "State" }  // Cross-alpha dependencies ONLY
+            ]
+          },
           "checklists": [
             "Checklist item 1 from mapping guide criteria",
             "Checklist item 2 from mapping guide criteria",
@@ -263,15 +271,25 @@ From mapping guide Alphas section:
 }
 ```
 
-**relatesTo Relationship Types:**
-- `"produces"`: This alpha enables/produces the target alpha
-- `"governed by"`: This alpha is constrained/governed by the target alpha
-- `"uses"`: This alpha uses/depends on the target alpha
+**relatesTo Fields (AlphaRelationship):**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `relationship` | Yes | Verb phrase: "produces", "governed by", "uses", "enables", etc. |
+| `alphaName` | Yes | Target alpha name (must exist in this baseline's alphas array) |
+| `direction` | Yes | `outgoing` (this alpha acts on target), `incoming` (target acts on this), or `mutual` (symmetric) |
+| `description` | No | Human-readable explanation of why this relationship exists |
+
+**Direction mapping for common relationship verbs:**
+- `outgoing`: "produces", "enables", "constrains", "depends on", "consumes", "hosts", "uses"
+- `incoming`: "governed by", "built by", "validated by", "supported by"
+- `mutual`: "correlates with", "co-evolves with" (use sparingly)
 
 **Quality Checks:**
 - ✓ 8-15 alphas (from mapping guide)
 - ✓ NO `contributesTo` property on any alpha
 - ✓ ALL alphas have `relatesTo` array (not empty)
+- ✓ Every `relatesTo` entry has `direction` field
 - ✓ Each alpha has 5-7 states
 - ✓ Each state has 3-5 checklist items
 - ✓ All `focusName` references exist in Step 3 focuses
@@ -292,6 +310,12 @@ From mapping guide ActivitySpaces section:
       "name": "ActivitySpace name from mapping guide",
       "description": "Execution boundary description from mapping guide",
       "focusName": "Focus name (must exist in Step 3 focuses array)",
+      "background": {  // Optional — shared prerequisites for this activity space; use sparingly in baselines
+        "given": ["Precondition before activities in this space begin"],
+        "alphaStates": [
+          { "alphaName": "Alpha", "stateName": "State" }
+        ]
+      },
       "contributesTo": [
         {
           "alphaName": "Alpha name (must exist in Step 6 alphas array)",
@@ -403,8 +427,27 @@ Citations use the "Citation Standard" narrative type with Author/Date/Title/Sour
 - ✓ The citation `name` field MUST be the **title of the work** (e.g., "Team Topologies", "Accelerate"), NOT an author-date shorthand like "Skelton and Pais (2019)" or "Forsgren et al. (2018)". Authors have their own element.
 - ✓ Dates in consistent format (YYYY-MM-DD or YYYY)
 - ✓ Sources include URLs, DOIs, or ISBN when available
+- ✓ **URL enrichment:** Every citation SHOULD include a retrieval URL — carry forward URLs from the mapping guide and analysis report, including internal, intranet, and Google Docs/Sheets/Slides links. Use user-provided URLs, official websites, DOI references (`https://doi.org/10.xxxx/xxxxx`) for academic works, or publisher pages. Only omit when no stable link exists. Internal/intranet URLs are valid.
 
 **Add to JSON skeleton (or merge with narratives array if preferred).**
+
+### Step 9.5: Build Acknowledgements Array (Optional)
+
+If the source methodology credits specific contributors, research groups, or supporting organizations, add an `acknowledgements` array. Acknowledgements attribute human contributions — distinct from citations which reference published works.
+
+```json
+{
+  "acknowledgements": [
+    {
+      "name": "Person or Institution Name",
+      "description": "Brief description of their contribution",
+      "url": "https://optional-profile-or-contact-url"
+    }
+  ]
+}
+```
+
+**Add to JSON skeleton.**
 
 ### Step 10: Build Assets Array
 
@@ -519,6 +562,7 @@ Before writing the final JSON file, validate:
 **Baseline-Specific Rules:**
 - ✓ Alphas have NO `contributesTo` property
 - ✓ Alphas ALL have `relatesTo` arrays (not empty)
+- ✓ Every `relatesTo` entry has required `direction` field
 - ✓ Alphas have 5-7 states each
 - ✓ ActivitySpaces defined (not referenced)
 - ✓ Competencies defined with 5 levels

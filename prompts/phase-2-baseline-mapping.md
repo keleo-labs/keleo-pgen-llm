@@ -61,6 +61,9 @@ You have access to the following resources via the Read tool:
    - Review activity types with contributesTo mappings
    - Review universal competencies with 5 levels
    - Review narrative frameworks
+   - **Note Gherkin seed material** — these fields feed Gherkin constructs in JSON:
+     - Concern **Concreteness Tests** (Given/When/Then) → inform state `background` decisions
+     - State **Prerequisites** → seed `background.given` and `background.alphaStates`
 
 2. **Read `baselines/<name>/01-analysis-report.md`** (SUPPORTING DETAIL)
    - Reference for citations, narrative examples, additional context
@@ -75,6 +78,7 @@ You have access to the following resources via the Read tool:
    - Focus on sections:
      - Section 3: PracticeElement, tags, checklists
      - Section 4: Alpha-State Trajectory
+     - Section 5.3: Gherkin-Inspired Test Model (for optional background on states)
      - Section 7: Narrative Management
      - Section 9: Decision frameworks
 
@@ -159,6 +163,9 @@ Total: [X focuses]
 - **States**: [From Phase 1.5 progressive states]
   - **State 1: [Name]**
     - **Description**: [From Phase 1.5]
+    - **Background**: [optional - populate from Phase 1.5 state Prerequisites; use sparingly in baselines — the practice layer is the natural place for detailed Gherkin structure]
+      - Given: [from Phase 1.5 Prerequisites: contextual conditions and natural-language preconditions]
+      - Alpha States: [from Phase 1.5 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
     - **Checklists**:
       - [ ] [Criteria 1 from Phase 1.5]
       - [ ] [Criteria 2 from Phase 1.5]
@@ -174,20 +181,30 @@ Total: [X focuses]
 
 **relatesTo Relationship Guidelines:**
 
-Use **directionality pattern** (provider perspective):
+Each `relatesTo` entry is an `AlphaRelationship` with required `relationship`, `alphaName`, and `direction` fields, plus an optional `description`:
 
-- **"produces" (enables)**: This alpha enables/produces the target alpha
-  - Example: Opportunity → produces → Platform Value (opportunity drives value realization)
+| Field | Required | Description |
+|-------|----------|-------------|
+| `relationship` | Yes | Verb phrase (e.g., "produces", "governed by", "uses") |
+| `alphaName` | Yes | Target alpha name (must exist in this baseline) |
+| `direction` | Yes | `outgoing` / `incoming` / `mutual` |
+| `description` | No | Why this relationship exists |
+
+**Direction values:**
+
+- **`outgoing`**: This alpha acts upon the target — "produces", "constrains", "enables", "depends on", "consumes"
+  - Example: Opportunity → produces → Platform Value (direction: `outgoing`)
   
-- **"governed by" (constrained)**: This alpha is constrained/governed by the target alpha
-  - Example: Platform → governed by → Platform Governance (governance constrains platform)
+- **`incoming`**: The target acts upon this alpha — "governed by", "built by", "validated by"
+  - Example: Platform → governed by → Platform Governance (direction: `incoming`)
   
-- **"uses" (depends on)**: This alpha uses/depends on the target alpha
-  - Example: Platform Consumption Interface → uses → Platform (interface wraps platform)
+- **`mutual`**: Symmetric relationship — "correlates with", "co-evolves with"
+  - Use sparingly for genuinely symmetric peer relationships
 
 **Quality Checks:**
 - ✓ NO `contributesTo` property (baseline alphas are root-level)
 - ✓ ALL alphas have `relatesTo` arrays (show interconnections)
+- ✓ Every `relatesTo` entry has `direction` field
 - ✓ 5-7 states per alpha (not more than 7, not fewer than 5)
 - ✓ Each state has 3-5 checklist items (from Phase 1.5 criteria)
 - ✓ 8-15 total alphas (from Phase 1.5 essential concerns)
@@ -221,6 +238,9 @@ Total: [X alphas] across [Y focuses]
 ### ActivitySpace: [Name from Phase 1.5]
 - **Description**: [From Phase 1.5 activity type description]
 - **Focus**: [From Phase 1.5 focus assignment]
+- **Background**: [optional - shared prerequisites for this activity space; use sparingly in baselines]
+  - Given: [preconditions before activities in this space begin]
+  - Alpha States: [prerequisite alpha/state pairs]
 - **contributesTo**: [Array of alpha-state pairs from Phase 1.5 mappings]
   - [Alpha Name] → [State 1], [State 2]
   - [Alpha Name] → [State 3]
@@ -413,6 +433,10 @@ Total: [X narrative types]
 - Narrative contexts MUST contain direct content, NOT self-references
   - WRONG: "In this Hero's Journey narrative, organizations embark on..."
   - CORRECT: "Organizations face accelerating competitive pressure from platform-native competitors..."
+- Narrative contexts MUST be **self-contained** — coherent without element headings
+  - Narrative element names (e.g., "Situation", "Task", "Action") are authoring scaffolding, NOT displayed to readers
+  - Users consume `name`, `description`, and `context` strings sequentially
+  - Bare lists in contexts require a framing introduction sentence
 
 **Quality Checks:**
 - ✓ Baseline-level narrative present (REQUIRED)
@@ -458,6 +482,14 @@ Use **Citation Standard** narrative type:
 - ✓ Prioritize authoritative sources (primary methodology creators)
 - ✓ Include publication dates
 - ✓ Provide full source references (URLs, DOIs, ISBNs)
+- ✓ **URL enrichment (REQUIRED):** Every citation SHOULD include a retrieval URL. Internal, intranet, and Google Docs/Sheets/Slides links are valid and preferred when available:
+  - Carry forward URLs recorded in the Phase 1 analysis report (highest priority)
+  - Carry forward URLs provided as user input sources
+  - Official framework/methodology websites
+  - DOI references for academic works: `https://doi.org/10.xxxx/xxxxx`
+  - Publisher catalog pages for books
+  - Standards body pages for standards (ISO, NIST, IEEE)
+  - Only omit when no stable link exists. Never fabricate URLs. Internal/intranet URLs are valid.
 
 **Output Format:**
 

@@ -55,6 +55,9 @@ practices/
     ├── 01-analysis-report.md      (Phase 1 output, ~30-50K words)
     ├── 02-mapping-guide.md         (Phase 2 output, ~40-60K words)
     └── <practice-name>.json        (Phase 3 output, schema-compliant JSON)
+
+bundles/
+└── <practice-name>.keleo           (Package: practice + baseline bundled)
 ```
 
 For methods with multiple practices:
@@ -64,7 +67,10 @@ practices/
 └── <method-name>/
     ├── 01-analysis-report.md       (Covers all practices)
     ├── 02-mapping-guide.md         (Maps all practices)
-    └── <method-name>.json          (Method JSON with embedded practices)
+    └── <practice-name>.json        (Per-practice standalone JSONs)
+
+bundles/
+└── <method-name>.keleo             (Package: method + practices + baseline)
 ```
 
 ---
@@ -100,24 +106,23 @@ In plan mode:
    - All provided PDFs, URLs, markdown files
    - Take comprehensive notes
 
-2. **Identify baseline or parent practice:**
-   - Ask user which baseline OR parent practice/method to use
-   - User can provide either a **file path** or a **name** (e.g., "Platform Adoption Essentials")
-   - **Auto-discover by name:** If user provides a name (no `/`, doesn't end in `.json`), resolve it:
+2. **Identify context sources (baselines, practices, methods, .keleo bundles):**
+   - Ask user which baseline, parent practice/method, or `.keleo` bundle(s) to use
+   - User can provide **file paths** (`.json` or `.keleo`), **names**, or a mix
+   - **Auto-discover by name:** If user provides a name (no `/`, doesn't end in `.json`/`.keleo`), resolve it:
      ```bash
      python3 utils/discover-dependencies.py --resolve "Name Provided By User"
      ```
      - `found` → use the resolved path
-     - `ambiguous` → present candidates to user, let them choose
+     - `ambiguous` → present candidates to user, let them choose (filesystem entries preferred over bundle copies)
      - `not_found` → ask user for the file path
-   - **If path provided directly:** validate file exists and is valid JSON
-   - **Detect input type:**
+   - **`.keleo` bundles:** Accepted directly — all documents inside are extracted and classified
+   - **Classify all inputs:**
      ```bash
-     python3 utils/resolve-parent-practice.py <resolved-path.json> --check-only
+     python3 utils/resolve-context.py <input1> [<input2> ...] --check-only
      ```
-     - If `inputKind: "practiceBaseline"` → Standard baseline flow (proceed to Step 0.5)
-     - If `inputKind: "practice"` or `"method"` → **Parent practice mode** (proceed to Step 0.25)
-   - Report detected input type and key details to user
+     Reports tiers (baselines, practices, methods) and document count. Review with user.
+   - Report detected context sources and tiers to user
 
 3. **Initial structure assessment (preliminary only):**
    - **Note:** Final practice delineation happens in Step 1.5 (Delineation Gate) before Phase 2 delegation
@@ -140,130 +145,57 @@ In plan mode:
 
 ---
 
-### Step 0.25: Parent Practice Resolution (Parent Practice Mode Only)
+### Step 0.5: Unified Context Resolution
 
-**Objective:** When the user provides an existing practice or method (instead of a baseline), resolve it into an effective parent and locate the actual baseline.
-
-**When this step is needed:** Only when Step 0 detected `inputKind: "practice"` or `"method"`. If the input is a `practiceBaseline`, skip this step entirely.
+**Objective:** Produce a single `_effective-context.json` containing all inherited elements from baselines, parent practices, and methods, with provenance annotations (`_contributingPracticeName`) on every element.
 
 **Process:**
 
-1. **Extract baseline practice name from the parent:**
-   The `--check-only` output from Step 0 includes `baselinePracticeName`. This is the actual baseline that the parent practice extends.
+1. **Collect all context sources** from Step 0:
+   - The baseline practice (`.json` file or discovered by name)
+   - Any parent practices/methods the user wants to extend (`.json` or `.keleo` files)
+   - `.keleo` bundles are accepted directly — all documents inside are extracted
 
-2. **Locate the actual baseline file:**
-   - Auto-discover the baseline by name:
-     ```bash
-     python3 utils/discover-dependencies.py --resolve "<baselinePracticeName from step 1>"
-     ```
-     - `found` → use the resolved path
-     - `not_found` → ask user for the file path
-     - `ambiguous` → present candidates to user
-   - Validate the baseline file exists and its `name` property matches `baselinePracticeName`
-
-3. **Create effective parent:**
+2. **Run unified context resolution:**
    ```bash
-   # Single parent
-   python3 utils/resolve-parent-practice.py <parent.json> -o <output-dir>/_effective-parent.json
-
-   # Multiple parents (later files take precedence on name conflicts)
-   python3 utils/resolve-parent-practice.py <parent1.json> <parent2.json> -o <output-dir>/_effective-parent.json
+   python3 utils/resolve-context.py \
+     <baseline.json> [<parent-practice.json>] [<bundle.keleo>] \
+     --transitive \
+     -o <output-dir>/_effective-context.json
    ```
    
    The utility:
-   - For a **practice**: Outputs the practice directly as the effective parent
-   - For a **method**: Unions all embedded practices' elements (alphas, activitySpaces, workProducts, patterns, etc.) using name-keyed merge
-   - **Multiple inputs**: Resolves each individually, then merges all into a combined effective parent
-   - Applies `practiceElementAliases` as `_aliasContext` annotations (canonical names preserved in all structural positions)
+   - Accepts `.json` and `.keleo` files (extracts all documents from bundles)
+   - Classifies documents into three tiers: baselines, practices, methods
+   - Resolves transitive baseline dependencies automatically (`--transitive`)
+   - Merges in hierarchy order: baselines (root-first topo sort) → practices → methods
+   - Stamps `_contributingPracticeName` on **every element** (provenance)
+   - Applies unified `_aliasContext` and `_domainAlias` annotations
+   - Builds `_provenance` manifest (merge order, tier membership, element-to-source mapping)
    
-   Report the effective parent composition to the user (alpha count, practice names, etc.).
+   Report the effective context composition to the user (tiers, alpha count, merge order, etc.).
 
-4. **Record key variables for subsequent steps:**
-   - `parentPracticePath` = path to user-provided practice/method
-   - `effectiveParentPath` = `<output-dir>/_effective-parent.json`
-   - `parentPracticeNames` = list from report's `parentPracticeNames` (candidate pool for `practiceDependencyNames` — filtered later based on actual references)
-   - `actualBaselinePath` = path to the actual baseline JSON (for Step 0.5 and validation)
+3. **Identify the validation baseline:**
+   The `_provenance.tiers.baselines` array in the output shows which baselines were merged. For **validation** (running `validate-practice-json.py`), always use the **leaf baseline file** (the most specific baseline in the chain) — canonical names in the generated JSON must match the actual baseline, not the effective context annotations.
+   
+   Record:
+   - `effectiveContextPath` = `<output-dir>/_effective-context.json`
+   - `validationBaselinePath` = path to the leaf baseline JSON (for validation only)
 
-5. **Proceed to Step 0.5** with `actualBaselinePath` — the actual baseline still needs dependency resolution.
+4. **How the mapping agent uses `_contributingPracticeName`:**
+   - **Baseline elements** (`_contributingPracticeName` points to a name in `_provenance.tiers.baselines`): These are ontology-level concepts. The new practice can redeclare them (add practice-specific checklists/narratives) or specialize them (`contributesTo` / `mapsTo`).
+   - **Practice elements** (`_contributingPracticeName` points to a name in `_provenance.tiers.practices`): These came from parent practices. `contributesTo`/`mapsTo` targets that point to these elements create `practiceDependencyNames` entries.
+   - **Method elements** (`_contributingPracticeName` points to a name in `_provenance.tiers.methods`): Coordination-level concepts from the parent method.
 
 **User Feedback:**
-- "Detected parent practice: '<name>' (extends baseline '<baselinePracticeName>')"
-- "Parent practice contains N alphas, M activitySpaces, K workProducts"
-- "For methods: Merged N practices into composite parent: [practice name list]"
-- "Using effective parent for analysis/mapping. Actual baseline '<name>' for validation."
-- "practiceDependencyNames will be determined per-practice based on actual element references (not all parent practice names)"
+- "Context resolution complete: N baselines, M practices, K methods merged"
+- "Merge order: [list of names in merge order]"
+- "Effective context: N alphas, M activitySpaces, K competencies"
+- "Using _effective-context.json for analysis/mapping. Leaf baseline '<name>' for validation."
 
-**CRITICAL:** All structural references in the generated JSON (`contributesTo`, `alphaName`, `stateName`, etc.) MUST use canonical names. If the effective parent has `_aliasContext`, aliases inform semantic understanding only — they do NOT appear in generated JSON output.
+**CRITICAL:** All structural references in the generated JSON (`contributesTo`, `alphaName`, `stateName`, etc.) MUST use canonical names. If the effective context has `_aliasContext`, aliases inform semantic understanding only — they do NOT appear in generated JSON output.
 
----
-
-### Step 0.5: Baseline Dependency Resolution
-
-**Objective:** Detect and resolve baseline dependencies to create a complete "effective baseline" that contains all inherited elements with domain-specific alias context.
-
-**When this step is needed:** Only when the baseline JSON has a non-empty `baselinePracticeNames` array. If the baseline has no dependencies, skip this step and use the baseline file as-is for all subsequent steps.
-
-**Note:** In parent practice mode, this step operates on `actualBaselinePath` (the baseline referenced by the parent practice), not the user-provided file.
-
-**Process:**
-
-1. **Auto-discover all dependencies (including transitive):**
-   ```bash
-   python3 utils/discover-dependencies.py --resolve-from <baseline-practice.json> --transitive
-   ```
-   This scans `baselines/`, `practices/`, and `deps/` directories, reads `baselinePracticeNames` from the baseline and any transitive parents, and resolves them all by matching the JSON `name` property.
-   - If `summary.total: 0`: **Skip this step.** Use the provided baseline file directly.
-   - If all dependencies are `found`: proceed to confirmation step.
-   - If any are `not_found` or `ambiguous`: handle before confirming.
-
-2. **Handle unresolved or ambiguous dependencies:**
-   - For `not_found` dependencies: ask the user for the file path
-   - For `ambiguous` dependencies: present candidates to user, let them choose
-   - Re-run discovery after user provides corrections to confirm resolution
-
-3. **Confirm all resolved dependencies with user:**
-   Present ALL dependencies in a single summary before proceeding:
-   ```
-   === Dependency Resolution ===
-
-   Baseline: "<name>" (<kind>)
-     Path: <path>
-
-   Resolved Dependencies:
-     1. [baselinePractice] "<name>"
-        Path: <resolved-path>
-     2. [baselinePractice] "<transitive-name>" (transitive)
-        Path: <resolved-path>
-
-   All dependencies resolved. Please confirm or correct:
-   - "ok" to proceed
-   - "1=/correct/path.json" to correct a path
-   ```
-   **Wait for user confirmation before proceeding.**
-
-4. **Create effective baseline using the resolver utility:**
-   ```bash
-   python3 utils/resolve-baseline.py \
-     <baseline-practice.json> \
-     <dependency-1.json> [<dependency-2.json> ...] \
-     -o <output-dir>/_effective-baseline.json
-   ```
-   
-   The utility programmatically:
-   - Determines merge order (root-first, leaf-last)
-   - Merges baselines using name-keyed union (child overrides parent where element names match)
-   - Applies `practiceElementAliases` as `_aliasContext` annotations on elements (adds `_domainAlias` to each aliased element and a top-level `_aliasContext` section)
-   - Preserves canonical names in all structural positions
-   - Writes the effective baseline to the output path
-   
-   The stdout JSON report shows the effective baseline composition (alpha count, alias count, etc.). Report this to the user.
-
-5. **Set effective baseline path:**
-   For ALL subsequent steps (Step 1.5 through Step 3), use `<output-dir>/_effective-baseline.json` wherever the baseline file path is referenced for analysis and mapping. For **validation** (running `validate-practice-json.py`), always use the **original user-provided baseline file** — canonical names in the generated JSON must match the actual baseline, not the effective baseline annotations.
-
-**CRITICAL:** If ANY dependency file cannot be resolved or provided by the user, STOP and discuss alternatives. Do NOT proceed with an incomplete baseline — this will cause mapping errors and validation failures.
-
-**CRITICAL:** Extension practices MUST use canonical element names (from `practiceElementName`) in all structural references (`contributesTo`, `alphaName`, `stateName`, `competencyName`, etc.), not alias names (`aliasName`). The alias context helps the LLM understand domain semantics during analysis and mapping, but the generated JSON output always uses canonical names.
+**CRITICAL:** If the context resolution fails (unresolved dependencies, missing files), STOP and discuss alternatives. Do NOT proceed with an incomplete context.
 
 ---
 
@@ -456,17 +388,13 @@ Fix any FAIL assertions before proceeding to Step 1.5. If sections are missing, 
 
 1. **Load baseline practice JSON** (use effective baseline from Step 0.5 if dependencies were resolved, otherwise use the user-provided baseline directly):
    ```bash
-   python3 utils/extract-reference-names.py <effective-baseline-or-baseline.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details
+   python3 utils/extract-reference-names.py <effective-context-or-baseline.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details
    ```
    This shows all structural elements: focuses, alphas (with states, contributesTo, relatesTo), activitySpaces, competencies (with levels), and narrativeTypes (with elements).
    
    If the effective baseline has `_aliasContext`, review domain aliases to understand the baseline's domain-specific terminology. Use canonical names for structural decisions, but let domain aliases inform your semantic understanding of each alpha's role.
 
-   **Parent Practice Mode:** Also load the effective parent JSON:
-   ```bash
-   python3 utils/extract-reference-names.py <effective-parent.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details
-   ```
-   Build a combined alpha index: parent practice alphas are the **primary mapping targets**; baseline alphas provide ontology context and support redeclarations of baseline-level concepts.
+   **Parent Practice Mode:** The effective context already contains merged baselines AND parent practices. Use `_contributingPracticeName` on each element to distinguish baseline-level alphas (ontology context) from practice-level alphas (primary mapping targets). Cross-reference with `_provenance.tiers` to classify each source.
    
    **IMPORTANT:** Never use inline `python3 -c` scripts to inspect JSON structure. Use `extract-reference-names.py` with appropriate `--sections` and detail flags (`--alpha-details`, `--citation-details`, `--activity-details`, `--narrative-details`).
 
@@ -474,13 +402,13 @@ Fix any FAIL assertions before proceeding to Step 1.5. If sections are missing, 
    
    **Standard baseline mode:**
    - Which baseline alphas does the content enrich (redeclarations)?
-   - Which baseline alphas need specialization (new alphas with `contributesTo`)?
-   - Count total baseline alpha coverage (both redeclarations + contributesTo targets)
+   - Which baseline alphas need specialization (new alphas with `contributesTo`) or variant mapping (new alphas with `mapsTo`)?
+   - Count total baseline alpha coverage (both redeclarations + contributesTo/mapsTo targets)
    
    **Parent practice mode:**
    - Which **parent practice** alphas does the content enrich (redeclarations of parent practice alphas)?
-   - Which **parent practice** alphas need further specialization (new alphas with `contributesTo` pointing to parent practice alphas)?
-   - Which **baseline** alphas are directly relevant but NOT already covered by the parent practice? (these can still be redeclared or specialized directly)
+   - Which **parent practice** alphas need further specialization or variant mapping (new alphas with `contributesTo` or `mapsTo` pointing to parent practice alphas)?
+   - Which **baseline** alphas are directly relevant but NOT already covered by the parent practice? (these can still be redeclared, specialized, or variant-mapped directly)
    - Count total alpha coverage using parent practice alphas as the primary set
 
 3. **Analyze coverage pattern:**
@@ -531,11 +459,11 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 **Process for Single Practice:**
 
-1. Read `prompts/phase-2-mapping.md`, analysis report, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies), semantics.md
-   - **Parent practice mode:** Also read the effective parent JSON (`_effective-parent.json`). During mapping, `contributesTo` targets should primarily reference parent practice alphas using canonical names. The effective parent's alphas are the primary mapping targets; baseline alphas provide ontology context. If the effective parent has `_aliasContext`, use aliases for semantic understanding but always use canonical names in structural references.
+1. Read `prompts/phase-2-mapping.md`, analysis report, effective context JSON (`_effective-context.json` from Step 0.5), semantics.md
+   - The effective context contains ALL merged elements (baselines + parent practices + methods) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements (ontology context) from practice elements (primary `contributesTo`/`mapsTo` targets). If the context has `_aliasContext`, use aliases for semantic understanding but always use canonical names in structural references.
 2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
    - **Parent practice mode:** Document which parent practice alphas are being extended and which (if any) baseline alphas are being addressed directly.
-3. Map concerns to alphas (redeclaration vs specialization)
+3. Map concerns to alphas (redeclaration vs specialization vs variant mapping)
 3. **CRITICAL: Ensure global name uniqueness across all PracticeElements:**
    - As you name Alphas, WorkProducts, Activities, Personas, Patterns, Assets: verify each name is GLOBALLY UNIQUE
    - **NO name may appear in more than one element type** (e.g., cannot have Alpha "Platform Configuration" AND WorkProduct "Platform Configuration")
@@ -555,6 +483,7 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
    - Review Phase 1 concern interactions
    - For each NEW alpha, identify what it provides/enables/produces/guides/validates for other alphas
    - Use active voice from provider perspective (directionality pattern)
+   - Include required `direction` field on every relatesTo entry (`outgoing`, `incoming`, or `mutual`)
    - Document relationships in mapping guide
 5. **Generate patterns using FOUR-PASS construction:**
    - Pass 1: Extract pattern structure from source (phases, explicitly mentioned states)
@@ -576,16 +505,31 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 2. **Each agent prompt must include:**
    - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
-   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies), `references/semantics.md`, `prompts/phase-2-mapping.md`
-   - **Parent practice mode:** Also include the effective parent JSON path (`_effective-parent.json`). Add to agent prompt: "You are extending a parent practice, not mapping directly to the baseline. The effective parent's alphas are your primary `contributesTo` targets. Use canonical names for all structural references. The actual baseline provides ontology context and validation targets. IMPORTANT: `practiceDependencyNames` must only include parent practices whose unique alphas (those NOT in the effective baseline) are actually referenced via `contributesTo`. Do NOT include a parent practice just because its redeclared baseline alphas are referenced."
-   - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline includes domain-specific aliases (e.g., 'Platform' is known as 'Automation Platform' in this domain). Use domain terms for semantic understanding but always use canonical names in structural references."
+   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-context-path>` (from Step 0.5), `references/semantics.md`, `prompts/phase-2-mapping.md`
+   - Add to agent prompt: "The effective context contains ALL merged elements (baselines + parent practices) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements from practice elements. Practice-level alphas are your primary `contributesTo`/`mapsTo` targets. Baseline-level alphas provide ontology context. Use canonical names for all structural references. Use `contributesTo` for specializations (different states) and `mapsTo` for variant mappings (exact same states, IS-A semantics). IMPORTANT: `practiceDependencyNames` must only include parent practices whose unique alphas (those NOT contributed by baselines per `_contributingPracticeName`) are actually referenced via `contributesTo` or `mapsTo`."
+   - If the effective context has `_aliasContext`, include in the agent prompt: "The context includes domain-specific aliases (e.g., 'Platform' is known as 'Automation Platform' in this domain). Use domain terms for semantic understanding but always use canonical names in structural references."
    - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
    - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships; (4) Work products; (5) Activities; (6) PATTERNS with complete matrix coverage. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
 
 3. **After all agents complete:**
-   - Combine practice mapping files into single `02-mapping-guide.md` (if using separate files)
-   - Add method-level metadata (citations, method narrative)
+   - **Assemble mapping guides** (REQUIRED — never use heredocs, cat, or shell loops):
+     ```bash
+     python3 utils/assemble-mapping-guide.py \
+       --name "<method-name>" \
+       --baseline-name "<baseline-name>" \
+       --parent-name "<parent-name>" \
+       --guides practices/<method-name>/02-mapping-guide-practice-1.md \
+                practices/<method-name>/02-mapping-guide-practice-2.md \
+                ... \
+       -o practices/<method-name>/02-mapping-guide.md \
+       --stats
+     ```
+   - **Validate pattern views** in each practice guide:
+     ```bash
+     python3 utils/validate-phase-output.py --phase 2 --validate-patterns \
+       practices/<method-name>/02-mapping-guide-practice-N.md
+     ```
    - Validate completeness: every practice has alphas + work products + activities
 
 **Critical: Multi-Agent Benefits**
@@ -631,9 +575,11 @@ From `references/semantics.md` Section 9.2:
   - Aliases on instances are rare (instances already have distinct names)
   
 - **Specializations** = Different facets/components with specialized behavior
-  - New alpha with contributesTo pointing to parent
-  - Different states/lifecycle than parent
-  - Example: Automation Controller, Execution Environment, Automation Mesh are specialized facets of Platform
+  - New alpha with `contributesTo` pointing to parent (different states/lifecycle)
+  - OR new alpha with `mapsTo` pointing to parent (same states, IS-A variant)
+  - Example (contributesTo): Automation Controller, Execution Environment are specialized facets of Platform with unique lifecycles
+  - Example (mapsTo): "AI-Ready Enterprise" IS a "Sales Play" — same states, domain-specific checklists
+  - **mapsTo naming convention:** Do NOT repeat the parent type name in the variant alpha name. Since `mapsTo` reads as "is a type of", including the type is redundant (e.g., "AI-Ready Enterprise" not "AI-Ready Enterprise Play"; "Container Management" not "Container Management TDP"). This convention applies to both the alpha `name` and any `aliasName`. It does NOT apply to `contributesTo` alphas, where including the type helps distinguish the specialized concept.
   - May have aliases if domain uses shortened forms
 
 **Alias can be combined with:**
@@ -648,6 +594,12 @@ From `references/semantics.md` Section 9.2:
   "aliasName": "domain-specific alternative term"
 }
 ```
+
+**CRITICAL RULE: No Alias Collisions with Dependencies**
+- **Do NOT re-declare aliases from parent/dependency practices** — they are inherited through `practiceDependencyNames` and will be merged automatically
+- **Do NOT reuse an alias name from a dependency for a different target** — this creates ambiguity on merge (validator flags as error)
+- When creating aliases for **mapsTo variant alphas**, differentiate the alias name from any parent alias for the mapped-to alpha. Prefix with the practice's domain qualifier (e.g., "RHEL Deal Registration" instead of "Deal Registration" when the parent already aliases "Deal Registration" → "Partner Deal Opportunity")
+- **Only create aliases for elements this practice defines or redefines** — not for inherited elements
 
 **CRITICAL RULE: Strict Alias Isolation**
 - Aliases are PRESENTATION-LAYER ONLY
@@ -760,20 +712,21 @@ Instances: Platform Engineering Team Alpha, Payments Team (specific named teams)
    - Instances = same behavior, different tracking (dev/test/prod environments)
    - NO → Go to step 3
 
-3. **Does this term represent a facet/component with specialized behavior?**
-   - YES → Use **specialization** (e.g., "Automation Controller", "Execution Environment" are facets of Platform with unique lifecycles)
-   - Specializations = new alpha with contributesTo, different states/behavior
-   - Optional: alias the specialized alpha if domain uses shortened form
+3. **Does this term represent a facet/component with specialized behavior, or a named variant?**
+   - YES, with different states → Use **specialization** (`contributesTo`) (e.g., "Automation Controller", "Execution Environment" are facets of Platform with unique lifecycles)
+   - YES, with same states (IS-A variant) → Use **variant mapping** (`mapsTo`) (e.g., "AI-Ready Enterprise" IS a "Sales Play" with same lifecycle)
+   - Optional: alias the specialized/variant alpha if domain uses shortened form
    - NO → Go to step 4
 
 4. **Is this an acronym/abbreviation/synonym?**
    - YES → Add to **keywords** array (e.g., "AAP", "automation platform", "EE")
    - NO → Skip
 
-**Three-Way Distinction:**
+**Four-Way Distinction:**
 - **Alias (1 per element):** "Playbook" replaces "Deployment Documentation" in presentation
 - **Keywords (10-20 per practice):** ["AAP", "ansible", "automation", "controller", "EE"] for search
-- **Specialization:** "Automation Controller" is new alpha (facet of Platform with unique states)
+- **Specialization (`contributesTo`):** "Automation Controller" is new alpha (facet of Platform with unique states/lifecycle)
+- **Variant Mapping (`mapsTo`):** "AI-Ready Enterprise" is new alpha (named variant of Sales Play with same states, domain-specific checklists). Name omits parent type — reads as "[Name] is a [Parent Type]", so repeating the type is redundant.
 - **Instance:** "Production Platform" is deployment tracking (same states as Platform)
 
 **Examples Across Domains:**
@@ -915,81 +868,259 @@ Instances: Platform Engineering Team Alpha, Payments Team (specific named teams)
 **Total Keywords: 10-20 terms** (all synonyms, acronyms, search terms)
 ```
 
-**Critical Mapping Rules:**
+## Feature: Alpha Relationship Integrity
 
-From `references/semantics.md`:
+Rules governing alpha hierarchy, parent relationships, and semantic connections. From `references/semantics.md` Sections 4.1, 6.1, 6.2.
 
-- **EXACT COMPETENCY LEVEL NAMES:** All `competencyLevelName` values MUST exactly match CompetencyLevel.name from baseline practice for the specific competency
-  - **Level names vary by competency** - each competency defines its own level progression
-  - **Extract baseline competency levels:** `python3 utils/extract-reference-names.py <baseline-practice.json> --sections competencies`
-  - Example (Platform Adoption Essentials - Analysis competency): "Basic", "Applies", "Masters", "Adapts", "Innovating"
-  - Common errors: "Advanced" (check baseline for actual name), "Expert" (check baseline), "Intermediate" (check baseline), "Beginner" (check baseline)
-  - **Validate all competencyLevelName values in Phase 2 mapping guide against baseline competency levels**
-  - Validation command: For each competencyLevelName in mapping, verify it exists in that competency's levels array
-- **NO FLOATING ALPHAS:** All new alphas MUST have `contributesTo` (Section 4.1)
-  - Valid targets: baseline alphas, practice-local alphas (internal hierarchy), or external practice alphas (creates dependency)
-  - Practice-local references create multi-level specialization chains (Alpha C → B → A → Baseline)
-  - External practice references require explicit practice dependency declaration
-- **SEMANTIC RELATIONSHIPS:** Use baseline `relatesTo` for analysis; define new relationships for new alphas (Section 4.1 - Semantic Relationships)
-  - **For baseline alpha analysis**: Read existing `relatesTo` relationships from baseline and dependent practices to understand how the alpha functions within the framework
-  - **For new alphas ONLY**: Define domain-specific `relatesTo` relationships using appropriate relationship verbs
-  - **Do NOT** add `relatesTo` to redeclarations - these inherit baseline relationships
-  - **DIRECTIONALITY PATTERN (CRITICAL)**: The alpha declaring `relatesTo` is the SOURCE imparting something to the target alphas
-    - Read as: `[Alpha with relatesTo] [relationship verb] [target alphaName]`
-    - Example: Platform has `relatesTo: [{relationship: "enables", alphaName: "Software System"}]` → "Platform enables Software System"
-    - This is a "reverse dependency" pattern: declare what you provide/influence, not what you depend on
-    - Benefits: Localized declarations, producer/provider pattern, new alphas don't require modifying existing ones
-  - **IDENTIFYING RELATIONSHIPS**: Look for interactions between concerns in Phase 1 analysis where one concern provides/influences another:
-    - Production: "Alpha A produces B", "Alpha A generates B", "Alpha A creates B"
-      - → A.relatesTo = [{relationship: "produces", alphaName: "B"}]
-    - Enablement: "Alpha A enables B", "Alpha A supports B", "Alpha A facilitates B"
-      - → A.relatesTo = [{relationship: "enables", alphaName: "B"}]
-    - Guidance: "Alpha A guides B", "Alpha A constrains B", "Alpha A governs B"
-      - → A.relatesTo = [{relationship: "guides", alphaName: "B"}]
-    - Information flow: "Alpha A provides data to B", "Alpha A informs B"
-      - → A.relatesTo = [{relationship: "provides", alphaName: "B"}]
-    - Validation: "Alpha A validates B", "Alpha A verifies B", "Alpha A evidences B"
-      - → A.relatesTo = [{relationship: "validates", alphaName: "B"}]
-    - Impact: "Alpha A influences B", "Alpha A justifies B"
-      - → A.relatesTo = [{relationship: "influences", alphaName: "B"}]
-    - Hosting/Consumption: "Alpha A hosts B", "Alpha A contains B"
-      - → A.relatesTo = [{relationship: "hosts", alphaName: "B"}]
-  - **REVERSE DEPENDENCIES**: For dependency relationships, flip the direction:
-    - Source says "X requires Y" → Y.relatesTo = [{relationship: "required by", alphaName: "X"}] OR X.relatesTo = [{relationship: "depends on", alphaName: "Y"}]
-    - Prefer active voice from provider perspective: "Y enables X" over "X depends on Y"
-- **Exact name matching:** All baseline references are case-sensitive (Section 3)
-- **Orthogonal tags:** Use {domainTags, lifecycleTags, organizationalTags} (Section 3.1.2)
-- **Redeclaration vs Specialization:** Follow decision framework (Section 9.2.5)
-- **Competency names:** Use EXACT baseline names, not descriptions (Section 6.2)
-- **Single sentences:** Descriptions max 20 words, states/LODs max 12 (Section 3.1)
+### Scenario: No floating alphas (@rule:semantic-001)
+- Given: A new alpha is defined that does not exist in the baseline
+- When: Phase 3 generates the alpha JSON
+- Then: The alpha has exactly one of `contributesTo` or `mapsTo`
+- And: The target resolves to a baseline, practice-local, or dependency alpha
 
-**CRITICAL: Narrative Structure Requirements**
+### Scenario: contributesTo and mapsTo are mutually exclusive (@rule:semantic-002)
+- Given: A new alpha declares a parent relationship
+- When: The alpha JSON is generated
+- Then: The alpha has `contributesTo` or `mapsTo` but never both
 
-**ALL narratives MUST be structured objects with narrativeTypeName and narrativeContexts arrays. NEVER use prose paragraphs.**
+### Scenario: mapsTo variants match parent states exactly (@rule:semantic-003)
+- Given: A new alpha has `mapsTo` pointing to a parent alpha
+- When: The alpha's states are generated
+- Then: The state names and sequence exactly match the parent alpha's states
 
-**CRITICAL: Narrative Content Rules**
+### Scenario: mapsTo variant names omit parent type (@rule:semantic-010)
+- Given: A new alpha has `mapsTo` pointing to a parent alpha
+- When: The alpha name is chosen
+- Then: The alpha name does not contain the parent alpha's name
+- And: The alias name (if present) does not contain the parent alpha's name
 
-- **NEVER reference the narrative type or framework in names, descriptions, OR contexts**
-- Narrative names MUST describe subject matter, NOT reference the template type
-  - WRONG: "Business Model Narrative", "The STAR Narrative for Platform"
-  - CORRECT: "Pipeline to Platform Transition", "Architectural Modernization Path"
-- Narrative descriptions MUST explain what the narrative covers, NOT the template structure
-  - WRONG: "The STAR narrative for the Business Model alpha."
-  - CORRECT: "How organizations evolve from pipeline models to platform economics through structured experimentation."
-- Narrative contexts contain the actual story content - they should NOT mention the narrative type
-- **WRONG**: "In this Hero's Journey narrative, organizations embark on..." or "This narrative describes..."
-- **CORRECT**: "Organizations operate with fragmented infrastructure..." (direct story content)
+### Scenario: Redeclared alphas have no contributesTo or mapsTo (@rule:semantic-005)
+- Given: An alpha name matches a baseline or parent practice alpha
+- When: The alpha is included in the practice JSON
+- Then: The alpha has neither `contributesTo` nor `mapsTo`
+- And: Only practice-specific checklists, narratives, and Gherkin guidance are added
 
-**CRITICAL: Narrative Placement Rules**
+### Scenario: Competency level names match baseline exactly (@rule:semantic-006)
+- Given: An activity or persona references a competency level
+- When: The `competencyLevelName` value is set
+- Then: The value exactly matches a CompetencyLevel.name from the baseline for that competency
+- And: Level names are extracted with `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`
 
-- Element-specific narratives MUST be embedded on their element's `narratives[]` property
-- Only practice/method-level narratives go in the top-level `narratives[]` array
-- WRONG: All narratives in a flat top-level array with ad-hoc element references
-- CORRECT: Alpha narratives on the alpha object, activity narratives on the activity object
+### Scenario: relatesTo only on new alphas (@rule:semantic-007)
+- Given: An alpha is a redeclaration of a baseline alpha
+- When: The alpha JSON is generated
+- Then: No `relatesTo` array is added (baseline relationships are inherited)
 
-**CRITICAL: Narrative Citation Rules**
+### Scenario: relatesTo entries have required fields (@rule:semantic-008)
+- Given: A new alpha defines `relatesTo` relationships
+- When: The relatesTo array is generated
+- Then: Every entry has `relationship`, `alphaName`, and `direction` fields
+- And: `direction` is one of `outgoing`, `incoming`, or `mutual`
 
-- All narratives MUST include `citationNames` array referencing relevant citations
+### Scenario: contributesToState references valid parent state (@rule:semantic-009)
+- Given: A state on a new alpha declares `contributesToState`
+- When: The state JSON is generated
+- Then: The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`
+
+### Scenario: Baseline references are case-sensitive (@rule:semantic-011)
+- Given: The practice references baseline elements (alphas, focuses, activitySpaces, competencies)
+- When: Symbolic reference values are set
+- Then: Every reference exactly matches the baseline element's `name` (case-sensitive)
+
+**Relationship Guidance (not testable — instructional context):**
+
+`contributesTo` creates a specialization with distinct state progression. `mapsTo` creates a named variant with identical states (IS-A semantics — appears in parent's `variants` array on merge). Valid targets for both: baseline alphas, practice-local alphas (multi-level chains), or external practice alphas (creates dependency via `practiceDependencyNames`).
+
+**relatesTo Directionality Pattern:** The declaring alpha is the SOURCE. Read as `[Source] [relationship verb] [target]`. Use `outgoing` for acts-upon ("produces", "enables", "constrains", "hosts"), `incoming` for acted-upon ("governed by", "built by"), `mutual` for symmetric (sparingly). Prefer active voice from provider perspective: "Y enables X" over "X depends on Y".
+
+**Identifying Relationships:** Look for Phase 1 concern interactions:
+- Production: A.relatesTo = `[{relationship: "produces", alphaName: "B", direction: "outgoing"}]`
+- Enablement: "enables", Guidance: "guides"/"constrains", Validation: "validates"
+- Hosting: "hosts", Impact: "influences", Information: "provides"
+- Passive: "governed by" with `direction: "incoming"`
+
+**`contributesToState`**: Optional on State objects — maps child state → parent state. Not every state needs a mapping. For `contributesTo`: contribution evidence; for `mapsTo`: state equivalence.
+
+**Orthogonal tags:** Use `{domainTags, lifecycleTags, organizationalTags}` (Section 3.1.2).
+
+**Redeclaration vs Specialization:** Follow decision framework (Section 9.2.5).
+
+**Gherkin-Inspired Structured Guidance:** Optional `background`, `test`, and `examples` properties add structured verification context (semantics.md Section 5.3, 8.1.1):
+- **Background** (on State, LevelOfDetail, ActivitySpace/Activity): `given`, `alphaStates`, `workProductLevels`
+- **Test** (on Checklist, Activity): Given/When/Then verification with `name` and `description`
+- **Examples** (on Checklist, Activity): Concrete scenario array
+- Use for complex prerequisites, verification logic, non-obvious triggers. Skip for self-evident items.
+
+## Feature: Narrative Quality
+
+Rules governing narrative structure, naming, self-containment, and citation linkage.
+
+### Scenario: Narratives are structured objects (@rule:narrative-001)
+- Given: A narrative is defined on any element or at practice level
+- When: The narrative JSON is generated
+- Then: The narrative has `narrativeTypeName` and `narrativeContexts` array
+- And: Each context has `seq`, `narrativeElementName`, and `context` fields
+
+### Scenario: Narrative names describe subject matter (@rule:narrative-003)
+- Given: A narrative has a `name` and `description`
+- When: The narrative JSON is generated
+- Then: The name describes the subject matter, not the template type
+- And: The description explains what the narrative covers, not the framework structure
+- And: Contexts contain direct story content without mentioning the narrative type
+
+### Scenario: Narrative contexts are self-contained (@rule:narrative-005)
+- Given: A narrative has contexts with `narrativeElementName` labels
+- When: The context strings are generated
+- Then: Each context is coherent without its element heading visible
+- And: Bare lists include a framing introduction sentence
+
+### Scenario: Narratives placed on correct elements (@rule:narrative-002)
+- Given: A narrative describes a specific alpha, activity, or work product
+- When: The narrative is attached in the JSON
+- Then: Element-specific narratives are on the element's `narratives[]` property
+- And: Only practice/method-level narratives go in the top-level `narratives[]` array
+
+### Scenario: All narratives have citation references (@rule:narrative-006)
+- Given: A narrative is defined
+- When: The narrative JSON is generated
+- Then: The narrative includes a `citationNames` array with at least one citation reference
+
+## Feature: Element Naming
+
+Rules governing element names, descriptions, and name uniqueness.
+
+### Scenario: Descriptions are single sentences under word limit (@rule:naming-001)
+- Given: An element has a `description` field
+- When: The description is generated
+- Then: Element descriptions are at most 20 words
+- And: State and LOD descriptions are at most 12 words
+
+### Scenario: Checklist names are noun-phrase labels (@rule:naming-002)
+- Given: A checklist item on an alpha state has `name` and `description`
+- When: The checklist JSON is generated
+- Then: The name is a short noun phrase (not truncated from the description)
+- And: The name is not identical to the description
+
+### Scenario: Global name uniqueness across element types (@rule:naming-003)
+- Given: Multiple PracticeElement types are defined (alphas, workProducts, activities, personas, patterns)
+- When: All element names are collected
+- Then: No name appears in more than one element type
+
+### Scenario: LOD names describe content maturity (@rule:naming-004)
+- Given: A work product has levels of detail
+- When: LOD names are chosen
+- Then: Names describe artifact content maturity (e.g., "Outline", "Comprehensive", "Automated")
+- And: Names do not use generic labels ("Level 1", "Basic") or concern progression terms ("Established", "Optimized")
+
+### Scenario: Activity names differ from ActivitySpace names (@rule:naming-005)
+- Given: An activity is assigned to an ActivitySpace
+- When: The activity name is chosen
+- Then: The activity name is distinct from the ActivitySpace name
+
+## Feature: Coverage Completeness
+
+Rules governing minimum counts and activity-to-state coverage.
+
+### Scenario: Alpha state minimum (@rule:coverage-001)
+- Given: An alpha is defined in the practice
+- When: States are assigned to the alpha
+- Then: The alpha has at least 3 states
+
+### Scenario: Work product LOD minimum (@rule:coverage-002)
+- Given: A work product is defined in the practice
+- When: Levels of detail are assigned
+- Then: The work product has at least 2 levels of detail
+
+### Scenario: Alpha states have supporting LODs (@rule:coverage-003)
+- Given: An alpha state exists on a new (non-baseline) alpha
+- When: Work product LODs are checked
+- Then: At least one LOD has `contributesTo` targeting the alpha state
+
+### Scenario: Patterns cover all practice alphas (@rule:coverage-004)
+- Given: A pattern is defined in the practice
+- When: PatternViews are checked
+- Then: Every practice alpha appears in at least one PatternView
+- And: Each alpha appears in every view (backfilled if needed)
+
+### Scenario: Alpha states have supporting activities (@rule:coverage-005)
+- Given: An alpha state beyond the initial state exists on a new alpha
+- When: Activity contributesTo references are checked
+- Then: At least one activity has `contributesTo` targeting the alpha state
+
+## Feature: Terminology Aliasing
+
+Rules governing practice element aliases and keywords.
+
+### Scenario: One alias per element maximum (@rule:aliasing-001)
+- Given: The practice defines terminology aliases
+- When: Aliases are assigned to baseline elements
+- Then: Each baseline element has at most one alias
+
+### Scenario: Alias names excluded from structural references (@rule:aliasing-002)
+- Given: An alias maps a baseline name to a domain-specific name
+- When: The practice JSON uses symbolic references (alphaName, contributesTo, activitySpaceName, etc.)
+- Then: Only canonical baseline names appear in structural reference fields
+- And: Alias names never appear in structural reference fields
+
+### Scenario: Keyword count within range (@rule:aliasing-003)
+- Given: The practice defines a keywords array
+- When: Keywords are generated
+- Then: The array contains between 10 and 20 keywords
+
+## Feature: Structural Integrity
+
+Validates that generated JSON has correct shape, required sections, and resolved cross-references.
+
+### Scenario: JSON has correct kind discriminator (@rule:structural-001)
+- Given: Phase 3 generates a JSON file
+- When: The JSON is validated
+- Then: The `kind` property is "practice" for single practices, "method" for multi-practice methods
+
+### Scenario: All required sections present in JSON (@rule:structural-002)
+- Given: Phase 3 generates a practice JSON
+- When: The JSON is validated
+- Then: alphas, activities, workProducts, patterns, and citations arrays are present and non-empty
+
+### Scenario: Pattern cross-references resolve (@rule:structural-003)
+- Given: A pattern references alpha names and state names in patternViews
+- When: Phase 3 generates the JSON
+- Then: Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline
+- And: Every stateName resolves to a valid state on that alpha
+
+### Scenario: Activity-alpha cross-references resolve (@rule:structural-004)
+- Given: An activity has contributesTo entries referencing alphas and states
+- When: Phase 3 generates the JSON
+- Then: Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state
+
+### Scenario: Activity-work product cross-references resolve (@rule:structural-005)
+- Given: An activity has worksOn entries referencing work products and LODs
+- When: Phase 3 generates the JSON
+- Then: Every workProductName and levelOfDetailName in worksOn resolves to defined elements
+
+## Feature: Process Compliance
+
+Validates that the three-phase pipeline is executed in order with proper gates.
+
+### Scenario: Phase 1 completed before Phase 2 (@rule:process-001)
+- Given: The three-phase pipeline is being executed
+- When: Phase 2 mapping begins
+- Then: 01-analysis-report.md exists with all 8 required sections
+- And: Analysis has sufficient depth (5+ numbered subsections and 3+ source references)
+
+### Scenario: Phase 2 completed before Phase 3 (@rule:process-002)
+- Given: The three-phase pipeline is being executed
+- When: Phase 3 JSON generation begins
+- Then: 02-mapping-guide.md exists with all 7 required sections
+- And: At least 3 alphas, 5 activities, and 1 pattern are mapped
+
+### Scenario: Validation run after JSON generation (@rule:process-003)
+- Given: Phase 3 has generated a JSON file
+- When: The phase is marked complete
+- Then: validate-practice-json.py has been run with 0 schema errors
+- And: assess-practice.py has been run with 0 error-severity issues
+
+**Narrative Citation Rules**
+
 - Citations provide provenance for the claims and frameworks referenced in the narrative
 
 From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
@@ -1127,21 +1258,24 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
 
 **CRITICAL QUALITY CONSTRAINTS:**
 
-**Constraint 1: Alpha State Count Per PatternView**
-- **Preference:** 1 alpha state per alpha per PatternView (one state progresses to next)
-- **Maximum:** 2 alpha states per alpha per PatternView (initial + achieved in single view)
-- **Anti-pattern:** 3+ states per alpha in single view → **Pattern views are too coarse-grained**
+**Constraint 1: One Alpha State Per PatternView**
+- **Rule:** Each alpha MUST target at most 1 state per PatternView
+- **Anti-pattern:** 2+ states for the same alpha in a single view → **Ambiguous** (which state is the view's target?)
+- **Validator enforcement:** `validate-practice-json.py` flags multi-state alpha targets as errors
 
-**When 3+ states appear for an alpha in a PatternView:**
-- **Root Cause:** PatternView represents too broad a lifecycle phase (e.g., "Implement" covering design → build → test → deploy)
-- **Fix:** Subdivide the pattern into finer-grained PatternViews
-- **Example:**
-  - **Before:** View 2 "Implement" has Platform states: Architecture Designed → Built → Deployed → Monitored (4 states!)
+**When 2+ states appear for an alpha in a PatternView, split into sub-views:**
+- **Naming convention:** `Phase: Sub-step` (e.g., "Enable: Train", "Enable: Certify")
+- Each sub-view gets its own `seq` number, activities, and narrative context
+- Activities are assigned to the sub-view whose alpha state they most directly advance
+- Sub-views within a phase can share the same narrative element (e.g., both map to "Do")
+
+**Example:**
+  - **Before:** View 2 "Implement" has Platform states: Architecture Designed, Built, Deployed, Monitored (4 states!)
   - **After:** Split into:
-    - View 2 "Design": Architecture Designed
-    - View 3 "Build": Built
-    - View 4 "Deploy": Deployed
-    - View 5 "Operate": Monitored
+    - View 2 "Implement: Design": Architecture Designed
+    - View 3 "Implement: Build": Built
+    - View 4 "Implement: Deploy": Deployed
+    - View 5 "Implement: Operate": Monitored
 
 **Constraint 2: Late-Appearing Alphas with Advanced States**
 - **Anti-pattern:** Alpha first appears in PatternView N with state "Achieved" or other advanced state, but was NOT in PatternViews 1 to N-1
@@ -1372,8 +1506,8 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 
 **APPROACH DECISION:**
 
-- **Single Practice**: Generate JSON directly (one step)
-- **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach + assembly
+- **Single Practice**: Generate JSON directly, then package into .keleo
+- **Multi-Practice Method (2+ practices)**: Use parallel Agent tool approach + package assembly
 
 **Process for Single Practice:**
 
@@ -1391,7 +1525,29 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    ```
    - **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice's `baselinePracticeName` (NOT the parent practice name). Set `practiceDependencyNames` using the filtering rule (see "Determining practiceDependencyNames" below).
 3. Include aliases array from mapping guide
-4. Validate and fix until 0 errors (always validate against the **actual baseline**, not the parent practice)
+4. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
+   ```bash
+   python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
+   ```
+5. **Resolve transitive dependencies** — `.keleo` bundles must include ALL dependency documents (baselines + practices), not the merged effective context:
+   ```bash
+   python3 utils/discover-dependencies.py --resolve-from practices/<name>/<name>.json --transitive
+   ```
+   Resolve any ambiguous dependencies (prefer `deps/` or `baselines/` or `practices/` paths over `.keleo`-embedded copies). Collect the full list of resolved file paths.
+6. **Package into .keleo** (NEVER use `python3 -c`, heredocs, or shell loops):
+   ```bash
+   python3 utils/package-keleo.py \
+     --name "<practice-name>" \
+     --version "1.0.0" \
+     --description "<practice description>" \
+     --documents <baseline>.json \
+                 [<transitive-dep-1>.json] \
+                 [<transitive-dep-2>.json] \
+                 practices/<name>/<name>.json \
+     -o bundles/<name>.keleo \
+     --verify
+   ```
+   List dependencies in topological order (baselines first, then practices in dependency order, entry-point practice last). Never use `_effective-context.json` as a document — it is a build artifact for semantic context during generation, not a distributable document.
 
 **Process for Multi-Practice Method:**
 
@@ -1407,9 +1563,9 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    ```
 
 2. **Each agent prompt must include:**
-   - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `<effective-baseline-path>` (from Step 0.5, or user-provided baseline if no dependencies)
-   - **Parent practice mode:** Include in the agent prompt: "Set `baselinePracticeName` to '<inherited baseline name>' (inherited from parent practice). `contributesTo` targets reference parent practice alphas using canonical names. Set `practiceDependencyNames` to ONLY those parent practices whose unique alphas (not in baseline) are actually referenced via `contributesTo` — see 'Determining practiceDependencyNames' section."
-   - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline uses domain aliases for semantic context. All structural references in the JSON (contributesTo, alphaName, stateName, etc.) MUST use canonical names, not alias names."
+   - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `<effective-context-path>` (from Step 0.5, or user-provided baseline if no dependencies)
+   - **Parent practice mode:** Include in the agent prompt: "Set `baselinePracticeName` to '<inherited baseline name>' (inherited from parent practice). `contributesTo`/`mapsTo` targets reference parent practice alphas using canonical names. Use `contributesTo` for specializations (different states) and `mapsTo` for variant mappings (exact same states, IS-A). Set `practiceDependencyNames` to ONLY those parent practices whose unique alphas (not in baseline) are actually referenced via `contributesTo` or `mapsTo` — see 'Determining practiceDependencyNames' section."
+   - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline uses domain aliases for semantic context. All structural references in the JSON (contributesTo, mapsTo, alphaName, stateName, etc.) MUST use canonical names, not alias names."
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
@@ -1417,63 +1573,64 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 
 3. **Agents run concurrently**, each producing one practice JSON file
 
-**Step 3B: Method Assembly**
+**Step 3B: Package Assembly**
 
 4. **After all practice JSONs complete:**
-   - Read all 4 practice JSON files
    - **Review Phase 1 analysis** for method-level overarching narrative (e.g., "The Cycle", SDLC mapping, value stream)
-   - Create method structure with **REQUIRED kind property AND method narrative**:
+   - **Create method narrative file** using the Write tool (auto-approved):
+     Write the narrative JSON to `practices/<method-name>/_method-narrative.json`:
      ```json
-     {
-       "kind": "method",
-       "name": "Method Name",
-       "description": "...",
-       "baselinePracticeName": "Platform Adoption Essentials",  // In parent practice mode: inherited from parent's baselinePracticeName
-       "practiceDependencyNames": ["..."],  // In parent practice mode: only parent practices with referenced unique alphas (see "Determining practiceDependencyNames")
-       "narratives": [
-         {
-           "name": "Method Lifecycle Narrative",
-           "description": "Overarching journey across all practices",
-           "narrativeTypeName": "The Cycle | STAR | Hero's Journey",
-           "narrativeContexts": [
-             {"seq": 1, "narrativeElementName": "...", "context": "..."},
-             ...
-           ],
-           "citationNames": [...]
-         }
-       ],
-       "tags": {...},
-       "citations": [...],
-       "practices": [
-         <practice-1-json-content>,
-         <practice-2-json-content>,
-         <practice-3-json-content>,
-         <practice-4-json-content>
-       ]
-     }
+     [
+       {
+         "name": "Method Lifecycle Narrative",
+         "description": "Overarching journey across all practices",
+         "narrativeTypeName": "The Cycle | STAR | Hero's Journey",
+         "narrativeContexts": [
+           {"seq": 1, "narrativeElementName": "...", "context": "..."}
+         ],
+         "citationNames": [...]
+       }
+     ]
      ```
-   - **CRITICAL:** Ensure `"kind": "method"` is at root level (required discriminator property)
-   - **CRITICAL:** Add method-level narrative from Phase 1 analysis (usually "The Cycle" or similar framework)
-   - Merge citations from all practices (deduplicate)
-   - **CRITICAL:** Ensure EVERY embedded practice has `"kind": "practice"` — verified by `python3 utils/assess-practice.py <file>.json`
-   - If any practice has `"kind": null`, the individual practice JSON generation omitted it - add it during assembly
+   - **Resolve transitive dependencies** for all practices in the method:
+     ```bash
+     python3 utils/discover-dependencies.py --resolve-from practices/<method-name>/practice-1.json --transitive
+     ```
+     Collect all unique dependency file paths across all practices (deduplicate shared baselines/dependencies).
+   - **Package into .keleo** using utility (NEVER use `python3 -c`, heredocs, or shell loops):
+     ```bash
+     python3 utils/package-keleo.py \
+       --name "<method-name>" \
+       --version "1.0.0" \
+       --description "<method description>" \
+       --documents <baseline>.json \
+                   [<transitive-dep-1>.json] \
+                   [<transitive-dep-2>.json] \
+                   practices/<method-name>/practice-1.json \
+                   practices/<method-name>/practice-2.json \
+                   ... \
+       --method-name "<Method Name>" \
+       --method-description "<method description>" \
+       --method-narrative-file practices/<method-name>/_method-narrative.json \
+       -o bundles/<method-name>.keleo \
+       --verify
+     ```
+   List dependencies in topological order (baselines first, then practices in dependency order, method practices last). Never use `_effective-context.json` as a document — it is a build artifact for semantic context during generation, not a distributable document. The packager automatically: generates an externalized method JSON with `practiceNames` (string references) and `baselinePracticeName`, merges/deduplicates citations from all practices, bundles all documents and assets into a `.keleo` ZIP archive with `manifest.json`. The `--verify` flag lists package contents inline.
 
 **Step 3C: Validation and Fixes**
 
-5. **Validate method JSON** (always use the **original user-provided baseline**, not the effective baseline — generated JSON uses canonical names):
+5. **Validate each practice JSON** — always use the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (resolves cross-practice competency/alpha/alias references):
    ```bash
-   python3 utils/validate-practice-json.py \
-     practices/<method-name>/<method-name>.json \
-     <original-baseline-practice.json> \
-     deps/language.schema.json
+   python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
 
-6. **Audit cross-practice references** (methods only):
+6. **Audit cross-practice references** (methods only — run on individual practice JSONs before packaging):
    ```bash
    python3 utils/audit-method-references.py \
-     practices/<method-name>/<method-name>.json \
-     --baseline <effective-baseline.json>
+     bundles/<method-name>.keleo \
+     --baseline <effective-context.json>
    ```
+   If the audit tool does not support `.keleo` input, run it against the individual practice JSONs instead.
 
 7. **Fix errors** — iterate until 0 errors. Common alpha-level fixes:
    ```bash
@@ -1481,8 +1638,8 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" --fix
    # Remap references from one alpha to another
    python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old" "New" --state-map '{"OldState":"NewState"}' --fix
-   # Quick error check after fixes
-   python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --errors-only
+   # Quick error check after fixes (add --parent for each practiceDependencyNames entry)
+   python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --errors-only [--parent <dep>.json ...]
    ```
 
 **Critical: Multi-Agent Benefits for Phase 3**
@@ -1490,13 +1647,14 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 - ✅ Concurrent execution (4x faster)
 - ✅ Simpler prompts (each agent focuses on one practice)
 - ✅ Easier debugging (one practice per file initially)
-- ✅ Clean assembly step combines everything
+- ✅ Clean packaging step bundles everything into .keleo
 
 **Critical JSON Rules:**
 
 From `deps/language.schema.json`:
 
 - **Discriminator property:** `"kind": "practice"` REQUIRED at root level of every practice JSON (enables type discrimination)
+- **Redeclared alphas:** Alphas that exist in the baseline or parent practice are REDECLARATIONS — they MUST NOT have `contributesTo` or `mapsTo` properties. These relationships are inherited from the baseline/parent definition. Only add practice-specific checklists, narratives, and Gherkin guidance to redeclared alphas.
 - **Checklist format:** Objects {name, description, seq}, NOT strings
 - **Competency references:** {competencyName, competencyLevelName}, NOT {competencyName, level}
 - **Persona property:** `competencies`, NOT `requiredCompetencies`
@@ -1522,7 +1680,8 @@ Fix all FAIL assertions with `error` severity. Warning assertions are advisory �
 - "Generating JSON from mapping guide..."
 - "Running validation (schema, baseline, integrity)..."
 - "Found N errors in category X, applying fixes..."
-- "Validation passed! Generated schema-compliant JSON at practices/<name>/<name>.json"
+- "Packaging into .keleo archive..."
+- "Validation passed! Generated schema-compliant package at bundles/<name>.keleo"
 
 ---
 
@@ -1533,15 +1692,17 @@ Fix all FAIL assertions with `error` severity. Warning assertions are advisory �
 **Purpose:** Comprehensive validation combining:
 1. JSON Schema compliance
 2. Baseline practice reference checking
-3. Internal cross-reference integrity
+3. Internal cross-reference integrity (including patternView ambiguity and alias collisions)
 
 **Usage:**
 ```bash
 python3 utils/validate-practice-json.py \
   <practice-or-method.json> \
-  <baseline-practice.json> \
+  <leaf-baseline.json> \
   <language-schema.json>
 ```
+
+The validator auto-discovers `_effective-context.json` or `_effective-parent.json` in the practice directory and loads them as dependencies for cross-practice element resolution. Always pass the **leaf baseline** — not the effective context — as the baseline argument.
 
 **Output:** JSON report with categorized errors:
 ```json
@@ -1585,7 +1746,7 @@ Read validation output and apply fixes:
 2. **Baseline errors:**
    - Map competency descriptions to exact baseline names
    - Correct state names to match alpha definitions
-   - Add contributesTo to floating alphas
+   - Add `contributesTo` or `mapsTo` to floating alphas
    - Use exact case-sensitive baseline references
 
 3. **Integrity errors:**
@@ -1605,6 +1766,15 @@ Read validation output and apply fixes:
 ### No Inline Scripts
 
 **All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.**
+
+**NEVER use any of these shell patterns — they all trigger permission prompts:**
+- `python3 -c "..."` — inline Python scripts
+- `bash -c "..."` — inline Bash scripts
+- `cat << 'EOF' ... EOF` — heredoc file creation (use Write tool instead)
+- `cat file1 <(echo ...) file2` — process substitution (use `assemble-mapping-guide.py` instead)
+- `for i in ...; do ... done` with variable expansion (use utility `--stats` flags or multi-file arguments instead)
+
+**Instead:** Use the Write tool (auto-approved) to create any intermediate files (e.g., narrative JSON, patch files), then call utility scripts with `--patch-file` or `--narrative-file`.
 
 Common utilities for JSON inspection:
 - **Structural inspection:** `python3 utils/extract-reference-names.py <file.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details`
@@ -1644,8 +1814,17 @@ Common utilities for JSON inspection:
 - **Add missing alpha redeclaration:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" [--fix]`
 - **Remap alpha references:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old Alpha" "New Alpha" --state-map '{"OldState":"NewState"}' [--fix]`
 - **Remove alpha and references:** `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remove-alpha "Alpha Name" [--fix]`
-- **Assemble method with merged assets:** `python3 utils/assemble-method-json.py --name "Name" --baseline-name "Baseline" --practices p1.json p2.json -o method.json --merge-assets`
-- **Assemble method with narrative file:** `python3 utils/assemble-method-json.py ... --narrative-file narratives.json`
+- **Resolve transitive deps:** `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (find all baselines + practices in dependency tree)
+- **Package into .keleo:** `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json dep1.json dep2.json p1.json p2.json --method-name "Method Name" --method-narrative-file narratives.json -o bundles/name.keleo --verify` (list ALL transitive deps in topological order, never use `_effective-context.json`)
+- **Package single practice:** `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json [transitive-deps.json ...] practice.json -o bundles/name.keleo --verify`
+- **Convert embedded method to .keleo:** `python3 utils/package-keleo.py --from-embedded method.json --baseline baseline.json -o bundles/method.keleo --verify`
+- **Verify existing package:** `python3 utils/package-keleo.py --verify-only bundles/name.keleo`
+
+Mapping guide assembly and validation:
+- **Assemble method mapping guide:** `python3 utils/assemble-mapping-guide.py --name "Name" --baseline-name "Baseline" --guides g1.md g2.md -o output.md --stats` (auto-generates method header with practice summary table)
+- **Assemble with parent:** `python3 utils/assemble-mapping-guide.py --name "Name" --baseline-name "Baseline" --parent-name "Parent" --guides g1.md g2.md g3.md -o output.md`
+- **File statistics:** `python3 utils/validate-phase-output.py --stats g1.md g2.md g3.md` (word/line/size counts for each file)
+- **Validate pattern views:** `python3 utils/validate-phase-output.py --phase 2 --validate-patterns guide.md` (checks alpha presence in every view, state validity, max 2 states per alpha per view)
 
 JSON patching (write operations):
 - **Set a top-level key:** `python3 utils/patch-practice-json.py <target>.json --set-key assets --patch-file assets.json`
@@ -1657,9 +1836,11 @@ JSON patching (write operations):
 - **Delete a top-level key:** `python3 utils/patch-practice-json.py <target>.json --delete-key kind`
 - **Deep find-and-replace:** `python3 utils/patch-practice-json.py <target>.json --replace "old text" "new text"` (recursive through all string values)
 - **Bulk replacements:** `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
+- **Rename element (with reference update):** `python3 utils/patch-practice-json.py <target>.json --rename-in activities "Old Name" "New Name"` (renames element AND all string references throughout JSON)
+- **Set key with inline value:** `python3 utils/patch-practice-json.py <target>.json --set-key narratives --value '[{"name":"..."}]'` (avoids temp files for simple values)
 - **Preview without writing:** Add `--dry-run` to any command above
 
-These commands work on ANY JSON file — practice, method, baseline, `_effective-baseline.json`, or `_effective-parent.json`. This rule applies to subagents too. If a subagent needs to inspect or modify JSON structure, it must use these utilities.
+These commands work on ANY JSON file — practice, method, baseline, `_effective-context.json`, or `_effective-context.json`. This rule applies to subagents too. If a subagent needs to inspect or modify JSON structure, it must use these utilities.
 
 ### Reference-Driven Architecture
 
@@ -1688,55 +1869,36 @@ The skill does NOT assume a specific baseline practice. Instead:
 
 **Baseline Dependency Resolution (Step 0.5):**
 
-If the provided baseline declares `baselinePracticeNames` (an array of other baseline names it depends on), the skill resolves the dependency chain:
+### Unified Context Resolution
 
-- Asks user for dependent baseline file paths (there is no practice library/registry)
-- Recursively resolves transitive dependencies until root baselines are reached
-- Merges baselines in dependency order (root-first, leaf-last overlay)
-- Creates `_effective-baseline.json` in the output directory with merged elements
-- Surfaces `practiceElementAliases` from child baselines as `_aliasContext` annotations for semantic understanding
-- Uses the effective baseline for analysis and mapping phases
-- Validation always uses the **original** user-provided baseline (canonical names)
+The skill uses `utils/resolve-context.py` to produce a single `_effective-context.json` from all context sources:
 
-**Alias Context:**
+- Accepts any mix of baselines (`.json`), practices (`.json`), methods (`.json`), and `.keleo` bundles
+- Classifies inputs into three tiers: baselines, practices, methods
+- Resolves transitive baseline dependencies automatically (`--transitive`)
+- Merges in hierarchy order: baselines (topo-sorted root-first) → practices → methods
+- Stamps `_contributingPracticeName` on every element (provenance tracking)
+- Builds `_provenance` manifest with merge order, tier membership, element-to-source mapping
+- Applies unified `_aliasContext` and `_domainAlias` annotations
 
-Child baselines often define `practiceElementAliases` that map generic parent terms to domain-specific terminology (e.g., "Platform" → "Automation Platform"). These aliases are surfaced in the effective baseline so agents understand the domain vocabulary during analysis and mapping. Extension practices always use canonical names in structural references — aliases inform semantic reasoning, not JSON output.
+**Provenance-based mapping:**
 
-**Benefits:**
-- Flexibility to use different baselines
-- No hardcoded assumptions
-- Baseline can evolve independently
-- Baseline dependency chains are resolved automatically
-- Domain-specific terminology improves semantic quality of analysis and mapping
+The mapping agent uses `_contributingPracticeName` + `_provenance.tiers` to make decisions:
+- Elements from baselines → ontology context, redeclaration targets
+- Elements from practices → primary `contributesTo`/`mapsTo` targets, create `practiceDependencyNames`
+- Elements from methods → coordination-level concepts
 
-### Parent Practice Extension Mode
-
-As an alternative to providing a baseline practice, users can provide an existing **practice** or **method** as the mapping target. The skill treats the provided practice/method as a "parent practice" — the new practice extends the parent's alphas rather than mapping directly to the baseline.
-
-**When to use:**
-- Creating a practice that builds on top of an existing practice (e.g., a specialized deployment practice extending a general platform engineering practice)
-- Creating a practice that extends a method's capabilities (e.g., adding AI inference to an OpenShift method)
-- The source methodology is a specialization or extension of content already captured in an existing practice
-
-**How it works:**
-
-1. **Detection:** `utils/resolve-parent-practice.py --check-only` classifies the input as `practiceBaseline`, `practice`, or `method`
-2. **Parent Resolution:** For methods, all embedded practices are merged into a composite "effective parent" via name-keyed union
-3. **Baseline Inheritance:** The actual baseline is inherited from the parent's `baselinePracticeName`
-4. **Mapping:** During analysis and mapping, parent practice alphas are the primary `contributesTo` targets
-5. **JSON Output:** The generated practice sets:
-   - `baselinePracticeName` = inherited from parent (NOT the parent practice name)
-   - `practiceDependencyNames` = only those parent practices whose unique alphas are actually referenced (see "Determining practiceDependencyNames")
-   - Alpha `contributesTo` targets = parent practice alphas (or baseline alphas where appropriate)
-
-**Alpha hierarchy:**
+**Alpha hierarchy example:**
 
 ```
-Baseline Alpha (e.g., "Platform")
-  └── Parent Practice Alpha (e.g., "Platform Infrastructure")
+Baseline Alpha (e.g., "Platform")         ← _contributingPracticeName: "Platform Adoption Essentials"
+  └── Parent Practice Alpha (e.g., "Platform Infrastructure")  ← _contributingPracticeName: "Platform Operations"
        └── New Practice Alpha (e.g., "AI Inference Platform")
-           contributesTo: "Platform Infrastructure"  (parent practice alpha)
+           contributesTo: "Platform Infrastructure"
+           practiceDependencyNames: ["Platform Operations"]   ← because "Platform Infrastructure" is practice-sourced
 ```
+
+**Validation:** Always uses the **original leaf baseline file** (canonical name checking), not the effective context.
 
 **Canonical names:** All structural references use canonical names. If the parent practice has `practiceElementAliases`, they are surfaced as `_aliasContext` annotations for semantic understanding — they do NOT appear in generated JSON output.
 
@@ -1773,34 +1935,24 @@ Output practice:
 
 **Algorithm (apply per practice after Phase 3 JSON generation):**
 
-1. **Collect `contributesTo` targets** from all alphas in the practice
+1. **Collect `contributesTo` and `mapsTo` targets** from all alphas in the practice
 2. **Filter out practice-local targets** (alphas defined within the same practice)
 3. **For each remaining target**, classify it:
-   - **Baseline alpha**: exists in the effective baseline → no dependency created
-   - **Parent-only alpha**: exists in the effective parent but NOT in the effective baseline → creates dependency on whichever parent practice defines it
-4. **Map parent-only alphas to their owning parent practice** (for methods: check which embedded practice defines the alpha)
-5. **Set `practiceDependencyNames`** to the deduplicated list of parent practices that own at least one referenced parent-only alpha. If no parent-only alphas are referenced, set to `[]`.
+   - **Baseline alpha** (`_contributingPracticeName` points to a baseline in `_provenance.tiers.baselines`): no dependency created
+   - **Practice-only alpha** (`_contributingPracticeName` points to a practice in `_provenance.tiers.practices`): creates dependency on that contributing practice
+4. **Set `practiceDependencyNames`** to the deduplicated list of contributing practices that own at least one referenced practice-only alpha. If no practice-only alphas are referenced, set to `[]`.
 
-**Verification command:**
+**Using `_contributingPracticeName` for dependency determination:**
+The effective context annotates every element with its source. When your new practice references an alpha via `contributesTo`/`mapsTo`, check that alpha's `_contributingPracticeName` and cross-reference with `_provenance.tiers`:
+- If the source is in `tiers.baselines` → baseline alpha → no dependency
+- If the source is in `tiers.practices` → practice alpha → add that practice to `practiceDependencyNames`
+
+**Verification command (legacy, still works):**
 ```bash
-# Show parent-only alphas and their owning practices
 python3 utils/resolve-practice-dependencies.py \
-  --parent _effective-parent.json \
-  --baseline _effective-baseline.json \
-  --parent-method <parent-method.json>
-
-# Compute dependencies for a specific practice
-python3 utils/resolve-practice-dependencies.py \
-  --parent _effective-parent.json \
-  --baseline _effective-baseline.json \
-  --parent-method <parent-method.json> \
-  --practice <practice.json>
-
-# Per-alpha detail: show each alpha's contributesTo target and origin classification
-python3 utils/resolve-practice-dependencies.py \
-  --parent _effective-parent.json \
-  --baseline _effective-baseline.json \
-  --practice <practice-or-method.json> \
+  --parent _effective-context.json \
+  --baseline <validation-baseline.json> \
+  --practice <practice.json> \
   --per-alpha
 ```
 
@@ -1868,6 +2020,8 @@ Single validation script replaces multiple utilities:
 - ❌ Forcing template patterns instead of discovering source's natural progression
 - ❌ Multi-sentence descriptions (violates conciseness standards)
 - ❌ Insufficient citations (need 5-15 authoritative sources)
+- ❌ **Citations missing URLs** — every citation SHOULD have a `url` field. Use user-provided URLs, official framework websites, DOI references (`https://doi.org/10.xxxx/xxxxx`) for academic works, or publisher catalog pages. Only omit when no stable public link exists. Never fabricate URLs.
+- ❌ Missing acknowledgements — if source methodology credits specific contributors or supporting organizations, include an `acknowledgements` array (distinct from citations — attributes human contributions rather than published works)
 - ❌ **Incomplete activity coverage** (must include ALL activities identified, not just 1-2 examples)
 - ❌ **Not identifying concern relationships** - Missing production flows, enablement patterns, governance structures, information flows between concerns
   - **Fix:** Explicitly analyze how concerns interact: what produces what, what enables what, what governs what
@@ -1876,7 +2030,7 @@ Single validation script replaces multiple utilities:
 ### Phase 2 Pitfalls
 
 - ❌ Not reading semantics.md before mapping
-- ❌ Creating floating alphas (missing contributesTo)
+- ❌ Creating floating alphas (missing `contributesTo` or `mapsTo`)
 - ❌ **Missing or insufficient terminology aliases** - Saying "no aliases needed" when source uses domain-specific vocabulary
   - **Fix:** Review source for domain canonical terms differing from baseline
   - Examples: "Playbook" (vs Deployment Documentation), "Execution Environment" (specialized alpha)
@@ -1885,13 +2039,25 @@ Single validation script replaces multiple utilities:
 - ❌ **Multiple aliases for same element** - Creating Platform → "AAP", Platform → "Automation Controller", Platform → "Automation Platform"
   - **Fix:** Distinguish synonyms vs facets vs deployments
   - **Synonyms/acronyms** → keywords: "AAP", "automation platform", "ansible automation platform"
-  - **Facets/components** → specializations: "Automation Controller", "Automation Hub", "Execution Environment" (new alphas with contributesTo)
+  - **Facets/components** → specializations: "Automation Controller", "Automation Hub", "Execution Environment" (new alphas with `contributesTo`)
+  - **Named variants** → variant mappings: "AI-Ready Enterprise", "IT Operations Efficiency" (new alphas with `mapsTo` — same states as parent)
   - **Different deployments** → instances: "Production AAP", "Staging AAP", "Development AAP" (same behavior, different tracking)
   - Do NOT create multiple aliases for one baseline element
-- ❌ **CRITICAL: contributesTo only references baseline** - Forgetting that contributesTo can reference practice-local alphas (internal hierarchy) or external practice alphas (cross-practice dependency)
-  - **Fix:** Consider all three contributesTo options: baseline, practice-local, external practice
+- ❌ **CRITICAL: `contributesTo`/`mapsTo` only references baseline** - Forgetting that these can reference practice-local alphas (internal hierarchy) or external practice alphas (cross-practice dependency)
+  - **Fix:** Consider all three target options: baseline, practice-local, external practice
   - Use State Alignment Heuristic to find best parent across all three sources
+  - Choose `contributesTo` (different states) vs `mapsTo` (exact same states, IS-A variant)
   - Document practice dependencies when using external practice references
+- ❌ **Using `contributesTo` when `mapsTo` is appropriate** - Alpha has identical state progression as parent and IS-A semantics apply
+  - **Fix:** If states match exactly and the concept IS a named variant of the parent → use `mapsTo`
+  - Example: "AI-Ready Enterprise" IS a "Sales Play" with same states → `mapsTo`, not `contributesTo`
+  - Example: Specific TDPs that follow the same "Technical Decision Point" lifecycle → `mapsTo`
+- ❌ **Setting both `mapsTo` and `contributesTo` on same alpha** - These are mutually exclusive
+  - **Fix:** Choose one based on state progression match and IS-A semantics
+- ❌ **Repeating parent type name in `mapsTo` alpha names** - "AI-Ready Enterprise Play" (redundant "Play"), "Container Management TDP" (redundant "TDP")
+  - **Fix:** Since `mapsTo` reads as "is a type of", drop the parent type from the name: "AI-Ready Enterprise" (is a Sales Play), "Container Management" (is a Technical Decision Point)
+  - This applies to both alpha `name` and any `aliasName`
+  - Does NOT apply to `contributesTo` alphas — including the type in specialization names is fine
 - ❌ **Not using baseline relatesTo for alpha analysis** - Ignoring existing semantic relationships when analyzing baseline alphas
   - **Fix:** Read baseline alpha's `relatesTo` array to understand dependencies, production, governance patterns
   - Use relationships to inform how the alpha fits in the practice's value stream
@@ -1901,15 +2067,20 @@ Single validation script replaces multiple utilities:
   - Redeclarations inherit baseline relationships automatically
 - ❌ **Missing relatesTo on new alphas** - New specialized alphas lack semantic relationships to peer alphas
   - **Fix:** Review Phase 1 concern interactions and map to relatesTo arrays
-  - Define domain-specific relationships using appropriate verbs from semantics.md Section 4.1
-  - Use directionality pattern: alpha declares what it provides/enables/produces (not what it depends on)
-  - Example: New alpha "Platform Capability" should relate to "Platform Asset" (produces), "Requirements" (validates), etc.
+  - Define domain-specific relationships using appropriate verbs from semantics.md Section 6.1
+  - Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`) — required by schema
+  - Optionally include `description` to explain why the relationship exists
+  - Example: `{ "relationship": "produces", "alphaName": "Platform Asset", "direction": "outgoing", "description": "Capabilities produce consumable platform assets" }`
 - ❌ **Using vague relationship verbs** - Generic "relates to" instead of specific relationship types
   - **Fix:** Use domain-appropriate verbs: "produces", "enables", "guides", "validates", "constrains", "provides", "hosts"
   - Prefer active voice from provider perspective
+- ❌ **Missing `direction` field on relatesTo entries** - Schema requires `direction` on every AlphaRelationship
+  - **Fix:** Add `direction` field: `outgoing` (this alpha acts on target), `incoming` (target acts on this), `mutual` (symmetric)
+  - Common mappings: "produces"/"enables"/"constrains"/"depends on" → `outgoing`; "governed by"/"built by"/"validated by" → `incoming`
 - ❌ **Wrong relationship directionality** - Alpha declares dependencies instead of provisions
   - **Fix:** Flip perspective - alpha should declare what it provides TO others, not what it needs FROM others
   - "Platform enables Software System" not "Software System depends on Platform"
+  - Use `direction: "outgoing"` for active relationships, `direction: "incoming"` for passive
 - ❌ **Using invalid competency level names** - Using descriptive names instead of exact baseline CompetencyLevel.name values
   - **Fix:** Extract valid level names from baseline: `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`
   - Use EXACT level names from baseline (case-sensitive)
@@ -1918,7 +2089,7 @@ Single validation script replaces multiple utilities:
   - **Validate BEFORE Phase 3:** Check all competencyLevelName values in mapping guide against baseline
 - ❌ Using competency descriptions instead of exact baseline names
 - ❌ Using alias names in structural references (use canonical names)
-- ❌ Wrong alpha approach (should use redeclaration vs specialization framework)
+- ❌ Wrong alpha approach (should use redeclaration vs specialization vs variant mapping framework)
 - ❌ Flat tags array instead of orthogonal structure
 - ❌ **CRITICAL: Writing prose paragraphs instead of structured narrative objects**
 - ❌ **Missing narrativeTypeName and narrativeContexts in narratives**
@@ -2022,6 +2193,11 @@ Single validation script replaces multiple utilities:
   - **Fix:** Alpha A should declare what it provides/enables/produces for other alphas, not what it depends on
   - Use active voice from provider perspective: "enables", "produces", "guides" rather than "depends on", "requires"
   - Exception: "depends on" is valid when explicitly modeling a dependency relationship from the dependent's side
+  - Always include `direction` field matching the verb: `outgoing` for active, `incoming` for passive, `mutual` for symmetric
+- ❌ **Missing `direction` field on relatesTo entries** - Schema requires `direction` on every AlphaRelationship
+  - **Fix:** Add `direction` field to every relatesTo entry. Values: `outgoing`, `incoming`, `mutual`
+- ❌ **Using `rationale` instead of `description` in relatesTo** - `rationale` is not a valid schema field
+  - **Fix:** Rename `rationale` to `description` (optional field for explaining the relationship)
 - ❌ **Missing relationships on interconnected alphas** - Phase 1 analysis shows concern interactions but Phase 3 JSON has no relatesTo
   - **Fix:** Review Phase 1 concern interactions and Phase 2 mapping for relationship opportunities
   - Look for production flows, enablement patterns, governance structures, information flows
@@ -2045,6 +2221,14 @@ Single validation script replaces multiple utilities:
   - Use Font Awesome 6 Free icons for zero distribution overhead
 - ❌ **Referenced assetName not in top-level assets array**
   - **Fix:** Every assetName in AssetReference objects must match an Asset.name in the assets array
+- ❌ **Wrong Gherkin property placement** - Adding `test`/`examples` to elements that don't support them
+  - **Fix:** `test` and `examples` are ONLY valid on Checklist items and Activities. `background` is valid on State, LevelOfDetail, ActivitySpace, and Activity.
+- ❌ **Gherkin `test` missing PracticeElement fields** - Test extends PracticeElement, so requires `name` and `description`
+  - **Fix:** Every `test` object must include `name` (string) and `description` (string) alongside optional `given`/`when`/`then` arrays
+- ❌ **Duplicating structural relationships in Gherkin** - Activity `test.then` repeating what `contributesTo`/`worksOn` already declares
+  - **Fix:** `test.then` should capture human-readable outcomes that complement (not duplicate) structural references
+- ❌ **Background as string or array** - `background` must be an object with optional `given`, `alphaStates`, `workProductLevels` arrays
+  - **Fix:** Use `{"given": [...], "alphaStates": [...]}` structure
 
 ---
 
@@ -2336,6 +2520,49 @@ When practices need coordination:
 - ❌ Orchestration practice duplicating content from dependent practices
 - ❌ Creating orchestration practice when simple method-level patterns would suffice
 
+**Step 5: Cross-Baseline Alpha Bindings (`alphaBindings`)**
+
+When a method composes practices from **different baseline families** (e.g., Platform Adoption Essentials + Partner Ecosystem Essentials), use `alphaBindings` at the method level to declare cross-baseline contribution relationships.
+
+`alphaBindings` is an array on the Method object. Each entry declares that alphas from one baseline contribute to an alpha in another baseline:
+
+```json
+"alphaBindings": [
+  {
+    "baselineAlpha": {
+      "baselineName": "Partner Ecosystem Essentials",
+      "alphaName": "Partner Engagement"
+    },
+    "contributingAlphas": [
+      {
+        "baselineName": "Platform Adoption Essentials",
+        "alphaName": "Stakeholders",
+        "stateContributions": [
+          { "fromState": "Recognized", "toState": "Identified" },
+          { "fromState": "Involved", "toState": "Active" }
+        ]
+      }
+    ]
+  }
+]
+```
+
+**When to use:**
+- Method composes practices from 2+ different baselines
+- Alphas from different baselines have natural contribution relationships
+- These bindings are post-merge metadata — consumed AFTER merge produces the unified document
+
+**When NOT to use:**
+- Single-baseline methods (use `contributesTo` on alphas instead)
+- Within-baseline relationships (use `contributesTo` or `relatesTo`)
+
+**Rules:**
+- Each `baselineName` must reference an accessible baseline
+- Each `alphaName` must exist in that baseline
+- State names in `stateContributions` must be valid for the respective alphas
+- `stateContributions` is optional — alpha-level binding without state mapping is valid
+- Bindings are additive — they don't replace existing `contributesTo` relationships
+
 **Examples:**
 
 **Example 1: Platform-Focused Practice (CORRECT)**
@@ -2464,14 +2691,20 @@ Report completion with file paths:
 "Translation complete! Generated files:
  ✓ practices/<name>/01-analysis-report.md (~40K words)
  ✓ practices/<name>/02-mapping-guide.md (~50K words)
- ✓ practices/<name>/<name>.json (schema-compliant)
+ ✓ bundles/<name>.keleo (schema-compliant package)
+
+Package contents:
+ ✓ manifest.json
+ ✓ documents/<baseline>.json (practiceBaseline)
+ ✓ documents/<practice>.json (practice) [× N for methods]
+ ✓ documents/<method>.json (method, entry point) [methods only]
 
 Validation summary:
  ✓ Schema compliance: PASS
  ✓ Baseline references: PASS
  ✓ Internal integrity: PASS
 
-JSON is ready for use in Practice Language consuming systems."
+Package is ready for use in Practice Language consuming systems."
 
 ---
 
@@ -2516,16 +2749,17 @@ For successful translation, user receives:
    - Human-readable, ready for review
    - Includes assets section identifying visual artifacts
 
-3. **`practices/<name>/<name>.json`**
-   - Schema-compliant Practice or Method JSON
-   - Validated against schema, baseline, internal integrity
-   - Ready for consumption by Practice Language tools
-   - Includes `assets` array if visual artifacts identified
+3. **`bundles/<name>.keleo`**
+   - `.keleo` package (ZIP archive with `manifest.json`)
+   - Bundles all documents: baseline JSON, practice JSON(s), method JSON (for methods)
+   - Method uses externalized `practiceNames` and `baselinePracticeName` string references
+   - Each practice/baseline validated against schema before packaging
+   - Includes bundled assets if visual artifacts use file-based paths
 
-4. **`practices/<name>/assets/`** (optional, if visual artifacts present)
-   - Diagrams, templates, charts extracted from source materials
-   - Organized by type: diagrams/, templates/, icons/
-   - Referenced by JSON via relative paths
+4. **`practices/<name>/<practice-name>.json`** (intermediate files)
+   - Individual practice JSONs produced by Phase 3 agents
+   - Used for validation before packaging
+   - Included as documents in the `.keleo` package
 
 ### Asset References and Visual Enhancement
 
@@ -2913,6 +3147,27 @@ Quality indicators:
 - Rich narratives with citations (not sparse)
 - Complete checklists (5-7 per state, 3-5 per LOD)
 - Exact baseline references (case-sensitive matches)
-- No floating alphas (all new alphas have contributesTo)
+- No floating alphas (all new alphas have `contributesTo` or `mapsTo`)
 - Orthogonal tags throughout
 - Single-sentence descriptions
+
+---
+
+## Post-Completion Review (MANDATORY)
+
+**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
+
+1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
+   - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list
+   - Inline `python3 -c` or `bash -c` scripts that should have been reusable utils
+   - Shell patterns (heredocs, loops, process substitution) that triggered prompts
+   - External tool calls (e.g., `unzip`, `zip`, `curl`) that could be absorbed into existing utils
+
+2. **Identify missing utils**: Did you have to write any ad-hoc logic that could be generalised into a reusable utility script in `utils/`?
+
+3. **Propose fixes** (present to user, don't apply unilaterally):
+   - **Permission gaps**: Suggest adding auto-allow entries to `.claude/settings.json`
+   - **Missing utils**: Propose new utility scripts or extensions to existing ones
+   - **Skill improvements**: Suggest skill instruction updates to prevent the ad-hoc pattern in future runs
+
+4. **Report**: Briefly tell the user what you found and what you'd recommend changing. If nothing was found, say so — a clean session is a good signal.

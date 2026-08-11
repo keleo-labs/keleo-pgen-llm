@@ -39,6 +39,28 @@ from utils._shared import load_json, detect_kind
 UTILS_DIR = Path(__file__).resolve().parent
 
 
+def load_specs_index(specs_path):
+    """Load specs-index.json and build reverse map: assess_category → list of spec IDs."""
+    data = load_json(specs_path, exit_on_error=False)
+    cat_to_specs = {}
+    for scenario in data.get("scenarios", []):
+        for cat in scenario.get("assess_categories", []):
+            cat_to_specs.setdefault(cat, []).append(scenario["id"])
+    return data, cat_to_specs
+
+
+def annotate_with_specs(assertion_results, cat_to_specs):
+    """Add spec_ids to each assertion result based on its assess categories."""
+    for a in assertion_results:
+        assertion_id = a["id"]
+        categories = ASSESS_CATEGORY_MAP.get(assertion_id, ())
+        spec_ids = []
+        for cat in categories:
+            spec_ids.extend(cat_to_specs.get(cat, []))
+        if spec_ids:
+            a["spec_ids"] = sorted(set(spec_ids))
+
+
 ASSESS_CATEGORY_MAP = {
     "structure:kind": ("structure",),
     "structure:sections": ("structure",),
@@ -73,6 +95,17 @@ ASSESS_CATEGORY_MAP = {
     "qual:asset-coverage": ("asset-coverage",),
     "qual:pattern-coverage": ("pattern-coverage",),
     "qual:narrative-uniqueness": ("narrative-uniqueness",),
+    "rel:mapsto-naming": ("mapsto-naming",),
+    "rel:contributes-to-state": ("contributes-to-state",),
+    "qual:narrative-structure": ("narrative-structure",),
+    "qual:description-length": ("description-length",),
+    "qual:activity-distinctness": ("activity-name-distinctness",),
+    "coverage:alpha-states": ("alpha-state-minimum",),
+    "coverage:wp-lods": ("workproduct-lod-minimum",),
+    "coverage:activity-gap": ("activity-state-gap",),
+    "qual:alias-uniqueness": ("alias-uniqueness",),
+    "qual:alias-isolation": ("alias-isolation",),
+    "qual:keyword-count": ("keyword-count",),
 }
 
 ERROR_ASSERTIONS = {
@@ -83,6 +116,7 @@ ERROR_ASSERTIONS = {
     "xref:pattern", "xref:citation", "xref:narrative-type",
     "bref:focus", "bref:alpha", "bref:activityspace", "bref:competency",
     "bref:narrativetype", "bref:alias",
+    "rel:contributes-to-state",
     "schema:valid", "schema:baseline-refs", "schema:integrity",
 }
 
@@ -94,6 +128,9 @@ ASSERTION_TEXTS = {
     "phase1:section-count": "Analysis has >= 8 top-level sections",
     "phase1:required-sections": "All 8 required sections present",
     "phase1:subsection-count": ">= 5 numbered subsections",
+    "phase1:citations": "Sufficient source references documented",
+    "phase1:perspectives": "Four-perspective analysis coverage",
+    "phase1:relationships": "Inter-concern relationships documented",
     "phase1.5:required-sections": "All 7 required sections present",
     "phase1.5:focuses": "2-4 focuses defined",
     "phase1.5:concerns": "8-15 essential concerns distilled",
@@ -108,6 +145,11 @@ ASSERTION_TEXTS = {
     "phase2:work-products": ">= 3 work products mapped",
     "phase2:alphas": ">= 3 alphas mapped",
     "phase2:patterns": ">= 1 pattern mapped",
+    "phase2:delineation": "Delineation analysis present",
+    "phase2:primary-alpha": "Primary alpha documented",
+    "phase2:keyword-content": "Keywords section has 10-20 items",
+    "phase2:pattern-construction": "Four-pass pattern construction evidence",
+    "phase2:narrative-format": "Structured narrative format used",
     "schema:valid": "JSON validates against schema with 0 errors",
     "schema:baseline-refs": "All baseline references resolve",
     "schema:integrity": "Internal cross-reference integrity",
@@ -144,6 +186,17 @@ ASSERTION_TEXTS = {
     "qual:asset-coverage": "Elements have icon assets",
     "qual:pattern-coverage": "Patterns cover all practice alphas",
     "qual:narrative-uniqueness": "No duplicate narrative names",
+    "rel:mapsto-naming": "mapsTo variant names omit parent type",
+    "rel:contributes-to-state": "contributesToState references valid parent states",
+    "qual:narrative-structure": "Narratives have narrativeTypeName and narrativeContexts",
+    "qual:description-length": "Descriptions within word limits",
+    "qual:activity-distinctness": "Activity names differ from ActivitySpace names",
+    "coverage:alpha-states": "Each alpha has >= 3 states",
+    "coverage:wp-lods": "Each work product has >= 2 LODs",
+    "coverage:activity-gap": "Alpha states have supporting activities",
+    "qual:alias-uniqueness": "One alias per element maximum",
+    "qual:alias-isolation": "Alias names not in structural references",
+    "qual:keyword-count": "Keywords count within 10-20 range",
 }
 
 
@@ -267,6 +320,25 @@ def eval_phase_1(analysis_path):
         results.append(make_assertion("phase1:subsection-count", subsection["pass"],
                                       f"{subsection.get('actual', '?')} numbered subsections", phase=1))
 
+    citation = next((c for c in checks if c.get("check") == "citation_count"), None)
+    if citation:
+        results.append(make_assertion("phase1:citations", citation["pass"],
+                                      f"{citation.get('actual', '?')} source references", phase=1))
+
+    perspective = next((c for c in checks if c.get("check") == "perspective_balance"), None)
+    if perspective:
+        missing = perspective.get("missing", [])
+        evidence = f"{perspective.get('actual', '?')}/4 perspectives"
+        if missing:
+            evidence += f"; missing: {', '.join(missing)}"
+        results.append(make_assertion("phase1:perspectives", perspective["pass"],
+                                      evidence, phase=1))
+
+    relationships = next((c for c in checks if c.get("check") == "relationship_documentation"), None)
+    if relationships:
+        results.append(make_assertion("phase1:relationships", relationships["pass"],
+                                      f"{relationships.get('actual', '?')} relationship mentions", phase=1))
+
     return results
 
 
@@ -342,6 +414,20 @@ def eval_phase_2(mapping_path):
         if c:
             results.append(make_assertion(assertion_id, c["pass"],
                                           f"{c.get('actual', '?')} {label} mapped", phase=2))
+
+    phase2_check_map = {
+        "delineation_analysis": ("phase2:delineation", "Delineation analysis"),
+        "primary_alpha_documented": ("phase2:primary-alpha", "Primary alpha"),
+        "keyword_content": ("phase2:keyword-content", "keywords"),
+        "pattern_construction": ("phase2:pattern-construction", "Pattern construction"),
+        "narrative_format": ("phase2:narrative-format", "Structured narratives"),
+    }
+    for check_name, (assertion_id, label) in phase2_check_map.items():
+        c = next((c for c in checks if c.get("check") == check_name), None)
+        if c:
+            actual = c.get("actual", "present" if c.get("pass") else "missing")
+            evidence = f"{actual} {label}" if isinstance(actual, int) else f"{label}: {actual}"
+            results.append(make_assertion(assertion_id, c["pass"], evidence, phase=2))
 
     return results
 
@@ -580,7 +666,14 @@ def main():
     parser.add_argument("--evals", metavar="EVALS_JSON",
                         help="Run batch evals from evals.json file")
     parser.add_argument("--eval-id", type=int, help="Run specific eval by ID (with --evals)")
+    parser.add_argument("--specs", metavar="SPECS_JSON",
+                        help="Annotate assertions with spec IDs from specs-index.json")
     args = parser.parse_args()
+
+    specs_data = None
+    cat_to_specs = {}
+    if args.specs:
+        specs_data, cat_to_specs = load_specs_index(args.specs)
 
     if args.evals:
         result = run_batch_evals(args.evals, eval_id=args.eval_id)
@@ -598,6 +691,10 @@ def main():
     else:
         parser.print_help()
         sys.exit(1)
+
+    if cat_to_specs and not args.evals:
+        annotate_with_specs(result.get("assertion_results", []), cat_to_specs)
+        result["specs_source"] = str(args.specs)
 
     if args.summary and not args.evals:
         summary = result.get("summary", {})

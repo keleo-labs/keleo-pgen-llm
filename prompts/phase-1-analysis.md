@@ -79,7 +79,24 @@ Document 5-15 distinct concerns, each with:
 - **Description** (single sentence, 15-20 words max)
 - **Tags** (domain, lifecycle, organizational)
 - **Narrative** (2-4 bulleted points summarizing the concern)
+- **Concreteness Test** (one Given/When/Then triplet proving the concern is actionable — see guidance below)
 - **Further Reading** (citations to source material sections)
+
+#### Concreteness Test (Gherkin Validation Heuristic)
+
+Each concern must pass a quick Given/When/Then test to confirm it represents a real, trackable area of attention rather than an abstract category. This is a validation gate, not full scenario specification — one triplet per concern is sufficient.
+
+- **Given**: What precondition or context makes this concern relevant?
+- **When**: What trigger, action, or event advances this concern?
+- **Then**: What observable outcome demonstrates progress?
+
+If you cannot write a coherent triplet, the concern is likely too abstract (split it) or too narrow (merge it with a related concern). The triplet also seeds downstream Gherkin structure in Phase 3 — preconditions feed `background`, triggers feed `test.when`, outcomes feed `test.then`.
+
+**Example:**
+> **Concern:** Platform Observability
+> - **Given** the platform hosts production workloads
+> - **When** the operations team deploys a monitoring stack with SLO dashboards
+> - **Then** service health is measurable and alert fatigue is within acceptable bounds
 
 ### Step 5: Identify Progressive States for Each Concern
 
@@ -94,6 +111,7 @@ For EACH concern, identify natural progression waypoints described in the source
 For each state:
 - **Name** (2-4 words, describing the waypoint)
 - **Description** (single sentence)
+- **Prerequisites** (what must already hold before this state is relevant? List 1-3 preconditions — cross-concern dependencies or contextual conditions. These seed `background.given` and `background.alphaStates` in Phase 3. Do NOT list the previous state of the same concern — sequential progression is implicit in state ordering and restating it is redundant.)
 - **Criteria** (5-7 one-sentence verification criteria - what must be demonstrably true?)
 
 ### Step 6: Identify Work Products
@@ -126,12 +144,14 @@ For each concern and work product, identify activities:
 For each activity:
 - **Name** (verb + specific object, e.g., "Design Security Architecture" not "Design")
 - **Description** (single sentence)
+- **Triggers** (what decision point, event, or lifecycle moment initiates this activity? 1-2 sentences. Seeds `test.when` in Phase 3)
 - **Technique Narrative** (2-5 paragraphs, 2-4 sentences each)
   - How is this activity performed?
   - What techniques or approaches are used?
   - What are common patterns or anti-patterns?
   - Citations to source material for details
 - **Outcomes** (which concerns/states does this activity contribute to?)
+- **Observable Results** (what is different after this activity completes, beyond concern state changes? E.g., "risk factors are documented", "team capacity plan is reviewed". Seeds `test.then` in Phase 3)
 - **Work Products Used** (which artifacts does this activity create/update?)
 
 ### Step 8: Identify Competencies
@@ -280,15 +300,29 @@ Document practice hierarchy and relationships.
 
 ### Step 13: Generate Citations
 
-Document all source materials as citations:
-- **Name** (exact source title)
-- **Description** (1 sentence summary)
-- **Authors** (array of author names)
-- **Date** (publication year)
-- **Source** (publisher, journal, or URL)
-- **URL** (if applicable)
+Document all source materials as structured citations with full metadata. This is the authoritative citation record — Phase 2 and Phase 3 will carry these details forward, so completeness here prevents information loss downstream.
+
+For each source:
+- **Name** (exact source title — this becomes the citation's symbolic key)
+- **Description** (1 sentence summary of content/relevance)
+- **Authors** (array of author names, full names preferred)
+- **Date** (publication year or full date if known)
+- **Source** (publisher, journal, or organization name)
+- **URL** (REQUIRED where possible — see URL enrichment rules below)
 
 Prioritize authoritative sources (primary methodology creators).
+
+**Citation URL Enrichment (REQUIRED):**
+
+Every citation SHOULD have a `url` field. Internal, intranet, and Google Docs/Sheets/Slides URLs are valid and preferred when the source material was accessed via those links. Populate URLs using these sources in priority order:
+
+1. **User-provided URLs** — If the user supplied URLs as input sources (including Google Docs, SharePoint, intranet links, or any internal domain), carry those URLs directly into the corresponding citations. These are the most authoritative source locators.
+2. **Official websites** — For frameworks, methodologies, and standards with known homepages (e.g., `https://framework.scaledagile.com/` for SAFe, `https://teamtopologies.com/` for Team Topologies)
+3. **DOI references** — For academic papers, journal articles, and conference proceedings, use the DOI URL format: `https://doi.org/10.xxxx/xxxxx`
+4. **Publisher pages** — For books, use the publisher's catalog page or a stable reference (e.g., IT Revolution Press, O'Reilly, Wiley)
+5. **Standards body pages** — For standards (ISO, NIST, IEEE, TOGAF), link to the official standards page
+
+Only omit `url` when no stable link exists. Never fabricate URLs — if uncertain, omit rather than guess. Internal/intranet URLs are perfectly acceptable; do not omit a URL merely because it is not publicly accessible.
 
 ## Output Format
 
@@ -334,6 +368,11 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 - Key point 2
 - Key point 3
 
+**Concreteness Test:**
+- **Given** [precondition making this concern relevant]
+- **When** [trigger or action that advances the concern]
+- **Then** [observable outcome demonstrating progress]
+
 **Further Reading:**
 - [Citation reference]
 
@@ -341,6 +380,8 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 
 **State 1: Name**
 - Description: ...
+- Prerequisites:
+  - [Prior state or cross-concern dependency]
 - Criteria:
   1. Criterion 1
   2. Criterion 2
@@ -381,12 +422,18 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 ### 4.1 Activity Name
 **Description:** Single sentence
 
+**Triggers:**
+[What decision point, event, or lifecycle moment initiates this activity?]
+
 **How to Perform:**
 [2-5 paragraphs describing techniques, approaches, patterns]
 
 **Outcomes:**
 - Contributes to Concern X → State Y
 - Contributes to Concern Z → State W
+
+**Observable Results:**
+- [What is different after this activity completes, beyond state changes?]
 
 **Work Products Used:**
 - Creates/Updates: Work Product A at Level N
@@ -519,8 +566,15 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 
 ## 10. Citations
 
-[1] Name. Authors. (Date). Source. URL.
-[2] ...
+### [1] [Exact Source Title]
+- **Description**: 1 sentence summary
+- **Authors**: Author 1, Author 2
+- **Date**: YYYY
+- **Source**: Publisher or journal
+- **URL**: https://... (or internal/Google Docs link)
+
+### [2] ...
+...
 ```
 
 ## Quality Standards

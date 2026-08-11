@@ -78,6 +78,55 @@ def count_elements(data, kind):
         for key in arrays:
             counts[key] = len(data.get(key, []))
 
+    # Gherkin-inspired property usage stats
+    gherkin = {
+        "statesWithBackground": 0,
+        "totalStates": 0,
+        "lodsWithBackground": 0,
+        "totalLods": 0,
+        "activitiesWithBackground": 0,
+        "activitiesWithTest": 0,
+        "activitiesWithExamples": 0,
+        "totalActivities": 0,
+        "checklistsWithTest": 0,
+        "checklistsWithExamples": 0,
+        "totalChecklists": 0,
+    }
+
+    gherkin_sources = [data]
+    if kind == "method":
+        gherkin_sources.extend(data.get("practices", []))
+
+    for source in gherkin_sources:
+        for alpha in source.get("alphas", []):
+            for state in alpha.get("states", []):
+                gherkin["totalStates"] += 1
+                if state.get("background"):
+                    gherkin["statesWithBackground"] += 1
+                for cl in state.get("checklist", []):
+                    gherkin["totalChecklists"] += 1
+                    if cl.get("test"):
+                        gherkin["checklistsWithTest"] += 1
+                    if cl.get("examples"):
+                        gherkin["checklistsWithExamples"] += 1
+
+        for wp in source.get("workProducts", []):
+            for lod in wp.get("levelsOfDetail", []):
+                gherkin["totalLods"] += 1
+                if lod.get("background"):
+                    gherkin["lodsWithBackground"] += 1
+
+        for act in source.get("activities", []):
+            gherkin["totalActivities"] += 1
+            if act.get("background"):
+                gherkin["activitiesWithBackground"] += 1
+            if act.get("test"):
+                gherkin["activitiesWithTest"] += 1
+            if act.get("examples"):
+                gherkin["activitiesWithExamples"] += 1
+
+    counts["gherkin"] = gherkin
+
     return counts
 
 
@@ -240,7 +289,7 @@ def check_practice_structure(data, kind):
     return results, issues
 
 
-def check_alpha_relationships(data, kind):
+def check_alpha_relationships(data, kind, baseline_alpha_names=None):
     issues = []
     is_baseline = kind == "practiceBaseline"
     alphas = data.get("alphas", [])
@@ -291,15 +340,165 @@ def check_alpha_relationships(data, kind):
                         "message": f"Non-standard relationship type: {relationship}",
                         "autoFixable": True,
                     })
+
+                if "direction" not in rel:
+                    issues.append({
+                        "severity": "error",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].direction",
+                        "message": f"relatesTo entry missing required 'direction' field (must be 'outgoing', 'incoming', or 'mutual')",
+                        "autoFixable": True,
+                    })
+                elif rel["direction"] not in ("outgoing", "incoming", "mutual"):
+                    issues.append({
+                        "severity": "error",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].direction",
+                        "message": f"Invalid direction value: {rel['direction']} (must be 'outgoing', 'incoming', or 'mutual')",
+                        "autoFixable": False,
+                    })
+
+                if "rationale" in rel:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].rationale",
+                        "message": f"relatesTo entry uses 'rationale' (not a schema field) — should be 'description'",
+                        "autoFixable": True,
+                    })
         else:
             contributes_to = alpha.get("contributesTo")
-            is_redeclaration = alpha.get("_isRedeclaration", False)
-            if not contributes_to and not is_redeclaration:
+            maps_to = alpha.get("mapsTo")
+            is_redeclaration = baseline_alpha_names and alpha_name in baseline_alpha_names
+            if not contributes_to and not maps_to and not is_redeclaration:
                 issues.append({
                     "severity": "warning",
                     "category": "practice-alpha",
                     "path": f"{prefix}.contributesTo",
                     "message": f"New alpha '{alpha_name}' may be missing contributesTo (floating alpha)",
+                    "autoFixable": False,
+                })
+
+            relates_to = alpha.get("relatesTo", [])
+            for rel_idx, rel in enumerate(relates_to):
+                if "direction" not in rel:
+                    issues.append({
+                        "severity": "error",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].direction",
+                        "message": f"relatesTo entry missing required 'direction' field (must be 'outgoing', 'incoming', or 'mutual')",
+                        "autoFixable": True,
+                    })
+                elif rel["direction"] not in ("outgoing", "incoming", "mutual"):
+                    issues.append({
+                        "severity": "error",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].direction",
+                        "message": f"Invalid direction value: {rel['direction']} (must be 'outgoing', 'incoming', or 'mutual')",
+                        "autoFixable": False,
+                    })
+
+                if "rationale" in rel:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "schema",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].rationale",
+                        "message": f"relatesTo entry uses 'rationale' (not a schema field) — should be 'description'",
+                        "autoFixable": True,
+                    })
+
+    return issues
+
+
+def check_mapsto_naming(data, kind, baseline_data=None):
+    """Check that mapsTo variant alpha names don't repeat the parent type name."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    all_alphas = {}
+    for a in data.get("alphas", []):
+        all_alphas[a.get("name", "")] = a
+    if baseline_data:
+        for a in baseline_data.get("alphas", []):
+            all_alphas.setdefault(a.get("name", ""), a)
+
+    for idx, alpha in enumerate(data.get("alphas", [])):
+        maps_to = alpha.get("mapsTo")
+        if not maps_to:
+            continue
+
+        alpha_name = alpha.get("name", "")
+        parent = all_alphas.get(maps_to)
+        if not parent:
+            continue
+
+        parent_name = parent.get("name", maps_to)
+        parent_words = set(parent_name.lower().split())
+
+        if parent_name.lower() in alpha_name.lower():
+            issues.append({
+                "severity": "warning",
+                "category": "mapsto-naming",
+                "path": f"alphas[{idx}].name",
+                "message": f"mapsTo variant '{alpha_name}' contains parent type name '{parent_name}' — "
+                           f"mapsTo reads as 'is a type of', so the type name is redundant",
+                "autoFixable": True,
+            })
+
+        alias_name = None
+        for alias in data.get("practiceElementAliases", data.get("aliases", [])):
+            if alias.get("name") == alpha_name and alias.get("elementType") == "Alpha":
+                alias_name = alias.get("aliasName", "")
+                break
+
+        if alias_name and parent_name.lower() in alias_name.lower():
+            issues.append({
+                "severity": "warning",
+                "category": "mapsto-naming",
+                "path": f"alphas[{idx}].aliasName",
+                "message": f"mapsTo variant alias '{alias_name}' contains parent type name '{parent_name}'",
+                "autoFixable": False,
+            })
+
+    return issues
+
+
+def check_contributes_to_state_validity(data, kind, baseline_data=None):
+    """Check that contributesToState values reference valid states on the parent alpha."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    all_alpha_states = {}
+    for a in data.get("alphas", []):
+        name = a.get("name", "")
+        if name:
+            all_alpha_states[name] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+    if baseline_data:
+        for a in baseline_data.get("alphas", []):
+            name = a.get("name", "")
+            if name and name not in all_alpha_states:
+                all_alpha_states[name] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+
+    for idx, alpha in enumerate(data.get("alphas", [])):
+        parent_ref = alpha.get("contributesTo") or alpha.get("mapsTo")
+        if not parent_ref:
+            continue
+
+        parent_states = all_alpha_states.get(parent_ref, set())
+        if not parent_states:
+            continue
+
+        for s_idx, state in enumerate(alpha.get("states", [])):
+            cts = state.get("contributesToState")
+            if cts and cts not in parent_states:
+                issues.append({
+                    "severity": "error",
+                    "category": "contributes-to-state",
+                    "path": f"alphas[{idx}].states[{s_idx}].contributesToState",
+                    "message": f"contributesToState '{cts}' is not a valid state on parent alpha '{parent_ref}' "
+                               f"(valid: {', '.join(sorted(parent_states))})",
                     "autoFixable": False,
                 })
 
@@ -661,6 +860,367 @@ def check_lod_naming(data, kind):
     return issues
 
 
+def check_description_length(data, kind):
+    """Check that descriptions are single sentences within word limits."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    long_element = 0
+    long_state = 0
+    total_element = 0
+    total_state = 0
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        for etype in ("alphas", "workProducts", "activities", "patterns", "personas"):
+            for elem in source.get(etype, []):
+                desc = elem.get("description", "")
+                if desc:
+                    total_element += 1
+                    words = len(desc.split())
+                    if words > 20:
+                        long_element += 1
+
+                if etype == "alphas":
+                    for state in elem.get("states", []):
+                        sd = state.get("description", "")
+                        if sd:
+                            total_state += 1
+                            if len(sd.split()) > 12:
+                                long_state += 1
+
+                if etype == "workProducts":
+                    for lod in elem.get("levelsOfDetail", []):
+                        ld = lod.get("description", "")
+                        if ld:
+                            total_state += 1
+                            if len(ld.split()) > 12:
+                                long_state += 1
+
+    if long_element > 0:
+        issues.append({
+            "severity": "warning",
+            "category": "description-length",
+            "path": "elements.description",
+            "message": (
+                f"{long_element}/{total_element} element descriptions exceed 20 words"
+            ),
+            "autoFixable": False,
+        })
+
+    if long_state > 0:
+        issues.append({
+            "severity": "warning",
+            "category": "description-length",
+            "path": "states/lods.description",
+            "message": (
+                f"{long_state}/{total_state} state/LOD descriptions exceed 12 words"
+            ),
+            "autoFixable": False,
+        })
+
+    return issues
+
+
+def check_activity_name_distinctness(data, kind, baseline_data=None):
+    """Check that activity names differ from their activitySpaceName."""
+    issues = []
+
+    activityspace_names = set()
+    if baseline_data:
+        for aspace in baseline_data.get("activitySpaces", []):
+            activityspace_names.add(aspace.get("name", "").lower())
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        for aspace in source.get("activitySpaces", []):
+            activityspace_names.add(aspace.get("name", "").lower())
+
+        for idx, act in enumerate(source.get("activities", [])):
+            act_name = act.get("name", "")
+            space_name = act.get("activitySpaceName", "")
+            if act_name and space_name and act_name.lower() == space_name.lower():
+                issues.append({
+                    "severity": "warning",
+                    "category": "activity-name-distinctness",
+                    "path": f"{pfx}activities[{idx}].name",
+                    "message": (
+                        f"Activity '{act_name}' has same name as its "
+                        f"ActivitySpace '{space_name}'"
+                    ),
+                    "autoFixable": False,
+                })
+
+    return issues
+
+
+def check_alpha_state_minimum(data, kind):
+    """Check that each alpha has at least 3 states."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        for idx, alpha in enumerate(source.get("alphas", [])):
+            states = alpha.get("states", [])
+            if len(states) < 3:
+                issues.append({
+                    "severity": "warning",
+                    "category": "alpha-state-minimum",
+                    "path": f"{pfx}alphas[{idx}]",
+                    "message": (
+                        f"Alpha '{alpha.get('name', '?')}' has {len(states)} state(s) "
+                        f"(minimum 3)"
+                    ),
+                    "autoFixable": False,
+                })
+
+    return issues
+
+
+def check_workproduct_lod_minimum(data, kind):
+    """Check that each work product has at least 2 levels of detail."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        for idx, wp in enumerate(source.get("workProducts", [])):
+            lods = wp.get("levelsOfDetail", [])
+            if len(lods) < 2:
+                issues.append({
+                    "severity": "warning",
+                    "category": "workproduct-lod-minimum",
+                    "path": f"{pfx}workProducts[{idx}]",
+                    "message": (
+                        f"WorkProduct '{wp.get('name', '?')}' has {len(lods)} LOD(s) "
+                        f"(minimum 2)"
+                    ),
+                    "autoFixable": False,
+                })
+
+    return issues
+
+
+def check_alpha_state_activity_gap(data, kind, baseline_alpha_names=None):
+    """Check that every alpha state beyond the initial has at least one supporting activity."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        activity_targets = set()
+        for act in source.get("activities", []):
+            for ct in act.get("contributesTo", []):
+                alpha_name = ct.get("alphaName", "")
+                state_name = ct.get("stateName", "")
+                if alpha_name and state_name:
+                    activity_targets.add((alpha_name, state_name))
+
+        for alpha in source.get("alphas", []):
+            a_name = alpha.get("name", "")
+            if baseline_alpha_names and a_name in baseline_alpha_names:
+                continue
+
+            states = alpha.get("states", [])
+            for s_idx, state in enumerate(states):
+                if s_idx == 0:
+                    continue
+                s_name = state.get("name", "")
+                if (a_name, s_name) not in activity_targets:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "activity-state-gap",
+                        "path": f"{pfx}alphas[{a_name}].states[{s_name}]",
+                        "message": (
+                            f"Alpha '{a_name}' state '{s_name}' has no activity "
+                            f"with contributesTo targeting it"
+                        ),
+                        "autoFixable": False,
+                    })
+
+    return issues
+
+
+def check_alias_uniqueness(data, kind):
+    """Check that each baseline element has at most one alias."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        alias_targets = {}
+        aliases = source.get("practiceElementAliases", source.get("aliases", []))
+        for idx, alias in enumerate(aliases):
+            key = (alias.get("elementType", ""), alias.get("name", ""))
+            if key in alias_targets:
+                issues.append({
+                    "severity": "warning",
+                    "category": "alias-uniqueness",
+                    "path": f"{pfx}aliases[{idx}]",
+                    "message": (
+                        f"Duplicate alias for {key[0]} '{key[1]}' "
+                        f"(already aliased as '{alias_targets[key]}')"
+                    ),
+                    "autoFixable": False,
+                })
+            else:
+                alias_targets[key] = alias.get("aliasName", "")
+
+    return issues
+
+
+def check_alias_isolation(data, kind):
+    """Check that alias names don't appear in structural reference fields."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        alias_names = set()
+        aliases = source.get("practiceElementAliases", source.get("aliases", []))
+        for alias in aliases:
+            aname = alias.get("aliasName", "")
+            if aname:
+                alias_names.add(aname)
+
+        if not alias_names:
+            continue
+
+        ref_fields = [
+            ("alphas", "contributesTo"),
+            ("alphas", "mapsTo"),
+            ("workProducts", None),
+            ("activities", "activitySpaceName"),
+        ]
+
+        for coll, field in ref_fields:
+            for elem in source.get(coll, []):
+                if field:
+                    val = elem.get(field, "")
+                    if val in alias_names:
+                        issues.append({
+                            "severity": "warning",
+                            "category": "alias-isolation",
+                            "path": f"{pfx}{coll}[{elem.get('name', '?')}].{field}",
+                            "message": (
+                                f"Alias name '{val}' used in structural reference "
+                                f"field '{field}' — use canonical baseline name instead"
+                            ),
+                            "autoFixable": True,
+                        })
+
+                if coll == "alphas":
+                    for rel in elem.get("relatesTo", []):
+                        target = rel.get("alphaName", "")
+                        if target in alias_names:
+                            issues.append({
+                                "severity": "warning",
+                                "category": "alias-isolation",
+                                "path": f"{pfx}alphas[{elem.get('name', '?')}].relatesTo",
+                                "message": (
+                                    f"Alias name '{target}' used in relatesTo.alphaName "
+                                    f"— use canonical name instead"
+                                ),
+                                "autoFixable": True,
+                            })
+
+                if coll == "activities":
+                    for ct in elem.get("contributesTo", []):
+                        aname = ct.get("alphaName", "")
+                        if aname in alias_names:
+                            issues.append({
+                                "severity": "warning",
+                                "category": "alias-isolation",
+                                "path": f"{pfx}activities[{elem.get('name', '?')}].contributesTo",
+                                "message": (
+                                    f"Alias name '{aname}' used in activity contributesTo "
+                                    f"— use canonical name instead"
+                                ),
+                                "autoFixable": True,
+                            })
+
+    return issues
+
+
+def check_keyword_count(data, kind):
+    """Check that keywords array has 10-20 entries."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        keywords = source.get("keywords", [])
+        count = len(keywords)
+        if count < 10:
+            issues.append({
+                "severity": "warning",
+                "category": "keyword-count",
+                "path": f"{pfx}keywords",
+                "message": f"Only {count} keyword(s) (expected 10-20)",
+                "autoFixable": False,
+            })
+        elif count > 20:
+            issues.append({
+                "severity": "warning",
+                "category": "keyword-count",
+                "path": f"{pfx}keywords",
+                "message": f"{count} keywords exceeds recommended maximum of 20",
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_evidence_coverage(data, kind, baseline_alpha_names=None):
     """Check that alpha states are covered by at least one LOD contributesTo.
 
@@ -733,6 +1293,37 @@ def check_internal_crossrefs(data, kind, baseline_data=None):
             name = nt.get("name", "")
             if name:
                 all_narrative_type_names.add(name)
+        for alpha in baseline_data.get("alphas", []):
+            name = alpha.get("name", "")
+            if name and name not in all_alpha_names:
+                all_alpha_names.add(name)
+                all_alpha_states[name] = {
+                    s.get("name") for s in alpha.get("states", []) if s.get("name")
+                }
+        for wp in baseline_data.get("workProducts", []):
+            name = wp.get("name", "")
+            if name and name not in all_wp_names:
+                all_wp_names.add(name)
+                all_wp_lods[name] = {
+                    lod.get("name") for lod in wp.get("levelsOfDetail", [])
+                    if lod.get("name")
+                }
+        for act in baseline_data.get("activities", []):
+            name = act.get("name", "")
+            if name:
+                all_activity_names.add(name)
+        for persona in baseline_data.get("personas", []):
+            name = persona.get("name", "")
+            if name:
+                all_persona_names.add(name)
+        for pg in baseline_data.get("personaGroups", []):
+            name = pg.get("name", "")
+            if name:
+                all_persona_group_names.add(name)
+        for cit in baseline_data.get("citations", []):
+            name = cit.get("name", "")
+            if name:
+                all_citation_names.add(name)
 
     for source in sources:
         for alpha in source.get("alphas", []):
@@ -1333,6 +1924,330 @@ def check_redeclaration_compliance(data, baseline_data, kind):
     return issues
 
 
+def check_gherkin_coverage(data, kind):
+    """Check Gherkin-inspired property usage and structural correctness."""
+    issues = []
+
+    is_baseline = kind == "practiceBaseline"
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    total_states = 0
+    states_with_bg = 0
+    any_checklist_test = False
+    any_checklist_examples = False
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practices[{source.get('name', '?')}]."
+
+        # --- Alphas: states and checklists ---
+        for ai, alpha in enumerate(source.get("alphas", [])):
+            alpha_name = alpha.get("name", f"<unnamed-{ai}>")
+
+            for si, state in enumerate(alpha.get("states", [])):
+                state_name = state.get("name", f"<unnamed-{si}>")
+                state_path = f"{pfx}alphas[{alpha_name}].states[{state_name}]"
+                total_states += 1
+
+                bg = state.get("background")
+                if bg is not None:
+                    states_with_bg += 1
+                    if not isinstance(bg, dict):
+                        issues.append({
+                            "severity": "error",
+                            "category": "gherkin-structure",
+                            "path": f"{state_path}.background",
+                            "message": (
+                                f"State '{state_name}' background must be an object, "
+                                f"got {type(bg).__name__}"
+                            ),
+                            "autoFixable": True,
+                        })
+
+                # test/examples are NOT valid on State — flag misplacement
+                if state.get("test") is not None:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "gherkin-placement",
+                        "path": f"{state_path}.test",
+                        "message": (
+                            f"State '{state_name}' has 'test' property — "
+                            f"test is only valid on Checklist items and Activity"
+                        ),
+                        "autoFixable": True,
+                    })
+                if state.get("examples") is not None:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "gherkin-placement",
+                        "path": f"{state_path}.examples",
+                        "message": (
+                            f"State '{state_name}' has 'examples' property — "
+                            f"examples is only valid on Checklist items and Activity"
+                        ),
+                        "autoFixable": True,
+                    })
+
+                # --- Checklist items ---
+                for ci, cl in enumerate(state.get("checklist", [])):
+                    cl_name = cl.get("name", f"<unnamed-{ci}>")
+                    cl_path = f"{state_path}.checklist[{cl_name}]"
+
+                    test = cl.get("test")
+                    if test is not None:
+                        any_checklist_test = True
+                        if not isinstance(test, dict):
+                            issues.append({
+                                "severity": "error",
+                                "category": "gherkin-structure",
+                                "path": f"{cl_path}.test",
+                                "message": (
+                                    f"Checklist '{cl_name}' test must be an object, "
+                                    f"got {type(test).__name__}"
+                                ),
+                                "autoFixable": True,
+                            })
+                        elif isinstance(test, dict):
+                            if not test.get("name"):
+                                issues.append({
+                                    "severity": "error",
+                                    "category": "gherkin-structure",
+                                    "path": f"{cl_path}.test.name",
+                                    "message": (
+                                        f"Checklist '{cl_name}' test missing required "
+                                        f"'name' (PracticeElement field)"
+                                    ),
+                                    "autoFixable": False,
+                                })
+                            if not test.get("description"):
+                                issues.append({
+                                    "severity": "error",
+                                    "category": "gherkin-structure",
+                                    "path": f"{cl_path}.test.description",
+                                    "message": (
+                                        f"Checklist '{cl_name}' test missing required "
+                                        f"'description' (PracticeElement field)"
+                                    ),
+                                    "autoFixable": False,
+                                })
+
+                    examples = cl.get("examples")
+                    if examples is not None:
+                        any_checklist_examples = True
+                        if not isinstance(examples, list):
+                            issues.append({
+                                "severity": "error",
+                                "category": "gherkin-structure",
+                                "path": f"{cl_path}.examples",
+                                "message": (
+                                    f"Checklist '{cl_name}' examples must be an array, "
+                                    f"got {type(examples).__name__}"
+                                ),
+                                "autoFixable": True,
+                            })
+                        else:
+                            for exi, ex in enumerate(examples):
+                                if not isinstance(ex, dict):
+                                    continue
+                                if not ex.get("name"):
+                                    issues.append({
+                                        "severity": "error",
+                                        "category": "gherkin-structure",
+                                        "path": f"{cl_path}.examples[{exi}].name",
+                                        "message": (
+                                            f"Checklist '{cl_name}' examples[{exi}] "
+                                            f"missing required 'name'"
+                                        ),
+                                        "autoFixable": False,
+                                    })
+                                if not ex.get("description"):
+                                    issues.append({
+                                        "severity": "error",
+                                        "category": "gherkin-structure",
+                                        "path": f"{cl_path}.examples[{exi}].description",
+                                        "message": (
+                                            f"Checklist '{cl_name}' examples[{exi}] "
+                                            f"missing required 'description'"
+                                        ),
+                                        "autoFixable": False,
+                                    })
+
+        # --- WorkProducts: LODs ---
+        for wi, wp in enumerate(source.get("workProducts", [])):
+            wp_name = wp.get("name", f"<unnamed-{wi}>")
+
+            for li, lod in enumerate(wp.get("levelsOfDetail", [])):
+                lod_name = lod.get("name", f"<unnamed-{li}>")
+                lod_path = f"{pfx}workProducts[{wp_name}].levelsOfDetail[{lod_name}]"
+
+                bg = lod.get("background")
+                if bg is not None:
+                    if not isinstance(bg, dict):
+                        issues.append({
+                            "severity": "error",
+                            "category": "gherkin-structure",
+                            "path": f"{lod_path}.background",
+                            "message": (
+                                f"LOD '{lod_name}' background must be an object, "
+                                f"got {type(bg).__name__}"
+                            ),
+                            "autoFixable": True,
+                        })
+
+                # test/examples are NOT valid on LevelOfDetail — flag misplacement
+                if lod.get("test") is not None:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "gherkin-placement",
+                        "path": f"{lod_path}.test",
+                        "message": (
+                            f"LOD '{lod_name}' has 'test' property — "
+                            f"test is only valid on Checklist items and Activity"
+                        ),
+                        "autoFixable": True,
+                    })
+                if lod.get("examples") is not None:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "gherkin-placement",
+                        "path": f"{lod_path}.examples",
+                        "message": (
+                            f"LOD '{lod_name}' has 'examples' property — "
+                            f"examples is only valid on Checklist items and Activity"
+                        ),
+                        "autoFixable": True,
+                    })
+
+        # --- Activities ---
+        for ai, act in enumerate(source.get("activities", [])):
+            act_name = act.get("name", f"<unnamed-{ai}>")
+            act_path = f"{pfx}activities[{act_name}]"
+
+            bg = act.get("background")
+            if bg is not None:
+                if not isinstance(bg, dict):
+                    issues.append({
+                        "severity": "error",
+                        "category": "gherkin-structure",
+                        "path": f"{act_path}.background",
+                        "message": (
+                            f"Activity '{act_name}' background must be an object, "
+                            f"got {type(bg).__name__}"
+                        ),
+                        "autoFixable": True,
+                    })
+
+            test = act.get("test")
+            if test is not None:
+                if not isinstance(test, dict):
+                    issues.append({
+                        "severity": "error",
+                        "category": "gherkin-structure",
+                        "path": f"{act_path}.test",
+                        "message": (
+                            f"Activity '{act_name}' test must be an object, "
+                            f"got {type(test).__name__}"
+                        ),
+                        "autoFixable": True,
+                    })
+                elif isinstance(test, dict):
+                    if not test.get("name"):
+                        issues.append({
+                            "severity": "error",
+                            "category": "gherkin-structure",
+                            "path": f"{act_path}.test.name",
+                            "message": (
+                                f"Activity '{act_name}' test missing required "
+                                f"'name' (PracticeElement field)"
+                            ),
+                            "autoFixable": False,
+                        })
+                    if not test.get("description"):
+                        issues.append({
+                            "severity": "error",
+                            "category": "gherkin-structure",
+                            "path": f"{act_path}.test.description",
+                            "message": (
+                                f"Activity '{act_name}' test missing required "
+                                f"'description' (PracticeElement field)"
+                            ),
+                            "autoFixable": False,
+                        })
+
+            examples = act.get("examples")
+            if examples is not None:
+                if not isinstance(examples, list):
+                    issues.append({
+                        "severity": "error",
+                        "category": "gherkin-structure",
+                        "path": f"{act_path}.examples",
+                        "message": (
+                            f"Activity '{act_name}' examples must be an array, "
+                            f"got {type(examples).__name__}"
+                        ),
+                        "autoFixable": True,
+                    })
+                else:
+                    for exi, ex in enumerate(examples):
+                        if not isinstance(ex, dict):
+                            continue
+                        if not ex.get("name"):
+                            issues.append({
+                                "severity": "error",
+                                "category": "gherkin-structure",
+                                "path": f"{act_path}.examples[{exi}].name",
+                                "message": (
+                                    f"Activity '{act_name}' examples[{exi}] "
+                                    f"missing required 'name'"
+                                ),
+                                "autoFixable": False,
+                            })
+                        if not ex.get("description"):
+                            issues.append({
+                                "severity": "error",
+                                "category": "gherkin-structure",
+                                "path": f"{act_path}.examples[{exi}].description",
+                                "message": (
+                                    f"Activity '{act_name}' examples[{exi}] "
+                                    f"missing required 'description'"
+                                ),
+                                "autoFixable": False,
+                            })
+
+    # Baseline overuse check
+    if is_baseline:
+        if total_states > 0 and states_with_bg / total_states > 0.5:
+            issues.append({
+                "severity": "warning",
+                "category": "gherkin-baseline-overuse",
+                "path": "alphas[*].states[*].background",
+                "message": (
+                    f"{states_with_bg}/{total_states} states have background "
+                    f"(>50%) — baselines should keep Gherkin usage minimal "
+                    f"— practice layer adds detail"
+                ),
+                "autoFixable": False,
+            })
+        if any_checklist_test or any_checklist_examples:
+            issues.append({
+                "severity": "warning",
+                "category": "gherkin-baseline-overuse",
+                "path": "alphas[*].states[*].checklist[*]",
+                "message": (
+                    "Baseline checklists have test/examples properties "
+                    "— baselines should keep Gherkin usage minimal "
+                    "— practice layer adds detail"
+                ),
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_asset_coverage(data):
     issues = []
     assets = data.get("assets", [])
@@ -1566,6 +2481,45 @@ def check_pattern_alpha_coverage(data, kind):
                     "autoFixable": False,
                 })
 
+            # Per-view completeness: every alpha should appear in every view
+            for view in pat.get("patternViews", []):
+                view_seq = view.get("seq", "?")
+                view_name = view.get("name", "?")
+                view_alphas = {
+                    astate.get("alphaName", "")
+                    for astate in view.get("alphaStates", [])
+                }
+                view_missing = alpha_names - view_alphas
+                if view_missing:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "pattern-view-completeness",
+                        "path": f"{pfx}patterns[{pat_name}].patternViews[{view_seq}]",
+                        "message": (
+                            f"Pattern '{pat_name}' view {view_seq} '{view_name}' "
+                            f"missing alphas: {sorted(view_missing)}"
+                        ),
+                        "autoFixable": False,
+                    })
+
+                # Max 2 states per alpha per view
+                alpha_state_counts = {}
+                for astate in view.get("alphaStates", []):
+                    aname = astate.get("alphaName", "")
+                    alpha_state_counts[aname] = alpha_state_counts.get(aname, 0) + 1
+                for alpha, count in sorted(alpha_state_counts.items()):
+                    if count > 2:
+                        issues.append({
+                            "severity": "warning",
+                            "category": "pattern-view-state-density",
+                            "path": f"{pfx}patterns[{pat_name}].patternViews[{view_seq}]",
+                            "message": (
+                                f"Pattern '{pat_name}' view {view_seq}: "
+                                f"alpha '{alpha}' has {count} states (max 2)"
+                            ),
+                            "autoFixable": False,
+                        })
+
     return issues
 
 
@@ -1754,7 +2708,7 @@ def main():
     )
     parser.add_argument(
         "--parent", action="append", default=[],
-        help="Parent/dependency practice JSON(s) whose alphas and narrativeTypes are merged into the baseline for validation (repeatable)"
+        help="Parent/dependency practice JSON(s) whose elements (alphas, work products, personas, activities, etc.) are merged into the baseline for cross-reference validation (repeatable)"
     )
     parser.add_argument(
         "--online", action="store_true",
@@ -1799,7 +2753,6 @@ def main():
         structure, struct_issues = check_practice_structure(data, kind)
     all_issues.extend(struct_issues)
 
-    all_issues.extend(check_alpha_relationships(data, kind))
     all_issues.extend(check_narrative_structure(data))
     all_issues.extend(check_citation_structure(data))
     all_issues.extend(check_narrative_citations(data))
@@ -1807,11 +2760,17 @@ def main():
     all_issues.extend(check_narrative_self_reference(data))
     all_issues.extend(check_checklist_quality(data, kind))
     all_issues.extend(check_lod_naming(data, kind))
+    all_issues.extend(check_description_length(data, kind))
+    all_issues.extend(check_alpha_state_minimum(data, kind))
+    all_issues.extend(check_workproduct_lod_minimum(data, kind))
+    all_issues.extend(check_alias_uniqueness(data, kind))
+    all_issues.extend(check_keyword_count(data, kind))
     all_issues.extend(check_narrative_name_uniqueness(data, kind))
     all_issues.extend(check_pattern_alpha_coverage(data, kind))
     all_issues.extend(check_narrative_context_length(data, kind))
     all_issues.extend(check_narrative_context_self_containment(data, kind))
     all_issues.extend(check_asset_coverage(data))
+    all_issues.extend(check_gherkin_coverage(data, kind))
 
     if args.online:
         all_issues.extend(check_asset_urls(data.get("assets", [])))
@@ -1834,9 +2793,15 @@ def main():
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}
         bl_comp_names = {c["name"] for c in baseline_data.get("competencies", []) if c.get("name")}
         bl_asp_names = {s["name"] for s in baseline_data.get("activitySpaces", []) if s.get("name")}
+        bl_wp_names = {w["name"] for w in baseline_data.get("workProducts", []) if w.get("name")}
+        bl_persona_names = {p["name"] for p in baseline_data.get("personas", []) if p.get("name")}
+        bl_pg_names = {pg["name"] for pg in baseline_data.get("personaGroups", []) if pg.get("name")}
+        bl_act_names = {a["name"] for a in baseline_data.get("activities", []) if a.get("name")}
+        bl_cit_names = {c["name"] for c in baseline_data.get("citations", []) if c.get("name")}
 
         def _merge_elements(source):
             nonlocal bl_alpha_set, bl_nt_set, bl_comp_names, bl_asp_names
+            nonlocal bl_wp_names, bl_persona_names, bl_pg_names, bl_act_names, bl_cit_names
             for alpha in source.get("alphas", []):
                 if alpha.get("name") and alpha["name"] not in bl_alpha_set:
                     baseline_data.setdefault("alphas", []).append(alpha)
@@ -1853,6 +2818,26 @@ def main():
                 if asp.get("name") and asp["name"] not in bl_asp_names:
                     baseline_data.setdefault("activitySpaces", []).append(asp)
                     bl_asp_names.add(asp["name"])
+            for wp in source.get("workProducts", []):
+                if wp.get("name") and wp["name"] not in bl_wp_names:
+                    baseline_data.setdefault("workProducts", []).append(wp)
+                    bl_wp_names.add(wp["name"])
+            for persona in source.get("personas", []):
+                if persona.get("name") and persona["name"] not in bl_persona_names:
+                    baseline_data.setdefault("personas", []).append(persona)
+                    bl_persona_names.add(persona["name"])
+            for pg in source.get("personaGroups", []):
+                if pg.get("name") and pg["name"] not in bl_pg_names:
+                    baseline_data.setdefault("personaGroups", []).append(pg)
+                    bl_pg_names.add(pg["name"])
+            for act in source.get("activities", []):
+                if act.get("name") and act["name"] not in bl_act_names:
+                    baseline_data.setdefault("activities", []).append(act)
+                    bl_act_names.add(act["name"])
+            for cit in source.get("citations", []):
+                if cit.get("name") and cit["name"] not in bl_cit_names:
+                    baseline_data.setdefault("citations", []).append(cit)
+                    bl_cit_names.add(cit["name"])
 
         for parent_path in args.parent:
             parent_data, perr = load_json_pair(Path(parent_path))
@@ -1870,14 +2855,23 @@ def main():
                 for practice in parent_data.get("practices", []):
                     _merge_elements(practice)
 
+    merged_bl_alpha_names = None
+    if baseline_data:
+        merged_bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
+    all_issues.extend(check_alpha_relationships(data, kind, baseline_alpha_names=merged_bl_alpha_names))
+    all_issues.extend(check_mapsto_naming(data, kind, baseline_data))
+    all_issues.extend(check_contributes_to_state_validity(data, kind, baseline_data))
+    all_issues.extend(check_activity_name_distinctness(data, kind, baseline_data))
+    all_issues.extend(check_alias_isolation(data, kind))
+
     all_issues.extend(check_internal_crossrefs(data, kind, baseline_data))
 
     if baseline_data and kind != "practiceBaseline":
         all_issues.extend(check_competency_levels(data, baseline_data, kind))
         all_issues.extend(check_baseline_references(data, baseline_data, kind))
         all_issues.extend(check_redeclaration_compliance(data, baseline_data, kind))
-        bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
-        all_issues.extend(check_evidence_coverage(data, kind, baseline_alpha_names=bl_alpha_names))
+        all_issues.extend(check_evidence_coverage(data, kind, baseline_alpha_names=merged_bl_alpha_names))
+        all_issues.extend(check_alpha_state_activity_gap(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     elif kind != "practiceBaseline":
         all_issues.extend(check_evidence_coverage(data, kind))
 
