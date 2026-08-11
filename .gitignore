@@ -5,6 +5,7 @@
 # Uncomment the following lines if you don't want to track generated practice files:
 practices/*
 baselines/*
+bundles/*
 reviews/*
 practice-resources/*
 archive
@@ -16,4 +17,5 @@ archive
 # Keep the practices directory structure
 !practices/.gitkeep
 !baselines/.gitkeep
+!bundles/.gitkeep
 !practice-resources/.gitkeep
