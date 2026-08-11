@@ -56,16 +56,9 @@ Baseline alphas are intentionally broad to support reuse across multiple extensi
 This skill orchestrates a 4-phase pipeline:
 
 1. **Phase 1: Analysis** - Extract comprehensive methodology structure (~30-50K words)
-2. **Phase 1.5: Distillation** - Identify essential elements and Focus areas (~15-25K words) **[NEW]**
+2. **Phase 1.5: Distillation** - Identify essential elements and Focus areas (~15-25K words) ****
 3. **Phase 2: Baseline Mapping** - Map distilled essentials to baseline structures (~40-60K words)
 4. **Phase 3: Baseline JSON** - Generate schema-compliant baseline practice JSON
-
-**Output Location:** All files for a baseline are in `baselines/<baseline-name>/`:
-- `01-analysis-report.md` - Phase 1 output
-- `01.5-distilled-essentials.md` - Phase 1.5 output **(critical new phase)**
-- `02-mapping-guide.md` - Phase 2 output
-- `<baseline-name>.json` - Phase 3 output (intermediate)
-- `bundles/<baseline-name>.keleo` - Final packaged output
 
 ## Critical Process Requirements
 
@@ -463,73 +456,7 @@ Never use `_effective-context.json` as a document — it is a build artifact, no
 | Phase 3 | ~50K | ~10K | ~60K |
 | **Total** | **~200K** | **~120K** | **~320K** |
 
-**Phase Compaction Pattern:**
-
-After each phase completes:
-1. **Clear conversation history** (compact context)
-2. **Retain only essential artifacts**:
-   - Current phase output file
-   - Next phase prompt
-   - Reference documents
-3. **Restart next phase** with fresh context
-
-**Instructions for Phase Transitions:**
-
-After Phase 1:
-```
-Phase 1 complete. Output: baselines/<name>/01-analysis-report.md
-
-Starting Phase 1.5 Distillation. Reading:
-- Phase 1 analysis
-- Domain framework
-- Distillation prompt
-```
-
-After Phase 1.5:
-```
-Phase 1.5 complete. Output: baselines/<name>/01.5-distilled-essentials.md
-
-Starting Phase 2 Mapping. Reading:
-- Phase 1.5 distilled essentials (PRIMARY)
-- Phase 1 analysis (supporting)
-- Semantics
-- Mapping prompt
-```
-
-After Phase 2:
-```
-Phase 2 complete. Output: baselines/<name>/02-mapping-guide.md
-
-Starting Phase 3 JSON Generation. Reading:
-- Phase 2 mapping guide
-- Schema
-- JSON prompt
-```
-
-## Baseline vs Extension Practice Decision
-
-**Use this skill (create-baseline-method) when:**
-- ✓ Creating a **foundational framework** for a domain
-- ✓ Defining **root-level alphas** (no parent baseline to extend)
-- ✓ Establishing **focuses, competencies, narrative types** for a domain
-- ✓ Source methodology defines **universal ontology**
-
-**Use /generate-method when:**
-- ✓ Creating a **practice that extends** an existing baseline
-- ✓ Defining **specialized alphas** with `contributesTo` or **variant alphas** with `mapsTo`
-- ✓ Adding **activities, work products, patterns** (not in baselines)
-- ✓ Source methodology is an **implementation** of a framework
-
-**Examples:**
-
-| Source | Use |
-|--------|-----|
-| Platform Adoption Essentials | create-baseline-method (foundational framework) |
-| AWS Well-Architected (specific practices) | /generate-method (extends Platform Adoption baseline) |
-| Partner Ecosystem Essentials | create-baseline-method (foundational framework) |
-| Specific Partner Demand Gen practice | /generate-method (extends Partner Ecosystem baseline) |
-| Team Topologies | create-baseline-method (foundational framework) |
-| Specific SDLC practice | /generate-method (extends appropriate baseline) |
+**Phase Compaction:** After each phase, compact context by clearing history and retaining only the current output, next prompt, and reference documents. For multi-practice methods, use the Agent tool for parallel execution.
 
 ## Feature: Baseline Structural Integrity
 
@@ -690,93 +617,8 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 
 **Success criteria:** `error_pass_rate: 1.0` on full validation. All 5 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
 
-## Deliverables
-
-**Final Output Structure:**
-
-```
-baselines/<baseline-name>/
-├── 01-analysis-report.md        # ~30-50K words
-├── 01.5-distilled-essentials.md # ~15-25K words
-├── 02-mapping-guide.md          # ~40-60K words
-├── <baseline-name>.json         # Schema-compliant baseline JSON (intermediate)
-# .keleo package output: bundles/<baseline-name>.keleo
-```
-
-**Validation:**
-
-```bash
-# Validate baseline JSON (standalone, no parents)
-python3 utils/validate-baseline-json.py \
-  baselines/<baseline-name>/<baseline-name>.json \
-  deps/language.schema.json
-
-# Validate baseline JSON (extending parent baselines)
-python3 utils/validate-baseline-json.py \
-  baselines/<baseline-name>/<baseline-name>.json \
-  baselines/<baseline-name>/_effective-context.json \
-  deps/language.schema.json
-
-# Expected output: {"valid": true, "errors": [], "warnings": []}
-```
-
-**Usage:**
-
-Generated baseline can be referenced by extension practices:
-
-```bash
-# Create practice extending this baseline
-/generate-method --baseline baselines/<baseline-name>/<baseline-name>.json <source-files>
-```
-
 ## Skill Invocation
-
-**Usage:**
 
 ```bash
 /create-baseline-method <source-files-or-urls>
 ```
-
-**Examples:**
-
-```bash
-# From local files
-/create-baseline-method docs/partner-ecosystem-framework.pdf
-
-# From URLs
-/create-baseline-method https://teamtopologies.com/key-concepts
-
-# From directory
-/create-baseline-method methodologies/platform-adoption/
-
-# With optional parent baseline
-/create-baseline-method --parent deps/platform-adoption-kernel.json docs/specialized-framework.md
-```
-
-## Notes
-
-- **Phase 1.5 is the critical new innovation** - it bridges the gap between comprehensive extraction (Phase 1) and focused baseline creation (Phase 2/3)
-- **Focus identification in Phase 1.5** allows baselines to define custom groupings beyond default Value/Solution/Endeavor
-- **Distillation in Phase 1.5** ensures baselines contain only universal, foundational elements suitable for broad reuse
-- Generated baselines become the **foundation for extension practices** created with `/generate-method`
-
----
-
-## Post-Completion Review (MANDATORY)
-
-**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
-
-1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
-   - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list
-   - Inline `python3 -c` or `bash -c` scripts that should have been reusable utils
-   - Shell patterns (heredocs, loops, process substitution) that triggered prompts
-   - External tool calls (e.g., `unzip`, `zip`, `curl`) that could be absorbed into existing utils
-
-2. **Identify missing utils**: Did you have to write any ad-hoc logic that could be generalised into a reusable utility script in `utils/`?
-
-3. **Propose fixes** (present to user, don't apply unilaterally):
-   - **Permission gaps**: Suggest adding auto-allow entries to `.claude/settings.json`
-   - **Missing utils**: Propose new utility scripts or extensions to existing ones
-   - **Skill improvements**: Suggest skill instruction updates to prevent the ad-hoc pattern in future runs
-
-4. **Report**: Briefly tell the user what you found and what you'd recommend changing. If nothing was found, say so — a clean session is a good signal.

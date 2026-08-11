@@ -19,14 +19,6 @@ This skill transforms enterprise methodology documentation into schema-compliant
 **Phase 2: Mapping** → Map to baseline practice using semantic guidance  
 **Phase 3: JSON** → Generate schema-compliant JSON with programmatic validation
 
-**Key Differences from v1:**
-
-- ✓ Simpler 3-phase structure (vs 8-phase pipeline)
-- ✓ Reference-driven (reads semantics.md, not embedded rules)
-- ✓ User-provided baseline (not hardcoded)
-- ✓ Single validation script (not 4+ separate utilities)
-- ✓ Cleaner output (3 files vs 8+ modules)
-
 ---
 
 ## Critical Process: ALWAYS Use EnterPlanMode
@@ -271,60 +263,6 @@ Each phase is designed to be **stateless** and **file-driven**:
 
 No conversational context is required - only file contents.
 
-### Example Flow: Single Practice
-
-```text
-[Planning complete]
-→ Compact conversation
-→ Phase 1: Read prompts/phase-1-analysis.md, generate 01-analysis-report.md
-[Phase 1 complete]
-→ Compact conversation  
-→ Phase 2: Read prompts/phase-2-mapping.md + 01-analysis-report.md, generate 02-mapping-guide.md
-[Phase 2 complete]
-→ Compact conversation
-→ Phase 3: Read prompts/phase-3-json.md + 02-mapping-guide.md, generate JSON
-[Phase 3 complete]
-```
-
-### Example Flow: Multi-Practice Method (4 practices) - Multi-Agent Approach
-
-```text
-[Planning complete]
-→ Phase 1: Generate 01-analysis-report.md (covers all 4 practices)
-[Phase 1 complete]
-
-→ Phase 2: Launch 4 parallel agents in single message
-  - Agent 1: Generate Practice 1 mapping (alphas + work products + activities)
-  - Agent 2: Generate Practice 2 mapping (alphas + work products + activities)
-  - Agent 3: Generate Practice 3 mapping (alphas + work products + activities)
-  - Agent 4: Generate Practice 4 mapping (alphas + work products + activities)
-  [All agents run concurrently]
-→ Combine practice mappings into 02-mapping-guide.md
-[Phase 2 complete]
-
-→ Phase 3A: Launch 4 parallel agents in single message
-  - Agent 1: Generate practice-1.json
-  - Agent 2: Generate practice-2.json
-  - Agent 3: Generate practice-3.json
-  - Agent 4: Generate practice-4.json
-  [All agents run concurrently]
-→ Phase 3B: Assemble method JSON
-  - Combine 4 practice JSONs into method structure
-  - Merge citations
-  - Write method-name.json
-→ Phase 3C: Validate and fix
-  - Run validation script
-  - Fix errors until 0 errors
-[Phase 3 complete]
-```
-
-**Benefits of Multi-Agent Approach:**
-- ✅ **No token budget issues** (each agent has independent budget)
-- ✅ **No quality degeneration** (Practice 4 gets same quality as Practice 1)
-- ✅ **4x faster** (concurrent execution vs sequential)
-- ✅ **Simpler prompts** (each agent focuses on one practice)
-- ✅ **No manual compaction needed** (agents handle it automatically)
-
 ---
 
 ### Step 1: Phase 1 - Analysis
@@ -531,14 +469,6 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
        practices/<method-name>/02-mapping-guide-practice-N.md
      ```
    - Validate completeness: every practice has alphas + work products + activities
-
-**Critical: Multi-Agent Benefits**
-- ✅ No token budget sharing between agents
-- ✅ Concurrent execution (4 practices finish in time of 1)
-- ✅ No quality degeneration (Practice 4 gets same quality as Practice 1)
-- ✅ Each agent focuses on single practice (cleaner, more focused)
-   - Complete mapping specification
-   - Validation checklist satisfied
 
 **CRITICAL: Terminology Aliasing for Domain Alignment**
 
@@ -749,86 +679,6 @@ Instances: Platform Engineering Team Alpha, Payments Team (specific named teams)
 - "Platform Engineering Team Alpha", "Payments Team" → **Instances** (specific teams) ✓
 - "Cognitive Load", "Team Interaction Mode" → **Specializations** (organizational concepts) ✓
 - "stream-aligned", "enabling team", "cognitive load" → **Keywords** ✓
-
-**Complete Example - Multi-Domain Pattern:**
-```markdown
-## Example 1: Ansible Automation Practice
-
-### Keywords (search/discovery)
-["AAP", "ansible automation platform", "ansible", "automation", "controller", 
- "EE", "execution environment", "playbook", "inventory", "mesh", "hub", 
- "event-driven", "rulebook", "RBAC"]
-
-### Alphas (specializations = facets/components)
-- **Execution Environment** (specialization of Platform)
-  - contributesTo: Platform
-  - States: Default Available → Custom Built → Governed → Optimized
-
-### Alpha Instances (deployments)
-- Production Automation Platform (instance of Platform)
-- Staging Automation Platform (instance of Platform)
-
-### Terminology Aliases (3-5 canonical terms)
-- Platform → "Automation Platform" (canonical Ansible term for platform)
-- Deployment Documentation → "Playbook"
-- Deploy System → "Run Playbook"
-- Platform Engineer → "Automation Architect"
-
----
-
-## Example 2: OpenShift Platform Practice
-
-### Keywords (search/discovery)
-["OCP", "openshift", "kubernetes", "k8s", "container platform", "pods", 
- "operators", "routes", "deployment", "imagestream"]
-
-### Alphas (specializations)
-- **Application Scalability** (specialization of Software System)
-  - contributesTo: Software System
-  - States: Manual Scaling → HPA Configured → Custom Metrics → Predictive
-
-### Alpha Instances (deployments)
-- Production OCP Cluster (instance of Platform)
-- Non-Prod OCP Cluster (instance of Platform)
-
-### Terminology Aliases (3-5 canonical terms)
-- Deployment Documentation → "Deployment Config"
-- Infrastructure Definition → "Operator Manifest"
-- Deploy System → "oc apply"
-
----
-
-## Example 3: Team Topologies Practice
-
-### Keywords (search/discovery)
-["stream-aligned", "enabling team", "platform team", "complicated subsystem",
- "cognitive load", "team interaction", "conway's law", "inverse conway",
- "team types", "interaction modes"]
-
-### Alphas (specializations = organizational concepts)
-- **Team Topology Design** (specialization of Team)
-  - contributesTo: Team
-  - States: Static Structure → Four Types Defined → Explicit Modes → Sensing & Evolving
-
-- **Cognitive Load** (new alpha)
-  - contributesTo: Team
-  - States: Unmanaged → Load Awareness → Domain Boundaries → Active Reduction
-
-### Alpha Instances (team types as instances of Team)
-- Stream-Aligned Team (instance of Team - team type)
-- Platform Team (instance of Team - team type)
-- Enabling Team (instance of Team - team type)
-- Complicated Subsystem Team (instance of Team - team type)
-
-### Alpha Instances (specific named teams)
-- Platform Engineering Team Alpha (instance of Team - specific team)
-- Payments Stream Team (instance of Team - specific team)
-- Data Platform Team (instance of Team - specific team)
-
-### Terminology Aliases (3-5 canonical terms)
-- Activity → "Team Interaction Design"
-- Way Of Working → "Team Working Agreement"
-```
 
 **Quality Target:** 3-8 aliases per practice (focused on genuinely different canonical terms)
 
@@ -1122,8 +972,6 @@ Validates that the three-phase pipeline is executed in order with proper gates.
 **Narrative Citation Rules**
 
 - Citations provide provenance for the claims and frameworks referenced in the narrative
-
-From `prompts/phase-2-mapping.md` (lines 87-89, 525-530):
 
 1. **Practice/Method Narratives** - REQUIRED structured format:
    ```
@@ -1642,13 +1490,6 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --errors-only [--parent <dep>.json ...]
    ```
 
-**Critical: Multi-Agent Benefits for Phase 3**
-- ✅ Each practice generated independently (no shared token budget)
-- ✅ Concurrent execution (4x faster)
-- ✅ Simpler prompts (each agent focuses on one practice)
-- ✅ Easier debugging (one practice per file initially)
-- ✅ Clean packaging step bundles everything into .keleo
-
 **Critical JSON Rules:**
 
 From `deps/language.schema.json`:
@@ -1867,68 +1708,6 @@ The skill does NOT assume a specific baseline practice. Instead:
 - Validation script validates against provided baseline
 - Works with any baseline following Practice Language schema
 
-**Baseline Dependency Resolution (Step 0.5):**
-
-### Unified Context Resolution
-
-The skill uses `utils/resolve-context.py` to produce a single `_effective-context.json` from all context sources:
-
-- Accepts any mix of baselines (`.json`), practices (`.json`), methods (`.json`), and `.keleo` bundles
-- Classifies inputs into three tiers: baselines, practices, methods
-- Resolves transitive baseline dependencies automatically (`--transitive`)
-- Merges in hierarchy order: baselines (topo-sorted root-first) → practices → methods
-- Stamps `_contributingPracticeName` on every element (provenance tracking)
-- Builds `_provenance` manifest with merge order, tier membership, element-to-source mapping
-- Applies unified `_aliasContext` and `_domainAlias` annotations
-
-**Provenance-based mapping:**
-
-The mapping agent uses `_contributingPracticeName` + `_provenance.tiers` to make decisions:
-- Elements from baselines → ontology context, redeclaration targets
-- Elements from practices → primary `contributesTo`/`mapsTo` targets, create `practiceDependencyNames`
-- Elements from methods → coordination-level concepts
-
-**Alpha hierarchy example:**
-
-```
-Baseline Alpha (e.g., "Platform")         ← _contributingPracticeName: "Platform Adoption Essentials"
-  └── Parent Practice Alpha (e.g., "Platform Infrastructure")  ← _contributingPracticeName: "Platform Operations"
-       └── New Practice Alpha (e.g., "AI Inference Platform")
-           contributesTo: "Platform Infrastructure"
-           practiceDependencyNames: ["Platform Operations"]   ← because "Platform Infrastructure" is practice-sourced
-```
-
-**Validation:** Always uses the **original leaf baseline file** (canonical name checking), not the effective context.
-
-**Canonical names:** All structural references use canonical names. If the parent practice has `practiceElementAliases`, they are surfaced as `_aliasContext` annotations for semantic understanding — they do NOT appear in generated JSON output.
-
-**Worked example:**
-
-```
-Input: practices/red-hat-openshift-foundations/red-hat-openshift-foundations.json (method)
-  → inputKind: "method"
-  → baselinePracticeName: "Platform Adoption Essentials"
-  → parentPracticeNames: ["Platform Operations", "Security & Compliance", ...]
-
-Output practice:
-  {
-    "kind": "practice",
-    "name": "OpenShift AI Inference",
-    "baselinePracticeName": "Platform Adoption Essentials",  // inherited
-    "practiceDependencyNames": ["Observability"],  // ONLY practices with referenced unique alphas
-    "alphas": [
-      {
-        "name": "Inference Endpoint",
-        "contributesTo": "Platform"  // baseline alpha — does NOT create a dependency
-      },
-      {
-        "name": "Inference Monitoring",
-        "contributesTo": "Observability Stack"  // unique to Observability practice — DOES create dependency
-      }
-    ]
-  }
-```
-
 ### Determining practiceDependencyNames (Parent Practice Mode)
 
 **Rule:** A practice should only declare a dependency on a parent practice if it actually references an alpha that is **uniquely defined** in that parent practice — i.e., an alpha that exists in the parent but NOT in the effective baseline. Baseline alphas that are merely **redeclared** by a parent practice do NOT create a dependency.
@@ -1962,47 +1741,6 @@ python3 utils/resolve-practice-dependencies.py \
 - Practice alpha "AI Model" has `contributesTo: "Platform Asset"` → "Platform Asset" is a baseline alpha → no dependency
 - Practice alpha "Inference Monitoring" has `contributesTo: "Observability Stack"` → "Observability Stack" is NOT in baseline, defined in parent's "Observability" practice → dependency on "Observability"
 - Result: `practiceDependencyNames: ["Observability"]`
-
-### Clean Three-Phase Structure
-
-Unlike the complex v1 pipeline (Phase 1 → 1.5 → 2 → 2.5 → 2.6 → 2.7 → 2.8), this uses:
-
-**Phase 1: Analysis** (one step)
-- Organize methodology into structured analysis
-- Output: Single markdown file
-
-**Phase 2: Mapping** (one step)
-- Map analysis to baseline using semantics
-- Output: Single markdown file
-
-**Phase 3: JSON** (one step with iterative validation)
-- Generate JSON, validate, fix, repeat until clean
-- Output: Schema-compliant JSON
-
-**Benefits:**
-- Easier to understand and explain
-- Clear phase boundaries
-- Simpler resumption if interrupted
-
-### Programmatic Validation
-
-Single validation script replaces multiple utilities:
-
-**Old approach (v1):**
-- fix-property-names.py
-- validate-baseline-references.py
-- validate-internal-integrity.py
-- Manual review and iteration
-
-**New approach (v2):**
-- validate-practice-json.py (all-in-one)
-- Skill interprets results and applies fixes
-- Automated iteration until clean
-
-**Benefits:**
-- Single command validates everything
-- Structured JSON output for skill consumption
-- Clear error categorization and suggestions
 
 ---
 
@@ -2174,33 +1912,14 @@ Single validation script replaces multiple utilities:
 - ❌ Using `requiredCompetencies` on personas (should be `competencies`)
 - ❌ Missing BOTH `requiredCompetencies` AND `recommendedCompetencyLevels` on activities
 - ❌ **Missing `activitySpaceName` property on activities** (required for flat Practice.activities)
-- ❌ **Missing `kind` property** (required discriminator for type discrimination)
-  - **Fix:** Add `"kind": "practice"` at root level for practice JSON
-  - **Fix:** Add `"kind": "method"` at root level for method JSON
-  - **Fix:** Ensure each practice in method's practices array has `"kind": "practice"`
-  - This is a CRITICAL property - schema validation may pass without it, but consumers will fail
 - ❌ Wrong PatternView property names (`alphas` instead of `alphaStates`, `views` instead of `patternViews`)
 - ❌ Missing contributesTo on LODs
-- ❌ **Adding relatesTo to redeclarations** - JSON includes relatesTo on baseline alpha redeclarations
-  - **Fix:** Remove relatesTo from any alpha that is a redeclaration (same name as baseline alpha)
-  - Only include relatesTo on NEW alphas (those with contributesTo to baseline)
 - ❌ **Invalid alphaName in relatesTo** - Relationship references non-existent alpha
   - **Fix:** Validate every relatesTo.alphaName against defined alphas in baseline and practice
-  - Use exact, case-sensitive alpha names
 - ❌ **Missing relatesTo on new alphas from mapping guide** - Mapping specifies relationships but JSON omits them
   - **Fix:** Copy relatesTo array from mapping guide to JSON for all new alphas
-- ❌ **Wrong relationship directionality** - Declaring dependencies instead of provisions
-  - **Fix:** Alpha A should declare what it provides/enables/produces for other alphas, not what it depends on
-  - Use active voice from provider perspective: "enables", "produces", "guides" rather than "depends on", "requires"
-  - Exception: "depends on" is valid when explicitly modeling a dependency relationship from the dependent's side
-  - Always include `direction` field matching the verb: `outgoing` for active, `incoming` for passive, `mutual` for symmetric
-- ❌ **Missing `direction` field on relatesTo entries** - Schema requires `direction` on every AlphaRelationship
-  - **Fix:** Add `direction` field to every relatesTo entry. Values: `outgoing`, `incoming`, `mutual`
 - ❌ **Using `rationale` instead of `description` in relatesTo** - `rationale` is not a valid schema field
   - **Fix:** Rename `rationale` to `description` (optional field for explaining the relationship)
-- ❌ **Missing relationships on interconnected alphas** - Phase 1 analysis shows concern interactions but Phase 3 JSON has no relatesTo
-  - **Fix:** Review Phase 1 concern interactions and Phase 2 mapping for relationship opportunities
-  - Look for production flows, enablement patterns, governance structures, information flows
 - ❌ Markdown or metadata in JSON strings
 - ❌ **Generating only 1-2 example activities** (must generate ALL activities from mapping guide)
 - ❌ **Empty patterns array** when mapping guide has patterns
@@ -2565,31 +2284,7 @@ When a method composes practices from **different baseline families** (e.g., Pla
 
 **Examples:**
 
-**Example 1: Platform-Focused Practice (CORRECT)**
-- **Source:** OpenShift Platform Administration
-- **Primary Alpha:** Platform (Solution focus)
-- **Related Alphas (from Platform.relatesTo):** 
-  - Platform Asset (hosts)
-  - Platform Consumption Interface (exposes)
-  - Platform Governance (governed by)
-  - Team (built by)
-- **Total Coverage:** 5 alphas (1 primary + 4 related)
-- **Coherence:** All content centers on platform infrastructure with broad coverage of related concerns
-- **Decision:** ✓ **Single Practice** - Platform is clear primary, related alphas provide broad loosely-related coverage
-
-**Example 2: Team-Focused Practice (CORRECT)**
-- **Source:** Team Topologies
-- **Primary Alpha:** Team (Endeavor focus)
-- **Related Alphas (from Team.relatesTo):**
-  - Work (performs)
-  - Way Of Working (applies)
-  - Platform (built by relationship reversed - Team builds Platform)
-  - Organizational Change (enabled by)
-- **Total Coverage:** 5 alphas (1 primary + 4 related)
-- **Coherence:** Team design as primary with broad coverage of team context (work, practices, change)
-- **Decision:** ✓ **Single Practice** - Team is clear primary, covers loosely-related organizational concerns
-
-**Example 3: Multi-Practice Method (CORRECT)**
+**Example 1: Multi-Practice Method (CORRECT)**
 - **Source:** SAFe Agile Framework
 - **Analysis:** Broad coverage without single primary alpha focus
 - **Decision:** Method with 3 focused practices + 1 orchestration practice
@@ -2615,7 +2310,7 @@ When a method composes practices from **different baseline families** (e.g., Pla
   - Minimal Alphas: Only if unique coordination concepts needed
   - NO redeclaration of practice alphas
 
-**Example 4: "Everything Else" Anti-Pattern (INCORRECT)**
+**Example 2: "Everything Else" Anti-Pattern (INCORRECT)**
 - **Source:** Platform Engineering Handbook
 - **Attempted Structure:**
   - Practice 1: Platform Infrastructure (Platform primary + Platform Asset, Platform Governance)
@@ -2628,7 +2323,7 @@ When a method composes practices from **different baseline families** (e.g., Pla
   - Is there consumption interface content? → Merge into Practice 1 (Platform.exposes relationship)
   - Is there value/economics content? → Merge into Practice 2 (Opportunity.justifies relationship)
 
-**Example 5: Orchestration Practice (CORRECT)**
+**Example 3: Orchestration Practice (CORRECT)**
 - **Source:** DevOps Lifecycle Framework
 - **Structure:** Method with 4 practices
   - Development Practice (Platform Asset primary)

@@ -33,10 +33,8 @@ Outputs structured JSON report to stdout.
 """
 
 import argparse
-import copy
 import json
 import sys
-from collections import OrderedDict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -44,7 +42,6 @@ from utils._shared import (
     detect_kind,
     load_all_from_keleo,
     load_json,
-    load_json_pair,
     merge_by_name_annotated,
     MERGEABLE_ARRAYS,
 )

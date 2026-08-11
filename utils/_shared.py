@@ -181,35 +181,6 @@ def load_all_from_keleo(keleo_path):
         return None, f"Invalid JSON in {keleo_path}: {e}"
 
 
-def collect_element_names(data, element_type):
-    """Collect all names from an element type across root and embedded practices."""
-    names = set()
-    for item in data.get(element_type, []):
-        name = item.get("name")
-        if name:
-            names.add(name)
-    for practice in data.get("practices", []):
-        for item in practice.get(element_type, []):
-            name = item.get("name")
-            if name:
-                names.add(name)
-    return names
-
-
-def collect_alpha_state_names(data):
-    """Build dict mapping alpha_name -> set of state names."""
-    result = {}
-    for alpha in data.get("alphas", []):
-        name = alpha.get("name")
-        if name:
-            result[name] = {s.get("name") for s in alpha.get("states", []) if s.get("name")}
-    for practice in data.get("practices", []):
-        for alpha in practice.get("alphas", []):
-            name = alpha.get("name")
-            if name:
-                result[name] = {s.get("name") for s in alpha.get("states", []) if s.get("name")}
-    return result
-
 
 def detect_kind(data):
     """Classify JSON by schema discrimination rules."""

@@ -241,7 +241,7 @@ Which mode?
 **Key reference files (read from generate-method skill):**
 - Phase 1 prompt: `prompts/phase-1-analysis.md`
 - Domain framework: `references/domain-framework.md`
-- Process: See generate-method SKILL.md "Step 1: Phase 1 - Analysis" (lines 258-340)
+- Process: See generate-method SKILL.md "Step 1: Phase 1 - Analysis" section
 
 **Update-specific additions:**
 - **Update citations:** Search for latest authoritative sources (official docs, recent editions). Enrich all citations with `url` fields — use user-provided URLs, official websites, DOI references (`https://doi.org/10.xxxx/xxxxx`), or publisher pages. Only omit when no stable link exists.
@@ -250,7 +250,7 @@ Which mode?
 - **Baselines only:** Also run Phase 1.5 distillation after Phase 1 (output: `<dir>/01.5-distilled-essentials.md`)
 - **Comparison:** Note major differences from existing JSON content, inform user if significant restructuring needed
 
-**Validation:** Apply Phase 1 Completion Validation from generate-method skill (lines 304-340)
+**Validation:** Apply Phase 1 Validation from generate-method skill
 
 **Step 2C: Run Phase 2 - Mapping**
 
@@ -261,19 +261,19 @@ Which mode?
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
+- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
 
 **Apply ALL latest guidance from generate-method skill:**
-- Primary alpha focus strategy (lines 2092-2217)
-- Competency level validation (lines 733-738)
-- Terminology aliases (lines 410-728)
-- Pattern completeness - FOUR-PASS construction (lines 878-1133)
-- Alpha relationships and relatesTo (lines 737-763)
-- All Critical Mapping Rules (lines 729-768)
+- Primary alpha focus strategy (see "Practice vs Method Handling" section)
+- Competency level validation (see "Feature: Alpha Relationship Integrity" @rule:semantic-006)
+- Terminology aliases (see "CRITICAL: Terminology Aliasing" section)
+- Pattern completeness - FOUR-PASS construction (see "Pattern Completeness Requirements" section)
+- Alpha relationships and relatesTo (see "Feature: Alpha Relationship Integrity" section)
+- All Critical Mapping Rules (see "Critical JSON Rules" section)
 
 **Output:** `practices/<name>/02-mapping-guide.md` (OVERWRITE existing)
 
-**Validation:** Apply Phase 2 Completion Validation from generate-method skill (lines 1190-1263)
+**Validation:** Apply Phase 2 Validation from generate-method skill
 
 **Step 2D: Run Phase 3 - JSON Generation**
 
@@ -283,12 +283,11 @@ Which mode?
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
 - Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
+- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 
 **Apply ALL latest validations from generate-method skill:**
-- Critical JSON Rules (lines 1406-1417)
-- Quality Gates (lines 1419-1467)
-- Phase 3 Completion Validation (lines 1461-1556)
+- Critical JSON Rules (see "Critical JSON Rules" section)
+- Phase 3 Validation (see "Phase 3 Validation" section)
 
 **Output:** `practices/<name>/<name>.json` (OVERWRITE existing)
 
@@ -326,15 +325,15 @@ python3 utils/extract-practice-content.py practices/<name>/<name>.json
 - Semantics guide: `references/semantics.md`
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" (lines 342-1237)
+- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
 
 **Apply ALL latest guidance from generate-method skill to extracted content:**
-- Primary alpha focus strategy (lines 2092-2217)
-- Competency level validation (lines 733-738, 1220-1237)
-- Terminology aliases (lines 410-728)
-- Pattern completeness - FOUR-PASS construction (lines 878-1133)
-- Alpha relationships and relatesTo (lines 737-763)
-- All Critical Mapping Rules (lines 729-768)
+- Primary alpha focus strategy (see "Practice vs Method Handling" section)
+- Competency level validation (see "Feature: Alpha Relationship Integrity" @rule:semantic-006)
+- Terminology aliases (see "CRITICAL: Terminology Aliasing" section)
+- Pattern completeness - FOUR-PASS construction (see "Pattern Completeness Requirements" section)
+- Alpha relationships and relatesTo (see "Feature: Alpha Relationship Integrity" section)
+- All Critical Mapping Rules (see "Critical JSON Rules" section)
 
 **Mode 2 specific approach:**
 - Start with existing content as base
@@ -344,7 +343,7 @@ python3 utils/extract-practice-content.py practices/<name>/<name>.json
 
 **Output:** `practices/<name>/02-mapping-guide.md` (OVERWRITE existing if present)
 
-**Validation:** Apply Phase 2 Completion Validation from generate-method skill (lines 1190-1263)
+**Validation:** Apply Phase 2 Validation from generate-method skill
 
 **User Feedback:**
 - "Applied latest mapping guidance to existing content"
@@ -359,12 +358,11 @@ python3 utils/extract-practice-content.py practices/<name>/<name>.json
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
 - Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" (lines 1265-1565)
+- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 
 **Apply ALL latest validations from generate-method skill:**
-- Critical JSON Rules (lines 1406-1417)
-- Quality Gates (lines 1419-1467)
-- Phase 3 Completion Validation (lines 1461-1556)
+- Critical JSON Rules (see "Critical JSON Rules" section)
+- Phase 3 Validation (see "Phase 3 Validation" section)
 
 **Output:** `practices/<name>/<name>.json` (OVERWRITE existing)
 
@@ -401,18 +399,6 @@ This compares scalar fields, element counts across all sections, diffs competenc
    - The packager generates an externalized method JSON with `practiceNames` references
    - Method-level narratives and merged citations are included automatically
    - Validate individual practice JSONs before packaging
-
----
-
-## Key Changes to Apply
-
-**IMPORTANT:** All requirements come from the `generate-method` skill. Read `.claude/skills/generate-method/SKILL.md` for complete details.
-
-**When updating practices, ensure these latest requirements from generate-method are met:**
-
-### Quality Requirements
-
-All quality requirements from the `generate-method` skill apply. Use the eval harness to validate rather than manual checklists — see Post-Update Validation below.
 
 ---
 
