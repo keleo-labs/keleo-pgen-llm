@@ -12,6 +12,10 @@ Usage:
     # Update with write:
     python3 utils/apply-versioning.py practices/name/name.json --fix
 
+    # Bump version on a single file (for update workflows):
+    python3 utils/apply-versioning.py practices/name/name.json --bump patch --fix
+    python3 utils/apply-versioning.py practices/name/name.json --bump minor --fix
+
     # Update multiple files:
     python3 utils/apply-versioning.py deps/*.json baselines/*/*.json practices/*/*.json --fix
 
@@ -29,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (
     detect_kind,
     get_schema_version,
+    increment_version,
     load_json_pair,
     MERGEABLE_ARRAYS,
 )
@@ -81,7 +86,7 @@ def get_dependency_names(data, kind):
     return deps
 
 
-def apply_versioning(data, schema_version, version_index, today):
+def apply_versioning(data, schema_version, version_index, today, bump=None):
     """Apply versioning fields to a document dict. Returns list of changes."""
     changes = []
     kind = detect_kind(data)
@@ -95,10 +100,22 @@ def apply_versioning(data, schema_version, version_index, today):
         changes.append(f"updated schemaVersion {old} → {schema_version}")
 
     old_version = data.get("version", "")
-    new_version = normalize_version(old_version)
-    if old_version != new_version:
+    if bump:
+        normalized = normalize_version(old_version)
+        new_version = increment_version(normalized, bump)
         data["version"] = new_version
-        changes.append(f"normalized version {old_version!r} → {new_version}")
+        changes.append(f"bumped version {old_version or '(empty)'} → {new_version} ({bump})")
+        if not data.get("updatedAt"):
+            data["updatedAt"] = today
+            changes.append(f"added updatedAt={today}")
+        else:
+            data["updatedAt"] = today
+            changes.append(f"updated updatedAt={today}")
+    else:
+        new_version = normalize_version(old_version)
+        if old_version != new_version:
+            data["version"] = new_version
+            changes.append(f"normalized version {old_version!r} → {new_version}")
 
     dep_names = get_dependency_names(data, kind)
     if dep_names:
@@ -108,7 +125,17 @@ def apply_versioning(data, schema_version, version_index, today):
         }
         new_dvs = []
         for name in dep_names:
-            if name in existing_dvs and existing_dvs[name]:
+            if bump:
+                dep_version = resolve_dependency_version(name, version_index)
+                if dep_version:
+                    vr = f"^{dep_version}"
+                    new_dvs.append({"documentName": name, "versionRange": vr})
+                    old_vr = existing_dvs.get(name, "")
+                    if old_vr != vr:
+                        changes.append(f"refreshed dependencyVersion {name} {old_vr or '(new)'} → {vr}")
+                else:
+                    changes.append(f"WARNING: no version found for dependency {name!r}")
+            elif name in existing_dvs and existing_dvs[name]:
                 new_dvs.append({
                     "documentName": name,
                     "versionRange": existing_dvs[name],
@@ -128,10 +155,10 @@ def apply_versioning(data, schema_version, version_index, today):
         if new_dvs:
             if data.get("dependencyVersions") != new_dvs:
                 data["dependencyVersions"] = new_dvs
-                if "added dependencyVersion" not in " ".join(changes):
+                if not any(c.startswith(("added dependency", "refreshed dependency")) for c in changes):
                     changes.append("updated dependencyVersions")
 
-    if data.get("updatedAt"):
+    if not bump and data.get("updatedAt"):
         data["updatedAt"] = today
         changes.append(f"updated updatedAt={today}")
 
@@ -228,6 +255,10 @@ def main():
         help="Process all JSON files in deps/, baselines/, practices/"
     )
     parser.add_argument(
+        "--bump", choices=["patch", "minor", "major"],
+        help="Increment version by bump level (patch/minor/major)"
+    )
+    parser.add_argument(
         "--fix", action="store_true",
         help="Write changes to files (default is dry-run)"
     )
@@ -248,17 +279,27 @@ def main():
         return
 
     schema_version = get_schema_version() or "1.0.0"
-    version_index = build_version_index(file_paths)
     today = date.today().isoformat()
 
-    # Pre-populate index with normalized versions for documents missing version
-    for path in file_paths:
-        data, err = load_json_pair(path)
-        if err or not isinstance(data, dict):
-            continue
-        name = data.get("name", "")
-        if name and name not in version_index:
-            version_index[name] = normalize_version(data.get("version", ""))
+    if args.bump and not args.all:
+        all_files = collect_all_files()
+        version_index = build_version_index(all_files)
+        for path in all_files:
+            data, err = load_json_pair(path)
+            if err or not isinstance(data, dict):
+                continue
+            name = data.get("name", "")
+            if name and name not in version_index:
+                version_index[name] = normalize_version(data.get("version", ""))
+    else:
+        version_index = build_version_index(file_paths)
+        for path in file_paths:
+            data, err = load_json_pair(path)
+            if err or not isinstance(data, dict):
+                continue
+            name = data.get("name", "")
+            if name and name not in version_index:
+                version_index[name] = normalize_version(data.get("version", ""))
 
     print(f"Schema version: {schema_version}")
     print(f"Files to process: {len(file_paths)}")
@@ -279,7 +320,7 @@ def main():
         kind = detect_kind(data)
         name = data.get("name", Path(path).stem)
 
-        changes = apply_versioning(data, schema_version, version_index, today)
+        changes = apply_versioning(data, schema_version, version_index, today, bump=args.bump)
 
         if changes:
             total_changes += len(changes)

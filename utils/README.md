@@ -19,7 +19,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | Script | Purpose | Usage |
 |--------|---------|-------|
 | `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, etc.) | `python3 utils/extract-reference-names.py <file>.json [--sections alphas,activities,...] [--alpha-details] [--structure]` |
-| `extract-practice-content.py` | Extract practice content from methods or resolve dependencies | `python3 utils/extract-practice-content.py <file>.json` |
+| `extract-practice-content.py` | Extract practice content from methods or resolve dependencies | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
 | `diff-practice-json.py` | Diff two practice JSON files by element type | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only]` |
 
@@ -42,7 +42,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type) | `python3 utils/transform-alphas.py <file>.json [--fix]` |
 | `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
-| `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions | `python3 utils/apply-versioning.py [--all] [--fix]` |
+| `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump version | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--fix]` |
 
 ## Packaging
 

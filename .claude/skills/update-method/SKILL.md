@@ -164,14 +164,17 @@ When updating an existing document, increment its `version` based on the update 
 | **Remap & Regenerate** | `minor` (e.g. 1.0.0 → 1.1.0) | Remapped content, new guidance applied |
 | **Full Reanalysis** | `minor` (e.g. 1.0.0 → 1.1.0) | Content reworked from source materials |
 
-**Process:**
-1. Read the existing `version` from the JSON file being updated
-2. Increment using the appropriate bump level
-3. Update `updatedAt` to current date
-4. Update `schemaVersion` to match current schema `$comment` (may have changed since document was authored)
-5. Refresh `dependencyVersions` — re-read each dependency's current `version` and update the caret range
+**Single command handles all versioning steps** (increment, schemaVersion, dependencyVersions, updatedAt):
 
-Use `python3 -c "from utils._shared import increment_version; print(increment_version('1.0.0', 'patch'))"` to compute the new version if needed, or set it directly.
+```bash
+# Auto-Fix → patch bump
+python3 utils/apply-versioning.py <file>.json --bump patch --fix
+
+# Remap or Full Reanalysis → minor bump
+python3 utils/apply-versioning.py <file>.json --bump minor --fix
+```
+
+Dependency versions are auto-resolved from all project files in deps/, baselines/, practices/.
 
 ### Step 1A: Auto-Fix (No User Interaction)
 
@@ -330,6 +333,13 @@ Without `--output`, prints a structured JSON summary to stdout for review:
 ```bash
 python3 utils/extract-practice-content.py practices/<name>/<name>.json
 ```
+
+**For methods — also extract method-level narratives** for later packaging:
+```bash
+python3 utils/extract-practice-content.py practices/<name>/<name>.json \
+  --extract-narratives practices/<name>/_method-narrative.json
+```
+This saves the top-level `narratives` array to a standalone JSON file compatible with `package-keleo.py --method-narrative-file`.
 
 **User Feedback:**
 - "Extracted existing content as Phase 1 analysis report"
@@ -897,6 +907,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - Compare (changes only): `python3 utils/diff-practice-json.py old.json new.json --changes-only`
    - Assessment with parent: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <parent>.json` (merges parent's alphas, work products, personas, activities, etc. into baseline for cross-reference validation)
    - Assessment summary: `python3 utils/assess-practice.py <file>.json --summary` (counts by severity/category, suggested mode)
+   - Extract method narratives: `python3 utils/extract-practice-content.py <method>.json --extract-narratives <output>.json` (for package-keleo.py --method-narrative-file)
    - Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only` (filter to only severity=error issues)
    - Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure` (type and count/length for each key)
    - Cross-practice method audit: `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json` (alpha refs, duplicates, persona consistency)
@@ -921,6 +932,10 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - JSON patching — bulk replace: `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
    - JSON patching — preview: add `--dry-run` to any patch command
    - These commands work on ANY JSON file — practice, method, baseline, `_effective-context.json`
+   - Bump version (patch): `python3 utils/apply-versioning.py <file>.json --bump patch --fix` (increments version, refreshes schemaVersion, dependencyVersions, updatedAt)
+   - Bump version (minor): `python3 utils/apply-versioning.py <file>.json --bump minor --fix` (for remap/reanalysis updates)
+   - Normalize versioning: `python3 utils/apply-versioning.py <file>.json --fix` (add schemaVersion, normalize version, populate dependencyVersions)
+   - Batch versioning: `python3 utils/apply-versioning.py --all --fix` (process all docs in dependency order)
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.

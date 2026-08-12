@@ -1667,6 +1667,7 @@ Common utilities for JSON inspection:
 - **Package single practice:** `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json [transitive-deps.json ...] practice.json -o bundles/name.keleo --verify`
 - **Convert embedded method to .keleo:** `python3 utils/package-keleo.py --from-embedded method.json --baseline baseline.json -o bundles/method.keleo --verify`
 - **Verify existing package:** `python3 utils/package-keleo.py --verify-only bundles/name.keleo`
+- **Extract method narratives:** `python3 utils/extract-practice-content.py <method>.json --extract-narratives <output>.json` (for package-keleo.py --method-narrative-file)
 
 Mapping guide assembly and validation:
 - **Assemble method mapping guide:** `python3 utils/assemble-mapping-guide.py --name "Name" --baseline-name "Baseline" --guides g1.md g2.md -o output.md --stats` (auto-generates method header with practice summary table)

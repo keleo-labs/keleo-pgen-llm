@@ -239,9 +239,25 @@ def main():
         "--output",
         help="Write Phase 1 analysis report markdown to this path (default: print JSON summary to stdout)",
     )
+    parser.add_argument(
+        "--extract-narratives",
+        metavar="PATH",
+        help="Extract top-level narratives array to a JSON file (for --method-narrative-file in package-keleo.py)",
+    )
     args = parser.parse_args()
 
     data = load_json(args.file)
+
+    if args.extract_narratives:
+        narratives = data.get("narratives", [])
+        with open(args.extract_narratives, "w", encoding="utf-8") as f:
+            json.dump(narratives, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        print(json.dumps({
+            "output": args.extract_narratives,
+            "narratives": len(narratives),
+        }, indent=2))
+        return
 
     if data.get("kind") == "method" and "practices" in data:
         practices = data.get("practices", [])
