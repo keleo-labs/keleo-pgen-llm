@@ -13,6 +13,9 @@ archive
 
 .claude/settings.local.json
 .claude/settings.json
+.playwright-mcp/
+__pycache__/
+deps/*-cr.json
 
 # Keep the practices directory structure
 !practices/.gitkeep
