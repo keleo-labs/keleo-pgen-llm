@@ -780,6 +780,102 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
     return result
 
 
+COVERAGE_SECTIONS = [
+    "alphas", "activities", "workProducts", "competencies",
+    "activitySpaces", "focuses", "narrativeTypes", "personas", "patterns",
+]
+
+
+def _has_icon(element):
+    """Check if an element has at least one icon asset reference."""
+    for ref in element.get("assetNames", []):
+        if isinstance(ref, dict) and ref.get("type") == "icon":
+            return True
+    return False
+
+
+def _has_narratives(element):
+    """Check if an element has a non-empty narratives array."""
+    return len(element.get("narratives", [])) > 0
+
+
+def _analyze_section(elements):
+    """Analyze a list of elements for narrative and icon coverage."""
+    with_narratives = 0
+    with_icons = 0
+    missing_narratives = []
+    missing_icons = []
+
+    for el in elements:
+        name = el.get("name", "?")
+        if _has_narratives(el):
+            with_narratives += 1
+        else:
+            missing_narratives.append(name)
+        if _has_icon(el):
+            with_icons += 1
+        else:
+            missing_icons.append(name)
+
+    return {
+        "total": len(elements),
+        "withNarratives": with_narratives,
+        "withIcons": with_icons,
+        "missingNarratives": missing_narratives,
+        "missingIcons": missing_icons,
+    }
+
+
+def collect_coverage(data):
+    """Collect coverage data for all sections, merging across embedded practices."""
+    coverage = {}
+
+    sources = [data]
+    for p in data.get("practices", []):
+        sources.append(p)
+
+    for section in COVERAGE_SECTIONS:
+        all_elements = []
+        for source in sources:
+            all_elements.extend(source.get(section, []))
+        if all_elements:
+            coverage[section] = _analyze_section(all_elements)
+
+    return coverage
+
+
+def print_coverage(data):
+    """Print per-section narrative and icon coverage report."""
+    coverage = collect_coverage(data)
+
+    if not coverage:
+        print("=== COVERAGE REPORT === (no elements found)")
+        return
+
+    print("=== COVERAGE REPORT ===")
+    print(f"{'Section':<20} {'Total':>5}  {'Narr':>7}  {'Icons':>7}  Gaps")
+
+    for section, info in coverage.items():
+        total = info["total"]
+        narr = f"{info['withNarratives']}/{total}"
+        icons = f"{info['withIcons']}/{total}"
+
+        gaps = []
+        missing_both = sorted(set(info["missingNarratives"]) & set(info["missingIcons"]))
+        only_narr = sorted(set(info["missingNarratives"]) - set(missing_both))
+        only_icon = sorted(set(info["missingIcons"]) - set(missing_both))
+
+        if missing_both:
+            gaps.append(f"narratives+icons: {', '.join(missing_both)}")
+        if only_narr:
+            gaps.append(f"narratives: {', '.join(only_narr)}")
+        if only_icon:
+            gaps.append(f"icons: {', '.join(only_icon)}")
+
+        gap_str = "; ".join(gaps) if gaps else "(none)"
+        print(f"{section:<20} {total:>5}  {narr:>7}  {icons:>7}  {gap_str}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract reference names and structure from practice/baseline/method JSON"
@@ -821,9 +917,18 @@ def main():
                         help="Show full context text (no truncation) with --long-contexts or --context-element")
     parser.add_argument("--structure", action="store_true",
                         help="Show top-level key overview (type and count/length for each key)")
+    parser.add_argument("--coverage", action="store_true",
+                        help="Show per-element narrative and icon asset coverage for each section")
 
     args = parser.parse_args()
     data = load_json(args.json_file)
+
+    if args.coverage:
+        if args.json:
+            print(json.dumps({"coverage": collect_coverage(data)}, indent=2))
+        else:
+            print_coverage(data)
+        return
 
     if args.find_refs:
         refs = find_references(data, args.find_refs)

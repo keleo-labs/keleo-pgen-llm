@@ -271,7 +271,7 @@ def validate_phase_2(content, lines, kind="practice"):
 
     if kind == "practice":
         activity_lines = [l for l in lines
-                          if re.match(r"^\*\*Activity:\s", l) or re.match(r"^### Activity[:\s]", l)]
+                          if re.match(r"^\*\*Activity:\s", l) or re.match(r"^#{3,5} Activity[:\s]", l)]
         checks.append({
             "check": "activity_count",
             "description": "Mapped activities",
@@ -281,7 +281,7 @@ def validate_phase_2(content, lines, kind="practice"):
         })
 
         wp_lines = [l for l in lines
-                    if re.match(r"^\*\*Work Product:\s", l) or re.match(r"^### Work Product[:\s]", l)]
+                    if re.match(r"^\*\*Work Product:\s", l) or re.match(r"^#{3,5} Work Product[:\s]", l)]
         checks.append({
             "check": "work_product_count",
             "description": "Mapped work products",
@@ -290,8 +290,37 @@ def validate_phase_2(content, lines, kind="practice"):
             "pass": len(wp_lines) >= 3,
         })
 
+        lod_names = re.findall(
+            r'(?:^\s*-\s*\*\*Level:\s*(.+?)\*\*|^#{3,5}\s*LOD:\s*(.+?)(?:\s*\(seq:|\s*$))',
+            content, re.MULTILINE,
+        )
+        lod_names = [n1 or n2 for n1, n2 in lod_names]
+        if lod_names:
+            lifecycle_terms = re.compile(
+                r"\b(?:completed|met|identified|updated|evolved|stated|achieved|"
+                r"realized|fulfilled|delivered|driving|enabling|guiding|validating|"
+                r"continuously|ongoing|in progress|optimized|performing|established|"
+                r"mature|advanced|forming|storming|norming|drafted|reviewed|"
+                r"approved|published|enforced)\b",
+                re.IGNORECASE,
+            )
+            flagged = []
+            for name in lod_names:
+                m = lifecycle_terms.search(name)
+                if m:
+                    flagged.append(f"{name} ('{m.group()}')")
+            checks.append({
+                "check": "lod_naming_quality",
+                "description": "LOD names describe document fidelity, not concern lifecycle",
+                "actual": len(flagged),
+                "expected": 0,
+                "pass": len(flagged) == 0,
+                "flagged": flagged if flagged else None,
+                "severity": "advisory",
+            })
+
         pattern_lines = [l for l in lines
-                         if re.match(r"^\*\*Pattern:\s", l) or re.match(r"^### Pattern[:\s]", l)]
+                         if re.match(r"^\*\*Pattern:\s", l) or re.match(r"^#{3,5} Pattern[:\s]", l)]
         checks.append({
             "check": "pattern_count",
             "description": "Mapped patterns",
@@ -301,7 +330,7 @@ def validate_phase_2(content, lines, kind="practice"):
         })
 
     alpha_lines = [l for l in lines
-                   if re.match(r"^\*\*Alpha:\s", l) or re.match(r"^### Alpha[:\s]", l)]
+                   if re.match(r"^\*\*Alpha:\s", l) or re.match(r"^#{3,5} Alpha[:\s]", l)]
     checks.append({
         "check": "alpha_count",
         "description": "Mapped alphas",
@@ -359,7 +388,7 @@ def validate_phase_2(content, lines, kind="practice"):
     })
 
     primary_alpha_match = re.search(
-        r'(?:\*\*)?(?:primary\s+alpha|central\s+alpha)(?:\*\*)?\s*[:\-]\s*(.+)',
+        r'(?:\*\*)?(?:primary\s+alpha|central\s+alpha)\S*(?:\*\*)?\s*[:\-]\s*(.+)',
         content, re.IGNORECASE,
     )
     checks.append({
@@ -396,13 +425,14 @@ def validate_phase_2(content, lines, kind="practice"):
     four_pass_markers = ["Pass 1", "Pass 2", "Pass 3", "Pass 4"]
     passes_found = sum(1 for marker in four_pass_markers if marker in content)
     has_four_pass = passes_found >= 3 or bool(re.search(
-        r'four.pass|4.pass|completeness\s+pass|backfill', content, re.IGNORECASE,
+        r'four.pass|4.pass|completeness\s+pass|backfill|gap\s+analysis|alpha.state.activity\s+gap|state\s+distribution',
+        content, re.IGNORECASE,
     ))
     checks.append({
         "check": "pattern_construction",
         "description": "Four-pass pattern construction evidence",
         "actual": passes_found,
-        "expected": ">=3 pass markers or backfill evidence",
+        "expected": ">=3 pass markers or gap analysis/backfill evidence",
         "pass": has_four_pass,
     })
 

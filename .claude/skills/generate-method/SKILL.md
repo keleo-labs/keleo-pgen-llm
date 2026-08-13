@@ -223,13 +223,15 @@ In plan mode:
 
 ### How to Implement Multi-Agent Approach
 
-**For Single-Practice translations:**
-- User can manually compact between phases
-- Tell user: "Phase N complete. [Optional: Compact before Phase N+1 for optimal token budget]"
-- Don't wait - continue working
+**For ALL translations (single-practice AND multi-practice):**
+- **ALWAYS use Agent tool** for Phase 1, Phase 2, and Phase 3
+- Each agent is self-contained with complete prompt and file paths
+- Benefits: isolated token budget per phase, no context window pressure, consistent quality
+- The main agent handles Step 0 (planning), Step 0.5 (context resolution), and Step 1.5 (delineation gate)
+- Phases 1, 2, and 3 are delegated to agents
 
 **For Multi-Practice methods (2+ practices):**
-- **Always use Agent tool** (don't ask user to compact)
+- **Phase 2 and Phase 3:** Launch parallel agents (one per practice)
 - Launch agents in parallel using single message with multiple Agent tool calls
 - Each agent is self-contained with complete prompt and file paths
 
@@ -429,6 +431,19 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
    - Pass 3: Consider related alphas from practice/dependencies (OPTIONAL)
    - Pass 4: State distribution validation (REQUIRED - max 2 states per alpha per view, backfill late-appearing alphas)
 6. Generate complete `02-mapping-guide.md` with terminology aliases, all alphas (including relatesTo), work products, activities, complete patterns
+
+**CRITICAL: Mapping Guide Element Heading Format**
+
+The eval validator (`validate-phase-output.py`) parses the mapping guide to count elements. Use these heading formats for elements so validation passes:
+
+```markdown
+#### Alpha: Name (Type -- Enrichment Level)
+#### Work Product: Name
+#### Activity: Name
+#### Pattern: Name
+```
+
+Acceptable heading levels: `###`, `####`, or `#####`. The key format is `<heading> <ElementType>: <Name>`. Bold format also works: `**Alpha: Name**`. Do NOT use other formats like `#### Name` without the element type prefix.
 
 **Process for Multi-Practice Method:**
 
@@ -859,8 +874,11 @@ Rules governing element names, descriptions, and name uniqueness.
 ### Scenario: LOD names describe content maturity (@rule:naming-004)
 - Given: A work product has levels of detail
 - When: LOD names are chosen
-- Then: Names describe artifact content maturity (e.g., "Outline", "Comprehensive", "Automated")
-- And: Names do not use generic labels ("Level 1", "Basic") or concern progression terms ("Established", "Optimized")
+- Then: Names describe what the **document looks like** at that fidelity level, following the rubric in `references/workproduct-assessment-rubric.csv` (Summarised → Structured → Elaborated → Actionable)
+- And: Every LOD covers the **same full scope** — the difference between levels is depth, not breadth or temporal progression
+- And: Names do not use generic labels ("Level 1", "Basic") or concern progression terms ("Established", "Optimized", "Evolved")
+- And: Names do not describe lifecycle events or temporal stages (e.g., "Work Completed", "Definition of Done Met", "Goal Stated", "Continuously Updated")
+- And: The litmus test passes: the name answers "what does this document contain?" not "where does the concern stand?"
 
 ### Scenario: Activity names differ from ActivitySpace names (@rule:naming-005)
 - Given: An activity is assigned to an ActivitySpace
@@ -946,6 +964,13 @@ Validates that generated JSON has correct shape, required sections, and resolved
 - Given: An activity has worksOn entries referencing work products and LODs
 - When: Phase 3 generates the JSON
 - Then: Every workProductName and levelOfDetailName in worksOn resolves to defined elements
+
+### Scenario: Work product partOf references resolve (@rule:structural-006)
+- Given: A work product has a `partOf` property
+- When: Phase 3 generates the JSON
+- Then: The `partOf` value resolves to a WorkProduct.name in the same practice, a dependency practice, or the baseline
+- And: The work product does not reference itself
+- And: No circular partOf chains exist (A partOf B, B partOf A)
 
 ## Feature: Process Compliance
 
@@ -1514,8 +1539,14 @@ From `deps/language.schema.json`:
 **Phase 3 Validation:**
 
 ```bash
-python3 utils/eval-skill-output.py practices/<name>/ \
-  --baseline <baseline-practice.json> --schema deps/language.schema.json --summary
+# --baseline and --schema are auto-discovered from the practice JSON;
+# explicit flags override auto-discovery when needed.
+python3 utils/eval-skill-output.py practices/<name>/ --summary
+```
+
+To see only failed assertions with details:
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ --show-failed
 ```
 
 Fix all FAIL assertions with `error` severity. Warning assertions are advisory — address where practical. Re-run until `error_pass_rate: 1.0`.
@@ -1623,6 +1654,12 @@ Read validation output and apply fixes:
 - `for i in ...; do ... done` with variable expansion (use utility `--stats` flags or multi-file arguments instead)
 
 **Instead:** Use the Write tool (auto-approved) to create any intermediate files (e.g., narrative JSON, patch files), then call utility scripts with `--patch-file` or `--narrative-file`.
+
+Source material extraction (Google Workspace):
+- **Extract text from Slides or Docs API JSON:** `python3 utils/extract-gws-text.py <api-output.json>` (auto-detects Slides vs Docs format)
+- **Force format:** `python3 utils/extract-gws-text.py <file.json> --format slides|docs`
+- **Batch with output directory:** `python3 utils/extract-gws-text.py file1.json file2.json -o output-dir/`
+- **Typical workflow:** Fetch via `gws slides presentations get --params '{"presentationId": "..."}' 2>/dev/null > /tmp/slides.json`, then `python3 utils/extract-gws-text.py /tmp/slides.json`
 
 Common utilities for JSON inspection:
 - **Structural inspection:** `python3 utils/extract-reference-names.py <file.json> --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details`
@@ -1885,6 +1922,13 @@ python3 utils/resolve-practice-dependencies.py \
 
 ### Phase 3 Pitfalls
 
+- ❌ **`focusName` missing on activities** — Every activity MUST have a `focusName` property derived from its activity space's focus mapping
+- ❌ **`involves` as object array instead of string array** — `involves` on activities is a `string[]` of persona group names, NOT an array of objects
+- ❌ **`alphaName`/`focusName` on work products** — Work products do NOT have `alphaName` or `focusName` properties; they use `contributesTo` on LODs to link to alpha states
+- ❌ **`seq` on activities** — Activities do NOT have a `seq` property (unlike checklists and LODs)
+- ❌ **`citationNames` on activities** — Activities do NOT have `citationNames`; use citation references in activity narratives instead
+- ❌ **`instanceName` on work product instances** — Use `name` not `instanceName` for `workProductInstances` entries
+- ❌ **Duplicate alpha states in pattern views** — Each alpha MUST target at most 1 state per PatternView; deduplicate before generating
 - ❌ Not reading language.schema.json before generating
 - ❌ **PracticeElement name collisions** - CRITICAL ERROR - Using same name for different element types
   - **Problem:** Alpha "Platform Configuration" + WorkProduct "Platform Configuration" = INVALID (names must be globally unique)
@@ -1956,6 +2000,8 @@ python3 utils/resolve-practice-dependencies.py \
   - **Fix:** `test.then` should capture human-readable outcomes that complement (not duplicate) structural references
 - ❌ **Background as string or array** - `background` must be an object with optional `given`, `alphaStates`, `workProductLevels` arrays
   - **Fix:** Use `{"given": [...], "alphaStates": [...]}` structure
+- ❌ **Invalid `partOf` on work products** - Self-reference, circular chain, or unresolvable target
+  - **Fix:** `partOf` must reference a valid WorkProduct.name in the same practice, a dependency, or the baseline. No self-references. No cycles (A partOf B, B partOf A). Keep one level deep.
 
 ---
 

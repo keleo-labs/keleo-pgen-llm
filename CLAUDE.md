@@ -352,6 +352,7 @@ These constraints apply to **extension practices** created with `/generate-metho
 - All symbolic references (alphaName, stateName, activitySpaceName, etc.) must be exact, case-sensitive string matches
 - Activity names must be specific and different from their ActivitySpace names
 - Minimum requirements: Alphas need ≥3 states, WorkProducts need ≥2 levels of detail
+- WorkProducts support optional `partOf` (string) declaring containment within another work product (see semantics.md Section 7.4)
 - Narratives use structured frameworks with sequential contexts mapped to narrative elements
 
 ### Versioning

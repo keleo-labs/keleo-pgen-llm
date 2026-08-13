@@ -167,6 +167,13 @@ From mapping guide Competencies section:
     {
       "name": "Competency name from mapping guide",
       "description": "Expertise area description from mapping guide",
+      "narratives": [],
+      "assetNames": [
+        {
+          "assetName": "competency-icon-name",
+          "type": "icon"
+        }
+      ],
       "competencyLevels": [
         {
           "name": "Basic",
@@ -204,12 +211,26 @@ From mapping guide Competencies section:
 }
 ```
 
+**Competency Narratives:** Include when the mapping guide provides a competency narrative (sourced from Phase 1.5 detail about why this competency matters, how it develops, or its domain significance). Do NOT invent narrative content absent from the mapping guide.
+
+**Competency Asset Icons:** Include a font-character icon for each competency. Add corresponding entries to the top-level `assets` array:
+```json
+{
+  "name": "competency-icon-name",
+  "type": "font-character",
+  "fontFamily": "Font Awesome 6 Free",
+  "fontCharacter": "fa-code",
+  "fontWeight": "900"
+}
+```
+
 **Quality Checks:**
 - ✓ 5-10 competencies (from mapping guide)
 - ✓ Each competency has exactly 5 competencyLevels
 - ✓ Level numbers are 1, 2, 3, 4, 5 (sequential)
 - ✓ Level names follow standard pattern (Basic, Applies, Masters, Adapts, Innovating)
 - ✓ Each level's competencyName matches parent competency name
+- ✓ Each competency has an asset icon with corresponding top-level assets entry
 
 **Add to JSON skeleton.**
 

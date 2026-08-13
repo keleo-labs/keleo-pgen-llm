@@ -296,6 +296,11 @@ Total: [X activity spaces] across [Y focuses]
 ```markdown
 ### Competency: [Name from Phase 1.5]
 - **Description**: [From Phase 1.5 expertise area description]
+- **Narrative**: [From Phase 1.5 competency context — include ONLY when Phase 1.5 provides
+  substantive detail about why this competency matters, how it develops, or its role in the
+  domain. Omit if Phase 1.5 provides only a name and brief description.]
+- **Asset Icon**: [font-character icon for this competency — e.g., fa-code for engineering,
+  fa-shield-halved for security, fa-chart-line for analysis]
 - **Levels**:
   1. **Basic**
      - **Description**: [From Phase 1.5 level 1 description]
@@ -319,6 +324,7 @@ Total: [X activity spaces] across [Y focuses]
 - ✓ Each competency has exactly 5 levels
 - ✓ Level numbers are 1, 2, 3, 4, 5 (sequential)
 - ✓ Level names follow standard pattern (Basic, Applies, Masters, Adapts, Innovating)
+- ✓ Each competency has an asset icon assigned
 
 **Output Format:**
 

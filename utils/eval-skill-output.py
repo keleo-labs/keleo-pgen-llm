@@ -2,7 +2,13 @@
 """Evaluate skill output quality by composing existing validators into agentskills.io grading.
 
 Usage:
-    # Full eval of extension practice
+    # Full eval (auto-discovers --baseline from baselinePracticeName, --schema from deps/)
+    python3 utils/eval-skill-output.py practices/<name>/ --summary
+
+    # Show only failed assertions with details
+    python3 utils/eval-skill-output.py practices/<name>/ --show-failed
+
+    # Explicit baseline/schema (overrides auto-discovery)
     python3 utils/eval-skill-output.py practices/<name>/ \
       --baseline deps/platform-adoption-kernel.json \
       --schema deps/language.schema.json
@@ -16,13 +22,10 @@ Usage:
 
     # Phase-specific eval
     python3 utils/eval-skill-output.py practices/<name>/ --phase 1
-    python3 utils/eval-skill-output.py practices/<name>/ --phase 3 --baseline ... --schema ...
+    python3 utils/eval-skill-output.py practices/<name>/ --phase 3
 
     # Batch eval from evals.json
     python3 utils/eval-skill-output.py --evals .claude/skills/generate-method/evals/evals.json
-
-    # Summary mode
-    python3 utils/eval-skill-output.py practices/<name>/ --baseline ... --schema ... --summary
 """
 import argparse
 import json
@@ -238,6 +241,30 @@ def discover_files(directory):
             continue
         files["json_files"].append(str(f))
     return files
+
+
+def auto_discover_baseline(json_files):
+    """Try to resolve baseline path from practice JSON's baselinePracticeName."""
+    import re as _re
+    project_root = UTILS_DIR.parent
+    for jf in json_files:
+        try:
+            data = load_json(jf, exit_on_error=False)
+            bl_name = data.get("baselinePracticeName")
+            if bl_name:
+                slug = _re.sub(r'[^a-z0-9]+', '-', bl_name.lower()).strip('-')
+                candidate = project_root / "baselines" / slug / f"{slug}.json"
+                if candidate.exists():
+                    return str(candidate)
+        except Exception:
+            continue
+    return None
+
+
+def auto_discover_schema():
+    """Return schema path if deps/language.schema.json exists."""
+    candidate = UTILS_DIR.parent / "deps" / "language.schema.json"
+    return str(candidate) if candidate.exists() else None
 
 
 def word_count(path):
@@ -550,6 +577,12 @@ def eval_directory(directory, baseline=None, schema=None, parent=None, phase_fil
         kind = "practiceBaseline" if "baselines" in str(directory) else "practice"
         name = Path(directory).name
 
+    # Auto-discover baseline and schema if not provided
+    if not baseline and files["json_files"]:
+        baseline = auto_discover_baseline(files["json_files"])
+    if not schema:
+        schema = auto_discover_schema()
+
     phases = set()
     if phase_filter is not None:
         phases.add(phase_filter)
@@ -663,6 +696,8 @@ def main():
                         help="Evaluate specific phase only")
     parser.add_argument("--output", "-o", help="Write grading.json to path (default: stdout)")
     parser.add_argument("--summary", action="store_true", help="Compact pass/fail counts only")
+    parser.add_argument("--show-failed", action="store_true",
+                        help="Show only failed assertions with details")
     parser.add_argument("--evals", metavar="EVALS_JSON",
                         help="Run batch evals from evals.json file")
     parser.add_argument("--eval-id", type=int, help="Run specific eval by ID (with --evals)")
@@ -696,7 +731,27 @@ def main():
         annotate_with_specs(result.get("assertion_results", []), cat_to_specs)
         result["specs_source"] = str(args.specs)
 
-    if args.summary and not args.evals:
+    if args.show_failed and not args.evals:
+        failed = [a for a in result.get("assertion_results", []) if not a["passed"]]
+        if not failed:
+            output = json.dumps({"status": "all_passed", "total": len(result.get("assertion_results", []))}, indent=2)
+        else:
+            output = json.dumps({
+                "failed_count": len(failed),
+                "error_count": sum(1 for a in failed if a["severity"] == "error"),
+                "warning_count": sum(1 for a in failed if a["severity"] == "warn"),
+                "failed": [
+                    {
+                        "id": a["id"],
+                        "severity": a["severity"],
+                        "text": a["text"],
+                        "evidence": a["evidence"],
+                        "phase": a.get("phase"),
+                    }
+                    for a in failed
+                ],
+            }, indent=2)
+    elif args.summary and not args.evals:
         summary = result.get("summary", {})
         summary["directory"] = result.get("directory")
         summary["kind"] = result.get("kind")

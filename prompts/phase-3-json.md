@@ -280,6 +280,8 @@ Individual elements reference assets via optional `assetName` property (singular
 - **Practice/Method**: Main icon (font character)
 - **Alphas**: Icon for UI representation (font character)
 - **Activities**: Icon for activity type (font character) OR reference diagram (URL)
+- **Personas**: Role icon (font character) — e.g., `fa-user-gear` for engineer, `fa-user-shield` for security lead
+- **Persona Groups**: Team icon (font character) — e.g., `fa-people-group` for cross-functional team
 - **Competencies**: Skill area icon (font character)
 - **Work Products**: Template reference (URL) if applicable
 - **Patterns**: Workflow diagram (URL or bundled if custom)
@@ -287,7 +289,8 @@ Individual elements reference assets via optional `assetName` property (singular
 **Common Font Awesome Icons:**
 
 - Platform/Infrastructure: `fa-cubes`, `fa-server`, `fa-cloud`
-- Team/People: `fa-users`, `fa-user-group`
+- Team/People: `fa-users`, `fa-user-group`, `fa-people-group`
+- Roles: `fa-user-gear`, `fa-user-tie`, `fa-user-shield`, `fa-user-doctor`, `fa-user-astronaut`
 - Security: `fa-shield-halved`, `fa-lock`
 - Architecture: `fa-sitemap`, `fa-diagram-project`
 - Development: `fa-code`, `fa-laptop-code`
@@ -462,6 +465,7 @@ Add workProducts array:
   {
     "name": "Work Product Name",
     "description": "Single sentence",
+    "partOf": "Parent Work Product Name",  // Optional — containment relationship (see semantics.md Section 7.4)
     "levelsOfDetail": [
       {
         "name": "Level Name",  // NO "Level X:" prefix
@@ -504,8 +508,10 @@ Add workProducts array:
 **CRITICAL:**
 
 - LOD names have NO "Level X:" prefix
+- LOD names describe **document fidelity/depth** (what the artifact looks like), NOT concern lifecycle (where the concern stands). Use `references/workproduct-assessment-rubric.csv` as the naming lens. Every LOD covers the same scope at increasing depth — the difference is detail, not temporal progression.
 - checklist items are objects, NOT strings
 - contributesTo is REQUIRED on every LOD
+- `partOf` is optional — include when the mapping guide identifies a containment relationship. The value must exactly match a WorkProduct.name (same practice, dependency, or baseline)
 
 **Asset Linking:**
 
@@ -550,9 +556,28 @@ Add personas array:
       }
     ],
     "tags": { ... },
-    "narratives": [ ... ]  // Optional
+    "narratives": [ ... ],
+    "assetNames": [
+      {
+        "assetName": "persona-icon-name",
+        "type": "icon"
+      }
+    ]
   }
 ]
+```
+
+**Narratives:** Include when the mapping guide provides a persona narrative (sourced from Phase 1 role detail). Use the same narrative structure as other elements — narrativeTypeName + narrativeContexts. Do NOT invent narrative content absent from the mapping guide.
+
+**Asset Icons:** Include a font-character icon for each persona. Add corresponding entries to the top-level `assets` array:
+```json
+{
+  "name": "persona-icon-name",
+  "type": "font-character",
+  "fontFamily": "Font Awesome 6 Free",
+  "fontCharacter": "fa-user-gear",
+  "fontWeight": "900"
+}
 ```
 
 **CRITICAL:**
@@ -570,10 +595,20 @@ Add personaGroups array:
     "description": "Single sentence",
     "personaNames": ["Persona 1", "Persona 2"],
     "tags": { ... },
-    "narratives": [ ... ]  // Optional
+    "narratives": [ ... ],
+    "assetNames": [
+      {
+        "assetName": "team-icon-name",
+        "type": "icon"
+      }
+    ]
   }
 ]
 ```
+
+**Narratives:** Include when the mapping guide provides a persona group narrative (sourced from Phase 1 team detail — charter, formation model, interaction patterns). Do NOT invent team narratives absent from the mapping guide.
+
+**Asset Icons:** Include a font-character icon for each persona group, with corresponding top-level `assets` entry.
 
 #### 3.10 Activities
 
@@ -719,10 +754,12 @@ Add patterns array:
       }
     ],
     "tags": { ... },
-    "narratives": [ ... ]  // Optional
+    "narratives": [ ... ]
   }
 ]
 ```
+
+**Pattern-Level Narratives:** Include when the mapping guide provides a pattern narrative (sourced from Phase 1 lifecycle rationale — why these phases exist, the transformation story). This is the pattern's own narrative, distinct from the per-view `narrativeContexts`. Do NOT invent lifecycle rationale absent from the mapping guide.
 
 **CRITICAL:**
 
@@ -934,6 +971,8 @@ Once validation passes, verify:
 - [ ] Verify ALL arrays present: citations, narratives, alphas, alphaInstances, workProducts, workProductInstances, personas, **personaGroups**, activities, patterns, practiceElementAliases
 - [ ] No content omissions from Phase 2 mapping guide
 - [ ] All narratives present (alpha, activity, practice/method level)
+- [ ] Persona/PersonaGroup/Pattern narratives present where mapping guide provided source-grounded content
+- [ ] Asset icons present for personas, persona groups, and competencies (with corresponding top-level assets entries)
 - [ ] All checklists present (alpha states, work product LODs)
 - [ ] All citations referenced in citationNames exist
 - [ ] All symbolic references are exact matches
@@ -1038,8 +1077,10 @@ Once validation passes, verify:
 ✅ Right: Citations with ONLY metadata (no narratives)
 
 ### 10. Work Product LOD Names
-❌ Wrong: `"name": "Level 1: Basic"`
-✅ Right: `"name": "Basic"`
+❌ Wrong: `"name": "Level 1: Basic"` (generic numbered prefix)
+❌ Wrong: `"name": "Work Completed"`, `"name": "Definition of Done Met"`, `"name": "Goal Stated"` (lifecycle/temporal stages — describe where the concern is, not what the document looks like)
+❌ Wrong: `"name": "Continuously Updated"`, `"name": "Evolved and Optimized"` (process states, not content depth)
+✅ Right: `"name": "Completion Record"`, `"name": "Quality-Verified Release"`, `"name": "Brief Objective"` (describe document content at that fidelity level)
 
 ### 11. Gherkin Structures (background, test, examples)
 ❌ Wrong: `background` as a string or array
@@ -1079,6 +1120,41 @@ Once validation passes, verify:
   { "name": "Scenario 1", "description": "...", "given": ["..."], "when": ["..."], "then": ["..."] }
 ]
 ```
+
+### 12. Activity Properties
+❌ Wrong: Activities with `seq`, `citationNames`, or `involves` as object array
+✅ Right:
+- Activities do NOT have `seq` (unlike checklists)
+- Activities do NOT have `citationNames` (use citation refs in narratives instead)
+- `involves` is a `string[]` of persona group names, NOT an array of objects
+- Activities MUST have `focusName` (derived from activity space focus)
+```json
+{
+  "name": "Configure Platform",
+  "focusName": "Solution",
+  "activitySpaceName": "Architecture Design",
+  "involves": ["Platform Team", "Security Team"],
+  "requiredCompetencies": ["Engineering"],
+  "recommendedCompetencyLevels": [...]
+}
+```
+
+### 13. Work Product Properties
+❌ Wrong: Work products with `alphaName` or `focusName`
+✅ Right: Work products link to alpha states via `contributesTo` on their LODs, not top-level properties
+
+### 13b. Work Product `partOf`
+❌ Wrong: `"partOf": "Same Work Product Name"` (self-reference)
+❌ Wrong: Circular chain (A partOf B, B partOf A)
+✅ Right: `"partOf": "Parent Work Product Name"` — optional string referencing another WorkProduct.name in the same practice, a dependency, or the baseline. Use for containment (component within a larger deliverable), not for "contributes evidence to" relationships.
+
+### 14. Work Product Instances
+❌ Wrong: `"instanceName": "Production Platform"`
+✅ Right: `"name": "Production Platform"` — instances use `name`, not `instanceName`
+
+### 15. Pattern View Alpha State Deduplication
+❌ Wrong: Same alpha appearing multiple times in a single PatternView's `alphaStates`
+✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate
 
 ## Text Cleaning
 

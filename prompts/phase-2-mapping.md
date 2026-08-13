@@ -864,13 +864,36 @@ For EACH work product from Phase 1:
 - YES → Redeclare baseline work product with additional LODs/checklists
 - NO → Create new practice work product
 
+**LOD Naming — The Rubric Principle:**
+
+LOD names describe **what the document looks like at that depth of fidelity**, NOT where the underlying concern is in its lifecycle. Every LOD covers the **same full scope** of the work product — the difference between levels is depth and detail, not breadth or temporal progression. Use the five-level rubric in `references/workproduct-assessment-rubric.csv` as the primary lens:
+
+| Rubric Level | Content Character | Example LOD Names |
+|---|---|---|
+| Level 1: Summarised | Complete scope in brief form — bullet lists, overviews | Outlined, Item Inventory, Brief Objective, Quality Checklist |
+| Level 2: Structured | Logical organisation — sections, rationale, relationships | Detailed, Ordered and Described, Contextualized Objective |
+| Level 3: Elaborated | Full depth — worked examples, scenarios, evidence | Validated, Sprint-Ready Backlog, Release-Ready Package |
+| Level 4: Actionable | Operational readiness — templates, automation, calculators | Automated, Strategic Planning Instrument, Self-Service |
+
+**The litmus test:** Does this name describe what the document contains, or where the concern stands? "Quality Checklist" describes document content. "Definition of Done Met" describes a lifecycle event — wrong for an LOD.
+
+**Anti-patterns (LOD names that read as progressive states):**
+- ❌ "Work Completed → Definition of Done Met → Releasable Product" (lifecycle stages of the Increment concern)
+- ❌ "Goal Stated → Goal Driving Decisions → Goal Enabling Value" (adoption stages of the goal concern)
+- ❌ "Basic Agreements → Values-Based Agreements → Evolved Agreements" (maturity stages of the team concern)
+- ✅ "Completion Record → Quality-Verified Release → Release-Ready Package" (increasing document fidelity)
+- ✅ "Brief Objective → Contextualized Objective → Value-Linked Objective" (increasing document depth)
+- ✅ "Logistics and Roles Outline → Behavioral Norms → Comprehensive Working Charter" (increasing document detail)
+
+Not every work product requires four LODs — use what fits the source content (minimum 2 per schema).
+
 **Work Product Structure:**
 ```
 Work Product Name: [from Phase 1 or baseline]
 Description: [single sentence from Phase 1]
-Levels of Detail: [map Phase 1 levels]
+Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT concern lifecycle]
   Level 1:
-    Name: [descriptive only, NO "Level X:" prefix]
+    Name: [content-descriptive, answers "what does this document look like at this depth?"]
     Description: [single sentence, max 12 words]
     Seq: [1, 2, 3...]
     Background: [optional - shared prerequisites for this LOD]
@@ -884,6 +907,68 @@ Levels of Detail: [map Phase 1 levels]
   Level 2: ...
 Narrative: [if Phase 1 provided additional context]
 ```
+
+**Work Product Composition (`partOf`):**
+
+When a work product is logically contained within another work product, declare the containment using `partOf`. See semantics.md Section 7.4 for full guidance.
+
+**When to use:**
+- Work product represents a distinct, independently trackable component of a larger deliverable
+- Both parent and child retain their own LODs and progress independently
+- The parent work product may be in the **same practice**, a **dependency practice**, or the **baseline** — check all three scopes
+
+**Cross-Practice `partOf` Discovery (REQUIRED):**
+
+When working with an effective context that includes dependency practices, actively scan for parent work products:
+
+1. **Load work products from effective context** — list all work products with their `_contributingPracticeName`
+2. **For each new practice work product**, ask: Is this artifact logically a component of a larger deliverable defined elsewhere?
+3. **Check dependency practice work products** — parent work products from `practiceDependencyNames` practices are valid `partOf` targets
+4. **Examples:**
+   - "Done Criteria" partOf "Definition of Done Specification" (from parent practice)
+   - "Sprint Goal Statement" partOf "Sprint Backlog" (same practice)
+   - "API Contract" partOf "Architecture" (from baseline or dependency)
+
+**When NOT to use:**
+- Document section that doesn't warrant independent tracking — use LOD checklists instead
+- "Contributes evidence to" relationship — use `contributesTo` on LOD
+- Related but not in containment — use narratives
+- Practice work product represents the **same artifact** as a dependency work product at a different abstraction level — that is specialization/aliasing, not containment. Test: does this work product exist *within* the parent, or does it *replace/specialize* the parent in this practice's context?
+- Candidate parent is a **visualization or rendering** of the child (e.g., a board displaying a backlog) — that is "rendered by", not containment
+- Child and parent have **fundamentally different update cadences or ownership** (e.g., updated every Sprint vs updated at formation) — independent lifecycles signal related-but-not-contained artifacts
+
+**Negative examples:**
+- ❌ "Sprint Backlog" partOf "Product Backlog Document" — Sprint Backlog is **derived from** the Product Backlog (items selected during planning), but it is an independent artifact with its own commitment. Selection is not containment.
+- ❌ "Sprint Backlog" partOf "Sprint Board" — the Sprint Board **visualizes** the Sprint Backlog, it does not contain it
+
+**Documentation format:**
+```
+Work Product Name: [child work product]
+partOf: [parent work product name]
+partOf Source: [same practice | dependency practice name | baseline]
+```
+
+For work products where you evaluated and rejected `partOf` candidates:
+```
+Work Product Name: [name]
+partOf: none
+Candidates Evaluated: [list of dependency WPs considered]
+Rejection Rationale: [why none qualify as containment]
+```
+
+**Resolution scope:**
+
+`partOf` targets resolve against work products from **declared dependencies only** — not the entire effective context. If a valid `partOf` target exists in a practice not yet in `practiceDependencyNames`, add it as a dependency first.
+
+- Same practice work products
+- Work products from practices listed in `practiceDependencyNames`
+- Baseline work products (if the baseline defines any)
+
+**Rules:**
+- Optional (0..1) — at most one parent
+- Value is a symbolic link: exact match to a WorkProduct.name
+- No self-references, no circular chains
+- Keep hierarchies shallow (one level typical)
 
 **Work Product Instances:**
 If Phase 1 identified distinct variants:
@@ -911,6 +996,7 @@ For each Phase 1 competency, match to baseline competencies:
   - Analysis/Research → "Analysis"
   - Leadership → "Leadership"
   - Management/Project → "Management"
+- Assign a font-character asset icon for each competency used in the practice (e.g., fa-shield-halved for security, fa-code for engineering)
 
 **Map Personas:**
 ```
@@ -920,6 +1006,13 @@ Competencies: [CompetencyLevelReference objects]
   - Competency Name: [EXACT baseline competency name]
     Competency Level Name: [from baseline competency levels]
 Tags: [orthogonal structure]
+Narrative: [from Phase 1 role description — include ONLY when Phase 1 provides substantive
+  detail about the role's responsibilities, context, decision authority, or how the persona
+  operates within the methodology. Use an appropriate baseline narrative type (e.g., Essay
+  for role context, STAR for role-in-action scenarios). Do NOT invent narrative content
+  to fill this field — omit if Phase 1 provides only a name and brief description.]
+Asset Icon: [font-character icon representing this role — e.g., fa-user-gear for engineer,
+  fa-shield-halved for security lead. Include when the role is visually distinct.]
 ```
 
 **Map Persona Groups (Teams):**
@@ -928,6 +1021,12 @@ Persona Group Name: [team name from Phase 1]
 Description: [single sentence from Phase 1]
 Persona Names: [array of persona names - members of this team]
 Tags: [organizational tags]
+Narrative: [from Phase 1 team description — include ONLY when Phase 1 provides substantive
+  detail about team charter, formation model, interaction patterns, or cross-functional
+  responsibilities. Do NOT invent team narratives. Omit if Phase 1 provides only
+  a team name and member list.]
+Asset Icon: [font-character icon representing this team — e.g., fa-people-group for
+  cross-functional team, fa-building-shield for security team.]
 ```
 
 ### Step 7: Map Activities
@@ -1267,6 +1366,11 @@ For EACH pattern from Phase 1 (including lifecycle):
 Pattern Name: [from Phase 1]
 Description: [single sentence from Phase 1]
 Narrative Type Name: [choose from baseline narrative types based on pattern nature]
+Narrative: [from Phase 1 lifecycle/workflow description — include ONLY when Phase 1 provides
+  substantive rationale for the lifecycle model, why these phases exist in this order, or the
+  transformation story the pattern represents. This is the pattern's own narrative (distinct
+  from the per-view narrativeContexts which are phase-specific slices). Omit if Phase 1
+  provides only a phase sequence without broader lifecycle context.]
 Pattern Views: [map Phase 1 views]
   View 1:
     Seq: [0 for prerequisites, 1+ for main phases]
@@ -1456,6 +1560,12 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 
 ### Alpha Mappings
 
+**Element Heading Format:** Use one of these formats for element headings so that automated validation can count elements:
+- `**Alpha: Name**` (bold) or `#### Alpha: Name` (heading level 3-5)
+- `**Work Product: Name**` or `#### Work Product: Name`
+- `**Activity: Name**` or `#### Activity: Name`
+- `**Pattern: Name**` or `#### Pattern: Name`
+
 #### Redeclared Baseline Alphas
 
 **Alpha: Platform** (Redeclaration - Enrichment)
@@ -1586,6 +1696,8 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
   - domainTags: [Architecture, Infrastructure]
   - lifecycleTags: [Adoption, Operations]
   - organizationalTags: [Platform Team]
+- **Narrative:** [Include only if Phase 1 provides substantive role detail beyond the description — e.g., responsibilities, decision authority, how the role operates within the methodology. Omit if Phase 1 provides only a brief role mention.]
+- **Asset Icon:** fa-user-gear (Font Awesome 6 Free, weight 900)
 
 **Persona: [Next]**
 ...
@@ -1601,6 +1713,8 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
   - Site Reliability Engineer
 - **Tags:**
   - organizationalTags: [Platform Team]
+- **Narrative:** [Include only if Phase 1 provides substantive team detail beyond membership — e.g., charter, formation model, interaction patterns. Omit if Phase 1 provides only a team name and member list.]
+- **Asset Icon:** fa-people-group (Font Awesome 6 Free, weight 900)
 
 ### Activity Mappings
 
@@ -1746,10 +1860,13 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] Activity names differ from Activity Space names
 - [ ] Work product LOD names have NO "Level X:" prefix
 - [ ] All LODs have contributesTo array
+- [ ] Work product `partOf` references (if any) point to valid work product names (no self-references, no cycles)
 - [ ] Narrative contexts are 1-3 sentences (not paragraphs)
 - [ ] Citations have NO narratives property
 - [ ] Checklists are 5-7 items per state, 3-5 per LOD, one sentence each
 - [ ] Practice narrative uses baseline narrative type
+- [ ] Persona/PersonaGroup/Pattern narratives included where Phase 1 provides substantive source material (not invented)
+- [ ] Asset icons specified for personas, persona groups, and competencies
 - [ ] All symbolic references are exact string matches
 - [ ] Gherkin structures (background, test, examples) used where verification logic adds value
 - [ ] Background.given preconditions are prose descriptions (not checklist assertions)
@@ -1801,7 +1918,7 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 ## Success Criteria
 
 - ✓ All Phase 1 concerns mapped to alphas (redeclaration or specialization)
-- ✓ All Phase 1 work products mapped with LODs and contributesTo
+- ✓ All Phase 1 work products mapped with LODs, contributesTo, and `partOf` where applicable
 - ✓ All Phase 1 activities mapped with complete references
 - ✓ **Alpha-state-activity gap analysis complete:**
   - ✓ Initial states evaluated (null point vs. prepared position)

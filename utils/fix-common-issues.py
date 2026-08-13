@@ -20,6 +20,7 @@ Consolidates structural fixes detected by assess-practice.py:
 - Element-level kind discriminators (narrativeTypes, activitySpaces, etc.)
 - Alias isolation (replace alias names in structural references with canonical names)
 - mapsTo variant naming (strip parent type name from variant alpha names and update refs)
+- Narrative schema (remove invalid kind='narrative', fix narrativeContext field names)
 
 Usage:
     # Dry run — show what would be fixed
@@ -57,6 +58,9 @@ Usage:
 
     # Strip parent type name from mapsTo variant alpha names
     python3 utils/fix-common-issues.py <file.json> <baseline.json> --fix --fix-mapsto-naming
+
+    # Fix invalid kind='narrative' and wrong narrativeContext field names
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-narrative-schema
 
     # Apply all optional fixes
     python3 utils/fix-common-issues.py <file.json> --fix --all
@@ -1147,6 +1151,89 @@ def fix_mapsto_naming(data, baseline=None):
     return fixes
 
 
+def fix_narrative_schema(data):
+    """Fix narrative schema issues: invalid kind='narrative' and wrong narrativeContext field names.
+
+    Fixes:
+    - Remove kind='narrative' from narratives (not a valid PracticeElement kind enum value)
+    - Rename sequenceNumber→seq in narrativeContexts
+    - Rename name→narrativeElementName in narrativeContexts (when narrativeElementName absent)
+    - Rename narrativeElements→context in narrativeContexts (join array with space if list)
+    """
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        narrative_locations = []
+
+        # Top-level narratives
+        if "narratives" in source:
+            narrative_locations.append((source["narratives"], "narratives"))
+
+        # Element-level narratives across all sections
+        for coll_key in ("alphas", "activities", "workProducts", "competencies",
+                         "activitySpaces", "focuses", "narrativeTypes", "personas",
+                         "patterns"):
+            for ei, elem in enumerate(source.get(coll_key, [])):
+                if "narratives" in elem:
+                    narrative_locations.append(
+                        (elem["narratives"], f"{coll_key}.{ei}.narratives")
+                    )
+
+        for narratives, path_prefix in narrative_locations:
+            for ni, narrative in enumerate(narratives):
+                narr_path = f"{path_prefix}.{ni}"
+
+                # Issue 1: Remove invalid kind="narrative"
+                if narrative.get("kind") == "narrative":
+                    del narrative["kind"]
+                    fixes.append({
+                        "category": "narrative-schema",
+                        "path": narr_path,
+                        "old": "kind=narrative",
+                        "new": "kind removed",
+                    })
+
+                # Issue 2: Fix narrativeContext field names
+                for ci, ctx in enumerate(narrative.get("narrativeContexts", [])):
+                    ctx_path = f"{narr_path}.narrativeContexts.{ci}"
+
+                    if "sequenceNumber" in ctx:
+                        ctx["seq"] = ctx.pop("sequenceNumber")
+                        fixes.append({
+                            "category": "narrative-schema",
+                            "path": f"{ctx_path}.seq",
+                            "old": "sequenceNumber",
+                            "new": "seq (renamed)",
+                        })
+
+                    if "name" in ctx and "narrativeElementName" not in ctx:
+                        ctx["narrativeElementName"] = ctx.pop("name")
+                        fixes.append({
+                            "category": "narrative-schema",
+                            "path": f"{ctx_path}.narrativeElementName",
+                            "old": "name",
+                            "new": "narrativeElementName (renamed)",
+                        })
+
+                    if "narrativeElements" in ctx and "context" not in ctx:
+                        val = ctx.pop("narrativeElements")
+                        if isinstance(val, list):
+                            ctx["context"] = " ".join(str(v) for v in val)
+                        else:
+                            ctx["context"] = val
+                        fixes.append({
+                            "category": "narrative-schema",
+                            "path": f"{ctx_path}.context",
+                            "old": "narrativeElements",
+                            "new": "context (renamed)",
+                        })
+
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
@@ -1193,6 +1280,10 @@ def main():
     parser.add_argument(
         "--fix-mapsto-naming", action="store_true",
         help="Strip parent type name from mapsTo variant alpha names"
+    )
+    parser.add_argument(
+        "--fix-narrative-schema", action="store_true",
+        help="Fix invalid kind='narrative' and wrong narrativeContext field names"
     )
     parser.add_argument(
         "--all", action="store_true",
@@ -1255,6 +1346,9 @@ def main():
 
     if args.fix_mapsto_naming or args.all:
         all_fixes.extend(fix_mapsto_naming(data, baseline))
+
+    if args.fix_narrative_schema or args.all:
+        all_fixes.extend(fix_narrative_schema(data))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

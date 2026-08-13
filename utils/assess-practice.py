@@ -801,6 +801,22 @@ CONCERN_DESCRIPTIVE_TERMS = [
     "approved", "published", "enforced",
 ]
 
+# Patterns that indicate lifecycle/temporal stages rather than document fidelity.
+# These are participles and verb forms that describe events or states of the
+# underlying concern, not what the document artifact contains.
+LIFECYCLE_STAGE_PATTERNS = [
+    # Past participles suggesting completion events
+    r"\bcompleted\b", r"\bmet\b", r"\bidentified\b", r"\bupdated\b",
+    r"\bevolved\b", r"\bstated\b", r"\bachieved\b", r"\brealized\b",
+    r"\bfulfilled\b", r"\bdelivered\b",
+    # Present participles suggesting ongoing adoption/impact
+    r"\bdriving\b", r"\benabling\b", r"\bguiding\b", r"\bvalidating\b",
+    # Temporal/process descriptors
+    r"\bcontinuously\b", r"\bongoing\b", r"\bin progress\b",
+]
+
+_LIFECYCLE_RE = re.compile("|".join(LIFECYCLE_STAGE_PATTERNS), re.IGNORECASE)
+
 
 def check_lod_naming(data, kind):
     """Flag LOD names that are generic labels or describe concern progression
@@ -813,6 +829,7 @@ def check_lod_naming(data, kind):
 
     generic_count = 0
     concern_count = 0
+    lifecycle_count = 0
     total = 0
 
     for source in sources:
@@ -840,7 +857,9 @@ def check_lod_naming(data, kind):
                         ),
                         "autoFixable": False,
                     })
+                    continue
 
+                hit_concern = False
                 for term in CONCERN_DESCRIPTIVE_TERMS:
                     if term in lower:
                         concern_count += 1
@@ -855,7 +874,26 @@ def check_lod_naming(data, kind):
                             ),
                             "autoFixable": False,
                         })
+                        hit_concern = True
                         break
+
+                if not hit_concern:
+                    m = _LIFECYCLE_RE.search(lower)
+                    if m:
+                        lifecycle_count += 1
+                        issues.append({
+                            "severity": "warning",
+                            "category": "lod-naming",
+                            "path": f"{pfx}workProducts[{wp_name}].levelsOfDetail[{name}]",
+                            "message": (
+                                f"LOD '{name}' on '{wp_name}' may describe a "
+                                f"lifecycle stage rather than document fidelity "
+                                f"(contains '{m.group()}'). LOD names should answer "
+                                f"'what does this document look like?' not 'where "
+                                f"does the concern stand?'"
+                            ),
+                            "autoFixable": False,
+                        })
 
     return issues
 
