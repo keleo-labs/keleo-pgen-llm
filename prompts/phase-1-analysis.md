@@ -132,6 +132,8 @@ For each work product:
   - Each level: Name, Description, 3-5 one-sentence characteristics
 - **Instances** (if source describes distinct variants, e.g., "Platform Architecture" vs "Security Architecture")
 
+When multiple work products follow the same LOD progression (e.g., several architecture documents all with Outlined → Detailed → Validated), note this pattern — Phase 2 may consolidate them as `mapsTo` variants of a single parent work product rather than separate work products.
+
 ### Step 7: Identify Activities
 
 **What types of work are performed?**

@@ -416,7 +416,7 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
 
 def check_mapsto_naming(data, kind, baseline_data=None):
-    """Check that mapsTo variant alpha names don't repeat the parent type name."""
+    """Check that mapsTo variant names don't repeat the parent type name (alphas and work products)."""
     issues = []
     if kind == "practiceBaseline":
         return issues
@@ -463,6 +463,47 @@ def check_mapsto_naming(data, kind, baseline_data=None):
                 "category": "mapsto-naming",
                 "path": f"alphas[{idx}].aliasName",
                 "message": f"mapsTo variant alias '{alias_name}' contains parent type name '{parent_name}'",
+                "autoFixable": False,
+            })
+
+    all_wps = {}
+    for wp in data.get("workProducts", []):
+        all_wps[wp.get("name", "")] = wp
+    if baseline_data:
+        for wp in baseline_data.get("workProducts", []):
+            all_wps.setdefault(wp.get("name", ""), wp)
+
+    for idx, wp in enumerate(data.get("workProducts", [])):
+        maps_to = wp.get("mapsTo")
+        if not maps_to:
+            continue
+
+        wp_name = wp.get("name", "")
+        parent = all_wps.get(maps_to)
+        if not parent:
+            continue
+
+        parent_name = parent.get("name", maps_to)
+
+        if parent_name.lower() in wp_name.lower():
+            issues.append({
+                "severity": "warning",
+                "category": "mapsto-naming",
+                "path": f"workProducts[{idx}].name",
+                "message": f"mapsTo variant '{wp_name}' contains parent type name '{parent_name}' — "
+                           f"mapsTo reads as 'is a type of', so the type name is redundant",
+                "autoFixable": True,
+            })
+
+        parent_lods = [lod.get("name") for lod in sorted(parent.get("levelsOfDetail", []), key=lambda l: l.get("seq", 0))]
+        variant_lods = [lod.get("name") for lod in sorted(wp.get("levelsOfDetail", []), key=lambda l: l.get("seq", 0))]
+        if parent_lods and variant_lods and parent_lods != variant_lods:
+            issues.append({
+                "severity": "error",
+                "category": "mapsto-lod-mismatch",
+                "path": f"workProducts[{idx}].mapsTo",
+                "message": f"mapsTo variant '{wp_name}' LODs {variant_lods} do not match parent '{parent_name}' LODs {parent_lods} — "
+                           f"variant must have identical LOD names and sequence",
                 "autoFixable": False,
             })
 
@@ -1177,6 +1218,8 @@ def check_alias_isolation(data, kind):
         ref_fields = [
             ("alphas", "contributesTo"),
             ("alphas", "mapsTo"),
+            ("workProducts", "mapsTo"),
+            ("workProducts", "partOf"),
             ("workProducts", None),
             ("activities", "activitySpaceName"),
         ]

@@ -40,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (
     detect_kind,
+    finalize_variants,
     load_all_from_keleo,
     load_json,
     merge_by_name,
@@ -296,6 +297,8 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
         merge_order.extend(name for name, _ in tiers["methods"])
 
     effective.pop("_merge_source", None)
+
+    finalize_variants(effective)
 
     all_docs = tiers["baselines"] + tiers["practices"] + tiers["methods"]
     aliases = collect_aliases(all_docs)

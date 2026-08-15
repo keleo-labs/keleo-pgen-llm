@@ -87,6 +87,28 @@ def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None
     return list(merged.values())
 
 
+def finalize_variants(effective):
+    """Post-merge variant aggregation per merge.md §7.2a (alphas) and §7.2b (work products).
+
+    Walks alphas and work products with mapsTo, appends the full variant object
+    to the target element's variants array. Variants remain in the top-level
+    array as authored elements; the variants array on the parent is additive
+    for UI rendering and taxonomy discovery.
+    """
+    for array_key in ("alphas", "workProducts"):
+        items = effective.get(array_key, [])
+        if not items:
+            continue
+        by_name = {item["name"]: item for item in items if "name" in item}
+        for item in items:
+            target_name = item.get("mapsTo")
+            if target_name and target_name in by_name:
+                target = by_name[target_name]
+                variants = target.setdefault("variants", [])
+                if not any(v.get("name") == item["name"] for v in variants):
+                    variants.append(copy.deepcopy(item))
+
+
 def load_json_from_keleo(keleo_path, document_name=None, document_type=None):
     """Load a JSON document from a .keleo ZIP archive.
 

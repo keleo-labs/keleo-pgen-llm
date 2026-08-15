@@ -860,9 +860,14 @@ Description: [what this instance represents]
 
 For EACH work product from Phase 1:
 
-**Determine if baseline defines similar work product:**
-- YES → Redeclare baseline work product with additional LODs/checklists
-- NO → Create new practice work product
+**Determine work product relationship:**
+1. Does the baseline/dependency define a similar work product?
+   - YES → **Redeclare** baseline work product with additional LODs/checklists
+2. Is this work product logically contained within a larger work product?
+   - YES → New work product with **`partOf`** (containment — see below)
+3. Is this work product a named variant of another work product with the SAME LOD progression?
+   - YES → New work product with **`mapsTo`** (variant mapping — see below)
+4. None of the above → Create new standalone practice work product
 
 **LOD Naming — The Rubric Principle:**
 
@@ -969,6 +974,58 @@ Rejection Rationale: [why none qualify as containment]
 - Value is a symbolic link: exact match to a WorkProduct.name
 - No self-references, no circular chains
 - Keep hierarchies shallow (one level typical)
+
+**Work Product Variant Mapping (`mapsTo`):**
+
+When a work product is a named variant of another work product — following the same LOD progression with domain-specific checklists — declare the relationship using `mapsTo`. See semantics.md Section 7.5 for full guidance.
+
+This mirrors the `mapsTo` relationship on Alphas (Step 4). The variant IS-A type of the parent work product: "Cloud Architecture" IS an "Architecture" with cloud-specific checklists. On merge, `mapsTo` work products are embedded in the parent's `variants` array.
+
+**When to use `mapsTo` vs `partOf`:**
+
+| Signal | `mapsTo` (Variant) | `partOf` (Containment) |
+|--------|-------------------|----------------------|
+| Relationship | IS-A (variant of parent artifact) | HAS-A (component within parent artifact) |
+| LOD progression | MUST match parent exactly (same names, same sequence) | Different LODs (independent maturity) |
+| Checklists | Domain-specific (e.g., cloud-specific items) | Sub-component-specific |
+| Merge behavior | Added to parent's `variants` array | Remains separate |
+| Mutually exclusive with | `partOf` | `mapsTo` |
+
+**Combinability test** (same as alpha decision): Would combining this work product's checklists with the parent's produce a coherent single document? If NOT — they represent distinct domain-specific views of the same artifact type — use `mapsTo`.
+
+**When NOT to use:**
+- Work product needs different LODs from the parent — `mapsTo` requires identical LOD names and sequences
+- Relationship is "contained within" — use `partOf` instead
+- Relationship is "contributes evidence to" — use `contributesTo` on LOD
+
+**Naming convention:** Variant work product names MUST NOT repeat the parent type name. `mapsTo` reads as "is a type of", so including the type is redundant:
+- ✅ "Cloud Architecture" mapsTo "Architecture"
+- ❌ "Cloud Architecture Document" mapsTo "Architecture" — "Document" repeats the parent type
+- ✅ "Security Assessment" mapsTo "Assessment Report"
+- ❌ "Security Assessment Report" mapsTo "Assessment Report" — "Report" repeats the parent type
+
+**Variant Mapping (New Work Product with `mapsTo`):**
+```
+Work Product Name: [name — omit parent type name per IS-A convention]
+Description: [single sentence — what this variant specializes]
+mapsTo: [parent work product name - REQUIRED]
+Levels of Detail: [MUST match parent exactly — same names, same sequence]
+  Level 1:
+    Name: [SAME name as parent LOD 1]
+    Description: [single sentence]
+    Seq: [same seq as parent]
+    Checklists: [domain-specific items for this variant]
+    Contributes To: [alpha/state targets — typically same as parent LOD]
+  Level 2: ...
+```
+
+**Rules:**
+- `mapsTo` and `partOf` are **mutually exclusive** — never set both on the same work product
+- Optional (0..1) — at most one parent
+- Value is a symbolic link: exact match to a WorkProduct.name
+- No self-references, no circular chains (including mixed `partOf`/`mapsTo` chains)
+- LODs MUST match the target work product exactly (same names, same sequence)
+- Resolution scope: same practice, `practiceDependencyNames` practices, or baseline
 
 **Work Product Instances:**
 If Phase 1 identified distinct variants:
@@ -1941,6 +1998,8 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] Work product LOD names have NO "Level X:" prefix
 - [ ] All LODs have contributesTo array
 - [ ] Work product `partOf` references (if any) point to valid work product names (no self-references, no cycles)
+- [ ] Work product `mapsTo` references (if any) point to valid work product names with matching LOD names/sequences
+- [ ] `mapsTo` and `partOf` are not both set on any work product
 - [ ] Narrative contexts are 1-3 sentences (not paragraphs)
 - [ ] Citations have NO narratives property
 - [ ] Checklists are 5-7 items per state, 3-5 per LOD, one sentence each
@@ -2000,7 +2059,7 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 ## Success Criteria
 
 - ✓ All Phase 1 concerns mapped to alphas (redeclaration or specialization)
-- ✓ All Phase 1 work products mapped with LODs, contributesTo, and `partOf` where applicable
+- ✓ All Phase 1 work products mapped with LODs, contributesTo, and `partOf`/`mapsTo` where applicable
 - ✓ All Phase 1 activities mapped with complete references
 - ✓ **Alpha-state-activity gap analysis complete:**
   - ✓ Initial states evaluated (null point vs. prepared position)

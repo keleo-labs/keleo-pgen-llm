@@ -479,7 +479,8 @@ Add workProducts array:
   {
     "name": "Work Product Name",
     "description": "Single sentence",
-    "partOf": "Parent Work Product Name",  // Optional — containment relationship (see semantics.md Section 7.4)
+    "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics.md Section 7.4)
+    "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics.md Section 7.5
     "levelsOfDetail": [
       {
         "name": "Level Name",  // NO "Level X:" prefix
@@ -526,6 +527,9 @@ Add workProducts array:
 - checklist items are objects, NOT strings
 - contributesTo is REQUIRED on every LOD
 - `partOf` is optional — include when the mapping guide identifies a containment relationship. The value must exactly match a WorkProduct.name (same practice, dependency, or baseline)
+- `mapsTo` is optional — include when the mapping guide identifies a variant relationship (IS-A). The value must exactly match a WorkProduct.name. `mapsTo` and `partOf` are **mutually exclusive** — never set both on the same work product
+- **`mapsTo` work products**: LODs MUST exactly match the target work product (same LOD names, same sequence). The variant has domain-specific checklists but shares the parent's LOD structure. On merge, variants are added to the parent's `variants` array.
+- **`mapsTo` naming convention**: Variant work product names MUST NOT repeat the parent type name — `mapsTo` reads as "is a type of", so including the type is redundant (e.g., "Cloud Architecture" not "Cloud Architecture Document" when mapping to "Architecture")
 
 **Asset Linking:**
 
@@ -1043,6 +1047,7 @@ Once validation passes, verify:
 - [ ] All checklists present (alpha states, work product LODs)
 - [ ] All citations referenced in citationNames exist
 - [ ] All symbolic references are exact matches
+- [ ] Work product `mapsTo` references (if any) point to valid targets with matching LOD names/sequences; `partOf` and `mapsTo` not both set on same work product
 - [ ] JSON is well-formatted and readable
 
 ## Common Schema Violations to Avoid
@@ -1210,10 +1215,14 @@ Once validation passes, verify:
 ❌ Wrong: Work products with `alphaName` or `focusName`
 ✅ Right: Work products link to alpha states via `contributesTo` on their LODs, not top-level properties
 
-### 13b. Work Product `partOf`
+### 13b. Work Product `partOf` and `mapsTo`
 ❌ Wrong: `"partOf": "Same Work Product Name"` (self-reference)
 ❌ Wrong: Circular chain (A partOf B, B partOf A)
+❌ Wrong: Work product with both `partOf` and `mapsTo` (mutually exclusive)
+❌ Wrong: `mapsTo` variant with different LOD names than parent (LODs must match exactly)
+❌ Wrong: `"mapsTo": "Same Work Product Name"` (self-reference)
 ✅ Right: `"partOf": "Parent Work Product Name"` — optional string referencing another WorkProduct.name in the same practice, a dependency, or the baseline. Use for containment (component within a larger deliverable), not for "contributes evidence to" relationships.
+✅ Right: `"mapsTo": "Architecture"` with matching LOD progression (e.g., Outlined → Detailed → Validated) — use for IS-A variant mapping. Variant has domain-specific checklists but same LOD structure as parent. On merge, added to parent's `variants` array.
 
 ### 14. Work Product Instances
 ❌ Wrong: `"instanceName": "Production Platform"`
@@ -1264,6 +1273,8 @@ Once validation passes, verify:
 ### Prohibited Patterns
 - NO floating alphas (all new alphas have `contributesTo` or `mapsTo`)
 - NO `contributesTo` AND `mapsTo` on same alpha (mutually exclusive)
+- NO `partOf` AND `mapsTo` on same work product (mutually exclusive)
+- NO `mapsTo` work product with LOD names/sequences that differ from the target
 - NO markdown in JSON strings
 - NO practice metadata in descriptions
 - NO "Level X:" prefixes on LOD names
