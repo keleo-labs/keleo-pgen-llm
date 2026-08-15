@@ -1418,7 +1418,61 @@ Practice Element Aliases:
   - Alias: {elementType: "Alpha", name: "Platform", aliasName: "Cloud Platform"}
   - All references use "Platform" (canonical)
 
-### Step 10: Validate Mapping Decisions
+### Step 10: Map Reference Content
+
+**Purpose:** Transform Phase 1's reference content candidates into fully mapped references anchored to specific alphas, states, and work products. References are `AlphaInstance` objects in the `Practice.references` array — curated external content that illustrates what an alpha state looks like in practice, optionally evidenced by work product instances at specific maturity levels.
+
+**CRITICAL RULE: Every reference MUST include at least one `links` entry with a valid URI.** Without a link, the reference provides no actionable value to practitioners. Drop candidates where no link can be found.
+
+**Step 10.1: Review Phase 1 Candidates**
+
+Read the "Reference Content Candidates" section from `01-analysis-report.md`. For each candidate:
+
+1. **Map to alpha + state:** Using the alpha mappings established in Step 4, determine which alpha this reference illustrates and at which specific state. Ask: "What level of maturity does this reference content represent?"
+2. **Map evidence to work product + LOD:** If the reference includes a concrete artifact (template, sample document, tool output), identify which work product it evidences and at which level of detail from Step 5 mappings.
+3. **Validate links:** Ensure the URL is present and points to accessible content. If Phase 1 recorded a URL, carry it forward. If not, search for it.
+4. **Assign tags:** Use the orthogonal tag structure to enable filtering by domain, lifecycle, and organizational context.
+
+**Step 10.2: Apply Naming Conventions (from semantics.md §6.6)**
+
+- Reference names should be specific and descriptive, identifying the source (e.g., "TOGAF-Based Platform Architecture" not "Platform Example 1")
+- Work product instance names within `evidenceBy` should identify the specific artifact (e.g., "TOGAF Architecture Document Template" not "Architecture Template")
+
+**Step 10.3: Document Mapped References**
+
+For each reference, document in the mapping guide:
+
+```markdown
+### Reference: [Descriptive Name]
+- **Alpha:** [alphaName] at **State:** [stateName]
+- **Description:** [What this reference illustrates — 1-2 sentences]
+- **Links:**
+  - Name: [link display name]
+    URI: [https://...]
+    Description: [what the link points to — optional]
+- **Evidence:** (if applicable)
+  - **Work Product:** [workProductName] at **LOD:** [levelOfDetailName]
+    - Name: [artifact instance name]
+    - Description: [what this artifact is]
+    - Links:
+      - Name: [artifact link name]
+        URI: [https://...]
+- **Tags:**
+  - domainTags: [...]
+  - lifecycleTags: [...]
+  - organizationalTags: [...]
+```
+
+**Quality Gates:**
+- [ ] Every reference has at least one `links` entry with a URI
+- [ ] Every `alphaName` maps to a defined alpha (baseline or practice)
+- [ ] Every `stateName` maps to a valid state on the referenced alpha
+- [ ] Every `evidenceBy` entry's `workProductName` maps to a defined work product
+- [ ] Every `evidenceBy` entry's `levelOfDetailName` maps to a valid LOD on the referenced work product
+- [ ] Reference names are unique
+- [ ] Reference names are descriptive (not generic)
+
+### Step 11: Validate Mapping Decisions
 
 **Before finalizing, check:**
 
@@ -1823,6 +1877,32 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 **Pattern: [Next Pattern]**
 ...
 
+### Reference Content Mappings
+
+**Reference: TOGAF-Based Platform Architecture**
+- **Alpha:** Platform at **State:** Architecture Selected
+- **Description:** Example of a platform achieving Architecture Selected state following TOGAF architectural patterns
+- **Links:**
+  - Name: TOGAF Architecture Framework
+    URI: https://www.opengroup.org/togaf
+    Description: The Open Group Architecture Framework reference
+- **Evidence:**
+  - **Work Product:** Architecture at **LOD:** Defined
+    - Name: TOGAF Architecture Document Template
+    - Description: Template for creating architecture documentation following TOGAF standards
+    - Links:
+      - Name: Architecture Document Template
+        URI: https://example.com/templates/togaf-architecture.docx
+- **Tags:**
+  - domainTags: [Architecture]
+  - lifecycleTags: [Adoption]
+  - organizationalTags: [Platform Team]
+
+**Reference: [Next Reference]**
+...
+
+[Include all mapped references from Phase 1 candidates. Drop candidates without links.]
+
 ### Alias Mappings
 
 [If source uses different terminology]
@@ -1868,6 +1948,8 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] Persona/PersonaGroup/Pattern narratives included where Phase 1 provides substantive source material (not invented)
 - [ ] Asset icons specified for personas, persona groups, and competencies
 - [ ] All symbolic references are exact string matches
+- [ ] Reference content mapped with valid alpha/state/work-product anchors and links
+- [ ] Every reference has at least one `links` entry with a URI
 - [ ] Gherkin structures (background, test, examples) used where verification logic adds value
 - [ ] Background.given preconditions are prose descriptions (not checklist assertions)
 - [ ] Test.when clauses on activities describe triggers/decision points (not state names)
@@ -1938,5 +2020,6 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 - ✓ If broad coverage (8+ alphas, all focuses), explicit justification provided for practice structure
 - ✓ Gherkin structures used selectively where verification logic adds value (see semantics.md Section 5.3.5)
 - ✓ Activities with complex triggers include test.when clauses (see semantics.md Section 8.1.1)
+- ✓ Reference content candidates mapped to alphas/states/work products with links
 
 This mapping guide will be used as input for Phase 3 (JSON Generation).

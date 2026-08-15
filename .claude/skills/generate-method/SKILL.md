@@ -126,14 +126,24 @@ In plan mode:
    - **If unified framework:** Plan for single practice (subject to Phase 2 validation)
    - **Key principle:** Don't determine primary alphas or practice boundaries yet - you need baseline context first
 
-4. **Plan execution:**
+4. **Reference strategy (present to user):**
+   - Estimate reference yield from source materials — how many templates, case studies, reference architectures, or sample artifacts are likely to emerge?
+   - Recommend whether secondary reference research (Step 2.5) is warranted:
+     - **Few candidates** (0-2 from source) → recommend secondary research
+     - **Moderate candidates** (3-5 from source) → optional, user decides
+     - **Many candidates** (6+) → recommend skipping secondary research
+   - Types of references expected (templates, case studies, architectures, tools)
+   - Note: References are only generated for practices (not baselines)
+
+5. **Plan execution:**
    - Tentative practice/method name (kebab-case)
    - Phase execution sequence
    - Expected complexity and size
    - Potential challenges
+   - Whether secondary reference research (Step 2.5) will be performed
    - **Note:** Practice boundaries will be finalized in Step 1.5 (Delineation Gate) before Phase 2 delegation
 
-5. **Exit plan mode** with clear execution roadmap
+6. **Exit plan mode** with clear execution roadmap
 
 ---
 
@@ -1373,6 +1383,47 @@ Fix any FAIL assertions before proceeding to Phase 3. If sections are missing, r
 
 If `narratives` is missing, review Phase 1 analysis for overarching lifecycle and add method narrative.
 
+### Step 2.5: Secondary Reference Research (Opt-In)
+
+**Skip this step if the planning phase (Step 0) determined secondary research is not needed.**
+
+**Objective:** Actively discover additional reference content to supplement what Phase 1 tagged from source materials. This step runs after Phase 2 mapping is complete, using the established alpha/state/work-product mappings as a search framework.
+
+**When to run:**
+- Planning step recommended it (few reference candidates from source materials)
+- User explicitly requested reference research
+
+**Process:**
+
+1. **Review Phase 2 reference mappings:** Read the "Reference Content Mappings" section of `02-mapping-guide.md`. Identify which alphas/states have reference coverage and which have gaps.
+
+2. **Search for additional references** targeting uncovered alphas/states:
+   - Official methodology templates and starter documents
+   - Community tools, GitHub repos, starter kits
+   - Reference implementations and architectural examples
+   - Industry standards and frameworks (ISO, NIST, TOGAF)
+   - Case studies and exemplary implementations
+
+3. **Map discovered references** following reference semantic conventions:
+   - `alphaName` + `stateName` (from established mappings)
+   - **Name**: Concept-oriented, not content-centric. Pattern: `"Standard [Qualifier] <AlphaName>"`. "Standard" prefix indicates exemplar.
+   - **Description**: Semantic role of the reference instance in terms of alpha state progression, not a description of the content asset.
+   - **`evidenceBy`**: Document artifacts (decks, guides, templates, cheatsheets) become `WorkProductInstance` entries with `workProductName` + `levelOfDetailName` resolving to practice or dependency work products. Navigation resources (hub/landing pages) stay as alpha-level `links` only.
+   - **Link names**: Use actual content title (not generic platform labels like "Sales Hub"). Applies at both alpha-level and evidenceBy-level links.
+   - **Link descriptions**: Optional but recommended when derivable from content inspection.
+   - `links` with valid URIs (REQUIRED — drop candidates without links)
+   - Tags for categorisation
+   - See update-method SKILL.md Step 3C for the full content-to-work-product heuristics table and structural examples
+
+4. **Present findings to user for approval** before appending to the mapping guide.
+
+5. **Append approved references** to the "Reference Content Mappings" section of `02-mapping-guide.md`.
+
+**User Feedback:**
+- "Searching for reference content across N uncovered alpha states..."
+- "Found M additional references (templates, tools, case studies)..."
+- "Appended N approved references to mapping guide"
+
 ### Step 3: Phase 3 - JSON Generation
 
 **Objective:** Generate schema-compliant Practice or Method JSON
@@ -1405,7 +1456,8 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - **Versioning:** Set `schemaVersion` from schema `$comment`. Set `version` to `"1.0.0"` for new documents. Populate `dependencyVersions` with a caret range (`^X.Y.Z`) pinned to each dependency's current `version` — one entry for `baselinePracticeName` and one per `practiceDependencyNames` entry.
    - **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice's `baselinePracticeName` (NOT the parent practice name). Set `practiceDependencyNames` using the filtering rule (see "Determining practiceDependencyNames" below).
 4. Include aliases array from mapping guide
-5. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
+5. **IMPORTANT:** Never re-run `resolve-context.py` during repair/fix iterations — the `_effective-context.json` was generated once in Step 0.5 from the correct baseline + parent sources. Re-running it after the practice JSON exists may include the practice itself, corrupting the context.
+6. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
    ```bash
    python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
@@ -1449,7 +1501,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
-   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies."
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies. (5) Write output to the SAME directory containing 02-mapping-guide.md — verify the directory exists before writing. (6) For redeclared alphas, include ALL states from the baseline/parent but add checklists ONLY to states enriched in the mapping guide — use empty checklist for unenriched states. (7) Every activity MUST have focusName, contributesTo, worksOn, requiredCompetencies, AND recommendedCompetencyLevels — all are schema-required."
 
 3. **Agents run concurrently**, each producing one practice JSON file
 
@@ -1527,7 +1579,10 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 From `deps/language.schema.json`:
 
 - **Discriminator property:** `"kind": "practice"` REQUIRED at root level of every practice JSON (enables type discrimination)
-- **Redeclared alphas:** Alphas that exist in the baseline or parent practice are REDECLARATIONS — they MUST NOT have `contributesTo` or `mapsTo` properties. These relationships are inherited from the baseline/parent definition. Only add practice-specific checklists, narratives, and Gherkin guidance to redeclared alphas.
+- **Redeclared alphas:** Alphas that exist in the baseline or parent practice are REDECLARATIONS — they MUST NOT have `contributesTo` or `mapsTo` properties. These relationships are inherited from the baseline/parent definition.
+  - **Include ALL states** from the baseline/parent definition — never subset to only enriched states (the validator checks for exact state-set match)
+  - **Add checklists ONLY to states** that the Phase 2 mapping guide explicitly enriches
+  - **For unenriched states**, include them with an empty `"checklist": []` — do NOT fabricate checklists for states the mapping guide does not cover
 - **Checklist format:** Objects {name, description, seq}, NOT strings
 - **Competency references:** {competencyName, competencyLevelName}, NOT {competencyName, level}
 - **Persona property:** `competencies`, NOT `requiredCompetencies`
@@ -1755,19 +1810,25 @@ The skill does NOT assume a specific baseline practice. Instead:
 
 ### Determining practiceDependencyNames (Parent Practice Mode)
 
-**Rule:** A practice should only declare a dependency on a parent practice if it actually references an alpha that is **uniquely defined** in that parent practice — i.e., an alpha that exists in the parent but NOT in the effective baseline. Baseline alphas that are merely **redeclared** by a parent practice do NOT create a dependency.
+**Rule:** A practice must declare a dependency on a parent practice when it references alphas that originate from that parent practice. There are two cases:
+
+1. **`contributesTo`/`mapsTo` targets:** If a new alpha targets a practice-only alpha (not in baseline), that creates a dependency.
+2. **Redeclarations of practice-only alphas:** If the practice redeclares an alpha that was **introduced** by a parent practice (has `contributesTo`/`mapsTo` in the parent, not a baseline root alpha), that alpha's defining practice is a dependency — the validator checks redeclared states against the defining practice.
 
 **Algorithm (apply per practice after Phase 3 JSON generation):**
 
-1. **Collect `contributesTo` and `mapsTo` targets** from all alphas in the practice
+1. **Collect all alpha references:**
+   - `contributesTo`/`mapsTo` targets from new alphas
+   - Names of all redeclared alphas (alphas without `contributesTo`/`mapsTo`)
 2. **Filter out practice-local targets** (alphas defined within the same practice)
-3. **For each remaining target**, classify it:
-   - **Baseline alpha** (`_contributingPracticeName` points to a baseline in `_provenance.tiers.baselines`): no dependency created
-   - **Practice-only alpha** (`_contributingPracticeName` points to a practice in `_provenance.tiers.practices`): creates dependency on that contributing practice
-4. **Set `practiceDependencyNames`** to the deduplicated list of contributing practices that own at least one referenced practice-only alpha. If no practice-only alphas are referenced, set to `[]`.
+3. **For each remaining reference**, classify it using `_effective-context.json`:
+   - Check the alpha's `_contributingPracticeName` against `_provenance.tiers`
+   - **Baseline alpha** (source in `tiers.baselines`): no dependency created
+   - **Practice-only alpha** (source in `tiers.practices`): creates dependency on that contributing practice
+4. **Set `practiceDependencyNames`** to the deduplicated list of contributing practices. If all referenced alphas trace to baselines, set to `[]`.
 
 **Using `_contributingPracticeName` for dependency determination:**
-The effective context annotates every element with its source. When your new practice references an alpha via `contributesTo`/`mapsTo`, check that alpha's `_contributingPracticeName` and cross-reference with `_provenance.tiers`:
+The effective context annotates every element with its source. Check each referenced alpha's `_contributingPracticeName` and cross-reference with `_provenance.tiers`:
 - If the source is in `tiers.baselines` → baseline alpha → no dependency
 - If the source is in `tiers.practices` → practice alpha → add that practice to `practiceDependencyNames`
 

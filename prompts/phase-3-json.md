@@ -4,6 +4,15 @@
 
 You are conducting **Phase 3: JSON Generation** of a methodology translation workflow. This phase creates machine-readable Practice or Method JSON that precisely conforms to the Practice Language JSON Schema.
 
+## Output Location
+
+**CRITICAL — verify before writing any files:**
+
+- **Single practice:** `practices/<practice-name>/<practice-name>.json`
+- **Method:** `practices/<method-name>/<method-name>.json` (plus per-practice JSONs)
+
+Always use the practice directory that already contains `01-analysis-report.md` and `02-mapping-guide.md`. Verify the directory exists before writing. Never write to the repository root.
+
 ## Objective
 
 Generate schema-compliant JSON files that:
@@ -100,7 +109,7 @@ You have access to the following resources via the Read tool:
 
 **Parent Practice Mode:** When extending a parent practice (instead of mapping directly to a baseline):
 - `baselinePracticeName`: Set to the value **inherited** from the parent practice's `baselinePracticeName` (NOT the parent practice name itself)
-- `practiceDependencyNames`: Auto-populated with the parent practice name(s) provided in Step 0.25
+- `practiceDependencyNames`: Include any parent practice whose **non-baseline alphas** you redeclare, specialize, or reference. Check `_effective-context.json` provenance: if an alpha's `_contributingPracticeName` points to a practice (not a baseline), and you redeclare/reference that alpha, you MUST list that practice as a dependency.
 - `dependencyVersions`: Include entries for BOTH the inherited baseline AND each practice dependency
 - All `contributesTo`/`mapsTo` references should primarily target parent practice alphas using canonical names
 ```json
@@ -428,6 +437,11 @@ Add alphas array:
   - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
 - Checklist items are objects {name, description, seq}, NOT strings
 - evidencedBy is optional array of WorkProductContribution
+- **Redeclared alpha state handling (CRITICAL):**
+  - Include ALL states from the baseline/parent practice definition — never subset to only enriched states
+  - Add practice-specific checklists ONLY to states that the Phase 2 mapping guide explicitly enriches
+  - For unenriched states, include them with an empty `"checklist": []` — do NOT fabricate checklists
+  - The validator checks for exact state-set match with the parent; missing or extra states are errors
 
 **Asset Linking:**
 
@@ -781,7 +795,59 @@ Add patterns array:
   }
   ```
 
-#### 3.12 Practice Element Aliases
+#### 3.12 References (Curated External Content)
+
+If the mapping guide includes a "Reference Content Mappings" section, add a `references` array. Each reference is an `AlphaInstance` object anchored to an alpha at a specific state, with links to external content and optional work product evidence.
+
+```json
+"references": [
+  {
+    "name": "TOGAF-Based Platform Architecture",
+    "description": "Example of a platform achieving Architecture Selected state following TOGAF architectural patterns.",
+    "alphaName": "Platform",
+    "stateName": "Architecture Selected",
+    "links": [
+      {
+        "name": "TOGAF Architecture Framework",
+        "description": "The Open Group Architecture Framework reference",
+        "uri": "https://www.opengroup.org/togaf"
+      }
+    ],
+    "evidenceBy": [
+      {
+        "name": "TOGAF Architecture Document Template",
+        "description": "Template for creating architecture documentation following TOGAF standards with ADR structure.",
+        "workProductName": "Architecture",
+        "levelOfDetailName": "Defined",
+        "links": [
+          {
+            "name": "Architecture Document Template",
+            "description": "Downloadable TOGAF-aligned architecture document template",
+            "uri": "https://example.com/templates/togaf-architecture.docx"
+          }
+        ]
+      }
+    ],
+    "tags": {
+      "domainTags": ["Architecture"],
+      "lifecycleTags": ["Adoption"],
+      "organizationalTags": ["Platform Team"]
+    }
+  }
+]
+```
+
+**CRITICAL:**
+
+- Every reference MUST have at least one `links` entry with a valid `uri`. References without links provide no actionable value — drop them.
+- `alphaName` must match a defined alpha (baseline or practice)
+- `stateName` must match a state on the referenced alpha
+- `evidenceBy` entries: `workProductName` must match a defined work product, `levelOfDetailName` must match an LOD on that work product
+- Reference names should be unique and descriptive (identify the source, not generic labels)
+- `evidenceBy` is optional — not every reference has a concrete artifact. But when present, its entries should also include `links` where a downloadable resource exists.
+- Tags are optional but recommended for filtering
+
+#### 3.13 Practice Element Aliases
 
 If mapping guide defines aliases:
 ```json
@@ -800,7 +866,7 @@ If mapping guide defines aliases:
 - For **mapsTo variant** alphas, differentiate alias names from parent aliases (e.g., prefix with practice domain: "RHEL Deal Registration" not "Deal Registration")
 - Only create aliases for elements **this practice defines or redefines**
 
-#### 3.13 Method Packaging (For Methods)
+#### 3.14 Method Packaging (For Methods)
 
 If generating a Method:
 
@@ -859,9 +925,9 @@ When a method composes practices from different baseline families, add `alphaBin
 
 Only include `alphaBindings` when the method spans multiple baselines. `stateContributions` is optional — alpha-level binding without state mapping is valid. All baseline/alpha/state names must resolve to valid references.
 
-#### 3.14 Verify Complete Structure
+#### 3.15 Verify Complete Structure
 
-Before proceeding to validation, verify ALL sections from 3.1-3.13 are complete:
+Before proceeding to validation, verify ALL sections from 3.1-3.14 are complete:
 
 **Required Arrays Checklist (For Practice JSON):**
 
@@ -876,11 +942,12 @@ Before proceeding to validation, verify ALL sections from 3.1-3.13 are complete:
 - [ ] 3.9: **personaGroups array populated** ← Often missed!
 - [ ] 3.10: activities array populated
 - [ ] 3.11: patterns array populated (REQUIRED: minimum 1 pattern per practice)
-- [ ] 3.12: practiceElementAliases array (if applicable)
+- [ ] 3.12: references array (if mapping guide has Reference Content Mappings)
+- [ ] 3.13: practiceElementAliases array (if applicable)
 
 **For Method JSON, verify EACH practice has:**
 
-- [ ] All arrays from 3.4-3.12 above
+- [ ] All arrays from 3.4-3.13 above
 - [ ] Method-level: citations, narratives (3.2-3.3)
 - [ ] Method-level: practices array with complete Practice objects
 
@@ -968,7 +1035,7 @@ After applying fixes:
 Once validation passes, verify:
 
 - [ ] All Phase 2 mappings translated to JSON
-- [ ] Verify ALL arrays present: citations, narratives, alphas, alphaInstances, workProducts, workProductInstances, personas, **personaGroups**, activities, patterns, practiceElementAliases
+- [ ] Verify ALL arrays present: citations, narratives, alphas, alphaInstances, workProducts, workProductInstances, personas, **personaGroups**, activities, patterns, references (if mapped), practiceElementAliases
 - [ ] No content omissions from Phase 2 mapping guide
 - [ ] All narratives present (alpha, activity, practice/method level)
 - [ ] Persona/PersonaGroup/Pattern narratives present where mapping guide provided source-grounded content
@@ -1231,5 +1298,7 @@ For methods: `practices/<method-name>/<method-name>.json`
 - ✓ All symbolic references are exact matches
 - ✓ No markdown or metadata in JSON strings
 - ✓ Narratives and checklists complete
+- ✓ References array populated from mapping guide (if Reference Content Mappings section present)
+- ✓ Every reference has at least one link with valid URI
 
 Validated JSON is ready for use in Practice Language consuming systems.

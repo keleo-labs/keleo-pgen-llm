@@ -51,6 +51,12 @@ Usage:
     # Dump raw JSON of first element from a section (template reference)
     python3 utils/extract-reference-names.py practice.json --sample activities
 
+    # Audit checklists for named techniques that should be generalized
+    python3 utils/extract-reference-names.py practice.json --checklist-audit
+
+    # Check narrative element completeness against type definitions
+    python3 utils/extract-reference-names.py practice.json --narrative-completeness --baseline baseline.json
+
     # JSON output for programmatic use
     python3 utils/extract-reference-names.py baseline.json --json
 
@@ -505,7 +511,9 @@ def print_work_products(data):
     for wp in wps:
         lods = wp.get("levelsOfDetail", [])
         lod_names = [l["name"] for l in lods]
-        print(f"  {wp['name']} (LODs: {lod_names})")
+        part_of = wp.get("partOf")
+        suffix = f", partOf: {part_of}" if part_of else ""
+        print(f"  {wp['name']} (LODs: {lod_names}{suffix})")
 
 
 def print_personas(data):
@@ -769,6 +777,7 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
             result["workProducts"] = [{
                 "name": wp["name"],
                 "lods": [l["name"] for l in wp.get("levelsOfDetail", [])],
+                **({"partOf": wp["partOf"]} if wp.get("partOf") else {}),
             } for wp in data.get("workProducts", [])]
         elif section == "practices":
             result["practices"] = [{
@@ -783,6 +792,21 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
 COVERAGE_SECTIONS = [
     "alphas", "activities", "workProducts", "competencies",
     "activitySpaces", "focuses", "narrativeTypes", "personas", "patterns",
+]
+
+TECHNIQUE_NAMES = [
+    "Wardley", "PESTLE", "STEEPLE", "STEEP", "SWOT", "SOAR",
+    "Porter's", "Five Forces", "BCG Matrix", "Ansoff", "VRIO",
+    "Blue Ocean", "GE-McKinsey", "Value Chain Analysis",
+    "Cynefin", "RACI", "CATWOE", "MoSCoW", "Delphi",
+    "Kepner-Tregoe", "OODA", "Eisenhower Matrix",
+    "Six Sigma", "DMAIC", "Poka-Yoke", "Gemba", "Kaizen",
+    "TOGAF", "Zachman", "ArchiMate",
+    "Balanced Scorecard", "Ishikawa", "Fishbone",
+    "Force Field", "SIPOC",
+    "Power/Interest", "Mendelow", "Kotter", "ADKAR", "Lewin",
+    "Tuckman", "Belbin", "Myers-Briggs", "MBTI",
+    "Business Model Canvas", "Lean Canvas",
 ]
 
 
@@ -876,6 +900,193 @@ def print_coverage(data):
         print(f"{section:<20} {total:>5}  {narr:>7}  {icons:>7}  {gap_str}")
 
 
+def _checklist_audit(data):
+    """Scan checklists for named techniques/frameworks."""
+    import re as _re
+
+    patterns = []
+    for name in TECHNIQUE_NAMES:
+        escaped = _re.escape(name)
+        patterns.append((name, _re.compile(r'\b' + escaped + r'\b', _re.IGNORECASE)))
+
+    findings = []
+
+    sources = [("", data)]
+    for p in data.get("practices", []):
+        sources.append((f"{p.get('name', '?')}/", p))
+
+    for prefix, source in sources:
+        for alpha in source.get("alphas", []):
+            for state in alpha.get("states", []):
+                checklists = state.get("checklist", state.get("checklists", []))
+                for cl in checklists:
+                    if not isinstance(cl, dict):
+                        continue
+                    cl_name = cl.get("name", "")
+                    cl_desc = cl.get("description", "")
+                    text = f"{cl_name} {cl_desc}"
+
+                    matched = []
+                    for technique, pattern in patterns:
+                        if pattern.search(text):
+                            matched.append(technique)
+
+                    if matched:
+                        findings.append({
+                            "alpha": f"{prefix}{alpha['name']}",
+                            "state": state["name"],
+                            "checklist": cl_name,
+                            "techniques": matched,
+                        })
+
+    return findings
+
+
+def print_checklist_audit(data, as_json=False):
+    """Print checklist audit report."""
+    findings = _checklist_audit(data)
+
+    if as_json:
+        print(json.dumps({"checklistAudit": findings, "count": len(findings)}, indent=2))
+        return
+
+    if not findings:
+        print("=== CHECKLIST AUDIT === (no named techniques found)")
+        return
+
+    print(f"=== CHECKLIST AUDIT ({len(findings)} items reference named techniques) ===")
+    print()
+    print("Checklists should be outcome-oriented, not prescribe specific techniques.")
+    print("Consider generalizing (move technique details to activity narratives).")
+    print()
+
+    by_alpha = {}
+    for f in findings:
+        by_alpha.setdefault(f["alpha"], []).append(f)
+
+    for alpha, items in sorted(by_alpha.items()):
+        print(f"  {alpha}:")
+        for item in items:
+            techniques = ", ".join(item["techniques"])
+            print(f"    [{item['state']}] \"{item['checklist']}\"")
+            print(f"      techniques: {techniques}")
+        print()
+
+
+def _narrative_completeness(data, narrative_types=None):
+    """Check narrative element completeness against type definitions."""
+    nt_lookup = {}
+    if narrative_types:
+        for nt in narrative_types:
+            elements = [ne["name"] for ne in nt.get("narrativeElements", [])]
+            nt_lookup[nt["name"]] = elements
+
+    findings = []
+
+    def _check_narratives(element_type, element_name, narratives, prefix=""):
+        for narr in narratives:
+            nt_name = narr.get("narrativeTypeName", "?")
+            n_name = narr.get("name", "?")
+            contexts = narr.get("narrativeContexts", [])
+            present_elements = {c.get("narrativeElementName") for c in contexts}
+            empty_contexts = [
+                c.get("narrativeElementName", "?")
+                for c in contexts
+                if not c.get("context", "").strip()
+            ]
+
+            expected = nt_lookup.get(nt_name, [])
+            missing = [e for e in expected if e not in present_elements] if expected else []
+
+            if missing or empty_contexts:
+                findings.append({
+                    "elementType": element_type,
+                    "elementName": f"{prefix}{element_name}",
+                    "narrativeName": n_name,
+                    "narrativeType": nt_name,
+                    "missingElements": missing,
+                    "emptyContexts": empty_contexts,
+                    "presentElements": sorted(present_elements),
+                })
+
+    sources = [("", data)]
+    for p in data.get("practices", []):
+        sources.append((f"{p.get('name', '?')}/", p))
+
+    for prefix, source in sources:
+        _check_narratives("Practice", source.get("name", "?"),
+                          source.get("narratives", []), prefix)
+
+        for alpha in source.get("alphas", []):
+            _check_narratives("Alpha", alpha["name"],
+                              alpha.get("narratives", []), prefix)
+            for state in alpha.get("states", []):
+                _check_narratives("State", f"{alpha['name']}/{state['name']}",
+                                  state.get("narratives", []), prefix)
+
+        for act in source.get("activities", []):
+            _check_narratives("Activity", act["name"],
+                              act.get("narratives", []), prefix)
+
+        for wp in source.get("workProducts", []):
+            _check_narratives("WorkProduct", wp["name"],
+                              wp.get("narratives", []), prefix)
+
+        for pat in source.get("patterns", []):
+            _check_narratives("Pattern", pat["name"],
+                              pat.get("narratives", []), prefix)
+
+        for pg in source.get("personaGroups", []):
+            _check_narratives("PersonaGroup", pg["name"],
+                              pg.get("narratives", []), prefix)
+
+    return findings
+
+
+def print_narrative_completeness(data, narrative_types=None, as_json=False):
+    """Print narrative completeness report."""
+    findings = _narrative_completeness(data, narrative_types)
+
+    if as_json:
+        print(json.dumps({
+            "narrativeCompleteness": findings,
+            "count": len(findings),
+            "hasTypeDefinitions": bool(narrative_types),
+        }, indent=2))
+        return
+
+    if not findings:
+        if narrative_types:
+            print("=== NARRATIVE COMPLETENESS === (all narratives complete)")
+        else:
+            print("=== NARRATIVE COMPLETENESS === (no type definitions available)")
+            print("  Use --baseline <file.json> to check against narrative type definitions")
+        return
+
+    missing_el = [f for f in findings if f["missingElements"]]
+    empty_ctx = [f for f in findings if f["emptyContexts"]]
+
+    print(f"=== NARRATIVE COMPLETENESS ===")
+    if narrative_types:
+        print(f"  Checked against {len(narrative_types)} narrative type definition(s)")
+    print()
+
+    if missing_el:
+        print(f"  Missing narrative elements ({len(missing_el)} narratives):")
+        for f in missing_el:
+            print(f"    {f['elementType']} \"{f['elementName']}\" -> {f['narrativeType']}")
+            print(f"      missing: {f['missingElements']}")
+            print(f"      present: {f['presentElements']}")
+        print()
+
+    if empty_ctx:
+        print(f"  Empty narrative contexts ({len(empty_ctx)} narratives):")
+        for f in empty_ctx:
+            print(f"    {f['elementType']} \"{f['elementName']}\" -> {f['narrativeType']}")
+            print(f"      empty: {f['emptyContexts']}")
+        print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract reference names and structure from practice/baseline/method JSON"
@@ -919,6 +1130,12 @@ def main():
                         help="Show top-level key overview (type and count/length for each key)")
     parser.add_argument("--coverage", action="store_true",
                         help="Show per-element narrative and icon asset coverage for each section")
+    parser.add_argument("--checklist-audit", action="store_true",
+                        help="Scan checklists for named techniques/frameworks that should be generalized")
+    parser.add_argument("--narrative-completeness", action="store_true",
+                        help="Check narratives for missing or empty narrative elements")
+    parser.add_argument("--baseline", metavar="FILE",
+                        help="Baseline JSON for narrative type definitions (with --narrative-completeness)")
 
     args = parser.parse_args()
     data = load_json(args.json_file)
@@ -928,6 +1145,18 @@ def main():
             print(json.dumps({"coverage": collect_coverage(data)}, indent=2))
         else:
             print_coverage(data)
+        return
+
+    if args.checklist_audit:
+        print_checklist_audit(data, as_json=args.json)
+        return
+
+    if args.narrative_completeness:
+        nt_defs = data.get("narrativeTypes")
+        if not nt_defs and args.baseline:
+            baseline_data = load_json(args.baseline)
+            nt_defs = baseline_data.get("narrativeTypes", [])
+        print_narrative_completeness(data, narrative_types=nt_defs, as_json=args.json)
         return
 
     if args.find_refs:

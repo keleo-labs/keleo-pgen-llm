@@ -386,6 +386,11 @@ def main():
         help="Auto-resolve transitive baseline dependencies from baselines/, practices/, deps/, bundles/",
     )
     parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite output file without creating a backup",
+    )
+    parser.add_argument(
         "--search-dirs",
         nargs="+",
         default=["baselines", "practices", "deps", "bundles"],
@@ -422,6 +427,13 @@ def main():
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if output_path.exists() and not args.force:
+        backup_path = output_path.with_suffix(".json.bak")
+        import shutil
+        shutil.copy2(output_path, backup_path)
+        report["backup"] = str(backup_path)
+
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(effective, f, indent=2, ensure_ascii=False)
 

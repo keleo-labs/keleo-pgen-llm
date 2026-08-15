@@ -272,6 +272,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **Activities** | Defined in practice | NOT PRESENT |
 | **WorkProducts** | Defined in practice | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
+| **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
 | **schemaVersion** | Optional (auto-set by skills) | Optional (auto-set by skills) |
 | **dependencyVersions** | Entries for baselinePracticeName + practiceDependencyNames | Entries for baselinePracticeNames (if any) |
@@ -401,6 +402,14 @@ Every practice must include comprehensive citations using the "Citation Standard
 
 ### Acknowledgements
 Optional `acknowledgements` array on Practice, PracticeBaseline, and Method. Recognizes individuals, groups, or institutions that contributed to the methodology. Distinct from citations — attributes human contributions rather than published works. Each entry has `name`, `description`, and optional `url`.
+
+### References (Curated External Content)
+Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content (templates, case studies, reference architectures, sample artifacts) that illustrate alphas at specific states. Each reference has:
+- **Required**: `name`, `description`, `alphaName`, `stateName`
+- **Optional**: `evidenceBy` (array of `WorkProductInstance`), `links` (array of `ExternalLink`), `tags`, `narratives`, `background`
+- **Skill-level rule**: Every reference MUST have at least one `links` entry with a valid URI — references without links provide no actionable value
+- `alphaName`/`stateName` must match defined elements; `evidenceBy` entries must resolve to defined work products/LODs
+- See `references/semantics.md` §6.6 for naming conventions and validation rules
 
 ### Assets
 Visual assets (diagrams, templates, icons) can be referenced in practices and methods using the AssetReference structure:

@@ -298,7 +298,33 @@ For each Practice:
 
 Document practice hierarchy and relationships.
 
-### Step 13: Generate Citations
+### Step 13: Identify Reference Content Candidates
+
+**What external content could help practitioners bootstrap their work?**
+
+During source material analysis, tag content that could serve as curated references — real-world exemplars that illustrate what alpha states look like in practice, with links to downloadable or viewable content.
+
+**What to look for:**
+
+- **Templates and starter documents** — Architecture decision records, runbook templates, governance policy templates, onboarding checklists
+- **Reference architectures** — Canonical design patterns with concrete examples (e.g., AWS reference architectures, TOGAF building blocks)
+- **Case studies and exemplary implementations** — Real-world examples showing how an organization achieved a particular maturity state
+- **Tools and repositories** — GitHub repos, community tools, starter kits, automation frameworks
+- **External standards and frameworks** — ISO standards, NIST frameworks, industry benchmarks that map to specific concerns
+- **Sample artifacts** — Example work products at various levels of maturity (e.g., a sample architecture document, a completed risk register)
+
+**For each candidate, document:**
+
+- **Name** (descriptive, identifying the source — e.g., "TOGAF Architecture Document Template", NOT "Architecture Template 1")
+- **Description** (1-2 sentences: what it illustrates and why it is useful)
+- **Related Concern** (which concern/alpha area it relates to — preliminary, pre-mapping)
+- **Content Type** (template | case study | reference architecture | tool | standard | sample artifact)
+- **URLs/Links** (REQUIRED where available — without a link, a reference provides no actionable value)
+- **Estimated Maturity** (what level of maturity/completeness does this content represent? e.g., basic starter vs comprehensive production-ready)
+
+**Quality over quantity** — focus on high-value references that would genuinely accelerate practitioner work. A practice may have 3-10 references; not every alpha state needs one.
+
+### Step 14: Generate Citations
 
 Document all source materials as structured citations with full metadata. This is the authoritative citation record — Phase 2 and Phase 3 will carry these details forward, so completeness here prevents information loss downstream.
 
@@ -564,7 +590,19 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 ### 9.2 [Next Practice if applicable]
 ...
 
-## 10. Citations
+## 10. Reference Content Candidates
+
+### 10.1 [Reference Name]
+**Description:** 1-2 sentences explaining what this illustrates and why it is useful
+**Related Concern:** [concern name from Section 2]
+**Content Type:** template | case study | reference architecture | tool | standard | sample artifact
+**URL:** https://... (REQUIRED where available)
+**Estimated Maturity:** [basic starter | intermediate | comprehensive/production-ready]
+
+### 10.2 [Next Reference]
+...
+
+## 11. Citations
 
 ### [1] [Exact Source Title]
 - **Description**: 1 sentence summary
@@ -628,5 +666,6 @@ Where `<practice-name>` is kebab-case derived from the methodology name (e.g., "
 - ✓ Patterns and lifecycle mapped to workflow frameworks
 - ✓ Preliminary practice structure observed with structural signals noted (final boundaries determined in Phase 2)
 - ✓ Comprehensive citations to source materials
+- ✓ Reference content candidates tagged with URLs, related concerns, and content types
 
 This analysis will be used as input for Phase 2 (Mapping to Baseline Practice).

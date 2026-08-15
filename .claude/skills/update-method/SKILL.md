@@ -8,6 +8,9 @@ triggerPatterns:
   - "refresh.*practice"
   - "rework.*method"
   - "rework.*practice"
+  - "add.*reference"
+  - "find.*reference"
+  - "update.*reference"
 ---
 
 # Update Method/Practice Skill
@@ -32,11 +35,12 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ## Workflow Overview
 
-**Three Update Modes (auto-detected):**
+**Four Update Modes (auto-detected or user-requested):**
 
 1. **Auto-Fix** — All issues are programmatically fixable. Run fix utilities and validate. No phase re-execution needed.
 2. **Remap & Regenerate** (Phase 2 → 3) — Use existing content, apply latest mapping guidance, regenerate JSON
 3. **Full Reanalysis** (Phase 1 → 2 → 3) — Revisit source materials, update citations, complete rework
+4. **Add/Update References** — Discover and map reference content without full remap. Lightweight mode that adds curated external content (templates, case studies, reference architectures) to the `references` array.
 
 ## Input Requirements
 
@@ -79,6 +83,7 @@ This single command:
 - Checks narrative citation references (narratives should link to citations via `citationNames`)
 - Assesses checklist name/description quality (truncation, echo, duplication)
 - Reports asset coverage by element type (NarrativeTypes, Focuses should have icon assets)
+- Validates reference anchors (alphaName/stateName resolution, link presence)
 - Runs schema validation
 - Produces `recommendations.suggestedUpdateMode` ("auto-fix" / "remap" / "full-reanalysis")
 
@@ -163,6 +168,7 @@ When updating an existing document, increment its `version` based on the update 
 | **Auto-Fix** | `patch` (e.g. 1.0.0 → 1.0.1) | Structural fixes, no content changes |
 | **Remap & Regenerate** | `minor` (e.g. 1.0.0 → 1.1.0) | Remapped content, new guidance applied |
 | **Full Reanalysis** | `minor` (e.g. 1.0.0 → 1.1.0) | Content reworked from source materials |
+| **Add/Update References** | `patch` (e.g. 1.0.0 → 1.0.1) | New reference content, no structural changes |
 
 **Single command handles all versioning steps** (increment, schemaVersion, dependencyVersions, updatedAt):
 
@@ -175,6 +181,8 @@ python3 utils/apply-versioning.py <file>.json --bump minor --fix
 ```
 
 Dependency versions are auto-resolved from all project files in deps/, baselines/, practices/.
+
+**IMPORTANT — Phase 3 subagents must NOT set version:** The generate-method skill tells Phase 3 to set `version: "1.0.0"` for new documents. When updating, this conflicts with `apply-versioning.py`. Override this in the Phase 3 subagent prompt: instruct it to **preserve the existing version** from the source JSON (or omit the version field). The `apply-versioning.py` call after Phase 3 is the sole version manager for updates.
 
 ### Step 1A: Auto-Fix (No User Interaction)
 
@@ -226,11 +234,21 @@ Recommended mode: [remap/full-reanalysis] — [modeReason from assessment]
 Options:
 1. Remap & Regenerate (Phase 2 → 3) — preserves existing analysis
 2. Full Reanalysis (Phase 1 → 2 → 3) — revisits source materials
+3. Add/Update References — discover and add reference content only
 
 Which mode?
 ```
 
-**Wait for user response, then proceed to Mode 1 or Mode 2 below.**
+**Wait for user response, then proceed to Mode 1, Mode 2, or Mode 3 below.**
+
+**Pre-Flight Fix (Mode 1 & 2 only):** Before entering remap or reanalysis, apply only structural schema fixes — NOT content fixes that Phase 3 will regenerate:
+
+```bash
+python3 utils/backup-practice.py <directory>/
+python3 utils/fix-common-issues.py <file.json> --fix-schema --fix
+```
+
+This resolves blockers (missing `kind`, tags nesting, persona property normalization) without wasting time on content fixes (pattern completeness, narrative placement) that Phase 3 will overwrite. Do NOT use `--all` or `--fix-pattern-completeness` — those are for auto-fix mode only.
 
 ---
 
@@ -381,6 +399,10 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 
 **Step 2C: Run Phase 3 - JSON Generation**
 
+**Size check:** If the existing practice JSON is **>100KB**, use the **Parallel Section Strategy** below instead of single-agent generation. Single-agent generation of large practices (>100KB output) can take many hours.
+
+#### Standard Phase 3 (practices ≤100KB)
+
 **IMPORTANT:** Follow the `generate-method` skill Phase 3 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 3: Phase 3 - JSON Generation section).
 
 **Key reference files (read from generate-method skill):**
@@ -395,6 +417,56 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 
 **Output:** `practices/<name>/<name>.json` (OVERWRITE existing)
 
+#### Parallel Section Strategy (practices >100KB)
+
+For large practices, split Phase 3 into parallel subagents that each generate one JSON section. This reduces per-agent output from ~200KB to ~30-50KB and enables parallel execution.
+
+**Step 1: Create scaffold from existing JSON**
+
+Copy the existing JSON as the base. The subagents will generate replacement sections:
+```bash
+cp practices/<name>/<name>.json practices/<name>/<name>.json.bak
+```
+
+**Step 2: Extract section assignments from mapping guide**
+
+The mapping guide has clear section headers. Assign sections to parallel subagents:
+
+| Subagent | Sections | Key Reference |
+|----------|----------|---------------|
+| A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
+| B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
+| C: Work Products + Patterns | `workProducts` (LODs, contributesTo), `patterns` (views, alphaStates) | Mapping guide §Work Products, §Patterns |
+| D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |
+
+**Step 3: Launch parallel subagents**
+
+Each subagent receives:
+- Its section(s) of the mapping guide
+- The schema (`deps/language.schema.json`) — relevant `$defs` only
+- The effective context for cross-reference names (alpha names, activity space names, etc.)
+- Instruction to output ONLY its assigned section(s) as a standalone JSON object
+
+Example subagent output for Subagent A:
+```json
+{"alphas": [...]}
+```
+
+**Step 4: Merge sections into base JSON**
+
+Use `patch-practice-json.py` to merge each section into the base:
+```bash
+python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key alphas --patch-file _section-alphas.json
+python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key activities --patch-file _section-activities.json
+python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key workProducts --patch-file _section-workproducts.json
+python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key patterns --patch-file _section-patterns.json
+# ... metadata sections
+```
+
+**Step 5: Run auto-fix + validation**
+
+After merging, run `fix-common-issues.py --all --fix` and validate as normal. The merged JSON may need element-kind discriminators and pattern completeness fixes.
+
 **Comparison Report:**
 
 Generate a structured diff showing changes:
@@ -404,6 +476,309 @@ python3 utils/diff-practice-json.py <old-file>.json <new-file>.json --json
 ```
 
 This compares scalar fields, element counts across all sections, diffs competency level names, lists aliases, and reports added/removed elements by name. Use `--changes-only` for human-readable output showing only changed sections.
+
+---
+
+### Mode 3: Add/Update References
+
+A lightweight mode that adds or updates curated reference content without requiring full remap or reanalysis. References are `AlphaInstance` objects in the `references` array — curated external content (templates, case studies, reference architectures, sample artifacts) that illustrate alphas at specific states.
+
+**When to use:**
+- Practice has no `references` array and would benefit from exemplar content
+- User wants to add specific references they've found
+- Practice has been through initial generation and alpha/state mappings are established
+- User explicitly requests "add references" or "find references"
+
+**Prerequisites:** The practice must already have established alpha/state/work-product mappings (i.e., Phase 2 has been completed at some point). This mode uses those mappings as the search framework.
+
+**Step 3A: Load Practice Context**
+
+1. **Read the existing practice JSON:**
+   ```bash
+   python3 utils/extract-reference-names.py <practice>.json --structure
+   ```
+   Review existing alphas, states, work products, and any existing references.
+
+2. **Read the Phase 2 mapping guide** (if available):
+   - `practices/<name>/02-mapping-guide.md` — contains alpha/state/work-product mappings
+   - If no mapping guide exists, extract mappings from JSON:
+     ```bash
+     python3 utils/extract-practice-content.py <practice>.json
+     ```
+
+3. **Load baseline and dependencies:**
+   ```bash
+   python3 utils/discover-dependencies.py --resolve-from <practice>.json --transitive
+   ```
+
+4. **Check existing references:**
+   ```bash
+   python3 utils/extract-reference-names.py <practice>.json --sections references
+   ```
+   If references already exist, review them for gaps, outdated links, or missing alpha coverage.
+
+**Step 3B: Discover Reference Content**
+
+Use the established alpha/state/work-product mappings to guide discovery. Three sources, in order of priority:
+
+1. **User-provided references:**
+   - Ask user if they have specific references to add (URLs, documents, templates)
+   - Map each to the appropriate alpha/state anchor
+
+2. **Re-examine source materials:**
+   - If original source materials are accessible (from citations or user), scan for:
+     - Templates, starter documents, sample configurations
+     - Reference architectures, design patterns with concrete examples
+     - Case studies, exemplary implementations
+     - Links to downloadable artifacts (repos, templates, tools)
+   - Focus on content that illustrates a specific alpha at a specific state
+
+3. **Secondary research (opt-in):**
+   - Ask user whether to conduct secondary research for references
+   - If approved, search for:
+     - Official templates and starter kits from methodology authors
+     - Community tools, reference implementations, open-source exemplars
+     - Industry case studies demonstrating the methodology
+   - Focus on alphas/states that have no references from other sources
+   - Present findings to user for approval before including
+
+**Step 3C: Map References to Anchors**
+
+For each discovered reference, map to the Practice Language structure:
+
+1. **Alpha + State anchor:** Which alpha does this reference illustrate, and at what state of maturity?
+2. **Evidence (`evidenceBy`):** Map document artifacts to `WorkProductInstance` entries (see guidance below)
+3. **Alpha-level links:** Landing pages, introductory or overview resources about the concern
+4. **Tags (optional):** Apply domain/lifecycle/organizational tags if applicable
+5. **Naming:** Follow the conventions below (concept-oriented names, not content-centric)
+
+**Discovery principle — scope drives search:** The alpha's scope tells you what kind of content is relevant (the concern area at a state), and the work product's scope tells you which specific documents fit as evidence. When browsing a content source, use the alpha scope to identify relevant content at the right maturity level, then examine each document's purpose to determine which work product it evidences. This two-level scoping approach (alpha concern → work product artifact) naturally produces well-structured references.
+
+---
+
+**Reference naming and description conventions:**
+
+References are AlphaInstance objects — they represent the alpha (a general concern or concept) at a specific state, not the content asset itself. Names and descriptions must reflect this.
+
+- **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — "Standard" prefix indicates a reference exemplar. Optional qualifier indicates the positioning context (e.g., "Customer", "Partner", "Internal", "Engagement").
+- **Description pattern:** Describe the semantic role of the reference instance in terms of the alpha's state progression, NOT what the linked content contains.
+
+| | BAD (content-centric) | GOOD (concept-centric) |
+|---|---|---|
+| **Name** | "AI Platform TDP Customer Presentation" | "Standard Customer AI Platform TDP" |
+| **Description** | "Customer-facing deck for the AI Platform technology decision point..." | "Reference AI Platform TDP at Positioned state with customer-facing positioning materials" |
+| **Name** | "Inference at Scale Sales Tactic" | "Standard Engagement Inference at Scale" |
+| **Description** | "Sales tactic guide for engaging customers on inference at scale..." | "Reference Inference at Scale at Prepared state with customer engagement materials" |
+
+---
+
+**Two-level link structure — alpha links vs evidence links:**
+
+A reference can carry links at two levels, serving different purposes:
+
+| Level | Property | Content Scope | Examples |
+|---|---|---|---|
+| **Alpha-level** | `links` on the AlphaInstance | Landing pages, introductory info, overview resources about the concern area | TDP hub pages, sales play landing pages, topic overviews |
+| **Evidence-level** | `links` on each `evidenceBy` WorkProductInstance | Specific documents scoped to a work product's purpose | Customer decks, cheatsheets, conversation guides, templates |
+
+A single reference can have BOTH alpha-level links (for orientation) and `evidenceBy` entries with their own links (for specific artifacts). Hub/landing pages with no specific work product scope go in alpha-level links only.
+
+**Link naming:** All link `name` fields — at both levels — must use the **actual title of the content** being linked (the page title, document name, or resource heading). Do NOT use generic platform labels.
+
+| BAD | GOOD |
+|---|---|
+| `"Sales Hub"` | `"Red Hat AI Platform Technology Decision Point — Customer Presentation"` |
+| `"Google Slides (Source)"` | `"AI Platform TDP Qualification Cheatsheet"` |
+| `"Sales Hub Page"` | `"AI Platform Technology Decision Point Hub"` |
+
+Link `description` is optional but recommended when derivable from content inspection.
+
+---
+
+**`evidenceBy` mapping — content to work products:**
+
+Document artifacts belong in `evidenceBy` as `WorkProductInstance` entries. Each entry maps the specific document to a work product type (from the practice or its `practiceDependencyNames` chain) at an appropriate level of detail. The property is spelled `evidenceBy` (NOT `evidencedBy`).
+
+Each `evidenceBy` entry requires:
+- `name`: Document-oriented name identifying the specific artifact
+- `description`: What this work product instance represents
+- `workProductName`: Must resolve to a defined work product (practice-local or from dependencies)
+- `levelOfDetailName`: Must resolve to a defined LOD on that work product
+- `links`: The actual document URLs with content-title names
+
+**Content-to-work-product heuristics:**
+
+| Content Type | Heuristic State | evidenceBy workProductName | evidenceBy LOD | Rationale |
+|---|---|---|---|---|
+| Hub/landing pages | Earliest (awareness) | NO evidenceBy — alpha `links` only | — | Navigation resource, not artifact |
+| Cheatsheets, qualification guides | Early-mid (assessment) | TDP Positioning Brief | Credentialed | Credentialing/qualification support |
+| Customer decks, pitch materials | Mid (positioning) | TDP Positioning Brief | Content-Complete | Customer-facing positioning artifact |
+| Sales tactic pages/guides | Sub-alpha relevant state | Sales Tactic Conversation Guide | Deployment-Ready | Tactic engagement guidance |
+| Sales play pitch decks | Mid (engagement) | Sales Play Execution Guide | Structured | Play-level customer engagement material |
+| Personas and discovery docs | Mid (engagement) | Sales Play Execution Guide | Structured | Persona/discovery support |
+| Templates, starter artifacts | Mid-late (execution) | (practice-specific work product) | (appropriate LOD) | Execution support |
+| Case studies, reference archs | Late (evidence) | (practice-specific work product) | (advanced LOD) | Demonstrated outcomes |
+
+Work product names above are examples from the Sales Play Framework practice. For other practice families, use the practice's own work products or its dependency chain's work products.
+
+---
+
+**Complete structural example:**
+
+Before (content-centric, no `evidenceBy`):
+```json
+{
+  "name": "AI Platform TDP Customer Presentation",
+  "description": "Customer-facing deck for the AI Platform technology decision point, positioning Red Hat's AI platform for enterprise AI deployment",
+  "alphaName": "AI Platform",
+  "stateName": "Positioned",
+  "links": [
+    { "name": "Sales Hub", "uri": "https://saleshub.redhat.com/Link/Content/DCPHDQgjP7JhTGcPDVmXhXF2XhJG" }
+  ]
+}
+```
+
+After (concept-centric, with `evidenceBy`):
+```json
+{
+  "name": "Standard Customer AI Platform TDP",
+  "description": "Reference AI Platform TDP at Positioned state with customer-facing positioning materials",
+  "alphaName": "AI Platform",
+  "stateName": "Positioned",
+  "evidenceBy": [
+    {
+      "name": "AI Platform Customer Positioning Deck",
+      "description": "Customer-facing slide deck for AI platform technology positioning",
+      "workProductName": "TDP Positioning Brief",
+      "levelOfDetailName": "Content-Complete",
+      "links": [
+        {
+          "name": "Red Hat AI Platform Technology Decision Point — Customer Presentation",
+          "description": "Slide deck covering AI platform positioning, competitive landscape, and customer value",
+          "uri": "https://saleshub.redhat.com/Link/Content/DCPHDQgjP7JhTGcPDVmXhXF2XhJG"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Hub page reference (alpha-level links only, no `evidenceBy`):
+```json
+{
+  "name": "Standard Discovery AI Platform TDP",
+  "description": "Reference AI Platform TDP at Identified state with discovery and enablement resources",
+  "alphaName": "AI Platform",
+  "stateName": "Identified",
+  "links": [
+    {
+      "name": "AI Platform Technology Decision Point Hub",
+      "description": "Landing page with links to all AI Platform TDP sales enablement resources",
+      "uri": "https://saleshub.redhat.com/Link/Content/DCGp7297MBFqdG2PWFCdjCgfWhcB"
+    }
+  ]
+}
+```
+
+---
+
+**For methods — present one consolidated mapping** covering all practices rather than prompting per-practice. Group by practice with a reference count summary:
+
+```
+=== Reference Mapping for "<method-name>" ===
+
+Practice: "<practice-1>" (N references)
+1. Standard Customer <AlphaName> → <alphaName> at <stateName>
+   evidenceBy: <workProductName> at <LOD>
+   links: [content title] (uri)
+2. Standard Discovery <AlphaName> → <alphaName> at <stateName>
+   alpha links: [content title] (uri)
+
+Practice: "<practice-2>" (N references)
+...
+
+Total: X references across Y practices. Proceed? (yes/edit/no)
+```
+
+**Wait for user confirmation.**
+
+**Step 3D: Update Practice JSON**
+
+For a **single practice**, follow steps 1-6 below. For a **method** (multiple practices), see **Step 3E: Method-Level Orchestration** instead.
+
+1. **Backup first:**
+   ```bash
+   python3 utils/backup-practice.py <directory>/
+   ```
+
+2. **Add references to JSON** using the patch utility:
+   ```bash
+   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file _references.json
+   ```
+   Or to append to existing references:
+   ```bash
+   python3 utils/patch-practice-json.py <practice>.json --append-key references --patch-file _new-references.json
+   ```
+
+3. **Validate updated practice:**
+   ```bash
+   python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --schema deps/language.schema.json
+   ```
+
+4. **Bump version (patch):**
+   ```bash
+   python3 utils/apply-versioning.py <practice>.json --bump patch --fix
+   ```
+
+5. **Re-package into `.keleo`:**
+   Follow the standard packaging process from Post-Update Packaging section.
+
+6. **Report results:**
+   ```
+   Added N references to "<practice-name>":
+   - [Reference 1]: [alphaName] at [stateName] — [link]
+   - [Reference 2]: [alphaName] at [stateName] — [link]
+   ...
+   
+   Version bumped: X.Y.Z → X.Y.(Z+1)
+   Package updated: bundles/<name>.keleo
+   ```
+
+**Step 3E: Method-Level Orchestration (Mode 3)**
+
+When adding references to a **method** with multiple constituent practices:
+
+1. **Backup the method directory:**
+   ```bash
+   python3 utils/backup-practice.py practices/<method-name>/
+   ```
+
+2. **Identify all constituent practices** from the method JSON's `practiceNames` array. List them with their alpha structures so content can be mapped accurately.
+
+3. **Batch discovery:** Browse the content source once for all practices, grouping discovered content by practice. Present a single consolidated mapping to the user for approval — do NOT prompt per-practice.
+
+4. **Patch all practices:** Create one reference JSON per practice and patch each:
+   ```bash
+   # Repeat for each practice with references
+   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file <refs>.json
+   ```
+
+5. **Batch version bump** all modified practices plus the method JSON in one command:
+   ```bash
+   python3 utils/apply-versioning.py --dir practices/<method-name>/ --bump patch --fix
+   ```
+
+6. **Repackage** the full method into `.keleo`:
+   ```bash
+   python3 utils/package-keleo.py \
+     --documents <baseline>.json <practice1>.json ... <method>.json \
+     --name <method-name> --version <new-version> \
+     --description "..." -o bundles/<method-name>.keleo --verify
+   ```
+
+7. **Report results** with a summary table showing references per practice.
+
+8. **Clean up** any temporary reference JSON files created during patching.
 
 ---
 
@@ -420,7 +795,7 @@ This compares scalar fields, element counts across all sections, diffs competenc
    ```
 
 2. **For each selected practice:**
-   - Run update workflow (Mode 1 or Mode 2) per practice
+   - Run update workflow (Mode 1, Mode 2, or Mode 3) per practice
    - Generate individual practice JSON or mapping sections
 
 3. **Package Method into `.keleo`:**
@@ -453,6 +828,7 @@ Present update mode choice:
 Please select an update mode:
 1. Full Reanalysis (Phase 1 → 2 → 3) - Recommended if source materials available
 2. Remap & Regenerate (Phase 2 → 3) - Faster, preserves existing analysis
+3. Add/Update References - Add curated external content without full remap
 
 Which mode would you like to use?"
 
@@ -734,6 +1110,31 @@ python3 utils/package-keleo.py \
   --documents [<parent-baseline>.json] <baseline>.json \
   -o bundles/<baseline-name>.keleo --verify
 ```
+
+### Scenario 9: Add/Update Reference Content
+
+**Symptoms:**
+- Practice has no `references` array or sparse references
+- User has found exemplar content (templates, case studies, reference architectures) to add
+- Practice would benefit from curated external content illustrating alphas at specific states
+- User explicitly requests reference discovery
+
+**Update Mode:** Add/Update References (Mode 3)
+
+**Process:**
+1. Load existing practice JSON and review alpha/state/work-product mappings
+2. Check for existing references and identify coverage gaps
+3. Discover new references from source materials, secondary research, or user-provided content
+4. Map each reference to alpha + state anchor with at least one `links` entry (URI)
+5. Present mapped references to user for approval
+6. Patch references into practice JSON, validate, version bump (patch), and re-package
+
+**Key Rules:**
+- Every reference MUST have at least one `links` entry with a valid URI
+- `alphaName` and `stateName` must match defined elements in practice or baseline
+- `evidenceBy` entries (if present) must reference defined work products and LODs
+- Follow naming conventions from `references/semantics.md` §6.6
+- References are `AlphaInstance` objects — they illustrate an alpha at a specific state of maturity
 
 ---
 

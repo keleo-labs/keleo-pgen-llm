@@ -185,7 +185,7 @@ def _load_for_transitive(match, file_path_fallback):
     return load_json_pair(file_path_fallback)
 
 
-def resolve_transitive(file_path_or_entry, index, visited=None):
+def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesystem=True):
     """Recursively resolve transitive baseline dependencies.
 
     file_path_or_entry can be a filesystem path (str/Path) or a resolved
@@ -215,7 +215,7 @@ def resolve_transitive(file_path_or_entry, index, visited=None):
     results = []
 
     for dep_name, role in dep_names:
-        match = resolve_name(dep_name, index)
+        match = resolve_name(dep_name, index, prefer_filesystem=prefer_filesystem)
         dep_result = {
             "name": dep_name,
             "role": role,
@@ -230,7 +230,7 @@ def resolve_transitive(file_path_or_entry, index, visited=None):
 
         if match["status"] == "found" and role != "practiceDependency":
             dep_result["transitiveDependencies"] = resolve_transitive(
-                match, index, visited
+                match, index, visited, prefer_filesystem=prefer_filesystem
             )
 
         results.append(dep_result)
@@ -252,13 +252,13 @@ def cmd_list(index, skipped):
     }
 
 
-def cmd_resolve(names, index):
+def cmd_resolve(names, index, prefer_filesystem=True):
     """Handle --resolve mode."""
-    results = [resolve_name(name, index) for name in names]
+    results = [resolve_name(name, index, prefer_filesystem=prefer_filesystem) for name in names]
     return {"results": results}
 
 
-def cmd_resolve_from(file_path, index, transitive=False):
+def cmd_resolve_from(file_path, index, transitive=False, prefer_filesystem=True):
     """Handle --resolve-from mode."""
     data, err = load_json_pair(file_path)
     if err:
@@ -269,11 +269,11 @@ def cmd_resolve_from(file_path, index, transitive=False):
     dep_names = extract_dependency_names(data, kind)
 
     if transitive:
-        dependencies = resolve_transitive(file_path, index)
+        dependencies = resolve_transitive(file_path, index, prefer_filesystem=prefer_filesystem)
     else:
         dependencies = []
         for dep_name, role in dep_names:
-            match = resolve_name(dep_name, index)
+            match = resolve_name(dep_name, index, prefer_filesystem=prefer_filesystem)
             dep_result = {
                 "name": dep_name,
                 "role": role,
@@ -363,21 +363,28 @@ def main():
         "--search-dirs", nargs="+", default=DEFAULT_SEARCH_DIRS,
         help=f"Override search directories (default: {' '.join(DEFAULT_SEARCH_DIRS)})"
     )
+    parser.add_argument(
+        "--include-bundles", action="store_true",
+        help="When ambiguous, include bundle-embedded candidates instead of preferring filesystem paths"
+    )
     args = parser.parse_args()
 
     index, skipped = build_index(args.search_dirs)
 
+    prefer_fs = not getattr(args, 'include_bundles', False)
+
     if args.list:
         result = cmd_list(index, skipped)
     elif args.resolve:
-        result = cmd_resolve(args.resolve, index)
+        result = cmd_resolve(args.resolve, index, prefer_filesystem=prefer_fs)
     elif args.dependents:
         result = cmd_dependents(args.dependents, index)
     elif args.resolve_from:
         if not Path(args.resolve_from).is_file():
             print(json.dumps({"error": f"File not found: {args.resolve_from}"}))
             sys.exit(1)
-        result = cmd_resolve_from(args.resolve_from, index, transitive=args.transitive)
+        result = cmd_resolve_from(args.resolve_from, index, transitive=args.transitive,
+                                  prefer_filesystem=prefer_fs)
 
     print(json.dumps(result, indent=2))
 

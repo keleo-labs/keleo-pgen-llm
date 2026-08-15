@@ -6,17 +6,22 @@ validation, and schema validation into one report. Designed to replace the
 multi-step manual assessment in the update-method skill.
 
 Usage:
-    # Basic assessment (detects kind, counts, structure, relationships)
+    # Basic assessment (auto-resolves baseline and practice dependencies)
     python3 utils/assess-practice.py <file.json>
-
-    # With baseline validation (competency levels, alpha references)
-    python3 utils/assess-practice.py <file.json> --baseline <baseline.json>
 
     # With schema validation
     python3 utils/assess-practice.py <file.json> --schema <schema.json>
 
-    # Full assessment
+    # With explicit baseline (overrides auto-resolution)
+    python3 utils/assess-practice.py <file.json> --baseline <baseline.json>
+
+    # Full assessment with explicit deps
     python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema <schema.json>
+
+For extension practices (kind != practiceBaseline), the tool auto-resolves
+baselinePracticeName and practiceDependencyNames from the JSON, searching
+deps/, baselines/, practices/, and bundles/ directories. Explicit --baseline
+and --parent flags override auto-resolution.
 
 Output: Structured JSON to stdout. Exit 0 if no errors, 1 if errors found.
 """
@@ -65,7 +70,7 @@ def count_elements(data, kind):
     arrays = [
         "alphas", "workProducts", "activities", "patterns", "citations",
         "activitySpaces", "competencies", "narrativeTypes", "aliases",
-        "assets", "focuses", "narratives", "personas",
+        "assets", "focuses", "narratives", "personas", "references",
     ]
 
     if kind == "method":
@@ -1127,7 +1132,8 @@ def check_alias_uniqueness(data, kind):
         alias_targets = {}
         aliases = source.get("practiceElementAliases", source.get("aliases", []))
         for idx, alias in enumerate(aliases):
-            key = (alias.get("elementType", ""), alias.get("name", ""))
+            key = (alias.get("practiceElementType", alias.get("elementType", "")),
+                   alias.get("practiceElementName", alias.get("name", "")))
             if key in alias_targets:
                 issues.append({
                     "severity": "warning",
@@ -1304,6 +1310,143 @@ def check_evidence_coverage(data, kind, baseline_alpha_names=None):
                         ),
                         "autoFixable": False,
                     })
+
+    return issues
+
+
+def check_references(data, kind, baseline_data=None):
+    """Validate references array (AlphaInstance objects) for link presence, anchor resolution, and evidenceBy work product resolution."""
+    issues = []
+
+    alpha_states = {}
+
+    def _collect_alphas(source):
+        for alpha in source.get("alphas", []):
+            aname = alpha.get("name")
+            if aname:
+                states = {s.get("name") for s in alpha.get("states", []) if s.get("name")}
+                if aname in alpha_states:
+                    alpha_states[aname] |= states
+                else:
+                    alpha_states[aname] = states
+
+    wp_lods = {}
+
+    def _collect_work_products(source):
+        for wp in source.get("workProducts", []):
+            wpname = wp.get("name")
+            if wpname:
+                lods = {lod.get("name") for lod in wp.get("levelsOfDetail", []) if lod.get("name")}
+                if wpname in wp_lods:
+                    wp_lods[wpname] |= lods
+                else:
+                    wp_lods[wpname] = lods
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+    for src in sources:
+        _collect_alphas(src)
+        _collect_work_products(src)
+    if baseline_data:
+        _collect_alphas(baseline_data)
+        _collect_work_products(baseline_data)
+
+    for si, source in enumerate(sources):
+        if si == 0:
+            pfx = ""
+        else:
+            pfx = f"practices[{si - 1}]."
+
+        refs = source.get("references", [])
+        seen_names = set()
+
+        for ri, ref in enumerate(refs):
+            ref_name = ref.get("name", f"<unnamed-ref-{ri}>")
+            path = f"{pfx}references[{ri}]"
+
+            links = ref.get("links", [])
+            if not links and not ref.get("evidenceBy"):
+                issues.append({
+                    "severity": "error",
+                    "category": "reference-links",
+                    "path": f"{path}.links",
+                    "message": f"Reference '{ref_name}' has no links and no evidenceBy",
+                    "autoFixable": False,
+                })
+            for li, link in enumerate(links):
+                uri = link.get("uri", "")
+                if not uri:
+                    issues.append({
+                        "severity": "error",
+                        "category": "reference-links",
+                        "path": f"{path}.links[{li}].uri",
+                        "message": f"Reference '{ref_name}' link '{link.get('name', '')}' has empty URI",
+                        "autoFixable": False,
+                    })
+
+            aname = ref.get("alphaName", "")
+            sname = ref.get("stateName", "")
+
+            if aname and aname not in alpha_states:
+                issues.append({
+                    "severity": "error",
+                    "category": "reference-alpha",
+                    "path": f"{path}.alphaName",
+                    "message": f"Reference '{ref_name}' alphaName '{aname}' not found in practice or baseline",
+                    "autoFixable": False,
+                })
+            elif aname and sname and sname not in alpha_states.get(aname, set()):
+                issues.append({
+                    "severity": "error",
+                    "category": "reference-state",
+                    "path": f"{path}.stateName",
+                    "message": (
+                        f"Reference '{ref_name}' stateName '{sname}' not found on alpha '{aname}' "
+                        f"(available: {sorted(alpha_states.get(aname, set()))})"
+                    ),
+                    "autoFixable": False,
+                })
+
+            for evi, ev in enumerate(ref.get("evidenceBy", [])):
+                ev_name = ev.get("name", f"<unnamed-evidence-{evi}>")
+                wpn = ev.get("workProductName", "")
+                lodn = ev.get("levelOfDetailName", "")
+
+                if wpn and wpn not in wp_lods:
+                    issues.append({
+                        "severity": "error",
+                        "category": "reference-evidence",
+                        "path": f"{path}.evidenceBy[{evi}].workProductName",
+                        "message": (
+                            f"Reference '{ref_name}' evidenceBy '{ev_name}' references "
+                            f"unknown work product '{wpn}'"
+                        ),
+                        "autoFixable": False,
+                    })
+                elif wpn and lodn and wpn in wp_lods:
+                    if lodn not in wp_lods[wpn]:
+                        issues.append({
+                            "severity": "error",
+                            "category": "reference-evidence",
+                            "path": f"{path}.evidenceBy[{evi}].levelOfDetailName",
+                            "message": (
+                                f"Reference '{ref_name}' evidenceBy '{ev_name}' references "
+                                f"unknown LOD '{lodn}' for work product '{wpn}' "
+                                f"(available: {sorted(wp_lods[wpn])})"
+                            ),
+                            "autoFixable": False,
+                        })
+
+            if ref_name in seen_names:
+                issues.append({
+                    "severity": "warning",
+                    "category": "reference-uniqueness",
+                    "path": f"{path}.name",
+                    "message": f"Duplicate reference name: '{ref_name}'",
+                    "autoFixable": False,
+                })
+            seen_names.add(ref_name)
 
     return issues
 
@@ -2733,6 +2876,51 @@ def suggest_update_mode(issues, counts, kind):
     return "remap", f"{remap_count} issue(s) require remapping: {', '.join(reasons)}"
 
 
+def _auto_resolve_deps(data, kind, file_path, existing_parents):
+    """Auto-resolve --baseline and --parent from the practice's declared dependencies.
+
+    Uses discover-dependencies.py's index to resolve baselinePracticeName and
+    practiceDependencyNames to filesystem paths, preferring non-keleo sources.
+    Returns (baseline_path_or_None, updated_parent_list).
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "discover_dependencies",
+        Path(__file__).resolve().parent / "discover-dependencies.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    build_index, resolve_name = mod.build_index, mod.resolve_name
+
+    project_root = Path(__file__).resolve().parent.parent
+    search_dirs = [
+        str(project_root / "deps"),
+        str(project_root / "baselines"),
+        str(project_root / "practices"),
+        str(project_root / "bundles"),
+    ]
+    index, _ = build_index(search_dirs)
+
+    baseline_path = None
+    bl_name = data.get("baselinePracticeName")
+    if bl_name:
+        result = resolve_name(bl_name, index, prefer_filesystem=True)
+        if result["status"] == "found":
+            path = result["path"]
+            if "::" not in path:
+                baseline_path = path
+
+    parents = list(existing_parents or [])
+    for dep_name in data.get("practiceDependencyNames", []):
+        result = resolve_name(dep_name, index, prefer_filesystem=True)
+        if result["status"] == "found":
+            path = result["path"]
+            if "::" not in path and path not in parents:
+                parents.append(path)
+
+    return baseline_path, parents
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Comprehensive assessment of practice/method/baseline JSON"
@@ -2770,6 +2958,9 @@ def main():
 
     kind = data.get("kind", "practice")
     name = data.get("name", "<unnamed>")
+
+    if not args.baseline and kind != "practiceBaseline":
+        args.baseline, args.parent = _auto_resolve_deps(data, kind, file_path, args.parent)
 
     all_issues = []
 
@@ -2912,6 +3103,8 @@ def main():
         all_issues.extend(check_alpha_state_activity_gap(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     elif kind != "practiceBaseline":
         all_issues.extend(check_evidence_coverage(data, kind))
+
+    all_issues.extend(check_references(data, kind, baseline_data))
 
     if kind == "practiceBaseline" and args.parent:
         parent_merged = None
