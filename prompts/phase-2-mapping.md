@@ -1495,6 +1495,16 @@ Read the "Reference Content Candidates" section from `01-analysis-report.md`. Fo
 - Reference names should be specific and descriptive, identifying the source (e.g., "TOGAF-Based Platform Architecture" not "Platform Example 1")
 - Work product instance names within `evidenceBy` should identify the specific artifact (e.g., "TOGAF Architecture Document Template" not "Architecture Template")
 
+**Instance Name Scoping:**
+- Instance names scope to the **example**, NOT the state or LOD. A real-world instance appearing at different maturity levels shares ONE name — the name identifies the specific example.
+- **"Same example or different?" test:** Before creating a new reference for the same alpha, ask: "Is this the same real-world example at a different level of progression, or a genuinely different example?" Same example → same instance name. Different example → different instance name.
+- Apply the same logic to `evidenceBy` — if multiple artifacts are instances of the same work product at different LODs, use the same WorkProductInstance name.
+- **Links arrays aggregate many documents** within a single instance — this is expected and produces richer references.
+
+**Merge Guidance:**
+- After mapping all references, identify same-name instances and merge: keep the highest state/LOD, aggregate all links from all instances.
+- Merge key is the instance `name`, not the element name (e.g., not `alphaName` or `workProductName`).
+
 **Step 10.3: Document Mapped References**
 
 For each reference, document in the mapping guide:

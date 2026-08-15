@@ -1456,6 +1456,52 @@ def check_references(data, kind, baseline_data=None):
                 wpn = ev.get("workProductName", "")
                 lodn = ev.get("levelOfDetailName", "")
 
+                if not ev.get("name"):
+                    issues.append({
+                        "severity": "error",
+                        "category": "reference-evidence",
+                        "path": f"{path}.evidenceBy[{evi}].name",
+                        "message": (
+                            f"Reference '{ref_name}' evidenceBy[{evi}] missing 'name' — "
+                            f"WorkProductInstance requires name, description, and links"
+                        ),
+                        "autoFixable": False,
+                    })
+                if not ev.get("description"):
+                    issues.append({
+                        "severity": "warning",
+                        "category": "reference-evidence",
+                        "path": f"{path}.evidenceBy[{evi}].description",
+                        "message": (
+                            f"Reference '{ref_name}' evidenceBy '{ev_name}' missing 'description'"
+                        ),
+                        "autoFixable": False,
+                    })
+                ev_links = ev.get("links", [])
+                if not ev_links:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "reference-evidence",
+                        "path": f"{path}.evidenceBy[{evi}].links",
+                        "message": (
+                            f"Reference '{ref_name}' evidenceBy '{ev_name}' has no links — "
+                            f"evidence without links provides no actionable value"
+                        ),
+                        "autoFixable": False,
+                    })
+                for eli, el in enumerate(ev_links):
+                    if not el.get("uri"):
+                        issues.append({
+                            "severity": "error",
+                            "category": "reference-evidence",
+                            "path": f"{path}.evidenceBy[{evi}].links[{eli}].uri",
+                            "message": (
+                                f"Reference '{ref_name}' evidenceBy '{ev_name}' "
+                                f"link '{el.get('name', '')}' has empty URI"
+                            ),
+                            "autoFixable": False,
+                        })
+
                 if wpn and wpn not in wp_lods:
                     issues.append({
                         "severity": "error",
@@ -1484,12 +1530,32 @@ def check_references(data, kind, baseline_data=None):
             if ref_name in seen_names:
                 issues.append({
                     "severity": "warning",
-                    "category": "reference-uniqueness",
+                    "category": "reference-merge",
                     "path": f"{path}.name",
-                    "message": f"Duplicate reference name: '{ref_name}'",
+                    "message": (
+                        f"Duplicate reference name: '{ref_name}' — "
+                        f"same-name instances should be merged (highest state/LOD, aggregated links)"
+                    ),
                     "autoFixable": False,
                 })
             seen_names.add(ref_name)
+
+            seen_ev_names = set()
+            for evi, ev in enumerate(ref.get("evidenceBy", [])):
+                evn = ev.get("name", "")
+                if evn and evn in seen_ev_names:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "reference-merge",
+                        "path": f"{path}.evidenceBy[{evi}].name",
+                        "message": (
+                            f"Duplicate evidenceBy name '{evn}' in reference '{ref_name}' — "
+                            f"same-name work product instances should be merged (highest LOD, aggregated links)"
+                        ),
+                        "autoFixable": False,
+                    })
+                if evn:
+                    seen_ev_names.add(evn)
 
     return issues
 

@@ -562,6 +562,9 @@ References are AlphaInstance objects — they represent the alpha (a general con
 
 - **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — "Standard" prefix indicates a reference exemplar. Optional qualifier indicates the positioning context (e.g., "Customer", "Partner", "Internal", "Engagement").
 - **Description pattern:** Describe the semantic role of the reference instance in terms of the alpha's state progression, NOT what the linked content contains.
+- **Instance names scope to the example, NOT the state/LOD.** A real-world instance appearing at different maturity levels shares ONE name — the name identifies the specific example. Do NOT engineer names for uniqueness by appending state/LOD qualifiers.
+- **"Same example or different?" test:** Before creating a new reference for the same alpha, check whether content belongs to an existing instance at a different state. If it's the same real-world example at a different level of progression, use the same instance name. Only create a separate instance for a genuinely different example.
+- **Apply the same logic to `evidenceBy` names.** If multiple work product artifacts are instances of the same document at different LODs, use the same WorkProductInstance name.
 
 | | BAD (content-centric) | GOOD (concept-centric) |
 |---|---|---|
@@ -725,15 +728,21 @@ For a **single practice**, follow steps 1-6 below. For a **method** (multiple pr
    python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --schema deps/language.schema.json
    ```
 
-4. **Bump version (patch):**
+4. **Merge pass** — after adding/updating references, merge same-name instances:
+   - Key on instance `name` (NOT `alphaName` or `workProductName`)
+   - Same-name AlphaInstance references → keep highest `stateName`, aggregate all `links` and `evidenceBy`
+   - Same-name WorkProductInstance entries within `evidenceBy` → keep highest `levelOfDetailName`, aggregate all `links`
+   - Links arrays can contain many documents — aggregation produces richer references
+
+5. **Bump version (patch):**
    ```bash
    python3 utils/apply-versioning.py <practice>.json --bump patch --fix
    ```
 
-5. **Re-package into `.keleo`:**
+6. **Re-package into `.keleo`:**
    Follow the standard packaging process from Post-Update Packaging section.
 
-6. **Report results:**
+7. **Report results:**
    ```
    Added N references to "<practice-name>":
    - [Reference 1]: [alphaName] at [stateName] — [link]
@@ -1135,6 +1144,28 @@ python3 utils/package-keleo.py \
 - `evidenceBy` entries (if present) must reference defined work products and LODs
 - Follow naming conventions from `references/semantics.md` §6.6
 - References are `AlphaInstance` objects — they illustrate an alpha at a specific state of maturity
+
+### Scenario 10: Convert Work Product `partOf` ↔ `mapsTo`
+
+**Symptoms:**
+- Assessment flags `mapsto-lod-mismatch` (variant LODs don't match parent) or `mapsto-naming` (variant name repeats parent type)
+- A work product uses `partOf` but has the same LOD progression as the parent (should be `mapsTo`)
+- A work product uses `mapsTo` but has different LODs from the parent (should be `partOf` or standalone)
+- Review identifies IS-A vs HAS-A relationship was incorrectly assigned
+
+**Update Mode:** Remap & Regenerate (Mode 2)
+
+**Process:**
+1. Load practice JSON and identify the work product(s) to convert
+2. For `partOf → mapsTo`: Verify LODs match the target work product exactly (same names, same sequence). Update checklists to be domain-specific. Remove `partOf`, add `mapsTo`. Apply naming convention (omit parent type name).
+3. For `mapsTo → partOf`: Design new LOD progression appropriate for the sub-component. Remove `mapsTo`, add `partOf`. Rename if needed (naming convention no longer applies).
+4. Validate, version bump (minor), and re-package
+
+**Key Rules:**
+- `mapsTo` and `partOf` are mutually exclusive — never set both
+- `mapsTo` requires identical LOD names and sequence to parent
+- `mapsTo` variant names must NOT repeat parent type name (IS-A convention)
+- `partOf` allows independent LOD progression
 
 ---
 

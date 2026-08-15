@@ -251,6 +251,10 @@ def main():
         help="JSON files to update"
     )
     parser.add_argument(
+        "--dir",
+        help="Process all JSON files in the specified directory"
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="Process all JSON files in deps/, baselines/, practices/"
     )
@@ -267,10 +271,16 @@ def main():
 
     if args.all:
         file_paths = collect_all_files()
+    elif args.dir:
+        import glob
+        dir_path = args.dir.rstrip("/")
+        file_paths = sorted(glob.glob(f"{dir_path}/*.json"))
+        if not file_paths:
+            parser.error(f"No JSON files found in {dir_path}/")
     elif args.files:
         file_paths = args.files
     else:
-        parser.error("Provide file paths or use --all")
+        parser.error("Provide file paths, --dir <directory>, or --all")
 
     file_paths = topo_sort_files(file_paths)
 

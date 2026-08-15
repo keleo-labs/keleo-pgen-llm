@@ -826,6 +826,32 @@ Rules governing alpha hierarchy, parent relationships, and semantic connections.
 - **Examples** (on Checklist, Activity): Concrete scenario array
 - Use for complex prerequisites, verification logic, non-obvious triggers. Skip for self-evident items.
 
+## Feature: Work Product Relationship Integrity
+
+Rules governing `mapsTo` and `partOf` on work products (mirrors alpha relationship rules).
+
+### Scenario: Work product mapsTo variants match parent LODs exactly (@rule:semantic-012)
+- Given: A new work product declares `mapsTo` pointing to a parent work product
+- When: The work product JSON is generated
+- Then: The variant's LOD names and sequence exactly match the parent work product's LODs
+- And: Checklists within each LOD are domain-specific (not duplicated from parent)
+
+### Scenario: Work product mapsTo naming convention (@rule:semantic-013)
+- Given: A work product has `mapsTo`
+- When: The work product name is assigned
+- Then: The name does NOT contain the parent work product's name (IS-A makes it redundant)
+
+### Scenario: mapsTo and partOf are mutually exclusive on work products (@rule:semantic-014)
+- Given: A work product is defined
+- When: Relationship properties are set
+- Then: The work product has at most one of `mapsTo` or `partOf`, never both
+
+**Work Product Relationship Guidance:**
+
+`partOf` declares containment (HAS-A): the work product is a component within a larger work product, with its own LOD progression. `mapsTo` declares variant equivalence (IS-A): the work product is a named variant of a parent, following the exact same LOD progression with domain-specific checklists. On merge, `mapsTo` work products are added to the parent's `variants` array.
+
+**Decision tree:** Is this WP logically contained within a larger WP? → `partOf`. Is it a named variant of another WP with same LODs? → `mapsTo`. Neither → standalone (no relationship).
+
 ## Feature: Narrative Quality
 
 Rules governing narrative structure, naming, self-containment, and citation linkage.
@@ -1408,11 +1434,14 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - `alphaName` + `stateName` (from established mappings)
    - **Name**: Concept-oriented, not content-centric. Pattern: `"Standard [Qualifier] <AlphaName>"`. "Standard" prefix indicates exemplar.
    - **Description**: Semantic role of the reference instance in terms of alpha state progression, not a description of the content asset.
-   - **`evidenceBy`**: Document artifacts (decks, guides, templates, cheatsheets) become `WorkProductInstance` entries with `workProductName` + `levelOfDetailName` resolving to practice or dependency work products. Navigation resources (hub/landing pages) stay as alpha-level `links` only.
+   - **`evidenceBy`**: Document artifacts (decks, guides, templates, cheatsheets) become **full WorkProductInstance objects** — each requires `name`, `description`, `workProductName`, `levelOfDetailName`, and `links` (with at least one valid URI). Bare `{workProductName, levelOfDetailName}` objects are invalid. Navigation resources (hub/landing pages) stay as alpha-level `links` only.
+   - **Instance naming**: Instance names scope to the **example**, NOT the state/LOD. The same real-world example at different maturity levels shares ONE name. Before creating a new reference, apply the "same example or different?" test — if content belongs to an existing instance at a different state, use the same name.
    - **Link names**: Use actual content title (not generic platform labels like "Sales Hub"). Applies at both alpha-level and evidenceBy-level links.
    - **Link descriptions**: Optional but recommended when derivable from content inspection.
+   - **Links arrays aggregate many documents** — a single instance can have multiple links, producing richer references.
    - `links` with valid URIs (REQUIRED — drop candidates without links)
    - Tags for categorisation
+   - **Merge pass**: After generating all references, merge same-name instances: key on instance `name` (NOT alphaName/workProductName), keep highest state/LOD, aggregate all links. Apply same merge to evidenceBy entries within each reference.
    - See update-method SKILL.md Step 3C for the full content-to-work-product heuristics table and structural examples
 
 4. **Present findings to user for approval** before appending to the mapping guide.

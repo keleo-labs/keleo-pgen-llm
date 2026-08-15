@@ -846,10 +846,23 @@ If the mapping guide includes a "Reference Content Mappings" section, add a `ref
 - Every reference MUST have at least one `links` entry with a valid `uri`. References without links provide no actionable value — drop them.
 - `alphaName` must match a defined alpha (baseline or practice)
 - `stateName` must match a state on the referenced alpha
-- `evidenceBy` entries: `workProductName` must match a defined work product, `levelOfDetailName` must match an LOD on that work product
+- `evidenceBy` entries are **full WorkProductInstance objects** — each MUST have `name`, `description`, `workProductName`, `levelOfDetailName`, and `links` (with at least one valid URI). Bare `{workProductName, levelOfDetailName}` objects are invalid.
 - Reference names should be unique and descriptive (identify the source, not generic labels)
-- `evidenceBy` is optional — not every reference has a concrete artifact. But when present, its entries should also include `links` where a downloadable resource exists.
 - Tags are optional but recommended for filtering
+
+**Instance Naming Rules:**
+
+- **Instance names scope to the example, NOT the state or LOD.** A real-world instance that appears at different maturity levels shares ONE name — the name identifies the specific example, not where it sits in the progression.
+- **"Same example or different?" test:** Before creating a new reference for the same alpha, check whether the content belongs to an existing instance at a different state. If it's the same real-world example at a different level of progression, use the same instance name. Only create a separate instance for a genuinely different example.
+- **Apply the same logic to `evidenceBy`:** If multiple work product artifacts are instances of the same real-world document at different LODs, use the same WorkProductInstance name.
+
+**Merge Pass (Post-Generation):**
+
+After generating all references, perform a merge pass:
+1. **Key on instance `name`** (NOT `alphaName` or `workProductName`)
+2. Same-name AlphaInstance references → keep highest `stateName`, aggregate all `links` and `evidenceBy`
+3. Same-name WorkProductInstance entries within `evidenceBy` → keep highest `levelOfDetailName`, aggregate all `links`
+4. **Links arrays can contain many documents** — aggregation produces richer, more useful references
 
 #### 3.13 Practice Element Aliases
 

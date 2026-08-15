@@ -271,6 +271,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **NarrativeTypes** | Referenced from baseline | DEFINED in baseline |
 | **Activities** | Defined in practice | NOT PRESENT |
 | **WorkProducts** | Defined in practice | NOT PRESENT |
+| **WorkProduct partOf / mapsTo** | Optional on WPs (mutually exclusive) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
@@ -354,6 +355,7 @@ These constraints apply to **extension practices** created with `/generate-metho
 - Activity names must be specific and different from their ActivitySpace names
 - Minimum requirements: Alphas need ≥3 states, WorkProducts need ≥2 levels of detail
 - WorkProducts support optional `partOf` (string) declaring containment within another work product (see semantics.md Section 7.4)
+- WorkProducts support optional `mapsTo` (string) declaring variant equivalence with a parent work product (IS-A semantics, see semantics.md Section 7.5). LODs must match parent exactly. `mapsTo` and `partOf` are mutually exclusive. Naming convention: omit parent type name. On merge, variants populate the parent's `variants` array.
 - Narratives use structured frameworks with sequential contexts mapped to narrative elements
 
 ### Versioning
@@ -410,6 +412,21 @@ Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBas
 - **Skill-level rule**: Every reference MUST have at least one `links` entry with a valid URI — references without links provide no actionable value
 - `alphaName`/`stateName` must match defined elements; `evidenceBy` entries must resolve to defined work products/LODs
 - See `references/semantics.md` §6.6 for naming conventions and validation rules
+
+**Two-Level Link Architecture:**
+- **Alpha-level `links`**: Navigation/contextual resources (hub pages, landing pages, overviews)
+- **`evidenceBy[].links`**: Specific content artifacts (presentations, guides, templates, cheatsheets)
+- `evidenceBy` entries are **full WorkProductInstance objects** — require `name`, `description`, `workProductName`, `levelOfDetailName`, and `links`
+
+**Instance Naming:**
+- Instance names scope to the **example**, NOT the state/LOD — a real-world instance at different maturity levels shares ONE name
+- "Same example or different?" test: before creating a new reference, check if content belongs to an existing instance at a different state
+- Apply same logic to `evidenceBy` WorkProductInstance names
+
+**Merge Rule:**
+- Same-name AlphaInstance references → merge to highest state, aggregate all links and evidenceBy
+- Same-name WorkProductInstance entries → merge to highest LOD, aggregate all links
+- Merge key is instance `name`, NOT element name (alphaName, workProductName)
 
 ### Assets
 Visual assets (diagrams, templates, icons) can be referenced in practices and methods using the AssetReference structure:
