@@ -25,7 +25,7 @@ ARRAY_SECTIONS = [
     "alphas", "workProducts", "activities", "patterns", "citations",
     "activitySpaces", "competencies", "narrativeTypes", "assets",
     "personas", "personaGroups", "practiceElementAliases", "narratives",
-    "focuses",
+    "focuses", "references",
 ]
 
 SCALAR_FIELDS = [
@@ -50,6 +50,27 @@ def extract_competency_levels(data):
             if name:
                 levels.add(name)
     return sorted(levels)
+
+
+def _diff_wp_properties(old, new):
+    """Compare partOf/mapsTo properties across work products."""
+    changes = []
+    old_wps = {wp["name"]: wp for wp in old.get("workProducts", []) if "name" in wp}
+    new_wps = {wp["name"]: wp for wp in new.get("workProducts", []) if "name" in wp}
+    for wp_name in sorted(set(old_wps) | set(new_wps)):
+        old_wp = old_wps.get(wp_name, {})
+        new_wp = new_wps.get(wp_name, {})
+        for prop in ("partOf", "mapsTo"):
+            old_val = old_wp.get(prop)
+            new_val = new_wp.get(prop)
+            if old_val != new_val:
+                changes.append({
+                    "workProduct": wp_name,
+                    "property": prop,
+                    "old": old_val,
+                    "new": new_val,
+                })
+    return changes
 
 
 def extract_aliases(data):
@@ -88,6 +109,10 @@ def diff_files(old, new):
             "added": added,
             "removed": removed,
         }
+
+    wp_prop_changes = _diff_wp_properties(old, new)
+    if wp_prop_changes:
+        result["workProductProperties"] = wp_prop_changes
 
     old_kw = set(old.get("keywords", []))
     new_kw = set(new.get("keywords", []))
@@ -149,6 +174,14 @@ def print_report(diff, changes_only=False):
             for name in info["removed"]:
                 print(f"    - {name}")
     print()
+
+    if diff.get("workProductProperties"):
+        print("=== WORK PRODUCT PROPERTY CHANGES ===")
+        for change in diff["workProductProperties"]:
+            old_val = change["old"] or "(none)"
+            new_val = change["new"] or "(none)"
+            print(f"  {change['workProduct']}.{change['property']}: {old_val} → {new_val}")
+        print()
 
     if diff.get("keywords"):
         print("=== KEYWORD CHANGES ===")

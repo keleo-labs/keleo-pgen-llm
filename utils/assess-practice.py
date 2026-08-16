@@ -510,6 +510,122 @@ def check_mapsto_naming(data, kind, baseline_data=None):
     return issues
 
 
+def check_partof_mapsto_candidates(data, kind, baseline_data=None):
+    """Detect partOf work products that may be better modeled as mapsTo variants."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    all_wps = {}
+    for wp in data.get("workProducts", []):
+        all_wps[wp.get("name", "")] = wp
+    if baseline_data:
+        for wp in baseline_data.get("workProducts", []):
+            all_wps.setdefault(wp.get("name", ""), wp)
+
+    for idx, wp in enumerate(data.get("workProducts", [])):
+        part_of = wp.get("partOf")
+        if not part_of:
+            continue
+
+        parent = all_wps.get(part_of)
+        if not parent:
+            continue
+
+        variant_lod_count = len(wp.get("levelsOfDetail", []))
+        parent_lod_count = len(parent.get("levelsOfDetail", []))
+
+        if variant_lod_count == parent_lod_count and variant_lod_count > 0:
+            issues.append({
+                "severity": "info",
+                "category": "partof-mapsto-candidate",
+                "path": f"workProducts[{idx}].partOf",
+                "message": f"Work product '{wp.get('name', '')}' uses partOf:'{part_of}' but has the same "
+                           f"LOD count ({variant_lod_count}) — consider mapsTo if this is an IS-A variant "
+                           f"rather than a component",
+                "autoFixable": False,
+            })
+
+    return issues
+
+
+def check_missing_partof_candidates(data, kind, baseline_data=None):
+    """Suggest work products that lack partOf but may be components of a parent practice WP."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+    if not baseline_data:
+        return issues
+
+    parent_wps = {}
+    for wp in baseline_data.get("workProducts", []):
+        name = wp.get("name", "")
+        if name:
+            parent_wps[name] = wp
+
+    if not parent_wps:
+        return issues
+
+    RELATED_TERMS = [
+        ("campaign", "marketing"), ("tracking", "attribution"),
+        ("timeline", "plan"), ("schedule", "plan"),
+        ("brief", "plan"), ("report", "plan"),
+        ("content", "marketing"), ("account", "marketing"),
+        ("raci", "plan"), ("dashboard", "tracking"),
+    ]
+
+    COMPONENT_TYPES = {
+        "brief", "timeline", "schedule", "matrix", "list", "library",
+        "dashboard", "report", "playbook", "checklist", "inventory",
+    }
+
+    for idx, wp in enumerate(data.get("workProducts", [])):
+        if wp.get("partOf") or wp.get("mapsTo"):
+            continue
+
+        wp_name = wp.get("name", "")
+        wp_name_lower = wp_name.lower()
+        wp_desc = wp.get("description", "").lower()
+
+        for parent_name, parent_wp in parent_wps.items():
+            if parent_name == wp_name:
+                continue
+
+            parent_name_lower = parent_name.lower()
+            parent_desc = parent_wp.get("description", "").lower()
+            reasons = []
+
+            is_component_type = any(t in wp_name_lower for t in COMPONENT_TYPES)
+            parent_is_plan = "plan" in parent_name_lower
+
+            for child_term, parent_term in RELATED_TERMS:
+                if child_term in wp_name_lower and parent_term in parent_name_lower:
+                    reasons.append(f"{child_term}→{parent_term}")
+                    break
+
+            if not reasons:
+                shared = set()
+                for term in ("demand generation", "marketing", "campaign",
+                             "pipeline", "attribution", "execution"):
+                    if term in wp_desc and term in parent_desc:
+                        shared.add(term)
+                if shared and is_component_type and parent_is_plan:
+                    reasons.append(f"shared domain: {', '.join(sorted(shared))}")
+
+            if reasons:
+                issues.append({
+                    "severity": "info",
+                    "category": "partof-candidate",
+                    "path": f"workProducts[{wp_name}]",
+                    "message": f"Work product '{wp_name}' may be a component of "
+                               f"parent practice WP '{parent_name}' — consider adding "
+                               f"partOf:'{parent_name}' ({'; '.join(reasons)})",
+                    "autoFixable": False,
+                })
+
+    return issues
+
+
 def check_contributes_to_state_validity(data, kind, baseline_data=None):
     """Check that contributesToState values reference valid states on the parent alpha."""
     issues = []
@@ -3198,6 +3314,8 @@ def main():
         merged_bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
     all_issues.extend(check_alpha_relationships(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     all_issues.extend(check_mapsto_naming(data, kind, baseline_data))
+    all_issues.extend(check_partof_mapsto_candidates(data, kind, baseline_data))
+    all_issues.extend(check_missing_partof_candidates(data, kind, baseline_data))
     all_issues.extend(check_contributes_to_state_validity(data, kind, baseline_data))
     all_issues.extend(check_activity_name_distinctness(data, kind, baseline_data))
     all_issues.extend(check_alias_isolation(data, kind))

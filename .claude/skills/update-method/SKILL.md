@@ -707,32 +707,33 @@ Total: X references across Y practices. Proceed? (yes/edit/no)
 
 **Step 3D: Update Practice JSON**
 
-For a **single practice**, follow steps 1-6 below. For a **method** (multiple practices), see **Step 3E: Method-Level Orchestration** instead.
+For a **single practice**, follow steps 1-5 below. For a **method** (multiple practices), see **Step 3E: Method-Level Orchestration** instead.
 
 1. **Backup first:**
    ```bash
    python3 utils/backup-practice.py <directory>/
    ```
 
-2. **Add references to JSON** using the patch utility:
+2. **Write a compact spec file** and apply with `build-references.py`:
    ```bash
-   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file _references.json
+   # Write compact spec (see build-references.py header for format)
+   # Then validate + merge into practice in one step:
+   python3 utils/build-references.py <practice>.json --spec refs-spec.json --fix
    ```
-   Or to append to existing references:
+   The utility validates all anchors (alphaName, stateName, workProductName, levelOfDetailName) against the practice, expands compact shorthand to full AlphaInstance objects, and handles same-name merge automatically (highest state wins, links and evidenceBy aggregated).
+
+   Link shorthand: `"https://url|Label"` expands to `{"name": "Label", "uri": "https://url"}`.
+
+   Alternative: output expanded JSON without applying:
    ```bash
-   python3 utils/patch-practice-json.py <practice>.json --append-key references --patch-file _new-references.json
+   python3 utils/build-references.py <practice>.json --spec refs-spec.json -o _references.json
+   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file _references.json
    ```
 
 3. **Validate updated practice:**
    ```bash
    python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --schema deps/language.schema.json
    ```
-
-4. **Merge pass** — after adding/updating references, merge same-name instances:
-   - Key on instance `name` (NOT `alphaName` or `workProductName`)
-   - Same-name AlphaInstance references → keep highest `stateName`, aggregate all `links` and `evidenceBy`
-   - Same-name WorkProductInstance entries within `evidenceBy` → keep highest `levelOfDetailName`, aggregate all `links`
-   - Links arrays can contain many documents — aggregation produces richer references
 
 5. **Bump version (patch):**
    ```bash
@@ -766,10 +767,10 @@ When adding references to a **method** with multiple constituent practices:
 
 3. **Batch discovery:** Browse the content source once for all practices, grouping discovered content by practice. Present a single consolidated mapping to the user for approval — do NOT prompt per-practice.
 
-4. **Patch all practices:** Create one reference JSON per practice and patch each:
+4. **Apply references to each practice** using compact specs:
    ```bash
    # Repeat for each practice with references
-   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file <refs>.json
+   python3 utils/build-references.py <practice>.json --spec <practice>-refs-spec.json --fix
    ```
 
 5. **Batch version bump** all modified practices plus the method JSON in one command:
@@ -1145,27 +1146,62 @@ python3 utils/package-keleo.py \
 - Follow naming conventions from `references/semantics.md` §6.6
 - References are `AlphaInstance` objects — they illustrate an alpha at a specific state of maturity
 
-### Scenario 10: Convert Work Product `partOf` ↔ `mapsTo`
+### Scenario 10: Add or Convert Work Product `partOf` / `mapsTo`
 
 **Symptoms:**
+- Assessment flags `partof-candidate` info (cross-practice containment candidates when `--parent` is provided)
 - Assessment flags `mapsto-lod-mismatch` (variant LODs don't match parent) or `mapsto-naming` (variant name repeats parent type)
 - A work product uses `partOf` but has the same LOD progression as the parent (should be `mapsTo`)
 - A work product uses `mapsTo` but has different LODs from the parent (should be `partOf` or standalone)
 - Review identifies IS-A vs HAS-A relationship was incorrectly assigned
+- Work products lack `partOf` but are clearly sub-artifacts of a parent practice WP
 
-**Update Mode:** Remap & Regenerate (Mode 2)
+**Update Mode:** Targeted transform (no full remap needed for additions/conversions)
 
 **Process:**
-1. Load practice JSON and identify the work product(s) to convert
-2. For `partOf → mapsTo`: Verify LODs match the target work product exactly (same names, same sequence). Update checklists to be domain-specific. Remove `partOf`, add `mapsTo`. Apply naming convention (omit parent type name).
-3. For `mapsTo → partOf`: Design new LOD progression appropriate for the sub-component. Remove `mapsTo`, add `partOf`. Rename if needed (naming convention no longer applies).
-4. Validate, version bump (minor), and re-package
+1. Run assessment with `--parent` — check for `partof-candidate` and `partof-mapsto-candidate` info messages
+2. Review candidates and decide which relationships to add/convert
+3. Apply using `transform-workproducts.py`:
+   ```bash
+   # Add partOf (single)
+   python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Campaign Brief","setPartOf":"Partner Marketing Plan"}]' --fix
+
+   # Add partOf (batch — multiple WPs)
+   python3 utils/transform-workproducts.py <practice>.json --spec '[
+     {"workProduct":"Campaign Brief","setPartOf":"Partner Marketing Plan"},
+     {"workProduct":"Campaign Timeline","setPartOf":"Campaign Brief"},
+     {"workProduct":"Target Account List","setPartOf":"Campaign Brief"}
+   ]' --fix
+
+   # Convert partOf → mapsTo
+   python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Old","setMapsTo":"Parent","lodMap":{"OldLOD":"NewLOD"}}]' --fix
+   ```
+4. For `partOf → mapsTo`: Verify LODs match the target work product exactly (same names, same sequence). Update checklists to be domain-specific.
+5. For `mapsTo → partOf`: Design new LOD progression appropriate for the sub-component.
+6. Validate, version bump (patch for additions, minor for conversions), and re-package
 
 **Key Rules:**
 - `mapsTo` and `partOf` are mutually exclusive — never set both
 - `mapsTo` requires identical LOD names and sequence to parent
 - `mapsTo` variant names must NOT repeat parent type name (IS-A convention)
 - `partOf` allows independent LOD progression
+
+### Scenario 11: Convert Work Product `partOf` → `mapsTo` (Batch)
+
+**Symptoms:**
+- Assessment flags `partof-mapsto-candidate` info messages
+- Multiple work products across practices use `partOf` but are IS-A variants (same LOD count as parent)
+- Systematic pattern: all TDP-specific briefs, all play-specific playbooks, etc.
+
+**Update Mode:** Targeted transform (no full remap needed)
+
+**Process:**
+1. Run assessment — detects `partof-mapsto-candidate` work products
+2. Identify parent WP LOD names for the mapsTo target
+3. Build transform specs: `setMapsTo`, `lodMap` (rename to match parent), `rename` (drop parent type suffix), `addLods` (if LOD count differs)
+4. Apply `transform-workproducts.py` per practice with `--fix`
+5. Validate — confirm 0 new errors, mapsTo LODs match parent
+6. Version bump (patch), repackage
 
 ---
 
@@ -1349,6 +1385,12 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - Batch alpha transform (dry-run): `python3 utils/transform-alphas.py <practice>.json --spec '[{"alpha":"Old","rename":"New","setMapsTo":"Parent","stateMap":{"S1":"T1"}}]'`
    - Batch alpha transform (apply): `python3 utils/transform-alphas.py <practice>.json --spec-file transforms.json --fix`
    - Transform spec supports: `rename`, `setMapsTo`, `setContributesTo`, `stateMap` (1:1 or many:1 merge), `addStates` (new states with checklist)
+   - Batch WP transform (dry-run): `python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Old","rename":"New","setMapsTo":"Parent","lodMap":{"S1":"T1"}}]'`
+   - Batch WP transform (apply): `python3 utils/transform-workproducts.py <practice>.json --spec-file transforms.json --fix`
+   - Transform spec supports: `rename`, `setMapsTo`, `setPartOf`, `lodMap` (LOD rename), `addLods` (new LODs with checklist)
+   - Build references (validate + expand): `python3 utils/build-references.py <practice>.json --spec refs-spec.json` (validate anchors, output full AlphaInstance JSON)
+   - Build references (apply): `python3 utils/build-references.py <practice>.json --spec refs-spec.json --fix` (validate, expand, merge into practice — handles same-name instance merge)
+   - Build references (to file): `python3 utils/build-references.py <practice>.json --spec refs-spec.json -o _references.json`
    - Resolve transitive deps: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (find all baselines + practices in dependency tree)
    - Package into .keleo: `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json [transitive-deps.json ...] p1.json p2.json --method-name "Method Name" -o bundles/name.keleo --verify` (list ALL transitive deps, never use `_effective-context.json`)
    - Convert embedded method to .keleo: `python3 utils/package-keleo.py --from-embedded method.json --baseline baseline.json -o bundles/method.keleo --verify`
