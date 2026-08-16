@@ -17,6 +17,24 @@ triggerPatterns:
 
 This skill updates existing Practice or Method JSON files to align with the latest generate-method skill guidance, baseline practice updates, and schema changes.
 
+## Supporting Standards
+
+`.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+
+| If you find yourself... | Stop and read |
+|---|---|
+| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 — these are prohibited; use reusable utils instead |
+| Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
+| Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
+| Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
+| Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
+| Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
+
+**How to read:** `Read .claude/skills/SKILL-STANDARD.md` — then navigate to the relevant `## N.` heading.
+
+---
+
 ## Modularity Principle
 
 **CRITICAL:** This skill is a wrapper around the `generate-method` skill. All phase processes, quality gates, and validation rules come directly from `.claude/skills/generate-method/SKILL.md`.
@@ -838,7 +856,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 
 ## Post-Completion Review (MANDATORY)
 
-**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
+**After completing the skill workflow OR after completing planning**, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then review the session for optimisation opportunities:
 
 1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
    - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list

@@ -21,6 +21,24 @@ This skill transforms enterprise methodology documentation into schema-compliant
 
 ---
 
+## Supporting Standards
+
+`.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+
+| If you find yourself... | Stop and read |
+|---|---|
+| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 — these are prohibited; use reusable utils instead |
+| Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
+| Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
+| Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
+| Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
+| Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
+
+**How to read:** `Read .claude/skills/SKILL-STANDARD.md` — then navigate to the relevant `## N.` heading.
+
+---
+
 ## Critical Process: ALWAYS Use EnterPlanMode
 
 **MANDATORY FIRST STEP:** Before starting ANY phase, you MUST use EnterPlanMode to:
@@ -1041,7 +1059,7 @@ Read validation output and apply fixes:
 **All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.**
 Use the Write tool (auto-approved) to create intermediate files, then call utility scripts. This rule applies to subagents too.
 
-**When you need functionality that doesn't exist yet**, follow the Utils Self-Extension Protocol (SKILL-STANDARD.md §7.4):
+**When you need functionality that doesn't exist yet**, read `.claude/skills/SKILL-STANDARD.md` §7.4 for the full Utils Self-Extension Protocol, then:
 1. Read `utils/README.md` to check for existing capabilities
 2. Extend an existing script or create a new one (do NOT halt or defer to the user)
 3. Update `utils/README.md` with the change
@@ -1267,7 +1285,7 @@ For successful translation, user receives:
 
 ## Post-Completion Review (MANDATORY)
 
-**After completing the skill workflow OR after completing planning**, follow the Post-Completion Review protocol defined in SKILL-STANDARD.md §11:
+**After completing the skill workflow OR after completing planning**, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then follow these steps:
 
 1. **Utils remediation (apply immediately)**: Audit the session for inline scripts, ad-hoc logic, or workarounds that should be generalizable utilities. For each finding, follow the Utils Self-Extension Protocol — extend or create the utility, update `utils/README.md`, and confirm it works. Do NOT defer to the user for utils changes.
 
