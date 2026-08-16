@@ -135,6 +135,26 @@ When adding a new Gherkin scenario with a new `@rule:` ID:
 
 Validation logic lives in reusable utility scripts (`utils/`), never as inline `python3 -c` or `bash -c` commands in skill instructions. When a new validation need arises, extend an existing utility rather than creating a new one.
 
+### 7.4 Utils Self-Extension Protocol
+
+`utils/README.md` is the canonical registry of all utility scripts — their purpose, capabilities, and usage. Skills MUST follow this protocol when they need programmatic functionality during execution:
+
+**Step 1 — Consult the registry.** Read `utils/README.md` to find an existing script that covers the need. If the script name looks relevant but you're unsure of its full capabilities, run `python3 utils/<script>.py --help` for detailed usage.
+
+**Step 2 — Use, extend, or create.**
+
+- **Existing script covers it:** Use it directly. No further action.
+- **Existing script is close but missing a feature:** Extend that script with the new capability. Follow the script's existing patterns (argument style, output format, `_shared.py` usage). Add a test run to confirm the extension works.
+- **No existing script covers it:** Create a new utility in `utils/`. Import from `_shared.py` where applicable. Include `--help` documentation via `argparse`. Keep the interface consistent with peer scripts (positional file args, `--fix` for writes, `--dry-run` for previews).
+
+**Step 3 — Update the registry.** After extending or creating a script, update `utils/README.md` to reflect the change. Add new scripts to the appropriate section. Update existing entries if capabilities were extended.
+
+**Step 4 — Continue processing.** Do not halt or defer to the user. The skill should seamlessly create/extend the utility and proceed with its workflow.
+
+**Scope guard:** Only create utilities for operations that are generalizable across practices/baselines. One-off data transformations specific to a single source methodology belong in the skill's workflow, not in a reusable script.
+
+**Post-completion:** The Post-Completion Review (Section 11) validates that no ad-hoc inline logic slipped through. If it did, remediate immediately rather than proposing.
+
 ---
 
 ## 8. Eval Harness Integration
@@ -195,3 +215,24 @@ Rules in `create-baseline-method` are structurally complementary to `generate-me
 ### 10.3 Cross-Skill Consistency
 
 Rules that appear identically in multiple skills should be maintained in one canonical location and referenced from others. If a rule diverges between skills, it should be split into separate scenarios with distinct IDs.
+
+---
+
+## 11. Post-Completion Review
+
+After completing the skill workflow OR after completing planning, every skill MUST review the session for improvement opportunities and **apply fixes directly** rather than proposing them to the user.
+
+### 11.1 Utils Remediation (Apply Immediately)
+
+1. **Audit for inline scripts**: Scan the session for any `python3 -c`, `bash -c`, heredocs, shell loops, or ad-hoc logic that performed generalizable operations.
+2. **Check for new capabilities**: Did the skill need functionality that required manual steps or workarounds?
+3. **Remediate**: For each finding, follow the Utils Self-Extension Protocol (§7.4) — extend an existing util or create a new one, update `utils/README.md`, and confirm it works.
+4. **Report**: Briefly tell the user what utils were created or extended and why.
+
+### 11.2 Permission Gaps (Propose to User)
+
+Identify Bash commands that triggered permission prompts but could be auto-allowed. Propose additions to `.claude/settings.json` — do not apply unilaterally since permission changes are a user decision.
+
+### 11.3 Skill Improvements (Propose to User)
+
+Identify patterns that indicate skill instruction gaps (repeated manual corrections, ambiguous guidance that led to wrong output). Propose specific SKILL.md edits — do not apply unilaterally since skill changes affect all future runs.

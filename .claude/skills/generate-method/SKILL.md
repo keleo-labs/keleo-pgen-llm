@@ -1036,30 +1036,22 @@ Read validation output and apply fixes:
 
 ## Key Principles
 
-### No Inline Scripts
+### No Inline Scripts + Utils Self-Extension
 
 **All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.**
 Use the Write tool (auto-approved) to create intermediate files, then call utility scripts. This rule applies to subagents too.
 
+**When you need functionality that doesn't exist yet**, follow the Utils Self-Extension Protocol (SKILL-STANDARD.md §7.4):
+1. Read `utils/README.md` to check for existing capabilities
+2. Extend an existing script or create a new one (do NOT halt or defer to the user)
+3. Update `utils/README.md` with the change
+4. Continue processing
+
 ### Key Utilities
 
-Run `python3 utils/<script>.py --help` for full usage. Most-used utilities:
+**Canonical registry:** `utils/README.md` — read this for the full, current list of all utilities.
 
-| Script | Purpose |
-|---|---|
-| `assess-practice.py` | Validate practice JSON (crossrefs, baseline alignment, schema). Use `--baseline`, `--parent`, `--summary`, `--errors-only` |
-| `extract-reference-names.py` | Inspect JSON structure, elements, narratives, citations. Use `--sections`, `--alpha-details`, `--narrative-content` |
-| `discover-dependencies.py` | Resolve dependencies by name (`--resolve`) or from file (`--resolve-from --transitive`) |
-| `fix-common-issues.py` | Auto-fix common issues (`--fix --all`). Handles kind, schema, narratives, citations, aliases, patterns, Gherkin |
-| `fix-alpha-refs.py` | Add/remap/remove alpha references (`--add-redeclaration`, `--remap`, `--remove-alpha`) |
-| `patch-practice-json.py` | JSON patching (`--set-key`, `--patch-file`, `--element-path`, `--replace`, `--rename-in`) |
-| `package-keleo.py` | Create .keleo packages (`--documents`, `--verify`). List ALL deps in topological order |
-| `rebuild-keleo.py` | Rebuild existing .keleo packages (`--all`, `--if-changed`) |
-| `assemble-mapping-guide.py` | Assemble method mapping guides from practice guides (`--guides`, `--stats`) |
-| `validate-phase-output.py` | Validate phase outputs (`--phase 2 --validate-patterns`) |
-| `extract-gws-text.py` | Extract text from Google Workspace API JSON (auto-detects Slides/Docs) |
-| `apply-versioning.py` | Stamp schemaVersion, bump version, populate dependencyVersions |
-| `diff-practice-json.py` | Structural diff between JSON versions (`--changes-only`) |
+Run `python3 utils/<script>.py --help` for detailed usage of any script.
 
 ### Reference-Driven Architecture
 
@@ -1275,19 +1267,12 @@ For successful translation, user receives:
 
 ## Post-Completion Review (MANDATORY)
 
-**After completing the skill workflow OR after completing planning**, review the session for optimisation opportunities:
+**After completing the skill workflow OR after completing planning**, follow the Post-Completion Review protocol defined in SKILL-STANDARD.md §11:
 
-1. **Audit ad-hoc commands**: Did the user have to confirm execution of any commands or scripts that weren't auto-approved? Look for:
-   - Permission prompts for Bash commands not in the project's `.claude/settings.json` allow list
-   - Inline `python3 -c` or `bash -c` scripts that should have been reusable utils
-   - Shell patterns (heredocs, loops, process substitution) that triggered prompts
-   - External tool calls (e.g., `unzip`, `zip`, `curl`) that could be absorbed into existing utils
+1. **Utils remediation (apply immediately)**: Audit the session for inline scripts, ad-hoc logic, or workarounds that should be generalizable utilities. For each finding, follow the Utils Self-Extension Protocol — extend or create the utility, update `utils/README.md`, and confirm it works. Do NOT defer to the user for utils changes.
 
-2. **Identify missing utils**: Did you have to write any ad-hoc logic that could be generalised into a reusable utility script in `utils/`?
+2. **Permission gaps (propose to user)**: Identify Bash commands that triggered permission prompts but could be auto-allowed. Suggest additions to `.claude/settings.json`.
 
-3. **Propose fixes** (present to user, don't apply unilaterally):
-   - **Permission gaps**: Suggest adding auto-allow entries to `.claude/settings.json`
-   - **Missing utils**: Propose new utility scripts or extensions to existing ones
-   - **Skill improvements**: Suggest skill instruction updates to prevent the ad-hoc pattern in future runs
+3. **Skill improvements (propose to user)**: Identify instruction gaps that led to wrong output or repeated manual corrections. Propose specific SKILL.md edits.
 
-4. **Report**: Briefly tell the user what you found and what you'd recommend changing. If nothing was found, say so — a clean session is a good signal.
+4. **Report**: Tell the user what was remediated (utils created/extended) and what is proposed (permissions, skill changes). A clean session is a good signal — say so if nothing was found.

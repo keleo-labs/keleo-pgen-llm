@@ -29,6 +29,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 |--------|---------|-------|
 | `discover-dependencies.py` | Auto-discover and resolve dependencies by scanning project directories | `python3 utils/discover-dependencies.py --resolve "Name" \| --resolve-from <file>.json [--transitive] \| --dependents "Name" \| --list` |
 | `resolve-context.py` | Unified context resolver: baselines + practices + .keleo → effective context | `python3 utils/resolve-context.py <baseline>.json [<practice>.json] [<bundle>.keleo] --transitive -o <output>.json` |
+| `resolve-practice-dependencies.py` | Determine practiceDependencyNames by comparing parent and baseline alphas | `python3 utils/resolve-practice-dependencies.py --parent <parent>.json --baseline <baseline>.json --practice <practice>.json [--per-alpha]` |
 
 ## Auto-Fix Tools
 
@@ -37,19 +38,29 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `fix-common-issues.py` | Fix structural issues: kind, narratives, citations, contributesTo, schema violations, narrative placement | `python3 utils/fix-common-issues.py <file>.json [--fix] [--all]` |
 | `fix-competency-levels.py` | Fix invalid competency level names against baseline | `python3 utils/fix-competency-levels.py <file>.json <baseline>.json [--fix] [--map "Old=New"]` |
 | `fix-alpha-refs.py` | Add/remap/remove alpha references in practice JSON | `python3 utils/fix-alpha-refs.py <file>.json <baseline>.json [--add-redeclaration NAME] [--remap OLD NEW --state-map JSON] [--remove-alpha NAME] [--fix]` |
-| `fix-method-redeclarations.py` | Fix redeclaration issues across all practices in a method | `python3 utils/fix-method-redeclarations.py <method>.json <baseline>.json [--fix]` |
 | `fix-citation-names.py` | Fix citation name fields to use work titles | `python3 utils/fix-citation-names.py <file>.json [--fix]` |
 | `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type) | `python3 utils/transform-alphas.py <file>.json [--fix]` |
+| `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |
 | `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump version | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--fix]` |
+| `align-baseline-states.py` | Align child baseline redeclared alpha states with parent canonical names | `python3 utils/align-baseline-states.py <child>.json <parent>.json [--check] [--mapping JSON]` |
+
+## Enrichment
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `add-citations.py` | Add citations to a practice/baseline JSON and link them to element narratives | `python3 utils/add-citations.py <target>.json --citations-file <citations>.json [--link-to alphas activities workProducts all] [--dry-run]` |
+| `add-element-icons.py` | Add Font Awesome icon assets to elements in bulk from an icon mapping file | `python3 utils/add-element-icons.py <file>.json --map <icons>.json [--fix] [--skip-existing]` |
+| `apply-narratives.py` | Apply narrative JSON to matching elements by name in a practice/baseline JSON | `python3 utils/apply-narratives.py <target>.json --map <narratives>.json [--fix]` |
+| `build-references.py` | Build schema-compliant AlphaInstance references from a compact spec, validating anchors against the practice | `python3 utils/build-references.py <practice>.json --spec <spec>.json [--fix] [-o <output>.json]` |
 
 ## Packaging
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `package-keleo.py` | Create .keleo archive from constituent JSON files | `python3 utils/package-keleo.py --name "Name" --version 1.0.0 --documents <file>.json [<file2>.json] -o <output>.keleo` |
-| `bundle-practices.py` | Batch-package practice directories into .keleo archives | `python3 utils/bundle-practices.py <dir1> [<dir2>...] [--baseline <baseline>.json]` |
+| `package-keleo.py` | Create .keleo archive from constituent JSON files | `python3 utils/package-keleo.py --name "Name" --version 1.0.0 --documents <file>.json [<file2>.json] -o <output>.keleo [--verify]` |
+| `rebuild-keleo.py` | Rebuild existing .keleo packages from their manifests using current source files | `python3 utils/rebuild-keleo.py [<files>.keleo] [--all] [--dry-run] [--if-changed] [--json]` |
 
 ## Refactoring & Backup
 
@@ -63,6 +74,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | Script | Purpose | Usage |
 |--------|---------|-------|
 | `extract-gws-slides.py` | Extract Google Workspace Slides content via gws CLI | `python3 utils/extract-gws-slides.py <presentation-id> [-o <output>.md]` |
+| `extract-gws-text.py` | Extract text from Google Workspace API JSON (auto-detects Slides/Docs format) | `python3 utils/extract-gws-text.py <input>.json [-o <output-dir>] [--format slides\|docs]` |
 
 ## Internal Module
 

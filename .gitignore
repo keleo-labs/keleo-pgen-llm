@@ -16,6 +16,7 @@ archive
 .playwright-mcp/
 __pycache__/
 deps/*-cr.json
+.tmp/*
 
 # Keep the practices directory structure
 !practices/.gitkeep
