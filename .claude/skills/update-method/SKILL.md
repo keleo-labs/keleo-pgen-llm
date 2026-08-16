@@ -556,154 +556,16 @@ For each discovered reference, map to the Practice Language structure:
 
 ---
 
-**Reference naming and description conventions:**
+**Reference conventions** — see `references/semantics.md` §6.6 for full naming rules, instance naming, and merge logic. Key rules:
 
-References are AlphaInstance objects — they represent the alpha (a general concern or concept) at a specific state, not the content asset itself. Names and descriptions must reflect this.
-
-- **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — "Standard" prefix indicates a reference exemplar. Optional qualifier indicates the positioning context (e.g., "Customer", "Partner", "Internal", "Engagement").
-- **Description pattern:** Describe the semantic role of the reference instance in terms of the alpha's state progression, NOT what the linked content contains.
-- **Instance names scope to the example, NOT the state/LOD.** A real-world instance appearing at different maturity levels shares ONE name — the name identifies the specific example. Do NOT engineer names for uniqueness by appending state/LOD qualifiers.
-- **"Same example or different?" test:** Before creating a new reference for the same alpha, check whether content belongs to an existing instance at a different state. If it's the same real-world example at a different level of progression, use the same instance name. Only create a separate instance for a genuinely different example.
-- **Apply the same logic to `evidenceBy` names.** If multiple work product artifacts are instances of the same document at different LODs, use the same WorkProductInstance name.
-
-| | BAD (content-centric) | GOOD (concept-centric) |
-|---|---|---|
-| **Name** | "AI Platform TDP Customer Presentation" | "Standard Customer AI Platform TDP" |
-| **Description** | "Customer-facing deck for the AI Platform technology decision point..." | "Reference AI Platform TDP at Positioned state with customer-facing positioning materials" |
-| **Name** | "Inference at Scale Sales Tactic" | "Standard Engagement Inference at Scale" |
-| **Description** | "Sales tactic guide for engaging customers on inference at scale..." | "Reference Inference at Scale at Prepared state with customer engagement materials" |
-
----
-
-**Two-level link structure — alpha links vs evidence links:**
-
-A reference can carry links at two levels, serving different purposes:
-
-| Level | Property | Content Scope | Examples |
-|---|---|---|---|
-| **Alpha-level** | `links` on the AlphaInstance | Landing pages, introductory info, overview resources about the concern area | TDP hub pages, sales play landing pages, topic overviews |
-| **Evidence-level** | `links` on each `evidenceBy` WorkProductInstance | Specific documents scoped to a work product's purpose | Customer decks, cheatsheets, conversation guides, templates |
-
-A single reference can have BOTH alpha-level links (for orientation) and `evidenceBy` entries with their own links (for specific artifacts). Hub/landing pages with no specific work product scope go in alpha-level links only.
-
-**Link naming:** All link `name` fields — at both levels — must use the **actual title of the content** being linked (the page title, document name, or resource heading). Do NOT use generic platform labels.
-
-| BAD | GOOD |
-|---|---|
-| `"Sales Hub"` | `"Red Hat AI Platform Technology Decision Point — Customer Presentation"` |
-| `"Google Slides (Source)"` | `"AI Platform TDP Qualification Cheatsheet"` |
-| `"Sales Hub Page"` | `"AI Platform Technology Decision Point Hub"` |
-
-Link `description` is optional but recommended when derivable from content inspection.
-
----
-
-**`evidenceBy` mapping — content to work products:**
-
-Document artifacts belong in `evidenceBy` as `WorkProductInstance` entries. Each entry maps the specific document to a work product type (from the practice or its `practiceDependencyNames` chain) at an appropriate level of detail. The property is spelled `evidenceBy` (NOT `evidencedBy`).
-
-Each `evidenceBy` entry requires:
-- `name`: Document-oriented name identifying the specific artifact
-- `description`: What this work product instance represents
-- `workProductName`: Must resolve to a defined work product (practice-local or from dependencies)
-- `levelOfDetailName`: Must resolve to a defined LOD on that work product
-- `links`: The actual document URLs with content-title names
-
-**Content-to-work-product heuristics:**
-
-| Content Type | Heuristic State | evidenceBy workProductName | evidenceBy LOD | Rationale |
-|---|---|---|---|---|
-| Hub/landing pages | Earliest (awareness) | NO evidenceBy — alpha `links` only | — | Navigation resource, not artifact |
-| Cheatsheets, qualification guides | Early-mid (assessment) | TDP Positioning Brief | Credentialed | Credentialing/qualification support |
-| Customer decks, pitch materials | Mid (positioning) | TDP Positioning Brief | Content-Complete | Customer-facing positioning artifact |
-| Sales tactic pages/guides | Sub-alpha relevant state | Sales Tactic Conversation Guide | Deployment-Ready | Tactic engagement guidance |
-| Sales play pitch decks | Mid (engagement) | Sales Play Execution Guide | Structured | Play-level customer engagement material |
-| Personas and discovery docs | Mid (engagement) | Sales Play Execution Guide | Structured | Persona/discovery support |
-| Templates, starter artifacts | Mid-late (execution) | (practice-specific work product) | (appropriate LOD) | Execution support |
-| Case studies, reference archs | Late (evidence) | (practice-specific work product) | (advanced LOD) | Demonstrated outcomes |
-
-Work product names above are examples from the Sales Play Framework practice. For other practice families, use the practice's own work products or its dependency chain's work products.
-
----
-
-**Complete structural example:**
-
-Before (content-centric, no `evidenceBy`):
-```json
-{
-  "name": "AI Platform TDP Customer Presentation",
-  "description": "Customer-facing deck for the AI Platform technology decision point, positioning Red Hat's AI platform for enterprise AI deployment",
-  "alphaName": "AI Platform",
-  "stateName": "Positioned",
-  "links": [
-    { "name": "Sales Hub", "uri": "https://saleshub.redhat.com/Link/Content/DCPHDQgjP7JhTGcPDVmXhXF2XhJG" }
-  ]
-}
-```
-
-After (concept-centric, with `evidenceBy`):
-```json
-{
-  "name": "Standard Customer AI Platform TDP",
-  "description": "Reference AI Platform TDP at Positioned state with customer-facing positioning materials",
-  "alphaName": "AI Platform",
-  "stateName": "Positioned",
-  "evidenceBy": [
-    {
-      "name": "AI Platform Customer Positioning Deck",
-      "description": "Customer-facing slide deck for AI platform technology positioning",
-      "workProductName": "TDP Positioning Brief",
-      "levelOfDetailName": "Content-Complete",
-      "links": [
-        {
-          "name": "Red Hat AI Platform Technology Decision Point — Customer Presentation",
-          "description": "Slide deck covering AI platform positioning, competitive landscape, and customer value",
-          "uri": "https://saleshub.redhat.com/Link/Content/DCPHDQgjP7JhTGcPDVmXhXF2XhJG"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Hub page reference (alpha-level links only, no `evidenceBy`):
-```json
-{
-  "name": "Standard Discovery AI Platform TDP",
-  "description": "Reference AI Platform TDP at Identified state with discovery and enablement resources",
-  "alphaName": "AI Platform",
-  "stateName": "Identified",
-  "links": [
-    {
-      "name": "AI Platform Technology Decision Point Hub",
-      "description": "Landing page with links to all AI Platform TDP sales enablement resources",
-      "uri": "https://saleshub.redhat.com/Link/Content/DCGp7297MBFqdG2PWFCdjCgfWhcB"
-    }
-  ]
-}
-```
-
----
-
-**For methods — present one consolidated mapping** covering all practices rather than prompting per-practice. Group by practice with a reference count summary:
-
-```
-=== Reference Mapping for "<method-name>" ===
-
-Practice: "<practice-1>" (N references)
-1. Standard Customer <AlphaName> → <alphaName> at <stateName>
-   evidenceBy: <workProductName> at <LOD>
-   links: [content title] (uri)
-2. Standard Discovery <AlphaName> → <alphaName> at <stateName>
-   alpha links: [content title] (uri)
-
-Practice: "<practice-2>" (N references)
-...
-
-Total: X references across Y practices. Proceed? (yes/edit/no)
-```
-
-**Wait for user confirmation.**
+- **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — concept-centric, not content-centric
+- **Description:** Semantic role in terms of alpha state progression, NOT what the linked content contains
+- **Instance names scope to the example, NOT the state/LOD** — same real-world instance at different maturity levels shares ONE name
+- **Two-level links:** Alpha-level `links` = navigation/overview; `evidenceBy[].links` = specific artifacts
+- **Link names:** Use the actual content title, never generic platform labels
+- **`evidenceBy` entries:** Each requires `name`, `description`, `workProductName`, `levelOfDetailName`, `links`. Spelled `evidenceBy` (NOT `evidencedBy`).
+- **Hub/landing pages:** Alpha-level links only, no `evidenceBy`
+- **For methods:** Present one consolidated mapping covering all practices; do NOT prompt per-practice. Wait for user confirmation.
 
 **Step 3D: Update Practice JSON**
 
@@ -794,94 +656,16 @@ When adding references to a **method** with multiple constituent practices:
 
 ## Handling Methods (Multiple Practices)
 
-**For Method JSON files:**
+For methods, ask user for scope (all practices, specific practices, or method-level only). Run update workflow per selected practice. Package with `package-keleo.py`.
 
-1. **Ask user for scope:**
-   ```
-   This is a Method with N practices. Which practices would you like to update?
-   - All practices (full method update)
-   - Specific practices: [list practice names]
-   - Method-level only (narratives, citations, patterns)
-   ```
+## User Interaction
 
-2. **For each selected practice:**
-   - Run update workflow (Mode 1, Mode 2, or Mode 3) per practice
-   - Generate individual practice JSON or mapping sections
+- **Start:** Read existing JSON + baseline, run assessment
+- **Present:** Assessment results, recommended mode, ask user to choose
+- **Progress:** Brief updates during phases
+- **Completion:** Comparison report (what changed, what preserved, validation summary)
 
-3. **Package Method into `.keleo`:**
-   - Package updated practices + baseline into `.keleo` archive using `package-keleo.py`
-   - The packager generates an externalized method JSON with `practiceNames` references
-   - Method-level narratives and merged citations are included automatically
-   - Validate individual practice JSONs before packaging
-
----
-
-## User Interaction Patterns
-
-### Initial Request
-
-When user provides existing JSON:
-
-"I'll update this practice/method to align with the latest guidance. Let me first read the existing content and identify what needs updating."
-
-**Then:** Read existing JSON and baseline practice
-
-### After Reading Existing Content
-
-Present update mode choice:
-
-"I've analyzed the existing practice. Here's what I found:
-- Current structure: [Practice/Method with N practices]
-- Primary alpha: [Identified or 'Not clearly defined']
-- Potential updates needed: [List key issues]
-
-Please select an update mode:
-1. Full Reanalysis (Phase 1 → 2 → 3) - Recommended if source materials available
-2. Remap & Regenerate (Phase 2 → 3) - Faster, preserves existing analysis
-3. Add/Update References - Add curated external content without full remap
-
-Which mode would you like to use?"
-
-### During Update
-
-Provide progress updates:
-
-- "Extracting existing content as Phase 1 analysis..."
-- "Applying latest mapping guidance: primary alpha focus, competency validation..."
-- "Generating updated JSON with latest schema requirements..."
-- "Packaging into .keleo archive..."
-- "Validation passed! Updated practice packaged at bundles/<name>.keleo"
-
-### Completion Report
-
-Provide comparison summary:
-
-"Update complete! Here's what changed:
-- Primary alpha: <Alpha Name> (focused practice around this alpha)
-- Competency levels: Updated X invalid names to baseline names
-- Aliases: Added Y canonical term aliases
-- Patterns: Completed Z pattern matrices (N×M entries)
-- Schema: Fixed [list fixes]
-
-Preserved content:
-- W activities
-- X work products
-- Y narratives
-- Z citations
-
-The updated JSON is schema-compliant and ready for use."
-
----
-
-## Backup Strategy
-
-**IMPORTANT:** Before overwriting existing files, create backups:
-
-```bash
-python3 utils/backup-practice.py <directory>/
-```
-
-This creates a `backup-YYYYMMDD-HHMMSS/` directory inside the practice/baseline folder and copies all JSON and markdown files. Output is structured JSON reporting the backup location and files copied.
+**Backup:** Always run `python3 utils/backup-practice.py <directory>/` before overwriting.
 
 ---
 
@@ -952,352 +736,35 @@ python3 utils/package-keleo.py \
 
 ## Common Update Scenarios
 
-### Scenario 1: Baseline Practice Updated
+| # | Trigger | Mode | Key Command / Notes |
+|---|---|---|---|
+| 1 | Baseline updated | Remap (Mode 2) | Map to new alphas, update competency levels |
+| 2 | Citations outdated | Full Reanalysis (Mode 1) | Gather updated sources, research latest editions |
+| 3 | Schema/guidance updated | Remap (Mode 2) | Apply latest guidance, fix schema issues |
+| 4 | Practice needs restructuring | Full Reanalysis (Mode 1) | Identify primary alphas, split practices |
+| 5 | Quality issues (names, assets, citations) | Auto-fix → Remap | `fix-common-issues.py --fix --all`, then remap for remaining |
+| 6 | Citation name format (Author-Date → Title) | Auto-fix | `fix-citation-names.py --rename "Old=New"` or `--map renames.json` |
+| 7 | Add Gherkin guidance | Remap (Mode 2) | Read semantics.md §5.3, §8.1.1; add background/test/examples |
+| 8 | Convert to .keleo package | Packaging only | `package-keleo.py --from-embedded` or `--documents` |
+| 9 | Add/update references | Mode 3 | Map to alpha+state, require ≥1 link per reference |
+| 10 | Add/convert WP partOf/mapsTo | Targeted transform | `transform-workproducts.py --spec '[...]' --fix` |
+| 11 | Batch WP partOf→mapsTo | Targeted transform | `transform-workproducts.py` — set `setMapsTo`, `lodMap`, `rename` |
 
-**Symptoms:**
-- New alphas in baseline
-- Changed competency levels
-- Updated relationships
+**Scenario 8 details** (packaging-only — most common standalone use):
+- Embedded method: `package-keleo.py --from-embedded <method>.json --baseline <baseline>.json -o bundles/<name>.keleo --verify`
+- Standalone practice: resolve deps first (`discover-dependencies.py --resolve-from <practice>.json --transitive`), then `package-keleo.py --documents <baseline>.json [<deps>...] <practice>.json -o bundles/<name>.keleo --verify`
 
-**Update Mode:** Remap & Regenerate (Mode 2)
-
-**Process:**
-1. Extract existing content
-2. Map to new baseline alphas
-3. Update competency level names
-4. Add new relationships
-5. Regenerate JSON
-
-### Scenario 2: Citations Outdated
-
-**Symptoms:**
-- Old methodology versions
-- Broken URLs
-- Newer editions available
-
-**Update Mode:** Full Reanalysis (Mode 1)
-
-**Process:**
-1. Gather updated source materials
-2. Research latest authoritative sources
-3. Update citations in Phase 1
-4. Remap with latest content
-5. Regenerate JSON
-
-### Scenario 3: Schema/Guidance Updated
-
-**Symptoms:**
-- Missing discriminator property
-- Invalid competency level names
-- Incomplete pattern matrices
-- Missing aliases
-
-**Update Mode:** Remap & Regenerate (Mode 2)
-
-**Process:**
-1. Extract existing content
-2. Apply latest guidance
-3. Fix schema issues
-4. Regenerate JSON
-
-### Scenario 4: Practice Needs Restructuring
-
-**Symptoms:**
-- No clear primary alpha
-- Too broad coverage (8+ unrelated alphas)
-- "Everything else" catch-all structure
-
-**Update Mode:** Full Reanalysis (Mode 1)
-
-**Process:**
-1. Revisit source materials
-2. Identify primary alphas
-3. Split into multiple focused practices
-4. Create orchestration practice if needed
-5. Generate separate practice JSONs
-
-### Scenario 5: Quality Improvements (Checklist Names, Asset Coverage, Citations)
-
-**Symptoms:**
-- Checklist names are sentence fragments or truncated at 50 characters
-- NarrativeTypes/Focuses lack icon assets
-- Narratives don't reference citations via `citationNames`
-
-**Update Mode:** Auto-fix first (citations, truncation stopgap), then Remap if quality issues remain
-
-**Process:**
-1. Run assessment — detects quality issues
-2. Auto-fix: narrative citations linked, truncated names expanded
-3. Re-assess: if echo/duplicate names or asset gaps remain → remap
-4. Remap: rewrite checklist names as noun phrases, add Font Awesome icons
-5. Re-assess to confirm clean state
-
-### Scenario 6: Citation Name Format (Author-Date → Work Title)
-
-**Symptoms:**
-- Assessment flags `citation-name-format` warnings
-- Citation names use author-date shorthand (e.g., `"Teece (2007)"`) instead of work titles
-
-**Update Mode:** Auto-fix using existing utilities (no remap needed)
-
-**Process:**
-1. Inspect citation metadata to determine correct titles:
-   ```bash
-   python3 utils/extract-reference-names.py <file.json> --sections citations --citation-details
-   ```
-2. For each flagged citation, determine the correct work title from the `description` and `source` fields
-3. Apply renames using `fix-citation-names.py`:
-   ```bash
-   python3 utils/fix-citation-names.py <file.json> --rename "Teece (2007)=Dynamic Capabilities and Strategic Management" --rename "Osterwalder (2010)=Business Model Generation"
-   ```
-   Or for many renames, create a rename map JSON file and use `--map`:
-   ```bash
-   python3 utils/fix-citation-names.py <file.json> --map <rename-map.json>
-   ```
-   Rename map format: `{"renames": [{"old": "Author (Year)", "new": "Work Title"}, ...]}`
-4. Re-assess to confirm `citation-name-format` warnings are resolved
-
-### Scenario 7: Add Gherkin-Inspired Structured Guidance
-
-**Symptoms:**
-- Practice/baseline lacks `background`, `test`, or `examples` properties
-- States have complex prerequisites not captured structurally
-- Checklist items need verification scenarios
-- Activities have non-obvious triggers or decision points
-
-**Update Mode:** Remap & Regenerate (Mode 2)
-
-**Process:**
-1. Read `references/semantics.md` Section 5.3 (Gherkin-Inspired Test Model) and Section 8.1.1 (Gherkin on Activities)
-2. Review existing states for complex prerequisites → add `background` with `given`, `alphaStates`, `workProductLevels`
-3. Review checklist items for verification logic → add `test` (Given/When/Then) and `examples` (concrete scenarios)
-4. Review activities for triggers/decision points → add `test.when` and `test.then` (complementing structural `contributesTo`/`worksOn`)
-5. For baselines: use sparingly — practice layer is the natural place for detailed Gherkin
-6. For LODs: add `background` where work product maturity depends on alpha state prerequisites
-7. Regenerate JSON and validate
-
-**Key Rules:**
-- `test` extends PracticeElement — requires `name` and `description` fields
-- `examples` is an array of Test objects (not strings)
-- `background` is an object (not string/array) with optional `given`, `alphaStates`, `workProductLevels`
-- `test.then` should complement (not duplicate) structural `contributesTo`/`worksOn`
-- Incremental adoption is valid — any combination of background/test/examples can be used independently
-
-### Scenario 8: Convert Existing Output to `.keleo` Package
-
-**Symptoms:**
-- Existing practice/baseline/method JSON files without `.keleo` packaging
-- Embedded method JSON that should use externalized `practiceNames` references
-- Need to bundle practice + baseline into a distributable package
-
-**Update Mode:** No phase re-execution needed — packaging only
-
-**Process for embedded method JSON:**
-```bash
-python3 utils/package-keleo.py \
-  --from-embedded <method>.json \
-  --baseline <baseline>.json \
-  -o bundles/<method-name>.keleo --verify
-```
-This extracts embedded practices into separate documents, creates an externalized method JSON with `practiceNames` string references, and bundles everything into a `.keleo` archive.
-
-**Process for standalone practice + baseline:**
-First resolve transitive dependencies (`python3 utils/discover-dependencies.py --resolve-from <practice>.json --transitive`), then include all resolved documents:
-```bash
-python3 utils/package-keleo.py \
-  --name "<practice-name>" --version "1.0.0" \
-  --description "<description>" \
-  --documents <baseline>.json [<transitive-deps>.json ...] <practice>.json \
-  -o bundles/<practice-name>.keleo --verify
-```
-
-**Process for standalone baseline:**
-If the baseline has `baselinePracticeName`, include the parent baseline:
-```bash
-python3 utils/package-keleo.py \
-  --name "<baseline-name>" --version "1.0.0" \
-  --description "<description>" \
-  --documents [<parent-baseline>.json] <baseline>.json \
-  -o bundles/<baseline-name>.keleo --verify
-```
-
-### Scenario 9: Add/Update Reference Content
-
-**Symptoms:**
-- Practice has no `references` array or sparse references
-- User has found exemplar content (templates, case studies, reference architectures) to add
-- Practice would benefit from curated external content illustrating alphas at specific states
-- User explicitly requests reference discovery
-
-**Update Mode:** Add/Update References (Mode 3)
-
-**Process:**
-1. Load existing practice JSON and review alpha/state/work-product mappings
-2. Check for existing references and identify coverage gaps
-3. Discover new references from source materials, secondary research, or user-provided content
-4. Map each reference to alpha + state anchor with at least one `links` entry (URI)
-5. Present mapped references to user for approval
-6. Patch references into practice JSON, validate, version bump (patch), and re-package
-
-**Key Rules:**
-- Every reference MUST have at least one `links` entry with a valid URI
-- `alphaName` and `stateName` must match defined elements in practice or baseline
-- `evidenceBy` entries (if present) must reference defined work products and LODs
-- Follow naming conventions from `references/semantics.md` §6.6
-- References are `AlphaInstance` objects — they illustrate an alpha at a specific state of maturity
-
-### Scenario 10: Add or Convert Work Product `partOf` / `mapsTo`
-
-**Symptoms:**
-- Assessment flags `partof-candidate` info (cross-practice containment candidates when `--parent` is provided)
-- Assessment flags `mapsto-lod-mismatch` (variant LODs don't match parent) or `mapsto-naming` (variant name repeats parent type)
-- A work product uses `partOf` but has the same LOD progression as the parent (should be `mapsTo`)
-- A work product uses `mapsTo` but has different LODs from the parent (should be `partOf` or standalone)
-- Review identifies IS-A vs HAS-A relationship was incorrectly assigned
-- Work products lack `partOf` but are clearly sub-artifacts of a parent practice WP
-
-**Update Mode:** Targeted transform (no full remap needed for additions/conversions)
-
-**Process:**
-1. Run assessment with `--parent` — check for `partof-candidate` and `partof-mapsto-candidate` info messages
-2. Review candidates and decide which relationships to add/convert
-3. Apply using `transform-workproducts.py`:
-   ```bash
-   # Add partOf (single)
-   python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Campaign Brief","setPartOf":"Partner Marketing Plan"}]' --fix
-
-   # Add partOf (batch — multiple WPs)
-   python3 utils/transform-workproducts.py <practice>.json --spec '[
-     {"workProduct":"Campaign Brief","setPartOf":"Partner Marketing Plan"},
-     {"workProduct":"Campaign Timeline","setPartOf":"Campaign Brief"},
-     {"workProduct":"Target Account List","setPartOf":"Campaign Brief"}
-   ]' --fix
-
-   # Convert partOf → mapsTo
-   python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Old","setMapsTo":"Parent","lodMap":{"OldLOD":"NewLOD"}}]' --fix
-   ```
-4. For `partOf → mapsTo`: Verify LODs match the target work product exactly (same names, same sequence). Update checklists to be domain-specific.
-5. For `mapsTo → partOf`: Design new LOD progression appropriate for the sub-component.
-6. Validate, version bump (patch for additions, minor for conversions), and re-package
-
-**Key Rules:**
-- `mapsTo` and `partOf` are mutually exclusive — never set both
-- `mapsTo` requires identical LOD names and sequence to parent
-- `mapsTo` variant names must NOT repeat parent type name (IS-A convention)
-- `partOf` allows independent LOD progression
-
-### Scenario 11: Convert Work Product `partOf` → `mapsTo` (Batch)
-
-**Symptoms:**
-- Assessment flags `partof-mapsto-candidate` info messages
-- Multiple work products across practices use `partOf` but are IS-A variants (same LOD count as parent)
-- Systematic pattern: all TDP-specific briefs, all play-specific playbooks, etc.
-
-**Update Mode:** Targeted transform (no full remap needed)
-
-**Process:**
-1. Run assessment — detects `partof-mapsto-candidate` work products
-2. Identify parent WP LOD names for the mapsTo target
-3. Build transform specs: `setMapsTo`, `lodMap` (rename to match parent), `rename` (drop parent type suffix), `addLods` (if LOD count differs)
-4. Apply `transform-workproducts.py` per practice with `--fix`
-5. Validate — confirm 0 new errors, mapsTo LODs match parent
-6. Version bump (patch), repackage
+**Scenario 10/11 key rules**: `mapsTo` and `partOf` are mutually exclusive. `mapsTo` requires identical LOD names. `mapsTo` variant names omit parent type.
 
 ---
 
-## Remap Phase: Checklist Name Quality
+## Remap Phase: Quality Fixes
 
-When assessment flags `checklist-quality` issues with names that echo or duplicate their descriptions, the remap phase must rewrite checklist names to proper noun-phrase labels.
+### Checklist Name Quality
+When assessment flags `checklist-quality` issues, rewrite names as short Title Case noun phrases (3-8 words) capturing WHAT is checked, not HOW. Names must not echo descriptions. Apply consistently across all alphas.
 
-**Current (bad) patterns:**
-- Sentence fragment: `"Pests and diseases identified accurately using field guides"`
-- Truncated at 50 chars: `"Surveillance protocols established for high-risk p"`
-- Duplicate of description: name == description verbatim
-
-**Target pattern:**
-- Short Title Case noun phrase: `"Pest & Disease Identification Accuracy"`
-
-**Rules for checklist name rewriting:**
-1. Names MUST be short noun phrases in Title Case (3-8 words)
-2. Names MUST NOT be sentences or verb-led phrases
-3. Names MUST NOT duplicate or echo the description
-4. Names SHOULD capture WHAT is being checked, not HOW
-5. Descriptions remain as full sentences explaining the criterion — do not modify descriptions
-
-**Transformation examples:**
-
-| Original Name | Rewritten Name |
-|---|---|
-| Taxonomic keys used correctly | Taxonomic Key Accuracy |
-| Cultivar authenticity verified | Cultivar Authenticity Verification |
-| Light-photosynthesis relationship understood | Light-Photosynthesis Competency |
-| Populations quantified using standard metrics | Population Quantification Standards |
-| Structural load analysis completed | Structural Load Analysis |
-| Inspections scheduled weekly or more frequently du... | Inspection Scheduling Frequency |
-| Surveillance protocols established for high-risk p... | High-Risk Pathway Surveillance |
-
-**Process during remap:**
-1. Read all checklist items across all alphas and states
-2. For each item where name echoes/duplicates description: rewrite name as a Title Case noun phrase
-3. Ensure names remain unique within each state's checklist
-4. Preserve descriptions unchanged (they provide the detailed criterion)
-5. Apply consistently across all alphas — don't fix some and leave others
-
----
-
-## Remap Phase: Asset Coverage
-
-When assessment flags `asset-coverage` issues, the remap phase must add icon assets for element types with coverage gaps (typically NarrativeTypes and Focuses).
-
-**Font Awesome 6 Free icon selection guidance:**
-
-All icons use these standard fields:
-- `fontFamily`: `"Font Awesome 6 Free"`
-- `fontWeight`: `"900"` (solid style)
-- Asset `type`: `"font-character"`
-- Naming convention: `<kebab-case-element-name>-icon`
-
-**AssetReference on elements:**
-```json
-"assetNames": [{"assetName": "<asset-name>-icon", "type": "icon"}]
-```
-
-**Process during remap:**
-1. For each NarrativeType without `assetNames`:
-   a. Choose an appropriate Font Awesome icon based on the narrative type's name/purpose
-   b. Create an Asset definition in the top-level `assets[]` array
-   c. Add `assetNames` to the NarrativeType element
-2. Repeat for each Focus without `assetNames`
-3. Verify all `assetName` references resolve to entries in `assets[]`
-
-**Common icon suggestions (adapt to domain):**
-
-| Element Type / Name | Suggested `fontCharacter` |
-|---|---|
-| NarrativeType "Hero's Journey" | `fa-route` |
-| NarrativeType "STAR" | `fa-star` |
-| NarrativeType "Three-Act Structure" | `fa-theater-masks` |
-| NarrativeType "StoryBrand" | `fa-bullhorn` |
-| NarrativeType "Seasonal Progression" | `fa-calendar-alt` |
-| NarrativeType "Citation Standard" | `fa-quote-right` |
-| Focus "Value" / business-oriented | `fa-chart-line` |
-| Focus "Solution" / technical | `fa-cogs` |
-| Focus "Endeavor" / organizational | `fa-people-group` |
-| Focus (biological/natural) | `fa-dna` |
-| Focus (operations/production) | `fa-industry` |
-| Focus (professional/practice) | `fa-user-tie` |
-
-**Asset definition example:**
-```json
-{
-  "name": "heros-journey-narrative-type-icon",
-  "type": "font-character",
-  "description": "Hero's Journey narrative type icon",
-  "fontFamily": "Font Awesome 6 Free",
-  "fontCharacter": "fa-route",
-  "fontWeight": "900"
-}
-```
+### Asset Coverage
+When assessment flags `asset-coverage` gaps, add Font Awesome 6 Free icons (`fontWeight: "900"`, naming: `<kebab-case>-icon`). Every NarrativeType and Focus needs an icon. See generate-method SKILL.md Assets section for icon suggestions and JSON structure.
 
 ---
 
@@ -1356,60 +823,12 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 ## Key Principles
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
-2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.
-   - Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
-   - Resolve all dependencies: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
-   - List available files: `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)
-   - Narrative inspection: `python3 utils/extract-reference-names.py <file>.json --sections narratives` (top-level) or `--narrative-placement` (all elements) or `--narrative-content` (with descriptions and first context)
-   - Aliases/citations/types: `python3 utils/extract-reference-names.py <file>.json --sections aliases narrativeTypes citations`
-   - Baseline/parent narrative types and elements: `python3 utils/extract-reference-names.py <baseline-or-parent>.json --sections narrativeTypes` (shows type names with their narrative elements)
-   - Specific narrative type definitions (full JSON): `python3 utils/extract-reference-names.py <file>.json --sections narrativeTypes --narrative-type-names "STAR" "Technique"` (dumps complete JSON for named types)
-   - Find all references to an element: `python3 utils/extract-reference-names.py <file>.json --find-refs "Platform"` (searches alphas, activities, workProducts, patterns, aliases)
-   - Narrative contexts by element: `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls"` (all contexts for a specific narrative element)
-   - Long narrative contexts: `python3 utils/extract-reference-names.py <file>.json --long-contexts` (contexts exceeding 3 sentences, truncated)
-   - Long contexts with full text: `python3 utils/extract-reference-names.py <file>.json --long-contexts --full-text` (full context text, no truncation)
-   - Context element with full text: `python3 utils/extract-reference-names.py <file>.json --context-element "Common Pitfalls" --full-text` (full text, no truncation)
-   - Parent practice activity narratives: `python3 utils/extract-reference-names.py <parent>.json --sections activities --activity-details` (shows narrative types and elements per activity)
-   - Full assessment: `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json]`
-   - Compare two versions: `python3 utils/diff-practice-json.py old.json new.json` (structural diff: count deltas, added/removed elements)
-   - Compare (changes only): `python3 utils/diff-practice-json.py old.json new.json --changes-only`
-   - Assessment with parent: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <parent>.json` (merges parent's alphas, work products, personas, activities, etc. into baseline for cross-reference validation)
-   - Assessment summary: `python3 utils/assess-practice.py <file>.json --summary` (counts by severity/category, suggested mode)
-   - Extract method narratives: `python3 utils/extract-practice-content.py <method>.json --extract-narratives <output>.json` (for package-keleo.py --method-narrative-file)
-   - Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only` (filter to only severity=error issues)
-   - Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure` (type and count/length for each key)
-   - Cross-practice method audit: `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json` (alpha refs, duplicates, persona consistency)
-   - Add missing alpha redeclaration: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --add-redeclaration "Alpha Name" [--fix]`
-   - Remap alpha references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remap "Old Alpha" "New Alpha" --state-map '{"OldState":"NewState"}' [--fix]`
-   - Remove alpha and references: `python3 utils/fix-alpha-refs.py <practice>.json <baseline>.json --remove-alpha "Alpha Name" [--fix]`
-   - Batch alpha transform (dry-run): `python3 utils/transform-alphas.py <practice>.json --spec '[{"alpha":"Old","rename":"New","setMapsTo":"Parent","stateMap":{"S1":"T1"}}]'`
-   - Batch alpha transform (apply): `python3 utils/transform-alphas.py <practice>.json --spec-file transforms.json --fix`
-   - Transform spec supports: `rename`, `setMapsTo`, `setContributesTo`, `stateMap` (1:1 or many:1 merge), `addStates` (new states with checklist)
-   - Batch WP transform (dry-run): `python3 utils/transform-workproducts.py <practice>.json --spec '[{"workProduct":"Old","rename":"New","setMapsTo":"Parent","lodMap":{"S1":"T1"}}]'`
-   - Batch WP transform (apply): `python3 utils/transform-workproducts.py <practice>.json --spec-file transforms.json --fix`
-   - Transform spec supports: `rename`, `setMapsTo`, `setPartOf`, `lodMap` (LOD rename), `addLods` (new LODs with checklist)
-   - Build references (validate + expand): `python3 utils/build-references.py <practice>.json --spec refs-spec.json` (validate anchors, output full AlphaInstance JSON)
-   - Build references (apply): `python3 utils/build-references.py <practice>.json --spec refs-spec.json --fix` (validate, expand, merge into practice — handles same-name instance merge)
-   - Build references (to file): `python3 utils/build-references.py <practice>.json --spec refs-spec.json -o _references.json`
-   - Resolve transitive deps: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (find all baselines + practices in dependency tree)
-   - Package into .keleo: `python3 utils/package-keleo.py --name "name" --version "1.0.0" --description "..." --documents baseline.json [transitive-deps.json ...] p1.json p2.json --method-name "Method Name" -o bundles/name.keleo --verify` (list ALL transitive deps, never use `_effective-context.json`)
-   - Convert embedded method to .keleo: `python3 utils/package-keleo.py --from-embedded method.json --baseline baseline.json -o bundles/method.keleo --verify`
-   - Verify existing package: `python3 utils/package-keleo.py --verify-only bundles/name.keleo`
-   - JSON patching — set key: `python3 utils/patch-practice-json.py <target>.json --set-key assets --patch-file assets.json`
-   - JSON patching — merge at root: `python3 utils/patch-practice-json.py <target>.json --patch-file patch.json`
-   - JSON patching — append to array: `python3 utils/patch-practice-json.py <target>.json --append-key assets --patch-file more-assets.json`
-   - JSON patching — named element: `python3 utils/patch-practice-json.py <target>.json --element-path "alphas[Platform]" --patch-file patch.json`
-   - JSON patching — field match: `python3 utils/patch-practice-json.py <target>.json --element-path "activities[My Activity].narratives[0].narrativeContexts[narrativeElementName=Common Pitfalls]" --patch-file patch.json`
-   - JSON patching — create new: `python3 utils/patch-practice-json.py <new>.json --patch-file skeleton.json --create`
-   - JSON patching — delete key: `python3 utils/patch-practice-json.py <target>.json --delete-key kind`
-   - JSON patching — deep replace: `python3 utils/patch-practice-json.py <target>.json --replace "old text" "new text"`
-   - JSON patching — bulk replace: `python3 utils/patch-practice-json.py <target>.json --replace-file replacements.json` (JSON array of `["old", "new"]` pairs)
-   - JSON patching — preview: add `--dry-run` to any patch command
-   - These commands work on ANY JSON file — practice, method, baseline, `_effective-context.json`
-   - Bump version (patch): `python3 utils/apply-versioning.py <file>.json --bump patch --fix` (increments version, refreshes schemaVersion, dependencyVersions, updatedAt)
-   - Bump version (minor): `python3 utils/apply-versioning.py <file>.json --bump minor --fix` (for remap/reanalysis updates)
-   - Normalize versioning: `python3 utils/apply-versioning.py <file>.json --fix` (add schemaVersion, normalize version, populate dependencyVersions)
-   - Batch versioning: `python3 utils/apply-versioning.py --all --fix` (process all docs in dependency order)
+2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`. See generate-method SKILL.md "Key Utilities" table for the full utility reference. Run `python3 utils/<script>.py --help` for detailed usage. Additional update-specific utilities:
+   - `transform-alphas.py` — Batch alpha transforms: `rename`, `setMapsTo`, `setContributesTo`, `stateMap`, `addStates`
+   - `transform-workproducts.py` — Batch WP transforms: `rename`, `setMapsTo`, `setPartOf`, `lodMap`, `addLods`
+   - `build-references.py` — Validate and expand reference specs into AlphaInstance JSON (`--spec`, `--fix`)
+   - `fix-citation-names.py` — Rename citation names (`--rename "Old=New"` or `--map renames.json`)
+   - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix` or `--all --fix` for batch)
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.

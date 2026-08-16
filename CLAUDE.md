@@ -292,71 +292,22 @@ All files for a baseline are co-located in `baselines/<baseline-name>/`:
 
 ### Extension Practice Constraints
 
-These constraints apply to **extension practices** created with `/generate-method`:
+These constraints apply to **extension practices** created with `/generate-method`. Full details in `references/semantics.md` Sections 4.1-4.5, 6.1-6.2, 7.4-7.5.
 
 ### Alpha Handling
-- **Redeclaration**: Enriching baseline alphas with additional checklists/narratives while preserving exact baseline structure
-- **Specialization** (`contributesTo`): Creating new alphas with distinct state progression that contribute to baseline alphas (e.g., "Platform Capability" → "Platform")
-- **Variant Mapping** (`mapsTo`): Creating named variants of a parent alpha that follow the exact same state progression with domain-specific checklists (e.g., "AI-Ready Enterprise" → "Sales Play", specific TDPs → "Technical Decision Point", specific Sales Tactics → "Sales Tactic"). On merge, variants appear in the parent's `variants` array.
-  - `mapsTo` and `contributesTo` are **mutually exclusive** — never set both on the same alpha
-  - States MUST exactly match the target alpha (same names, same sequence)
-  - IS-A semantics: the variant IS a type of the parent
-  - **Naming convention**: Variant alpha names MUST NOT repeat the parent type name — `mapsTo` reads as "is a type of", so including the type is redundant (e.g., "AI-Ready Enterprise" not "AI-Ready Enterprise Play"; "Container Management" not "Container Management TDP"). Applies to both alpha names and alias names. Does NOT apply to `contributesTo` alphas.
-- **CRITICAL RULE - NO FLOATING ALPHAS**: ALL new alphas MUST have a `contributesTo` OR `mapsTo` relationship pointing to a baseline alpha, practice-local alpha, OR external practice alpha
-  - Floating alphas (new alphas without `contributesTo` or `mapsTo`) are **strictly prohibited** by the Practice Language semantics
-  - **Cross-Practice References**: Alphas can contribute to or map to alphas from other practices using `practiceDependencyNames`
-  - **State-Level Contributions**: Individual states on new alphas can optionally declare `contributesToState` (string) mapping to a parent alpha state — not every state needs a mapping. In a `mapsTo` context, `contributesToState` takes on equivalence semantics.
-- **`relatesTo` (AlphaRelationship)**: Required fields: `relationship` (verb), `alphaName` (target), `direction` (`outgoing` | `incoming` | `mutual`). Optional: `description` (why the relationship exists)
-- **Instances**: Tracking specific occurrences (e.g., "Security Team" and "Platform Team" as instances of "Team")
-- When multiple perspectives reference the same alpha, create a SINGLE merged redeclaration, not separate definitions
+- **Redeclaration**: Enrich baseline alphas with checklists/narratives; preserve baseline structure
+- **Specialization** (`contributesTo`): New alphas with distinct state progression contributing to parent
+- **Variant** (`mapsTo`): Named variants with exact same states as parent (IS-A semantics). `mapsTo` and `contributesTo` are mutually exclusive. Variant names MUST NOT repeat parent type name.
+- **NO FLOATING ALPHAS**: All new alphas MUST have `contributesTo` OR `mapsTo`
+- **`relatesTo`**: Required on new alphas. Fields: `relationship`, `alphaName`, `direction` (`outgoing`|`incoming`|`mutual`)
 
-### Practice Structure - Primary Alpha Focus
-
-**Core Principle:** Each practice should focus around ONE primary alpha, with secondary coverage of that alpha's directly related alphas (via `relatesTo` relationships). This creates focused, coherent practices with broad coverage of loosely related concerns.
-
-**Practice Composition:**
-- **Primary Alpha**: ONE central baseline alpha that is the main focus (e.g., Platform, Team, Requirements)
-- **Related Alphas**: 2-6 alphas directly related to primary via `relatesTo` relationships (1-level deep)
-- **Total Coverage**: 3-7 alphas per practice (broad, loosely related coverage)
-- **Coherence**: All content should relate back to the primary alpha's value proposition
-
-**Example - Platform-Focused Practice:**
-- Primary: Platform
-- Related (from Platform.relatesTo): Platform Asset (hosts), Platform Consumption Interface (exposes), Platform Governance (governed by), Team (built by)
-- Result: 5 alphas with broad coverage of platform infrastructure concerns
-
-**Example - Team-Focused Practice:**
-- Primary: Team  
-- Related (from Team.relatesTo): Work (performs), Way Of Working (applies), Platform (built by reversed), Organizational Change (enabled by)
-- Result: 5 alphas with broad coverage of team and organizational concerns
-
-**Anti-Pattern:** "Everything else" catch-all practices without identifiable primary alpha
-
-### Orchestration Practices (Exception)
-
-**When to Create:** Source methodology describes an overarching lifecycle or coordination framework that ties together multiple domain practices
-
-**Structure:**
-- **Purpose**: Cross-practice coordination, NOT content duplication
-- **Dependencies**: Lists all practices it coordinates via `practiceDependencyNames`
-- **Content**:
-  - **Aliases**: Unifying terminology across dependent practices
-  - **Patterns**: Lifecycle patterns referencing alphas from multiple dependent practices
-  - **Minimal Alphas**: ONLY if coordination requires new tracking concepts
-- **No Redeclaration**: Does NOT redefine alphas from dependent practices
-- **Example**: SDLC Orchestration practice coordinating Development, Deployment, Operations practices
-
-**Orchestration vs Regular Practice:**
-- Regular Practice: Primary alpha + related alphas (content-focused)
-- Orchestration Practice: Dependencies + patterns + aliases (coordination-focused)
+### Practice Structure
+Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-level deep), 3-7 total. See `references/practice-method-strategy.md` for full strategy and worked examples.
 
 ### Schema Rules
-- All symbolic references (alphaName, stateName, activitySpaceName, etc.) must be exact, case-sensitive string matches
-- Activity names must be specific and different from their ActivitySpace names
-- Minimum requirements: Alphas need ≥3 states, WorkProducts need ≥2 levels of detail
-- WorkProducts support optional `partOf` (string) declaring containment within another work product (see semantics.md Section 7.4)
-- WorkProducts support optional `mapsTo` (string) declaring variant equivalence with a parent work product (IS-A semantics, see semantics.md Section 7.5). LODs must match parent exactly. `mapsTo` and `partOf` are mutually exclusive. Naming convention: omit parent type name. On merge, variants populate the parent's `variants` array.
-- Narratives use structured frameworks with sequential contexts mapped to narrative elements
+- All symbolic references are exact, case-sensitive string matches
+- Minimums: ≥3 states per alpha, ≥2 LODs per work product
+- WorkProduct `mapsTo` and `partOf` are mutually exclusive (see semantics.md §7.4-7.5)
 
 ### Versioning
 
@@ -406,83 +357,10 @@ Every practice must include comprehensive citations using the "Citation Standard
 Optional `acknowledgements` array on Practice, PracticeBaseline, and Method. Recognizes individuals, groups, or institutions that contributed to the methodology. Distinct from citations — attributes human contributions rather than published works. Each entry has `name`, `description`, and optional `url`.
 
 ### References (Curated External Content)
-Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content (templates, case studies, reference architectures, sample artifacts) that illustrate alphas at specific states. Each reference has:
-- **Required**: `name`, `description`, `alphaName`, `stateName`
-- **Optional**: `evidenceBy` (array of `WorkProductInstance`), `links` (array of `ExternalLink`), `tags`, `narratives`, `background`
-- **Skill-level rule**: Every reference MUST have at least one `links` entry with a valid URI — references without links provide no actionable value
-- `alphaName`/`stateName` must match defined elements; `evidenceBy` entries must resolve to defined work products/LODs
-- See `references/semantics.md` §6.6 for naming conventions and validation rules
-
-**Two-Level Link Architecture:**
-- **Alpha-level `links`**: Navigation/contextual resources (hub pages, landing pages, overviews)
-- **`evidenceBy[].links`**: Specific content artifacts (presentations, guides, templates, cheatsheets)
-- `evidenceBy` entries are **full WorkProductInstance objects** — require `name`, `description`, `workProductName`, `levelOfDetailName`, and `links`
-
-**Instance Naming:**
-- Instance names scope to the **example**, NOT the state/LOD — a real-world instance at different maturity levels shares ONE name
-- "Same example or different?" test: before creating a new reference, check if content belongs to an existing instance at a different state
-- Apply same logic to `evidenceBy` WorkProductInstance names
-
-**Merge Rule:**
-- Same-name AlphaInstance references → merge to highest state, aggregate all links and evidenceBy
-- Same-name WorkProductInstance entries → merge to highest LOD, aggregate all links
-- Merge key is instance `name`, NOT element name (alphaName, workProductName)
+Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content illustrating alphas at specific states. Every reference MUST have at least one `links` entry. See `references/semantics.md` §6.6 for naming conventions, instance naming, merge rules, and two-level link architecture.
 
 ### Assets
-Visual assets (diagrams, templates, icons) can be referenced in practices and methods using the AssetReference structure:
-
-- **Top-level `assets` array**: Defines available assets with metadata
-- **Element-level `assetNames` property**: Array of AssetReference objects linking practice elements to assets with semantic type classification
-- **AssetReference structure**: Each reference includes:
-  - `assetName`: Symbolic reference to Asset.name in top-level assets array
-  - `type`: Semantic classification (`icon`, `illustrative`, `template`, `diagram`)
-- **Asset types in top-level assets array**:
-  - **File-based**: `image`, `diagram`, `template`, `icon` with `path`, `mimeType`, optional `checksum`
-  - **Font characters**: `font-character` with `fontFamily`, `fontCharacter`, `fontWeight` (e.g., Font Awesome icons)
-  - **Remote**: Assets can use `url` for external hosting or `dataUri` for embedded data
-
-**AssetReference Type Semantics**:
-
-- **icon**: UI markers, visual identity (alpha icons, competency badges, activity type indicators)
-- **illustrative**: Documentation diagrams, architecture visualizations, workflow charts
-- **template**: Reusable documents, forms, decision records, ADR templates
-- **diagram**: Technical architecture, state progression, pattern orchestration
-
-**Example**:
-```json
-{
-  "alphas": [
-    {
-      "name": "Platform",
-      "assetNames": [
-        {
-          "assetName": "platform-icon",
-          "type": "icon"
-        },
-        {
-          "assetName": "platform-states-diagram",
-          "type": "diagram"
-        }
-      ]
-    }
-  ],
-  "assets": [
-    {
-      "name": "platform-icon",
-      "type": "font-character",
-      "fontFamily": "Font Awesome 6 Free",
-      "fontCharacter": "fa-cubes",
-      "fontWeight": "900"
-    },
-    {
-      "name": "platform-states-diagram",
-      "type": "diagram",
-      "path": "assets/diagrams/platform.svg",
-      "mimeType": "image/svg+xml"
-    }
-  ]
-}
-```
+Visual assets use `AssetReference` objects (`{assetName, type}`) on elements, resolved against a top-level `assets` array. Types: `icon`, `illustrative`, `template`, `diagram`. Asset formats: `font-character`, `image`, `diagram`, `template` (with `path`/`url`/`dataUri`). See `deps/language.schema.json` `$defs/Asset` and `$defs/AssetReference` for schema.
 
 ### `.keleo` Packaging
 

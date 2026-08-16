@@ -48,6 +48,8 @@ You have access to the following resources via the Read tool:
 
 ### Step 0: Practice Delineation
 
+**Read `references/practice-method-strategy.md` for the full delineation strategy, worked examples, and anti-patterns.**
+
 **Purpose:** Determine whether the source methodology maps to a single practice or a method with multiple practices. This decision requires baseline context and MUST happen here in Phase 2, not earlier.
 
 **Why this step exists:** Phase 1 analysis extracts concerns without baseline context. Only after reading the baseline practice JSON can you map concerns to baseline alphas and make an informed practice boundary decision. Any "Preliminary Structure" declared in Phase 1 is an observation, not a binding decision — override it if the alpha coverage analysis warrants it.
@@ -1386,6 +1388,8 @@ For each gap, document the inferred activity with:
 ```
 
 ### Step 8: Map Patterns (REQUIRED)
+
+**Read `references/pattern-completeness.md` for the four-pass construction algorithm, constraints, and worked examples.**
 
 **CRITICAL: Every practice MUST have at least one pattern.** Patterns coordinate multiple alphas/concerns through a lifecycle.
 
