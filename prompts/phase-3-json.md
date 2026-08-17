@@ -787,6 +787,7 @@ Add patterns array:
 - NO `workProducts` property on PatternView (not in schema)
 - activities are string names, not objects
 - **Each alpha MUST target at most 1 state per patternView** — if a phase advances an alpha through multiple states, split into sub-views using `Phase: Sub-step` naming (e.g., "Enable: Train", "Enable: Certify"). Each sub-view gets its own seq, activities, and narrative context.
+- **State compression:** In non-final views, only include alpha states that CHANGE from the previous view. Omit unchanged carry-forward states — they are implicit. The FINAL view MUST include ALL alphas (even if unchanged) as a complete end-state snapshot.
 
 **Asset Linking:**
 

@@ -2887,23 +2887,30 @@ def check_pattern_alpha_coverage(data, kind):
                     "autoFixable": False,
                 })
 
-            # Per-view completeness: every alpha should appear in every view
-            for view in pat.get("patternViews", []):
-                view_seq = view.get("seq", "?")
-                view_name = view.get("name", "?")
-                view_alphas = {
+            # Final-view completeness: all alphas must appear in the last view
+            # Non-final views use compression (unchanged states omitted)
+            views_sorted = sorted(
+                pat.get("patternViews", []),
+                key=lambda v: v.get("seq", 0),
+            )
+            if views_sorted:
+                final_view = views_sorted[-1]
+                final_seq = final_view.get("seq", "?")
+                final_name = final_view.get("name", "?")
+                final_alphas = {
                     astate.get("alphaName", "")
-                    for astate in view.get("alphaStates", [])
+                    for astate in final_view.get("alphaStates", [])
                 }
-                view_missing = alpha_names - view_alphas
-                if view_missing:
+                final_missing = alpha_names - final_alphas
+                if final_missing:
                     issues.append({
                         "severity": "warning",
                         "category": "pattern-view-completeness",
-                        "path": f"{pfx}patterns[{pat_name}].patternViews[{view_seq}]",
+                        "path": f"{pfx}patterns[{pat_name}].patternViews[{final_seq}]",
                         "message": (
-                            f"Pattern '{pat_name}' view {view_seq} '{view_name}' "
-                            f"missing alphas: {sorted(view_missing)}"
+                            f"Pattern '{pat_name}' final view {final_seq} '{final_name}' "
+                            f"missing alphas (all must appear in final view): "
+                            f"{sorted(final_missing)}"
                         ),
                         "autoFixable": False,
                     })

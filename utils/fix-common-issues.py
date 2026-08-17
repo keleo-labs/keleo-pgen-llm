@@ -884,7 +884,8 @@ def fix_narrative_placement(data):
 
 
 def fix_pattern_completeness(data):
-    """Add carry-forward alpha states to pattern views missing practice alphas."""
+    """Add carry-forward alpha states to pattern views missing practice alphas,
+    then compress by removing unchanged carry-forward states from non-final views."""
     fixes = []
     sources = [data]
     if "practices" in data:
@@ -907,32 +908,126 @@ def fix_pattern_completeness(data):
             views = pattern.get("patternViews", [])
             views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
 
+            # Pass 1: Add carry-forward states for truly missing alphas (final view only)
             last_state = {}
-            for view in views_sorted:
+            for vi, view in enumerate(views_sorted):
+                is_final = (vi == len(views_sorted) - 1)
                 view_seq = view.get("seq", "?")
-                view_alphas = set()
                 for astate in view.get("alphaStates", []):
                     aname = astate.get("alphaName", "")
                     sname = astate.get("stateName", "")
-                    view_alphas.add(aname)
                     last_state[aname] = sname
 
-                missing = all_alpha_names - view_alphas
-                for aname in sorted(missing):
-                    carry = last_state.get(aname, alpha_first_state.get(aname, ""))
-                    if not carry:
-                        continue
-                    view.setdefault("alphaStates", []).append({
-                        "alphaName": aname,
-                        "stateName": carry,
-                    })
-                    last_state[aname] = carry
-                    fixes.append({
-                        "category": "pattern-completeness",
-                        "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
-                        "old": f"missing alpha '{aname}'",
-                        "new": f"carry-forward state '{carry}'",
-                    })
+                if is_final:
+                    view_alphas = {a.get("alphaName", "") for a in view.get("alphaStates", [])}
+                    missing = all_alpha_names - view_alphas
+                    for aname in sorted(missing):
+                        carry = last_state.get(aname, alpha_first_state.get(aname, ""))
+                        if not carry:
+                            continue
+                        view.setdefault("alphaStates", []).append({
+                            "alphaName": aname,
+                            "stateName": carry,
+                        })
+                        fixes.append({
+                            "category": "pattern-completeness",
+                            "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                            "old": f"missing alpha '{aname}' in final view",
+                            "new": f"carry-forward state '{carry}'",
+                        })
+
+            # Pass 2: Compress — remove unchanged carry-forward states from non-final views
+            fixes.extend(compress_pattern_states_for_pattern(
+                pattern, pat_name, views_sorted
+            ))
+
+    return fixes
+
+
+def compress_pattern_states(data):
+    """Remove unchanged carry-forward alpha states from non-final pattern views."""
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        for pi, pattern in enumerate(source.get("patterns", [])):
+            pat_name = pattern.get("name", f"pattern[{pi}]")
+            views = pattern.get("patternViews", [])
+            views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
+            fixes.extend(compress_pattern_states_for_pattern(
+                pattern, pat_name, views_sorted
+            ))
+
+    return fixes
+
+
+def compress_pattern_states_for_pattern(pattern, pat_name, views_sorted):
+    """Remove unchanged carry-forward alpha states from non-final views,
+    then remove empty non-final views (merging activities into the next view)."""
+    fixes = []
+    prev_states = {}
+
+    for vi, view in enumerate(views_sorted):
+        is_final = (vi == len(views_sorted) - 1)
+        view_seq = view.get("seq", "?")
+        alpha_states = view.get("alphaStates", [])
+
+        if is_final:
+            for astate in alpha_states:
+                prev_states[astate.get("alphaName", "")] = astate.get("stateName", "")
+            continue
+
+        kept = []
+        for astate in alpha_states:
+            aname = astate.get("alphaName", "")
+            sname = astate.get("stateName", "")
+            if aname in prev_states and prev_states[aname] == sname:
+                fixes.append({
+                    "category": "pattern-compression",
+                    "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                    "old": f"carry-forward '{aname}' = '{sname}'",
+                    "new": "removed (unchanged from previous view)",
+                })
+            else:
+                kept.append(astate)
+            prev_states[aname] = sname
+
+        view["alphaStates"] = kept
+
+    # Remove empty non-final views, merging activities into next view
+    to_remove = []
+    for vi in range(len(views_sorted) - 1):
+        view = views_sorted[vi]
+        if not view.get("alphaStates"):
+            next_view = views_sorted[vi + 1] if vi + 1 < len(views_sorted) else None
+            if next_view:
+                orphaned = view.get("activities", [])
+                next_view["activities"] = orphaned + next_view.get("activities", [])
+                fixes.append({
+                    "category": "pattern-compression",
+                    "path": f"patterns['{pat_name}'].patternViews[{view.get('seq', '?')}]",
+                    "old": f"empty view '{view.get('name', '?')}' with {len(orphaned)} activities",
+                    "new": f"removed, activities merged into '{next_view.get('name', '?')}'",
+                })
+                to_remove.append(vi)
+
+    for idx in reversed(to_remove):
+        views_sorted.pop(idx)
+
+    # Renumber seq values
+    for i, view in enumerate(views_sorted):
+        if view.get("seq") != i:
+            fixes.append({
+                "category": "pattern-compression",
+                "path": f"patterns['{pat_name}'].patternViews",
+                "old": f"'{view.get('name', '?')}' seq={view['seq']}",
+                "new": f"seq={i}",
+            })
+            view["seq"] = i
+
+    pattern["patternViews"] = views_sorted
 
     return fixes
 
@@ -1271,7 +1366,11 @@ def main():
     )
     parser.add_argument(
         "--fix-pattern-completeness", action="store_true",
-        help="Add carry-forward alpha states to pattern views missing practice alphas"
+        help="Ensure final view completeness and compress unchanged carry-forward states"
+    )
+    parser.add_argument(
+        "--compress-patterns", action="store_true",
+        help="Remove unchanged carry-forward alpha states from non-final pattern views"
     )
     parser.add_argument(
         "--fix-alias-isolation", action="store_true",
@@ -1340,6 +1439,9 @@ def main():
 
     if args.fix_pattern_completeness or args.all:
         all_fixes.extend(fix_pattern_completeness(data))
+
+    if args.compress_patterns or args.all:
+        all_fixes.extend(compress_pattern_states(data))
 
     if args.fix_alias_isolation or args.all:
         all_fixes.extend(fix_alias_isolation(data))

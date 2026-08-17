@@ -718,6 +718,8 @@ Patterns MUST show complete alpha state progressions across all PatternViews. Re
 3. **Pass 3 (Related Alphas — OPTIONAL):** Consider adding alphas from practice/dependencies with meaningful progressions
 4. **Pass 4 (Validation — REQUIRED):** Max 1 state per alpha per view (split views if 2+), backfill late-appearing alphas with progressive states
 
+**State Compression (JSON Output):** Non-final PatternViews include ONLY alpha states that CHANGE from the previous view. Unchanged carry-forward states are omitted — they are implicit. The FINAL PatternView MUST include ALL alphas (even if unchanged) as a complete end-state snapshot. This prevents redundant entries that obscure which alphas actually progress in each phase.
+
 **Phase 2 Validation:**
 
 ```bash

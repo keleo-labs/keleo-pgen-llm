@@ -220,7 +220,8 @@ Dependency versions are auto-resolved from all project files in deps/, baselines
    Add `--fix-schema` for schema violations (tags nesting, persona groups, persona properties, techniqueNarratives).
    Add `--fix-contributesto-arrays` to convert contributesTo arrays to strings.
    Add `--fix-narrative-placement` to move top-level narratives to matching element's narratives[].
-   Add `--fix-pattern-completeness` to add carry-forward alpha states to incomplete pattern views.
+   Add `--fix-pattern-completeness` to ensure final view completeness and compress unchanged carry-forward states.
+   Add `--compress-patterns` to remove unchanged carry-forward alpha states from non-final pattern views.
    Add `--all` to enable all optional fixes.
 
 3. **For extension practices — fix competency levels if needed:**
