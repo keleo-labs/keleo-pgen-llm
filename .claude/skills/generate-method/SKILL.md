@@ -63,7 +63,7 @@ All generated outputs for a practice go in `practices/<practice-name>/`:
 practices/
 └── <practice-name>/
     ├── 01-analysis-report.md      (Phase 1 output, ~30-50K words)
-    ├── 02-mapping-guide.md         (Phase 2 output, ~40-60K words)
+    ├── 02-mapping-guide.md         (Phase 2 output, scales with alpha count: ~5-6K words/alpha)
     └── <practice-name>.json        (Phase 3 output, schema-compliant JSON)
 
 bundles/
@@ -820,12 +820,27 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    ```bash
    python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
-6. **Resolve transitive dependencies** — `.keleo` bundles must include ALL dependency documents (baselines + practices), not the merged effective context:
+6. **Generate ChangeRequest and report downstream impact (if updating existing):** If a prior version of the practice JSON exists in the output directory (i.e., this is a regeneration, not first-time generation), generate a ChangeRequest and present a downstream impact report:
+   ```bash
+   python3 utils/generate-change-request.py \
+     <old-version>.json <new-version>.json \
+     --author "<git user>" \
+     --status accepted \
+     -o practices/<name>/<name>.changerequest.json
+   ```
+   Then discover downstream dependents and present an impact report to the user:
+   ```bash
+   python3 utils/discover-dependencies.py --dependents "<Practice Name>"
+   ```
+   **Present a Downstream Impact Report** listing each affected practice, its path, and which nameChanges impact it. Classify each as "auto-propagatable" (renames that `apply-change-request.py` handles) or "manual remap needed" (structural changes requiring `/update-method`). See `update-method` SKILL.md "ChangeRequest Generation" section for the full report format and propagation workflow.
+   
+   Skip this step for first-time generation (no prior version exists).
+7. **Resolve transitive dependencies** — `.keleo` bundles must include ALL dependency documents (baselines + practices), not the merged effective context:
    ```bash
    python3 utils/discover-dependencies.py --resolve-from practices/<name>/<name>.json --transitive
    ```
    Resolve any ambiguous dependencies (prefer `deps/` or `baselines/` or `practices/` paths over `.keleo`-embedded copies). Collect the full list of resolved file paths.
-7. **Package into .keleo** (NEVER use `python3 -c`, heredocs, or shell loops). The packager auto-reads `schemaVersion` from the schema and auto-builds package dependencies from document `dependencyVersions`:
+8. **Package into .keleo** (NEVER use `python3 -c`, heredocs, or shell loops). The packager auto-reads `schemaVersion` from the schema and auto-builds package dependencies from document `dependencyVersions`:
    ```bash
    python3 utils/package-keleo.py \
      --name "<practice-name>" \
@@ -860,7 +875,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
-   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies. (5) Write output to the SAME directory containing 02-mapping-guide.md — verify the directory exists before writing. (6) For redeclared alphas, include ALL states from the baseline/parent but add checklists ONLY to states enriched in the mapping guide — use empty checklist for unenriched states. (7) Every activity MUST have focusName, contributesTo, worksOn, requiredCompetencies, AND recommendedCompetencyLevels — all are schema-required."
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies. (5) Write output to the SAME directory containing 02-mapping-guide.md — verify the directory exists before writing. (6) For redeclared alphas, include ALL states from the baseline/parent but add checklists ONLY to states enriched in the mapping guide — use empty checklist for unenriched states. Copy baseline state name and description fields VERBATIM — do not rephrase. (7) Every activity MUST have focusName, contributesTo, worksOn, requiredCompetencies, AND recommendedCompetencyLevels — all are schema-required. (8) After writing each pattern, verify the FINAL PatternView includes ALL alphas that appear anywhere in the pattern — missing alphas in the final view is the most common auto-fix."
 
 3. **Agents run concurrently**, each producing one practice JSON file
 
@@ -940,6 +955,7 @@ From `deps/language.schema.json`:
 - **Discriminator property:** `"kind": "practice"` REQUIRED at root level of every practice JSON (enables type discrimination)
 - **Redeclared alphas:** Alphas that exist in the baseline or parent practice are REDECLARATIONS — they MUST NOT have `contributesTo` or `mapsTo` properties. These relationships are inherited from the baseline/parent definition.
   - **Include ALL states** from the baseline/parent definition — never subset to only enriched states (the validator checks for exact state-set match)
+  - **Copy baseline state `name` and `description` fields verbatim** — do NOT rephrase, shorten, or enrich state descriptions (the validator flags description mismatches as redeclaration-compliance warnings)
   - **Add checklists ONLY to states** that the Phase 2 mapping guide explicitly enriches
   - **For unenriched states**, include them with an empty `"checklist": []` — do NOT fabricate checklists for states the mapping guide does not cover
 - **Checklist format:** Objects {name, description, seq}, NOT strings
@@ -958,6 +974,11 @@ From `deps/language.schema.json`:
 python3 utils/eval-skill-output.py practices/<name>/ --summary
 ```
 
+Quick status check:
+```bash
+python3 utils/eval-skill-output.py practices/<name>/ --one-line
+```
+
 To see only failed assertions with details:
 ```bash
 python3 utils/eval-skill-output.py practices/<name>/ --show-failed
@@ -965,7 +986,12 @@ python3 utils/eval-skill-output.py practices/<name>/ --show-failed
 
 Fix all FAIL assertions with `error` severity. Warning assertions are advisory — address where practical. Re-run until `error_pass_rate: 1.0`.
 
-**Common fix tools:**
+**Combined validate-fix loop** (preferred — runs all fixes and re-validates in one command):
+```bash
+python3 utils/lint-practice.py <practice>.json [<baseline>.json] [<schema>.json] --fix
+```
+
+**Individual fix tools** (when targeted intervention is needed):
 - `python3 utils/fix-competency-levels.py <file>.json <baseline>.json --fix` — fix competency level name mismatches
 - `python3 utils/assess-practice.py <file.json> --baseline <baseline.json>` — detailed issue report for targeted fixes
 

@@ -12,7 +12,8 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `validate-baseline-json.py` | Schema validation for baselines | `python3 utils/validate-baseline-json.py <file>.json` |
 | `validate-phase-output.py` | Validate Phase 1/1.5/2 markdown output structure | `python3 utils/validate-phase-output.py <file>.md --phase <1|1.5|2>` |
 | `verify-mapping-against-specs.py` | Verify Phase 2 mapping output against Gherkin specs | `python3 utils/verify-mapping-against-specs.py <mapping>.md --baseline <baseline>.json [--parent <parent>.json] [--kind baseline]` |
-| `eval-skill-output.py` | Evaluate skill output quality against assertions | `python3 utils/eval-skill-output.py <practice-dir> [--specs <specs-index.json>]` |
+| `eval-skill-output.py` | Evaluate skill output quality against assertions | `python3 utils/eval-skill-output.py <practice-dir> [--specs <specs-index.json>] [--one-line]` |
+| `lint-practice.py` | Combined validate-fix-revalidate loop (auto-discovers baseline/schema) | `python3 utils/lint-practice.py <practice>.json [--fix] [--one-line] [--max-iterations N]` |
 
 ## Structural Inspection
 
@@ -42,9 +43,15 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type) | `python3 utils/transform-alphas.py <file>.json [--fix]` |
 | `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |
-| `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump version | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--fix]` |
 | `align-baseline-states.py` | Align child baseline redeclared alpha states with parent canonical names | `python3 utils/align-baseline-states.py <child>.json <parent>.json [--check] [--mapping JSON]` |
+
+## Change Management
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `generate-change-request.py` | Generate a ChangeRequest JSON from the diff between old and new practice/baseline/method JSON files | `python3 utils/generate-change-request.py <old>.json <new>.json [--author NAME] [--status draft\|accepted] [--note "..."] [-o <output>.json]` |
+| `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
 
 ## Enrichment
 

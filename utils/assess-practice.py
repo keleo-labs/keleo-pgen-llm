@@ -3254,6 +3254,7 @@ def main():
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}
         bl_comp_names = {c["name"] for c in baseline_data.get("competencies", []) if c.get("name")}
         bl_asp_names = {s["name"] for s in baseline_data.get("activitySpaces", []) if s.get("name")}
+        bl_focus_names = {f["name"] for f in baseline_data.get("focuses", []) if f.get("name")}
         bl_wp_names = {w["name"] for w in baseline_data.get("workProducts", []) if w.get("name")}
         bl_persona_names = {p["name"] for p in baseline_data.get("personas", []) if p.get("name")}
         bl_pg_names = {pg["name"] for pg in baseline_data.get("personaGroups", []) if pg.get("name")}
@@ -3263,6 +3264,11 @@ def main():
         def _merge_elements(source):
             nonlocal bl_alpha_set, bl_nt_set, bl_comp_names, bl_asp_names
             nonlocal bl_wp_names, bl_persona_names, bl_pg_names, bl_act_names, bl_cit_names
+            nonlocal bl_focus_names
+            for focus in source.get("focuses", []):
+                if focus.get("name") and focus["name"] not in bl_focus_names:
+                    baseline_data.setdefault("focuses", []).append(focus)
+                    bl_focus_names.add(focus["name"])
             for alpha in source.get("alphas", []):
                 if alpha.get("name") and alpha["name"] not in bl_alpha_set:
                     baseline_data.setdefault("alphas", []).append(alpha)
@@ -3370,7 +3376,7 @@ def main():
                 "autoFixable": False,
             })
         elif schema_report and not schema_report.get("valid", True):
-            error_count = schema_report.get("summary", {}).get("error_count", 0)
+            error_count = schema_report.get("error_count", 0) or schema_report.get("summary", {}).get("error_count", 0)
             all_issues.append({
                 "severity": "error",
                 "category": "schema",

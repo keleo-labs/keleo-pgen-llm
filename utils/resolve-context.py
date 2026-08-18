@@ -114,6 +114,9 @@ def topo_sort_baselines(baselines):
         data = by_name[name]
         for dep_name in data.get("baselinePracticeNames", []):
             resolve(dep_name)
+        singular = data.get("baselinePracticeName")
+        if singular and singular not in resolved and singular in by_name:
+            resolve(singular)
         resolved.add(name)
         sorted_names.append(name)
 
@@ -144,7 +147,11 @@ def resolve_transitive_baselines(baselines, search_dirs):
 
     while to_check:
         name, data = to_check.pop(0)
-        for dep_name in data.get("baselinePracticeNames", []):
+        dep_names = list(data.get("baselinePracticeNames", []))
+        singular = data.get("baselinePracticeName")
+        if singular and singular not in dep_names:
+            dep_names.append(singular)
+        for dep_name in dep_names:
             if dep_name in existing:
                 continue
             match = dd.resolve_name(dep_name, index, prefer_filesystem=True)

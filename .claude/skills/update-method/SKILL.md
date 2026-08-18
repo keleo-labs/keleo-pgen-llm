@@ -707,6 +707,85 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 
 **Expected result:** `error_pass_rate: 1.0`. Warning assertions are advisory — address where practical.
 
+### ChangeRequest Generation (MANDATORY)
+
+After any update that modifies a practice/baseline/method JSON, generate a ChangeRequest capturing the delta between the backup version and the updated version. ChangeRequests enable automatic downstream propagation of renames and structural changes via `apply-change-request.py`.
+
+**When to generate:**
+- **Mode 1 (Full Reanalysis):** Always — content is reworked from source
+- **Mode 2 (Remap & Regenerate):** Always — mappings and structure change
+- **Mode 1A (Auto-Fix):** Only if the fix introduced nameChanges (LOD renames, alpha renames, state renames). Pure structural fixes (missing `kind`, tags nesting, persona property normalization) do not need a ChangeRequest.
+- **Mode 3 (Add/Update References):** Not needed — references are additive with no downstream impact
+
+**Step 1: Generate ChangeRequest from diff:**
+```bash
+python3 utils/generate-change-request.py \
+  <backup-dir>/<old-file>.json <updated-file>.json \
+  --author "<git user>" \
+  --status accepted \
+  --note "Mode N update: <brief description of changes>" \
+  -o <practice-dir>/<name>.changerequest.json
+```
+
+The utility compares old and new JSON, detects element renames (alphas, states, LODs, competencies, focuses, activity spaces, work products, narrative types), and generates a schema-compliant ChangeRequest with `operations` and `nameChanges` arrays.
+
+**Step 2: Discover downstream dependents and present impact report:**
+```bash
+python3 utils/discover-dependencies.py --dependents "<Document Name>"
+```
+
+**MANDATORY: Present a Downstream Impact Report to the user.** Combine the ChangeRequest output with the dependents list to show which practices need updating:
+
+```
+=== Downstream Impact Report ===
+
+ChangeRequest: <changeId>
+Target: "<Document Name>" (<kind>)
+Operations: N total (X modify, Y add, Z remove)
+NameChanges: M renames requiring downstream propagation
+
+Affected practices:
+  1. "<Dependent Name>" (practices/<path>.json)
+     Role: <practiceDependency|baselinePractice>
+     Impact: <auto-propagatable|manual remap needed>
+     Affected nameChanges:
+       - <ElementType>: "<fromName>" → "<toName>"
+       - ...
+
+  2. "<Dependent Name>" (practices/<path>.json)
+     ...
+
+No dependents found.  (if none)
+
+Actions needed:
+  - Auto-propagatable: Run apply-change-request.py to update references
+  - Manual remap needed: Run /update-method on affected practices
+```
+
+**Impact classification:**
+- **Auto-propagatable:** The ChangeRequest contains `nameChanges` that `apply-change-request.py` can cascade automatically (element renames, state renames, LOD renames). These are safe to apply programmatically.
+- **Manual remap needed:** The ChangeRequest contains structural changes (new alphas, removed alphas, changed contributesTo targets, new activity spaces) that require the dependent practice to be remapped via `/update-method`. Flag these for the user.
+
+**Step 3: Propagate auto-fixable changes (dry-run first):**
+
+If the ChangeRequest has `nameChanges` and dependents were found:
+```bash
+# Preview changes
+python3 utils/apply-change-request.py <changerequest>.json <downstream1>.json <downstream2>.json
+
+# Apply after user confirms
+python3 utils/apply-change-request.py <changerequest>.json <downstream1>.json <downstream2>.json --fix
+```
+
+Show the dry-run output to the user before applying. Wait for user confirmation. The `nameChanges` array drives automatic reference updates in downstream files -- alpha name references, state references, competency names, LOD names, and all cascading structural references are updated in a single pass.
+
+**Step 4: Re-validate downstream files** after applying changes:
+```bash
+python3 utils/assess-practice.py <downstream>.json --baseline <baseline>.json --errors-only
+```
+
+**Step 5: Report remaining manual work** to the user. List any dependents that need a full `/update-method` remap due to structural changes that cannot be auto-propagated.
+
 ### Post-Update Packaging
 
 After validation passes, resolve transitive dependencies and package the updated output into a `.keleo` archive. **Never use `_effective-context.json` as a document** — it is a build artifact for semantic context during generation, not a distributable document.
@@ -839,6 +918,27 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 - Then: The user is asked to choose between remap and full-reanalysis
 - And: The recommended mode and reason from assessment are presented
 
+### Scenario: ChangeRequest generated after update (@rule:process-409)
+- Given: An update has modified an existing practice/baseline/method JSON
+- When: The updated JSON differs from the backup version
+- Then: generate-change-request.py produces a ChangeRequest JSON
+- And: The ChangeRequest is written to the practice directory
+- And: A Downstream Impact Report is presented to the user listing affected practices
+
+### Scenario: Downstream impact report presented (@rule:process-410)
+- Given: A ChangeRequest has been generated with operations and nameChanges
+- When: discover-dependencies.py --dependents finds downstream practices
+- Then: The user is shown each dependent practice name, path, and role
+- And: Each nameChange affecting that dependent is listed
+- And: Each dependent is classified as auto-propagatable or manual remap needed
+- And: The user is told which practices need /update-method remap vs auto-fix
+
+### Scenario: Downstream auto-propagation requires confirmation (@rule:process-411)
+- Given: Downstream dependents have auto-propagatable nameChanges
+- When: apply-change-request.py is invoked
+- Then: A dry-run is shown to the user first
+- And: Changes are only applied after user confirms
+
 ## Key Principles
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
@@ -848,6 +948,8 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - `build-references.py` — Validate and expand reference specs into AlphaInstance JSON (`--spec`, `--fix`)
    - `fix-citation-names.py` — Rename citation names (`--rename "Old=New"` or `--map renames.json`)
    - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix` or `--all --fix` for batch)
+   - `generate-change-request.py` — Generate ChangeRequest JSON from old/new diff (`<old>.json <new>.json --author --status -o`)
+   - `apply-change-request.py` — Apply ChangeRequest nameChanges/removals to downstream JSON (`<cr>.json <target>.json [--fix]`)
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.

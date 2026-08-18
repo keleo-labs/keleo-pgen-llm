@@ -152,6 +152,9 @@ def extract_dependency_names(data, kind):
     if kind == "practiceBaseline":
         for name in data.get("baselinePracticeNames", []):
             deps.append((name, "baselinePractice"))
+        bpn = data.get("baselinePracticeName")
+        if bpn and not any(n == bpn for n, _ in deps):
+            deps.append((bpn, "baselinePractice"))
 
     elif kind == "practice":
         bpn = data.get("baselinePracticeName")

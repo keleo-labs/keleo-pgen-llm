@@ -8,6 +8,9 @@ Usage:
     # Show only failed assertions with details
     python3 utils/eval-skill-output.py practices/<name>/ --show-failed
 
+    # Single-line summary (great for scripting / quick checks)
+    python3 utils/eval-skill-output.py practices/<name>/ --one-line
+
     # Explicit baseline/schema (overrides auto-discovery)
     python3 utils/eval-skill-output.py practices/<name>/ \
       --baseline deps/platform-adoption-kernel.json \
@@ -698,6 +701,8 @@ def main():
     parser.add_argument("--summary", action="store_true", help="Compact pass/fail counts only")
     parser.add_argument("--show-failed", action="store_true",
                         help="Show only failed assertions with details")
+    parser.add_argument("--one-line", action="store_true",
+                        help="Print single-line summary (e.g. PASS 52/56 (100%% errors))")
     parser.add_argument("--evals", metavar="EVALS_JSON",
                         help="Run batch evals from evals.json file")
     parser.add_argument("--eval-id", type=int, help="Run specific eval by ID (with --evals)")
@@ -730,6 +735,19 @@ def main():
     if cat_to_specs and not args.evals:
         annotate_with_specs(result.get("assertion_results", []), cat_to_specs)
         result["specs_source"] = str(args.specs)
+
+    if args.one_line and not args.evals:
+        summary = result.get("summary", {})
+        passed = summary.get("passed", 0)
+        total = summary.get("total", 0)
+        error_rate = summary.get("error_pass_rate", 0)
+        failed_warns = sum(1 for a in result.get("assertion_results", [])
+                          if not a["passed"] and a["severity"] == "warn")
+        name = result.get("name", "unknown")
+        status = "PASS" if error_rate == 1.0 else "FAIL"
+        warn_str = f" ({failed_warns} warnings)" if failed_warns else ""
+        print(f"{status} {passed}/{total} ({error_rate:.0%} errors){warn_str} — {name}")
+        sys.exit(0 if error_rate == 1.0 else 1)
 
     if args.show_failed and not args.evals:
         failed = [a for a in result.get("assertion_results", []) if not a["passed"]]
