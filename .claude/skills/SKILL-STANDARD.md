@@ -28,6 +28,7 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
 - `generate-method`: 001–199
 - `create-baseline-method`: 200–399
 - `update-method`: 400–599
+- `method-based-report`: 600–799
 
 ### 1.2 Feature Grouping
 

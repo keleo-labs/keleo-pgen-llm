@@ -19,7 +19,9 @@ keleo-pgen-llm/
 │   └── skills/
 │       ├── generate-method/              # Extension practice creation skill
 │       │   └── SKILL.md
-│       └── create-baseline-method/       # Baseline practice creation skill
+│       ├── create-baseline-method/       # Baseline practice creation skill
+│       │   └── SKILL.md
+│       └── method-based-report/          # Plain English report generation skill
 │           └── SKILL.md
 ├── deps/                                   # Symlinks to keleo-studio
 │   ├── language.schema.json               # JSON Schema definition
@@ -48,6 +50,8 @@ keleo-pgen-llm/
 │       ├── 01.5-distilled-essentials.md   # Distillation phase
 │       ├── 02-mapping-guide.md
 │       └── <baseline-name>.json           # Intermediate baseline JSON
+├── reports/                                # Generated reports output (git-ignored contents)
+│   └── <report-name>.md                   # Plain English reports from /method-based-report
 ├── bundles/                                # Packaged .keleo output
 │   └── <name>.keleo                       # ZIP archive with manifest + documents
 ├── utils/
@@ -469,6 +473,27 @@ This skill automates the three-phase pipeline:
 **Output Location**: All files for a practice are co-located in `practices/<practice-name>/`
 
 The skill is defined in `.claude/skills/generate-method/SKILL.md` and uses the phase prompts from `prompts/`.
+
+### Generating Reports
+
+Use the `/method-based-report` skill to create plain English reports structured by practice/method narrative frameworks:
+
+```
+/method-based-report
+```
+
+The user provides a practice/method/baseline and a subject to report on. The skill:
+
+1. **Plans** — Identifies practice context, subject, audience, and narrative strategy
+2. **Loads Context** — Resolves the practice via `utils/resolve-context.py --transitive`
+3. **Analyzes & Selects** — Extracts domain knowledge (alphas, activities, patterns, narratives) and selects baseline narrative structures that fit the report purpose
+4. **Generates Report** — Writes a standalone markdown report to `reports/<report-name>.md`
+
+The report uses narrative types from the baseline (Report Narrative, Essay Narrative, STAR, etc.) to organize content, and practice domain knowledge to inform the analysis — but presents everything in plain English with no Keleo terminology.
+
+**Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
+
+The skill is defined in `.claude/skills/method-based-report/SKILL.md`.
 
 ### Manual Workflow
 
