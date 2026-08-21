@@ -368,7 +368,14 @@ Fix any FAIL assertions before proceeding to Phase 3.
    Read references/semantics.md
    ```
 
-2. **Read schema version** from `deps/language.schema.json` `$comment` field (format: `schemaVersion:X.Y.Z`).
+2. **Read schema and baseline metadata** using utility commands (never parse `$comment` manually):
+   ```bash
+   python3 utils/extract-reference-names.py deps/language.schema.json --metadata
+   ```
+   If extending a parent baseline, also extract its version:
+   ```bash
+   python3 utils/extract-reference-names.py <parent-baseline>.json --metadata
+   ```
 
 3. **Generate Baseline JSON Skeleton**:
    ```json
@@ -406,11 +413,18 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - Narrative contexts are self-contained — coherent without element headings (element names are authoring scaffolding, not shown to readers)
 
 6. **Write Final JSON**:
+   - Write ONE output file only — do NOT create intermediate fragment files (e.g., `_part1.json`). Write the complete JSON in a single Write call.
+   - For asset definitions, copy the format of an existing asset entry (use `type`, `fontCharacter`, `fontFamily`, `fontWeight` — NOT `format` or `character`).
    ```
    Write baselines/<name>/<name>.json
    ```
 
-7. **Validate with Script**:
+7. **Auto-fix common issues before validation:**
+   ```bash
+   python3 utils/fix-common-issues.py baselines/<name>/<name>.json --fix --all
+   ```
+
+8. **Validate with Script**:
    ```bash
    # If extending parent baseline(s), pass effective parent for cross-reference validation:
    python3 utils/validate-baseline-json.py \

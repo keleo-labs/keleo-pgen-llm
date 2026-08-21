@@ -795,7 +795,11 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 **Process for Single Practice:**
 
 1. Read `prompts/phase-3-json.md`, mapping guide, schema, effective baseline JSON (from Step 0.5, or user-provided baseline if no dependencies). If the effective baseline has `_aliasContext`, note that all structural references MUST use canonical names.
-2. **Read schema version** from `deps/language.schema.json` `$comment` field (format: `schemaVersion:X.Y.Z`).
+2. **Read schema version and baseline version** using utilities (NEVER use `python3 -c` for JSON inspection):
+   ```bash
+   python3 utils/extract-reference-names.py deps/language.schema.json --metadata
+   python3 utils/extract-reference-names.py <baseline>.json --metadata
+   ```
 3. Generate complete practice JSON with **REQUIRED discriminator property**:
    ```json
    {
@@ -816,7 +820,11 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice's `baselinePracticeName` (NOT the parent practice name). Set `practiceDependencyNames` using the filtering rule (see "Determining practiceDependencyNames" below).
 4. Include aliases array from mapping guide
 5. **IMPORTANT:** Never re-run `resolve-context.py` during repair/fix iterations — the `_effective-context.json` was generated once in Step 0.5 from the correct baseline + parent sources. Re-running it after the practice JSON exists may include the practice itself, corrupting the context.
-6. Validate and fix until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
+6. **Auto-fix common issues first** (resolves missing assets, pattern compression, narrative structure, etc.):
+   ```bash
+   python3 utils/fix-common-issues.py <practice>.json <leaf-baseline>.json --fix --all
+   ```
+   Then validate until 0 errors. Always pass the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (for cross-practice competency/alpha/alias resolution):
    ```bash
    python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
@@ -875,7 +883,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    - What to generate: **Practice JSON** (NOT method JSON) - single practice object
    - Output location: `practices/<method-name>/<practice-name>.json`
    - Schema compliance: all required properties (aliases, alphas, activities, work products, **patterns**, etc.)
-   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies. (5) Write output to the SAME directory containing 02-mapping-guide.md — verify the directory exists before writing. (6) For redeclared alphas, include ALL states from the baseline/parent but add checklists ONLY to states enriched in the mapping guide — use empty checklist for unenriched states. Copy baseline state name and description fields VERBATIM — do not rephrase. (7) Every activity MUST have focusName, contributesTo, worksOn, requiredCompetencies, AND recommendedCompetencyLevels — all are schema-required. (8) After writing each pattern, verify the FINAL PatternView includes ALL alphas that appear anywhere in the pattern — missing alphas in the final view is the most common auto-fix."
+   - Explicit instruction: "Generate STANDALONE practice JSON, not embedded in method. CRITICAL REQUIREMENTS: (1) MUST include 'kind': 'practice' property at root level (required discriminator). (2) MUST include aliases array from mapping guide terminology section. (3) MUST include patterns array from mapping guide - minimum 1 pattern per practice with 2+ PatternViews showing alpha progression. (4) Set 'schemaVersion' from schema $comment, 'version' to '1.0.0', and populate 'dependencyVersions' with caret ranges for all declared dependencies. (5) Write output to the SAME directory containing 02-mapping-guide.md — verify the directory exists before writing. (6) For redeclared alphas, include ALL states from the baseline/parent but add checklists ONLY to states enriched in the mapping guide — use empty checklist for unenriched states. Copy baseline state name and description fields VERBATIM — do not rephrase. (7) Every activity MUST have focusName, contributesTo, worksOn, requiredCompetencies, AND recommendedCompetencyLevels — all are schema-required. (8) After writing each pattern, verify the FINAL PatternView includes ALL alphas that appear anywhere in the pattern — missing alphas in the final view is the most common auto-fix. (9) Write ONE output file only — do NOT create intermediate fragment files (e.g., _part1.json). Write the complete JSON in a single Write call. (10) For asset definitions, copy the format of an existing asset entry (use `type`, `fontCharacter`, `fontFamily`, `fontWeight` — NOT `format` or `character`)."
 
 3. **Agents run concurrently**, each producing one practice JSON file
 
@@ -925,8 +933,9 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
 
 **Step 3C: Validation and Fixes**
 
-5. **Validate each practice JSON** — always use the **leaf baseline** as the baseline argument. The validator auto-discovers `_effective-context.json` in the practice directory as a dependency (resolves cross-practice competency/alpha/alias references):
+5. **Auto-fix then validate each practice JSON** — always use the **leaf baseline** as the baseline argument:
    ```bash
+   python3 utils/fix-common-issues.py <practice>.json <leaf-baseline>.json --fix --all
    python3 utils/validate-practice-json.py <practice>.json <leaf-baseline>.json deps/language.schema.json
    ```
 

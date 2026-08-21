@@ -62,6 +62,9 @@ Usage:
     # Fix invalid kind='narrative' and wrong narrativeContext field names
     python3 utils/fix-common-issues.py <file.json> --fix --fix-narrative-schema
 
+    # Auto-create asset definitions for unresolved assetNames references
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-missing-assets
+
     # Apply all optional fixes
     python3 utils/fix-common-issues.py <file.json> --fix --all
 
@@ -1329,6 +1332,59 @@ def fix_narrative_schema(data):
     return fixes
 
 
+DEFAULT_ICONS = {
+    "Opportunity": "fa-lightbulb",
+    "Stakeholders": "fa-people-group",
+    "Objectives": "fa-bullseye",
+    "Deliverable": "fa-box",
+    "Work": "fa-list-check",
+    "Team": "fa-users",
+    "Way Of Working": "fa-gears",
+    "Platform": "fa-cubes",
+    "Requirements": "fa-clipboard-list",
+}
+
+
+def fix_missing_assets(data):
+    """Auto-create asset definitions for unresolved assetNames references."""
+    fixes = []
+    existing = {a["name"] for a in data.get("assets", [])}
+    if "assets" not in data:
+        data["assets"] = []
+
+    element_sections = [
+        ("alphas", "alphas"), ("workProducts", "workProducts"),
+        ("activities", "activities"), ("personas", "personas"),
+        ("personaGroups", "personaGroups"), ("patterns", "patterns"),
+    ]
+
+    for section_key, section_label in element_sections:
+        for i, elem in enumerate(data.get(section_key, [])):
+            for ref in elem.get("assetNames", []):
+                asset_name = ref.get("assetName", "")
+                if asset_name and asset_name not in existing:
+                    elem_name = elem.get("name", "unknown")
+                    icon = DEFAULT_ICONS.get(elem_name, "fa-circle")
+                    new_asset = {
+                        "name": asset_name,
+                        "description": f"Icon for {elem_name}",
+                        "type": "font-character",
+                        "fontFamily": "Font Awesome 6 Free",
+                        "fontCharacter": icon,
+                        "fontWeight": "900",
+                    }
+                    data["assets"].append(new_asset)
+                    existing.add(asset_name)
+                    fixes.append({
+                        "category": "missing-asset",
+                        "path": f"assets (new: {asset_name})",
+                        "old": "missing",
+                        "new": f"created for {section_label}[{i}] '{elem_name}'",
+                    })
+
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
@@ -1383,6 +1439,10 @@ def main():
     parser.add_argument(
         "--fix-narrative-schema", action="store_true",
         help="Fix invalid kind='narrative' and wrong narrativeContext field names"
+    )
+    parser.add_argument(
+        "--fix-missing-assets", action="store_true",
+        help="Auto-create asset definitions for unresolved assetNames references"
     )
     parser.add_argument(
         "--all", action="store_true",
@@ -1451,6 +1511,9 @@ def main():
 
     if args.fix_narrative_schema or args.all:
         all_fixes.extend(fix_narrative_schema(data))
+
+    if args.fix_missing_assets or args.all:
+        all_fixes.extend(fix_missing_assets(data))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

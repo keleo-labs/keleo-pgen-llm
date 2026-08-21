@@ -238,7 +238,7 @@ def discover_files(directory):
 
     for f in sorted(d.glob("*.json")):
         name = f.name
-        if name.startswith("_effective") or name.startswith("backup-"):
+        if name.startswith("_") or name.startswith("backup-"):
             continue
         if name in ("grading.json", "benchmark.json", "timing.json"):
             continue

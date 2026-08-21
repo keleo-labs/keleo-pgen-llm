@@ -1126,6 +1126,8 @@ def main():
                         help="Show narrative contexts exceeding 3 sentences, sorted by length")
     parser.add_argument("--full-text", action="store_true",
                         help="Show full context text (no truncation) with --long-contexts or --context-element")
+    parser.add_argument("--metadata", action="store_true",
+                        help="Show document metadata (kind, name, version, schemaVersion, baselinePracticeName)")
     parser.add_argument("--structure", action="store_true",
                         help="Show top-level key overview (type and count/length for each key)")
     parser.add_argument("--coverage", action="store_true",
@@ -1189,6 +1191,17 @@ def main():
     if args.narrative_contexts or args.context_element or args.long_contexts:
         print_narrative_contexts(data, args.context_element, args.long_contexts,
                                  args.full_text)
+        return
+
+    if args.metadata:
+        meta_fields = ["kind", "name", "version", "schemaVersion", "baselinePracticeName",
+                       "practiceDependencyNames"]
+        meta = {k: data.get(k) for k in meta_fields if data.get(k) is not None}
+        if args.json:
+            print(json.dumps(meta, indent=2))
+        else:
+            for k, v in meta.items():
+                print(f"  {k}: {v}")
         return
 
     if args.structure:
