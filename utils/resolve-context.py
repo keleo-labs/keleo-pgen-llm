@@ -17,8 +17,14 @@ Usage:
     # Mixed inputs with transitive baseline resolution
     python3 utils/resolve-context.py baseline.json parent.keleo --transitive -o _effective-context.json
 
+    # Resolve by document name (searches practices/, baselines/, deps/, bundles/)
+    python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" --transitive -o context.json
+
     # Check-only mode (metadata report, no output file)
     python3 utils/resolve-context.py baseline.json --check-only
+
+    # Describe the output JSON structure
+    python3 utils/resolve-context.py --describe-output
 
 Merge hierarchy (higher tiers override lower on name conflicts):
     Tier 1: Baselines (root-first topological sort)
@@ -371,24 +377,162 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
     return effective, report
 
 
+OUTPUT_SCHEMA = {
+    "description": "Effective context JSON structure produced by resolve-context.py",
+    "topLevelKeys": {
+        "alphas": "array — merged alphas from all tiers (each has name, description, states[], contributesTo, relatesTo, etc.)",
+        "activitySpaces": "array — baseline activity spaces",
+        "competencies": "array — baseline competencies with levels",
+        "focuses": "array — baseline focuses (Value, Solution, Endeavor, etc.)",
+        "narrativeTypes": "array — baseline narrative types with narrativeElements[]",
+        "narratives": "array — practice narratives (named stories on elements)",
+        "citations": "array — practice citations",
+        "assets": "array — asset definitions",
+        "workProducts": "array — practice work products with levels of detail",
+        "patterns": "array — practice lifecycle patterns",
+        "personas": "array — personas (name, description, aliases[], competencies[])",
+        "personaGroups": "array — persona groups (name, description, personaNames[])",
+        "workProductInstances": "array — curated work product instances",
+        "_aliasContext": "object — {description, aliases[]} mapping domainName to canonicalName",
+        "practiceElementAliases": "array — raw alias entries from all sources",
+        "_provenance": "object — {mergeOrder[], tiers{}, elementSources{}} tracking where each element came from",
+        "name": "string — combined name of all merged sources",
+        "description": "string — merge summary",
+        "kind": "string — practiceBaseline | practice | method",
+        "authors": "array — merged author list",
+        "version": "string — version from first document",
+        "keywords": "array — deduplicated merged keywords",
+    },
+    "elementAnnotations": {
+        "_contributingPracticeName": "string on each merged element — source practice/baseline name",
+        "_domainAlias": "string on elements with aliases — the domain-specific name",
+    },
+}
+
+
+def _normalize_name(name):
+    """Normalize a name for fuzzy matching: lowercase, strip hyphens/underscores, collapse whitespace."""
+    import re
+    return re.sub(r'\s+', ' ', name.lower().replace('-', ' ').replace('_', ' ')).strip()
+
+
+def _fuzzy_match(name, index):
+    """Find the best fuzzy match for a name in the index.
+
+    Strategy: normalize both sides, try exact match first, then substring containment,
+    then word-overlap scoring. Returns the matching index key or None.
+    """
+    norm_input = _normalize_name(name)
+    norm_lookup = {_normalize_name(k): k for k in index}
+
+    if norm_input in norm_lookup:
+        return norm_lookup[norm_input]
+
+    containment_matches = []
+    for norm_key, orig_key in norm_lookup.items():
+        if norm_input in norm_key or norm_key in norm_input:
+            containment_matches.append((norm_key, orig_key))
+    if len(containment_matches) == 1:
+        return containment_matches[0][1]
+    if containment_matches:
+        containment_matches.sort(key=lambda x: abs(len(x[0]) - len(norm_input)))
+        return containment_matches[0][1]
+
+    input_words = set(norm_input.split())
+    scored = []
+    for norm_key, orig_key in norm_lookup.items():
+        key_words = set(norm_key.split())
+        overlap = len(input_words & key_words)
+        score = overlap / max(len(input_words | key_words), 1)
+        if score >= 0.5:
+            scored.append((score, abs(len(norm_key) - len(norm_input)), orig_key))
+    if scored:
+        scored.sort(key=lambda x: (-x[0], x[1]))
+        return scored[0][2]
+    return None
+
+
+def resolve_names_to_paths(names, search_dirs):
+    """Resolve document names to file paths using discover-dependencies index.
+
+    Uses exact match first, then fuzzy matching (normalized, substring, word-overlap).
+    """
+    dd = _load_discover_module()
+    index, _ = dd.build_index(search_dirs)
+    resolved_paths = []
+    errors = []
+    for name in names:
+        match = dd.resolve_name(name, index, prefer_filesystem=True)
+        if match["status"] == "not_found":
+            fuzzy_key = _fuzzy_match(name, index)
+            if fuzzy_key:
+                match = dd.resolve_name(fuzzy_key, index, prefer_filesystem=True)
+
+        if match["status"] == "found":
+            path = match.get("path", "")
+            if "::" in path:
+                keleo_path = match.get("keleo_path", path.split("::")[0])
+                if keleo_path not in resolved_paths:
+                    resolved_paths.append(keleo_path)
+            else:
+                if path not in resolved_paths:
+                    resolved_paths.append(path)
+        elif match["status"] == "ambiguous":
+            candidates = match.get("candidates", [])
+            errors.append(f"Ambiguous name '{name}': {[c.get('path','') for c in candidates]}")
+        else:
+            errors.append(f"Name '{name}' not found in {search_dirs}")
+    return resolved_paths, errors
+
+
+def filter_effective_context(effective, extract_keys):
+    """Return a subset of the effective context containing only the requested element types."""
+    filtered = {}
+    for key in extract_keys:
+        if key in effective:
+            filtered[key] = effective[key]
+    for meta_key in ("_provenance", "_aliasContext", "name", "description", "kind"):
+        if meta_key in effective:
+            filtered[meta_key] = effective[meta_key]
+    return filtered
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Unified context resolver for baselines, practices, methods, and .keleo bundles"
     )
     parser.add_argument(
         "inputs",
-        nargs="+",
-        help="Input files (.json or .keleo). .keleo bundles have all documents extracted.",
+        nargs="*",
+        help="Input files (.json or .keleo), or document names when --by-name is set.",
     )
     parser.add_argument(
         "-o",
         "--output",
-        help="Output path for the effective context JSON (required unless --check-only)",
+        help="Output path for the effective context JSON (required unless --check-only or --describe-output)",
     )
     parser.add_argument(
         "--check-only",
         action="store_true",
         help="Report metadata without producing output",
+    )
+    parser.add_argument(
+        "--by-name",
+        action="store_true",
+        help="Treat inputs as document names instead of file paths. "
+             "Resolves names against --search-dirs using the dependency index.",
+    )
+    parser.add_argument(
+        "--extract",
+        nargs="+",
+        metavar="KEY",
+        help="Output only specified element types (e.g., --extract personas alphas patterns). "
+             "Always includes metadata (_provenance, name, kind).",
+    )
+    parser.add_argument(
+        "--describe-output",
+        action="store_true",
+        help="Print the output JSON schema description and exit.",
     )
     parser.add_argument(
         "--transitive",
@@ -409,12 +553,31 @@ def main():
 
     args = parser.parse_args()
 
+    if args.describe_output:
+        print(json.dumps(OUTPUT_SCHEMA, indent=2))
+        return
+
+    if not args.inputs:
+        parser.error("No inputs provided. Pass file paths, or document names with --by-name.")
+
+    if args.by_name:
+        resolved_paths, errors = resolve_names_to_paths(args.inputs, args.search_dirs)
+        if errors:
+            print(json.dumps({"error": "Name resolution failed", "details": errors}))
+            sys.exit(1)
+        if not resolved_paths:
+            print(json.dumps({"error": "No documents resolved from names", "names": args.inputs}))
+            sys.exit(1)
+        file_paths = resolved_paths
+    else:
+        file_paths = args.inputs
+
     if args.check_only:
-        documents = load_inputs(args.inputs)
+        documents = load_inputs(file_paths)
         tiers = classify_documents(documents)
         check_report = {
             "success": True,
-            "inputCount": len(args.inputs),
+            "inputCount": len(file_paths),
             "documentCount": sum(len(v) for v in tiers.values()),
             "tiers": {
                 "baselines": [name for name, _ in tiers["baselines"]],
@@ -422,18 +585,27 @@ def main():
                 "methods": [name for name, _ in tiers["methods"]],
             },
         }
+        if args.by_name:
+            check_report["resolvedPaths"] = file_paths
         print(json.dumps(check_report, indent=2))
         return
 
     if not args.output:
-        print(json.dumps({"error": "Output path (-o) required unless --check-only"}))
+        print(json.dumps({"error": "Output path (-o) required unless --check-only or --describe-output"}))
         sys.exit(1)
 
     effective, report = resolve_context(
-        args.inputs,
+        file_paths,
         transitive=args.transitive,
         search_dirs=args.search_dirs,
     )
+
+    if args.extract:
+        effective = filter_effective_context(effective, args.extract)
+        report["extractedKeys"] = args.extract
+
+    if args.by_name:
+        report["resolvedPaths"] = file_paths
 
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -97,17 +97,31 @@ In plan mode:
 
 ### Step 1: Load Practice Context
 
-Use `resolve-context.py` to load the effective context:
+Use `resolve-context.py` to load the effective context. **Always pass all inputs in a single call** — the utility merges them with correct tier precedence.
 
 ```bash
-python3 utils/resolve-context.py <input-file(s)> --transitive -o /tmp/report-context.json
+# By file path (one or many)
+python3 utils/resolve-context.py practices/crm-foundations/crm-foundations.json practices/meddpicc-qualification/meddpicc-qualification.json --transitive -o /tmp/report-context.json
+
+# By document name (preferred — avoids path guessing and directory name mismatches)
+python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" "User Stories" --transitive -o /tmp/report-context.json
+
+# To see only specific element types (reduces output size for targeted extraction)
+python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive --extract personas alphas patterns -o /tmp/report-context.json
+
+# To understand the output JSON structure
+python3 utils/resolve-context.py --describe-output
 ```
 
-If the user provides a practice name rather than a path, search for it in standard directories (`practices/`, `baselines/`, `deps/`, `bundles/`).
+**Name resolution:** `--by-name` uses the dependency index to find documents by their `name` field (not directory name). This eliminates trial-and-error path lookups — e.g., the user may type "CRM-Foundations" but the directory is `crm-foundations/` and the document name is "CRM Foundations".
+
+**Multi-practice reports:** When the report draws on multiple practices, pass all of them in one call. The merged effective context gives you all personas, alphas, activities, and patterns from all sources with provenance annotations (`_contributingPracticeName`) so you know which practice each element came from.
 
 Read the output effective context JSON to extract:
 - **Baseline**: The foundational framework (narrative types, focuses, alphas, competencies)
 - **Practice/Method**: The specialized domain knowledge (alphas, states, activities, patterns, narratives, work products)
+
+**Do not fork subagents to extract data from the effective context.** The JSON is already structured — use targeted `python3 -c` reads or the `--extract` flag to pull specific element types directly.
 
 ---
 
@@ -290,6 +304,22 @@ Tell the user:
 - When: context resolution fails
 - Then: the skill reports the error clearly
 - And: suggests how the user can provide valid input (path to .json or .keleo file)
+
+---
+
+---
+
+## Multi-Source Reports
+
+When a report draws on multiple practices, methods, or baselines:
+
+1. **Single context call:** Pass all sources to `resolve-context.py` in one invocation (with `--by-name` or file paths). The merged context preserves provenance via `_contributingPracticeName` on each element.
+
+2. **Persona cross-referencing:** Different practices may define personas for the same real-world role under different names (e.g., "Sales Representative" in CRM, "Account Executive" in MEDDPICC, "Field Seller" in Sales Play). Cross-reference persona names against the user's target roles during planning — document the mapping in the plan.
+
+3. **No forking for extraction:** The merged effective context JSON contains all elements at the top level (personas, alphas, activities, patterns, etc.). Read the data directly — do not spawn subagents for data that is already structured in the JSON.
+
+4. **External reference documents:** When the user provides Google Docs URLs as supplementary context, use `gws drive files export` to fetch them as plain text (see memory `gws-cli`). Write the export to a file within the current working directory (gws sandboxes output paths). Clean up the file after use.
 
 ---
 
