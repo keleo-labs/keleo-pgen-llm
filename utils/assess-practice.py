@@ -883,6 +883,19 @@ def check_narrative_self_reference(data):
     return issues
 
 
+_STOP_WORDS = frozenset({
+    "a", "an", "the", "and", "or", "of", "for", "in", "on", "to",
+    "is", "are", "with", "by", "at", "from", "as", "into", "that",
+    "this", "its", "has", "have", "been", "be",
+})
+
+
+def _normalize_checklist_name(name):
+    """Lowercase, strip stop words, sort remaining tokens."""
+    tokens = name.lower().split()
+    return frozenset(t for t in tokens if t not in _STOP_WORDS)
+
+
 def check_checklist_quality(data, kind):
     issues = []
     total = 0
@@ -896,8 +909,39 @@ def check_checklist_quality(data, kind):
 
     for source in sources:
         for alpha in source.get("alphas", []):
+            alpha_name = alpha.get("name", "<unnamed>")
             for state in alpha.get("states", []):
-                for cl in state.get("checklist", []):
+                state_name = state.get("name", "<unnamed>")
+                checklist = state.get("checklist", [])
+                cl_count = len(checklist)
+
+                # --- Per-state count caps ---
+                if cl_count > 12:
+                    issues.append({
+                        "severity": "error",
+                        "category": "checklist-bloat",
+                        "path": f"alphas['{alpha_name}'].states['{state_name}'].checklist",
+                        "message": (
+                            f"State '{state_name}' on alpha '{alpha_name}' has "
+                            f"{cl_count} checklist items (error threshold: 12)"
+                        ),
+                        "autoFixable": False,
+                    })
+                elif cl_count > 8:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "checklist-bloat",
+                        "path": f"alphas['{alpha_name}'].states['{state_name}'].checklist",
+                        "message": (
+                            f"State '{state_name}' on alpha '{alpha_name}' has "
+                            f"{cl_count} checklist items (warning threshold: 8)"
+                        ),
+                        "autoFixable": False,
+                    })
+
+                # --- Near-duplicate detection within state ---
+                seen_normalized = {}
+                for cl in checklist:
                     total += 1
                     name = cl.get("name", "")
                     desc = cl.get("description", "")
@@ -911,6 +955,22 @@ def check_checklist_quality(data, kind):
                         truncated_count += 1
                     elif desc.startswith(name) and len(name) < len(desc):
                         echo_count += 1
+
+                    norm = _normalize_checklist_name(name)
+                    if len(norm) >= 2 and norm in seen_normalized:
+                        issues.append({
+                            "severity": "warning",
+                            "category": "checklist-bloat",
+                            "path": f"alphas['{alpha_name}'].states['{state_name}'].checklist",
+                            "message": (
+                                f"Near-duplicate checklist names on state "
+                                f"'{state_name}': '{seen_normalized[norm]}' "
+                                f"and '{name}'"
+                            ),
+                            "autoFixable": False,
+                        })
+                    elif len(norm) >= 2:
+                        seen_normalized[norm] = name
 
     if truncated_count > 0:
         issues.append({

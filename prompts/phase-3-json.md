@@ -652,7 +652,7 @@ Add activities array:
       "description": "What triggers and outcomes this test captures",
       "given": ["Preconditions for the activity"],
       "when": ["Triggers, decision points, or events that initiate the activity"],
-      "then": ["Expected outcomes beyond structural contributesTo/worksOn"]
+      "then": ["Expected outcomes — MUST NOT restate contributesTo/worksOn targets"]
     },
     "examples": [  // Optional - concrete scenario Tests
       {

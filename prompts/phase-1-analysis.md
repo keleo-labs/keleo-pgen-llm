@@ -112,7 +112,7 @@ For each state:
 - **Name** (2-4 words, describing the waypoint)
 - **Description** (single sentence)
 - **Prerequisites** (what must already hold before this state is relevant? List 1-3 preconditions — cross-concern dependencies or contextual conditions. These seed `background.given` and `background.alphaStates` in Phase 3. Do NOT list the previous state of the same concern — sequential progression is implicit in state ordering and restating it is redundant.)
-- **Criteria** (5-7 one-sentence verification criteria - what must be demonstrably true?)
+- **Criteria** (distinct observable verification criteria — what must be demonstrably true? Typical 3-7 per state; error if >10 unless justified. Same-state near-duplicate names are a fail. Extract unique criteria globally, then assign to states — do not invent per-state.)
 
 ### Step 6: Identify Work Products
 
@@ -623,7 +623,7 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 - **Descriptions**: Single grammatically correct sentence, max 20 words
 - **State/LOD Descriptions**: Max 12 words
 - **Narrative Contexts**: 1-3 sentences per bullet point (not paragraphs)
-- **Criteria**: 5-7 per state, 3-5 per LOD, one sentence each
+- **Criteria**: Each a distinct observable criterion, one sentence; typical 3-7 per state (error if >10 unless justified), typical 3-5 per LOD. Same-state near-duplicates are a fail.
 
 ### Completeness
 - NO placeholders ("etc.", "...")

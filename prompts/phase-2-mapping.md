@@ -850,6 +850,9 @@ States: [...]
 - [ ] Relationships inform practice activities and patterns
 - [ ] No circular dependencies (A → B → A)
 
+**Cross-Alpha Duplication Guard:**
+If alpha A `relatesTo` alpha B, do NOT duplicate B's criteria on A's states. Instead, share a Work Product whose LODs `contributesTo` both alphas. Copying criteria across relatesTo peers inflates checklist counts and creates near-duplicates that diverge on update.
+
 **Alpha Instances:**
 If Phase 1 identified multiple concurrent instances of a concern (e.g., different team types):
 ```
@@ -907,7 +910,7 @@ Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT 
       Given: [preconditions that should hold when LOD is reached]
       Alpha States: [prerequisite alpha/state pairs]
       Work Product Levels: [prerequisite work product/LOD pairs]
-    Checklists: [3-5 one-sentence characteristics from Phase 1]
+    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum]
     Contributes To: [AlphaContribution objects - which alpha/state this LOD proves]
       - Alpha Name: [alpha]
         State Name: [state]
@@ -2016,7 +2019,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] `mapsTo` and `partOf` are not both set on any work product
 - [ ] Narrative contexts are 1-3 sentences (not paragraphs)
 - [ ] Citations have NO narratives property
-- [ ] Checklists are 5-7 items per state, 3-5 per LOD, one sentence each
+- [ ] Checklists are distinct observable criteria, one sentence each (typical 3-7/state, error if >10; typical 3-5/LOD). No same-state near-duplicates.
 - [ ] Practice narrative uses baseline narrative type
 - [ ] Persona/PersonaGroup/Pattern narratives included where Phase 1 provides substantive source material (not invented)
 - [ ] Asset icons specified for personas, persona groups, and competencies

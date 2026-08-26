@@ -268,3 +268,33 @@ Feature: Process Compliance
     When the phase is marked complete
     Then validate-practice-json.py has been run with 0 schema errors
     And assess-practice.py has been run with 0 error-severity issues
+
+
+Feature: Checklist Bloat Prevention
+
+  Rules governing checklist counts and near-duplicate detection.
+  Prevents quota-driven inflation of success criteria.
+
+  Scenario: Checklist count within range (@rule:bloat-001)
+    Given an alpha state has a checklist array
+    When the checklist items are counted
+    Then the count is typically 3-7 items
+    And a count above 8 produces a warning
+    And a count above 12 produces an error (unless explicitly justified)
+
+  Scenario: No near-duplicate checklist names within a state (@rule:bloat-002)
+    Given an alpha state has multiple checklist items
+    When checklist names are normalized (lowercase, strip articles/prepositions, sort tokens)
+    Then no two names within the same state normalize to the same token set
+
+  Scenario: Cross-alpha criteria not duplicated via relatesTo (@rule:bloat-003)
+    Given alpha A has relatesTo alpha B
+    When checklists are authored for both alphas
+    Then A's state checklists do not restate B's criteria
+    And shared verification is expressed through a Work Product whose LODs contributesTo both alphas
+
+  Scenario: evidencedBy stays optional (@rule:bloat-004)
+    Given a checklist item is defined on an alpha state
+    When the checklist JSON is generated
+    Then evidencedBy is never required by generation prompts or assessment rules
+    And empty evidencedBy arrays are valid

@@ -1316,7 +1316,7 @@ For successful translation, user receives:
 
 1. All three phases complete, validation passes with 0 errors (schema + baseline + internal integrity)
 2. All source methodology content mapped — no omissions
-3. Rich narratives with citations, complete checklists (5-7/state, 3-5/LOD), orthogonal tags
+3. Rich narratives with citations, distinct observable criteria (typical 3-7/state; error if >10), orthogonal tags
 
 ---
 
