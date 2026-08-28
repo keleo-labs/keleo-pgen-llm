@@ -11,12 +11,12 @@ triggerPatterns:
 
 # Plan from Feedback Skill
 
-Read an issue register (Google Sheet), triage each item, and plan/execute fixes at up to three levels: direct practice/method fixes, skill/utility improvements (keleo-pgen-llm), and schema/semantics improvements (keleo-language). Write resolution status and change details back to the register.
+Read an issue register (Google Sheet with structured table), triage each item, and plan/execute fixes at up to three levels: direct practice/method fixes, skill/utility improvements (keleo-pgen-llm), and schema/semantics improvements (keleo-language). Write resolution status and change details back to the register.
 
 ## Workflow Overview
 
-**Step 0: Configuration** → Load or prompt for issue register URL
-**Step 1: Read Issues** → Fetch register, identify actionable items
+**Step 0: Configuration** → Load or prompt for issue register URL; detect table structure
+**Step 1: Read Issues** → Fetch register, ensure table schema is current, identify actionable items
 **Step 2: Plan** → Triage each issue, determine resolution approach
 **Step 3: Execute** → Make changes at appropriate level(s)
 **Step 4: Update Register** → Write back status, rationale, and change details
@@ -62,63 +62,147 @@ The issue register URL is stored per-user in `.claude/user-config.json` (git-ign
 2. Use the stored `issueRegisterSpreadsheetId`
 3. If the user provides a different URL, update the config
 
+### Detect Table Structure
+
+After obtaining the spreadsheet ID, fetch the spreadsheet metadata to detect the table:
+
+```bash
+gws sheets spreadsheets get --params '{"spreadsheetId": "<ID>", "includeGridData": false}' \
+  | jq '.sheets[0].tables'
+```
+
+Store the table metadata (name, ID, column count, row count) in memory for use in subsequent steps. The register uses a Google Sheets structured table — all reads and writes must respect table boundaries and column definitions.
+
 ---
 
 ## Step 1: Read Issues
 
 ### Fetch the Register
 
-Read the issue register using the gws CLI:
+Read the full table range using the gws CLI:
 
 ```bash
 gws sheets +read --spreadsheet "<SPREADSHEET_ID>" --range "Sheet1"
 ```
 
-### Register Column Layout
+### Register Table Schema
 
-The register has two zones — **input columns** (A–P) populated by the feedback form, and **resolution columns** (Q–T) populated by this skill.
+The register is a structured Google Sheets table with two column zones — **input columns** populated by the feedback form, and **resolution columns** populated by this skill.
 
-**Input columns (A–P):**
+**Input columns (form-populated):**
 
-| Col | Field |
-|---|---|
-| A | Timestamp |
-| B | Email |
-| C | Type (Issue, Enhancement, Question) |
-| D | Summary |
-| E | Description |
-| F | Page |
-| G | Document Name |
-| H | Document Version |
-| I | Document Kind |
-| J | Bundle |
-| K | Navigator Mode |
-| L | Selected Element |
-| M | Element Type |
-| N | Secondary Element |
-| O | Secondary Type |
-| P | Status |
+| Index | Column | Field |
+|---|---|---|
+| 0 | A | Timestamp |
+| 1 | B | Email |
+| 2 | C | Type (Issue, Enhancement, Question) |
+| 3 | D | Summary |
+| 4 | E | Description |
+| 5 | F | Page |
+| 6 | G | Document Name |
+| 7 | H | Document Version |
+| 8 | I | Document Kind |
+| 9 | J | Bundle |
+| 10 | K | Navigator Mode |
+| 11 | L | Selected Element |
+| 12 | M | Element Type |
+| 13 | N | Secondary Element |
+| 14 | O | Secondary Type |
+| 15 | P | Status |
 
-**Resolution columns (Q–T) — written by this skill:**
+**Resolution columns (skill-populated):**
 
-| Col | Field |
-|---|---|
-| Q | Resolution Summary |
-| R | Practice/Method Changes |
-| S | keleo-pgen-llm Changes |
-| T | keleo-language Changes |
+| Index | Column | Field |
+|---|---|---|
+| 16 | Q | Resolution Summary |
+| 17 | R | Practice/Method Changes |
+| 18 | S | keleo-pgen-llm Changes |
+| 19 | T | keleo-language Changes |
 
-If the header row (row 1) does not yet contain Q–T headers, write them first:
+### Ensure Table Schema Is Current
+
+On each run, verify the table includes the resolution columns. If the table's `endColumnIndex` is 16 (only input columns), extend it:
+
+**Step 1a: Extend the table range and add resolution column definitions:**
 
 ```bash
-gws sheets spreadsheets values update \
-  --params '{"spreadsheetId": "<ID>", "range": "Sheet1!Q1:T1", "valueInputOption": "USER_ENTERED"}' \
-  --json '{"values": [["Resolution Summary", "Practice/Method Changes", "keleo-pgen-llm Changes", "keleo-language Changes"]]}'
+gws sheets spreadsheets batchUpdate \
+  --params '{"spreadsheetId": "<ID>"}' \
+  --json '{
+    "requests": [
+      {
+        "updateTable": {
+          "table": {
+            "tableId": "<TABLE_ID>",
+            "range": {
+              "sheetId": 0,
+              "startRowIndex": 0,
+              "startColumnIndex": 0,
+              "endRowIndex": <CURRENT_END_ROW>,
+              "endColumnIndex": 20
+            },
+            "columnProperties": [
+              {"columnIndex": 16, "columnName": "Resolution Summary"},
+              {"columnIndex": 17, "columnName": "Practice/Method Changes"},
+              {"columnIndex": 18, "columnName": "keleo-pgen-llm Changes"},
+              {"columnIndex": 19, "columnName": "keleo-language Changes"}
+            ]
+          },
+          "fields": "range,columnProperties"
+        }
+      }
+    ]
+  }'
 ```
+
+**Step 1b: Update Status column dropdown to include all status values:**
+
+The Status column (index 15) is a DROPDOWN type. Update its data validation to include all six status values:
+
+```bash
+gws sheets spreadsheets batchUpdate \
+  --params '{"spreadsheetId": "<ID>"}' \
+  --json '{
+    "requests": [
+      {
+        "updateTable": {
+          "table": {
+            "tableId": "<TABLE_ID>",
+            "columnProperties": [
+              {
+                "columnIndex": 15,
+                "columnName": "Status",
+                "columnType": "DROPDOWN",
+                "dataValidationRule": {
+                  "condition": {
+                    "type": "ONE_OF_LIST",
+                    "values": [
+                      {"userEnteredValue": "New"},
+                      {"userEnteredValue": "Planned"},
+                      {"userEnteredValue": "In Progress"},
+                      {"userEnteredValue": "Resolved"},
+                      {"userEnteredValue": "Closed"},
+                      {"userEnteredValue": "Declined"}
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "fields": "columnProperties"
+        }
+      }
+    ]
+  }'
+```
+
+Steps 1a and 1b can be combined into a single batchUpdate with both requests if both are needed.
+
+**Idempotency:** If the table already has 20 columns and the Status dropdown already has all values, skip the schema update. Check by inspecting the table metadata from Step 0.
 
 ### Identify Actionable Items
 
-Filter for rows where Status (column P) is **"New"**. These are the items to triage. Skip rows with any other status — they have already been processed or are in progress.
+Filter for rows where Status (column P, index 15) is **"New"**. These are the items to triage. Skip rows with any other status — they have already been processed or are in progress.
 
 Present the actionable items to the user as a summary table before planning.
 
@@ -223,7 +307,7 @@ If an issue is declined:
 
 ## Step 4: Update Register
 
-After executing changes for each issue, write back to the spreadsheet.
+After executing changes for each issue, write back to the spreadsheet within the table structure.
 
 ### Status Values
 
@@ -238,7 +322,7 @@ After executing changes for each issue, write back to the spreadsheet.
 
 ### Writing Resolution Data
 
-For each processed row, update columns P–T:
+For each processed row, update columns P–T using the Sheets values API. The table structure ensures banding and formatting are maintained automatically.
 
 ```bash
 gws sheets spreadsheets values update \
@@ -248,7 +332,7 @@ gws sheets spreadsheets values update \
 
 **Column content guidelines:**
 
-- **P (Status)**: One of the six status values above
+- **P (Status)**: One of the six status values above. Must match a dropdown value.
 - **Q (Resolution Summary)**: 1-3 sentences explaining the assessment and resolution approach. Include rationale for declined items.
 - **R (Practice/Method Changes)**: Brief description of L1 changes. File paths and nature of change. "N/A" if no L1 changes.
 - **S (keleo-pgen-llm Changes)**: Brief description of L2 changes. File paths and nature of change. "N/A" if no L2 changes.
@@ -257,6 +341,12 @@ gws sheets spreadsheets values update \
 ### Batch Updates
 
 When processing multiple issues, update the register after each issue is resolved (not all at once). This provides incremental progress visibility in the spreadsheet.
+
+### Table Integrity
+
+- **Never write outside the table range.** All writes target cells within the table's column and row boundaries.
+- **New rows** added by the form automatically extend the table. No action needed from this skill.
+- **Status values** must match the dropdown validation. Writing an invalid status will produce a validation error in the sheet.
 
 ---
 
@@ -314,6 +404,7 @@ unzip -o bundles/<name>.keleo -d /tmp/keleo-inspect/  # Extract to temp
 - **Document not found locally**: Set Status to "Planned" with Resolution Summary explaining the document needs to be available locally. Do not guess at changes.
 - **Validation fails after change**: Revert the change, investigate the validation error, and fix properly. Do not suppress validation errors.
 - **Google Sheet write fails**: Report the intended status update to the user in the conversation so they can update manually.
+- **Table schema update fails**: Fall back to plain cell-range writes for data, and inform the user that the table structure may need manual adjustment.
 - **Ambiguous issue**: Ask the user for clarification using AskUserQuestion. Set Status to "New" until clarified.
 
 ---
