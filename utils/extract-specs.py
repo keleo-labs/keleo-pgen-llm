@@ -56,7 +56,7 @@ ASSESS_CATEGORY_BRIDGE = {
     "semantic-010": ["mapsto-naming"],
     "semantic-011": ["baseline-ref-focus", "baseline-ref-alpha", "baseline-ref-activityspace", "baseline-ref-competency", "baseline-ref-narrativetype"],
     "naming-001": ["description-length"],
-    "naming-002": ["checklist-quality"],
+    "naming-002": ["checklist-quality", "checklist-polarity"],
     "naming-003": ["uniqueness"],
     "naming-004": ["lod-naming"],
     "naming-005": ["activity-name-distinctness"],

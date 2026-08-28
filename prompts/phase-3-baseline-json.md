@@ -319,7 +319,7 @@ From mapping guide Alphas section:
 - ✓ ALL alphas have `relatesTo` array (not empty)
 - ✓ Every `relatesTo` entry has `direction` field
 - ✓ Each alpha has 5-7 states
-- ✓ Each state has 3-5 checklist items
+- ✓ Each state has 3-5 checklist items (positive/additive — achievements to reach, not absences)
 - ✓ All `focusName` references exist in Step 3 focuses
 - ✓ All `relatesTo.alphaName` references exist in alphas array
 

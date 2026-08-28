@@ -968,6 +968,7 @@ From `deps/language.schema.json`:
   - **Add checklists ONLY to states** that the Phase 2 mapping guide explicitly enriches
   - **For unenriched states**, include them with an empty `"checklist": []` — do NOT fabricate checklists for states the mapping guide does not cover
 - **Checklist format:** Objects {name, description, seq}, NOT strings
+- **Checklist polarity:** Every item must be positive and additive — describes an achievement to reach, never the absence or lack of something (e.g., "Key Metrics Defined" not "Metrics absent"). Use description/narratives for level qualities including limitations
 - **Competency references:** {competencyName, competencyLevelName}, NOT {competencyName, level}
 - **Persona property:** `competencies`, NOT `requiredCompetencies`
 - **Activity competencies:** BOTH `requiredCompetencies` (strings) AND `recommendedCompetencyLevels` (objects)

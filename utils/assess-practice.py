@@ -896,12 +896,38 @@ def _normalize_checklist_name(name):
     return frozenset(t for t in tokens if t not in _STOP_WORDS)
 
 
+_NEGATIVE_POLARITY_PATTERNS = [
+    re.compile(r'\babsent\b', re.IGNORECASE),
+    re.compile(r'\bmissing\b', re.IGNORECASE),
+    re.compile(r'\blacking\b', re.IGNORECASE),
+    re.compile(r'\bundefined\b', re.IGNORECASE),
+    re.compile(r'\bunresolved\b', re.IGNORECASE),
+    re.compile(r'\bunaddressed\b', re.IGNORECASE),
+    re.compile(r'\bincomplete\b', re.IGNORECASE),
+    re.compile(r'\bnot\s+(?:defined|established|documented|identified|created|completed|present|available)\b', re.IGNORECASE),
+    re.compile(r'^no\s+', re.IGNORECASE),
+    re.compile(r'^without\s+', re.IGNORECASE),
+    re.compile(r'\bgaps?\s+(?:identified|noted|exist|present|remain)', re.IGNORECASE),
+]
+
+
+def _is_negative_polarity(name, desc):
+    """Check if a checklist item uses negative/absence framing."""
+    for pattern in _NEGATIVE_POLARITY_PATTERNS:
+        if pattern.search(name):
+            return True
+        if pattern.search(desc):
+            return True
+    return False
+
+
 def check_checklist_quality(data, kind):
     issues = []
     total = 0
     truncated_count = 0
     echo_count = 0
     duplicate_count = 0
+    negative_items = []
 
     sources = [data]
     if kind == "method":
@@ -956,6 +982,12 @@ def check_checklist_quality(data, kind):
                     elif desc.startswith(name) and len(name) < len(desc):
                         echo_count += 1
 
+                    # --- Negative polarity detection ---
+                    if _is_negative_polarity(name, desc):
+                        negative_items.append(
+                            f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
+                        )
+
                     norm = _normalize_checklist_name(name)
                     if len(norm) >= 2 and norm in seen_normalized:
                         issues.append({
@@ -971,6 +1003,20 @@ def check_checklist_quality(data, kind):
                         })
                     elif len(norm) >= 2:
                         seen_normalized[norm] = name
+
+        # --- Work product LOD checklist polarity ---
+        for wp in source.get("workProducts", []):
+            wp_name = wp.get("name", "<unnamed>")
+            for lod in wp.get("levelsOfDetail", []):
+                lod_name = lod.get("name", "<unnamed>")
+                for cl in lod.get("checklist", []):
+                    total += 1
+                    name = cl.get("name", "")
+                    desc = cl.get("description", "")
+                    if name and desc and _is_negative_polarity(name, desc):
+                        negative_items.append(
+                            f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
+                        )
 
     if truncated_count > 0:
         issues.append({
@@ -1004,6 +1050,25 @@ def check_checklist_quality(data, kind):
             "message": (
                 f"{duplicate_count}/{total} checklist names are identical "
                 f"to their description"
+            ),
+            "autoFixable": False,
+        })
+
+    if negative_items:
+        detail = "\n".join(negative_items[:10])
+        suffix = ""
+        if len(negative_items) > 10:
+            suffix = f"\n  ... and {len(negative_items) - 10} more"
+        issues.append({
+            "severity": "warning",
+            "category": "checklist-polarity",
+            "path": "alphas[*].states[*].checklist | workProducts[*].levelsOfDetail[*].checklist",
+            "message": (
+                f"{len(negative_items)}/{total} checklist items use negative/absence "
+                f"framing (e.g., 'absent', 'missing', 'undefined'). Checklists must "
+                f"be positive and additive — describe achievements to reach, not "
+                f"deficiencies to observe. Use description/narratives for level "
+                f"qualities including limitations.\n{detail}{suffix}"
             ),
             "autoFixable": False,
         })

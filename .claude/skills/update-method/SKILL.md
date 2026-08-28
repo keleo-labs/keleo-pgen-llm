@@ -861,6 +861,8 @@ python3 utils/package-keleo.py \
 ### Checklist Name Quality
 When assessment flags `checklist-quality` issues, rewrite names as short Title Case noun phrases (3-8 words) capturing WHAT is checked, not HOW. Names must not echo descriptions. Apply consistently across all alphas.
 
+When assessment flags `checklist-polarity` issues, rewrite items to be positive and additive — describing an achievement to reach, not the absence or lack of something. For example, "Metrics absent" → "Key Metrics Defined". Use the state/LOD description and narratives to characterize level qualities including limitations.
+
 ### Asset Coverage
 When assessment flags `asset-coverage` gaps, add Font Awesome 6 Free icons (`fontWeight: "900"`, naming: `<kebab-case>-icon`). Every NarrativeType and Focus needs an icon. See generate-method SKILL.md Assets section for icon suggestions and JSON structure.
 

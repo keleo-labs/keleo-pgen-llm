@@ -910,7 +910,7 @@ Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT 
       Given: [preconditions that should hold when LOD is reached]
       Alpha States: [prerequisite alpha/state pairs]
       Work Product Levels: [prerequisite work product/LOD pairs]
-    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum]
+    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum; positive/additive items only — what to achieve, never absence of something]
     Contributes To: [AlphaContribution objects - which alpha/state this LOD proves]
       - Alpha Name: [alpha]
         State Name: [state]
@@ -2019,7 +2019,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] `mapsTo` and `partOf` are not both set on any work product
 - [ ] Narrative contexts are 1-3 sentences (not paragraphs)
 - [ ] Citations have NO narratives property
-- [ ] Checklists are distinct observable criteria, one sentence each (typical 3-7/state, error if >10; typical 3-5/LOD). No same-state near-duplicates.
+- [ ] Checklists are distinct observable criteria, one sentence each (typical 3-7/state, error if >10; typical 3-5/LOD). No same-state near-duplicates. Every item is positive and additive — describes something to achieve, never the absence or lack of something (use description/narratives for level qualities including limitations).
 - [ ] Practice narrative uses baseline narrative type
 - [ ] Persona/PersonaGroup/Pattern narratives included where Phase 1 provides substantive source material (not invented)
 - [ ] Asset icons specified for personas, persona groups, and competencies

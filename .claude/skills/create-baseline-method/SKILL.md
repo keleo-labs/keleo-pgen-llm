@@ -316,7 +316,7 @@ Fix any FAIL assertions before proceeding to Phase 2.
 4. **Transform Essential Concerns → Alphas**:
    - NO `contributesTo` property (baseline alphas are root-level)
    - REQUIRED `relatesTo` arrays (from Phase 1.5 relationships)
-   - 5-7 states per alpha with checklists
+   - 5-7 states per alpha with checklists (positive/additive items only — achievements to reach, not absences)
    - Assign to appropriate focus
    - Optional `background` on states (use sparingly — practice layer adds detailed Gherkin; see semantics.md Section 5.3.5)
 

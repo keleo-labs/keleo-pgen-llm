@@ -206,7 +206,7 @@ Each `relatesTo` entry is an `AlphaRelationship` with required `relationship`, `
 - ✓ ALL alphas have `relatesTo` arrays (show interconnections)
 - ✓ Every `relatesTo` entry has `direction` field
 - ✓ 5-7 states per alpha (not more than 7, not fewer than 5)
-- ✓ Each state has 3-5 checklist items (from Phase 1.5 criteria)
+- ✓ Each state has 3-5 checklist items (from Phase 1.5 criteria), all positive/additive (achievements to reach, not absences to observe)
 - ✓ 8-15 total alphas (from Phase 1.5 essential concerns)
 
 **Output Format:**

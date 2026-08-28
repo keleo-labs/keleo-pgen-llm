@@ -51,7 +51,7 @@ Steps should be concrete and verifiable: "The alpha has exactly one of `contribu
 |---|---|---|
 | `structural` | JSON shape, required sections, element counts | Required arrays present, minimum element counts |
 | `semantic` | Alpha relationships, cross-references, type correctness | contributesTo/mapsTo semantics, relatesTo direction |
-| `naming` | Element names, descriptions, name uniqueness | Checklist names are noun phrases, global name uniqueness |
+| `naming` | Element names, descriptions, name uniqueness, polarity | Checklist names are noun phrases, positive/additive framing, global name uniqueness |
 | `coverage` | Completeness of state/activity/pattern mapping | Every alpha state has supporting activity, pattern backfill |
 | `narrative` | Citation linkage, placement, quality, self-containment | Narratives have citationNames, context length 1-3 sentences |
 | `process` | Workflow steps, phase ordering, gate checks | Phase 1 before Phase 2, delineation gate decision |

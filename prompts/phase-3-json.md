@@ -435,7 +435,7 @@ Add alphas array:
   - Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`) — required by schema
   - Optional `description` field explains why the relationship exists
   - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
-- Checklist items are objects {name, description, seq}, NOT strings
+- Checklist items are objects {name, description, seq}, NOT strings. Every item must be positive and additive — describes an achievement to reach, never the absence or lack of something (e.g., "Key metrics defined" not "Metrics absent")
 - evidencedBy is optional array of WorkProductContribution
 - **Redeclared alpha state handling (CRITICAL):**
   - Include ALL states from the baseline/parent practice definition — never subset to only enriched states
