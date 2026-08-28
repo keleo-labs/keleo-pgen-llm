@@ -1488,7 +1488,7 @@ Practice Element Aliases:
 
 ### Step 10: Map Reference Content
 
-**Purpose:** Transform Phase 1's reference content candidates into fully mapped references anchored to specific alphas, states, and work products. References are `AlphaInstance` objects in the `Practice.references` array — curated external content that illustrates what an alpha state looks like in practice, optionally evidenced by work product instances at specific maturity levels.
+**Purpose:** Transform Phase 1's reference content candidates into fully mapped references anchored to specific alphas, states, and work products. References are `AlphaInstance` objects in the `Practice.references` array — actionable starting points (templates, sample artifacts, worked examples) that practitioners can directly use or adapt, optionally evidenced by work product instances at specific maturity levels. References are NOT documentation explaining how to do work — apply the actionability test to every candidate.
 
 **CRITICAL RULE: Every reference MUST include at least one `links` entry with a valid URI.** Without a link, the reference provides no actionable value to practitioners. Drop candidates where no link can be found.
 
@@ -1496,10 +1496,11 @@ Practice Element Aliases:
 
 Read the "Reference Content Candidates" section from `01-analysis-report.md`. For each candidate:
 
-1. **Map to alpha + state:** Using the alpha mappings established in Step 4, determine which alpha this reference illustrates and at which specific state. Ask: "What level of maturity does this reference content represent?"
-2. **Map evidence to work product + LOD:** If the reference includes a concrete artifact (template, sample document, tool output), identify which work product it evidences and at which level of detail from Step 5 mappings.
-3. **Validate links:** Ensure the URL is present and points to accessible content. If Phase 1 recorded a URL, carry it forward. If not, search for it.
-4. **Assign tags:** Use the orthogonal tag structure to enable filtering by domain, lifecycle, and organizational context.
+1. **Apply actionability test:** Ask: "If a practitioner followed this link, would they find something they can directly use, adapt, or fill in — or would they find text explaining a concept?" Drop candidates that fail this test. Documentation links belong in citations, not references.
+2. **Map to alpha + state:** Using the alpha mappings established in Step 4, determine which alpha this reference supports and at which specific state. Ask: "What level of maturity does this reusable content represent?"
+3. **Map evidence to work product + LOD:** If the reference includes a concrete artifact (template, sample document, tool output), identify which work product it evidences and at which level of detail from Step 5 mappings.
+4. **Validate links and pages:** Ensure the URL is present. If Phase 1 recorded a URL, carry it forward. If not, search for it. **If Phase 1 identified specific pages/sections containing the actionable content, carry the `pages` value forward into the link.** A link to a large document without `pages` is rarely a valid reference — it is usually documentation.
+5. **Assign tags:** Use the orthogonal tag structure to enable filtering by domain, lifecycle, and organizational context.
 
 **Step 10.2: Apply Naming Conventions (from semantics.md §6.6)**
 
@@ -1523,10 +1524,11 @@ For each reference, document in the mapping guide:
 ```markdown
 ### Reference: [Descriptive Name]
 - **Alpha:** [alphaName] at **State:** [stateName]
-- **Description:** [What this reference illustrates — 1-2 sentences]
+- **Description:** [What the practitioner gets and how they would use it — 1-2 sentences]
 - **Links:**
   - Name: [link display name]
     URI: [https://...]
+    Pages: [pp. X-Y | Section N | Slides N-M — REQUIRED when actionable content is at a specific location]
     Description: [what the link points to — optional]
 - **Evidence:** (if applicable)
   - **Work Product:** [workProductName] at **LOD:** [levelOfDetailName]
@@ -1535,6 +1537,7 @@ For each reference, document in the mapping guide:
     - Links:
       - Name: [artifact link name]
         URI: [https://...]
+        Pages: [if applicable]
 - **Tags:**
   - domainTags: [...]
   - lifecycleTags: [...]
@@ -1542,7 +1545,9 @@ For each reference, document in the mapping guide:
 ```
 
 **Quality Gates:**
+- [ ] Every reference passes the actionability test — practitioners get something they can directly use or adapt, not documentation explaining a concept
 - [ ] Every reference has at least one `links` entry with a URI
+- [ ] Links to large documents include `pages` pointing to the specific template/example/artifact location
 - [ ] Every `alphaName` maps to a defined alpha (baseline or practice)
 - [ ] Every `stateName` maps to a valid state on the referenced alpha
 - [ ] Every `evidenceBy` entry's `workProductName` maps to a defined work product

@@ -306,29 +306,38 @@ Document practice hierarchy and relationships.
 
 ### Step 13: Identify Reference Content Candidates
 
-**What external content could help practitioners bootstrap their work?**
+**What reusable content could practitioners directly use or adapt to bootstrap their work?**
 
-During source material analysis, tag content that could serve as curated references — real-world exemplars that illustrate what alpha states look like in practice, with links to downloadable or viewable content.
+References are actionable starting points — templates, sample artifacts, worked examples, reference architectures — NOT documentation explaining how to do work. During source material analysis, identify content that a practitioner could pick up and immediately use or adapt.
 
 **What to look for:**
 
-- **Templates and starter documents** — Architecture decision records, runbook templates, governance policy templates, onboarding checklists
-- **Reference architectures** — Canonical design patterns with concrete examples (e.g., AWS reference architectures, TOGAF building blocks)
-- **Case studies and exemplary implementations** — Real-world examples showing how an organization achieved a particular maturity state
+- **Templates and starter documents** — Architecture decision records, runbook templates, governance policy templates, onboarding checklists, fillable forms
+- **Reference architectures** — Reusable design patterns with concrete structure (e.g., AWS reference architecture diagrams, TOGAF building blocks)
+- **Sample artifacts and worked examples** — Completed or partially completed work products that practitioners can study and replicate (e.g., a sample architecture document, a completed risk register)
 - **Tools and repositories** — GitHub repos, community tools, starter kits, automation frameworks
-- **External standards and frameworks** — ISO standards, NIST frameworks, industry benchmarks that map to specific concerns
-- **Sample artifacts** — Example work products at various levels of maturity (e.g., a sample architecture document, a completed risk register)
+- **Reusable components within standards** — Specific checklists, control matrices, or assessment templates within larger standards documents (NOT the standard's explanatory text)
+
+**CRITICAL — Page-level identification:**
+
+Most source documents are primarily explanatory. But many contain templates, examples, or sample artifacts at specific pages or sections. When a larger document contains actionable content at a specific location:
+- Record the **specific pages, sections, or slide numbers** where the template/example/artifact appears
+- Use `Pages/Sections` field (APA 7th format: "pp. 23-31", "Section 3", "Slides 12-15", "Appendix B")
+- A link to "the AWS Well-Architected Framework" is a citation; a link to "pp. 45-48" where the review template appears is a reference
+
+**Actionability test (apply to every candidate):** "If a practitioner followed this link, would they find something they can directly use, adapt, or fill in — or would they find text explaining a concept?" Only the former is a reference candidate.
 
 **For each candidate, document:**
 
 - **Name** (descriptive, identifying the source — e.g., "TOGAF Architecture Document Template", NOT "Architecture Template 1")
-- **Description** (1-2 sentences: what it illustrates and why it is useful)
+- **Description** (1-2 sentences: what the practitioner gets and how they would use it)
 - **Related Concern** (which concern/alpha area it relates to — preliminary, pre-mapping)
-- **Content Type** (template | case study | reference architecture | tool | standard | sample artifact)
-- **URLs/Links** (REQUIRED where available — without a link, a reference provides no actionable value)
+- **Content Type** (template | sample artifact | worked example | reference architecture | tool | reusable component)
+- **URLs/Links** (REQUIRED — without a link, a reference provides no actionable value)
+- **Pages/Sections** (REQUIRED when actionable content is at a specific location within a larger document)
 - **Estimated Maturity** (what level of maturity/completeness does this content represent? e.g., basic starter vs comprehensive production-ready)
 
-**Quality over quantity** — focus on high-value references that would genuinely accelerate practitioner work. A practice may have 3-10 references; not every alpha state needs one.
+**Quality over quantity** — focus on high-value references that would genuinely accelerate practitioner work. A practice may have 3-10 references; not every alpha state needs one. Zero references is better than references that are actually just documentation links.
 
 ### Step 14: Generate Citations
 
@@ -599,10 +608,11 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 ## 10. Reference Content Candidates
 
 ### 10.1 [Reference Name]
-**Description:** 1-2 sentences explaining what this illustrates and why it is useful
+**Description:** 1-2 sentences explaining what the practitioner gets and how they would use it
 **Related Concern:** [concern name from Section 2]
-**Content Type:** template | case study | reference architecture | tool | standard | sample artifact
-**URL:** https://... (REQUIRED where available)
+**Content Type:** template | sample artifact | worked example | reference architecture | tool | reusable component
+**URL:** https://... (REQUIRED)
+**Pages/Sections:** [pp. X-Y | Section N | Slides N-M | Appendix X — REQUIRED when actionable content is at a specific location within a larger document]
 **Estimated Maturity:** [basic starter | intermediate | comprehensive/production-ready]
 
 ### 10.2 [Next Reference]

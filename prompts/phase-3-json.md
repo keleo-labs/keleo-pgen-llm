@@ -806,7 +806,7 @@ Add patterns array:
 
 #### 3.12 References (Curated External Content)
 
-If the mapping guide includes a "Reference Content Mappings" section, add a `references` array. Each reference is an `AlphaInstance` object anchored to an alpha at a specific state, with links to external content and optional work product evidence.
+If the mapping guide includes a "Reference Content Mappings" section, add a `references` array. Each reference is an `AlphaInstance` object anchored to an alpha at a specific state, with links to actionable external content (templates, sample artifacts, worked examples) and optional work product evidence. References must be things practitioners can directly use or adapt — not documentation explaining concepts.
 
 ```json
 "references": [
@@ -849,6 +849,7 @@ If the mapping guide includes a "Reference Content Mappings" section, add a `ref
 **CRITICAL:**
 
 - Every reference MUST have at least one `links` entry with a valid `uri`. References without links provide no actionable value — drop them.
+- **Use `pages` on `ExternalLink` when the actionable content (template, example, artifact) is at a specific location within a larger document.** A link to a large document without `pages` is rarely a valid reference — without it, the link points to documentation, not a starting point. Format: APA 7th edition ("pp. 23-31", "Section 3", "Slides 12-15", "Appendix B").
 - `alphaName` must match a defined alpha (baseline or practice)
 - `stateName` must match a state on the referenced alpha
 - `evidenceBy` entries are **full WorkProductInstance objects** — each MUST have `name`, `description`, `workProductName`, `levelOfDetailName`, and `links` (with at least one valid URI). Bare `{workProductName, levelOfDetailName}` objects are invalid.
