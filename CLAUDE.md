@@ -279,6 +279,8 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **WorkProducts** | Defined in practice | NOT PRESENT |
 | **WorkProduct partOf / mapsTo** | Optional on WPs (mutually exclusive) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
+| **PatternGroups** | Optional (organize patterns into navigational groups) | NOT PRESENT |
+| **Activity ledBy** | Optional (single Persona.name accountable for leading) | Optional (on ActivitySpace) |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
 | **schemaVersion** | Optional (auto-set by skills) | Optional (auto-set by skills) |

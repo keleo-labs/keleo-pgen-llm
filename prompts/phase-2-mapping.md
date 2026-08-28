@@ -836,10 +836,14 @@ States: [...]
   - relationship: "[verb phrase]"
     alphaName: "[Alpha Name]"
     direction: [outgoing | incoming | mutual]
+    relationshipKind: [optional — machine-traversable classification: dependency | production |
+      guidance | information-flow | enabling | impact | consumption | mutual.
+      Include when the relationship fits one of these archetypes cleanly.]
     description: [Why this relationship exists and what it means in context]
   - relationship: "[verb phrase]"
     alphaName: "[Alpha Name]"
     direction: [outgoing | incoming | mutual]
+    relationshipKind: [optional — see above]
     description: [...]
 ```
 
@@ -905,6 +909,9 @@ Not every work product requires four LODs — use what fits the source content (
 ```
 Work Product Name: [from Phase 1 or baseline]
 Description: [single sentence from Phase 1]
+Contributes To Alpha Names: [optional — array of alpha names this work product serves.
+  The union of all LOD-level contributesTo alphaNames. Include when the work product
+  clearly serves multiple alphas, to provide a purpose-hub summary at the WP level.]
 Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT concern lifecycle]
   Level 1:
     Name: [content-descriptive, answers "what does this document look like at this depth?"]
@@ -1120,6 +1127,9 @@ Recommended Competency Levels: [CompetencyLevelReference objects]
   - Competency Name: [EXACT baseline competency name]
     Competency Level Name: [baseline level name]
 Involves: [array of Persona Group names - from Phase 1 team mappings]
+Led By: [optional - single Persona name accountable for leading this activity.
+  Distinct from Involves (which maps groups that participate). Only include when
+  Phase 1 identifies a clear single-person accountability role for this activity.]
 Narrative: [from Phase 1 "How to Perform" section]
   - Use technique narrative type
   - Include citations to source material
@@ -1467,6 +1477,44 @@ Pattern Views: [map Phase 1 views]
 - Only include alphas that **change state** in this pattern
 - Omit alphas with identical state across consecutive views
 - Use seq: 0 for prerequisite/preparation phases
+
+### Step 8.5: Map Pattern Groups (If Applicable)
+
+**When to create PatternGroups** (see semantics.md §9.3):
+- Practice contributes 3+ patterns
+- Method will compose 10+ patterns from multiple practices
+- Single-pattern practices generally do NOT need groups
+
+**Grouping strategy** — group by coordination intent that cuts across practices, NOT by source practice (redundant with `sourcePracticeName`):
+- **By lifecycle archetype** (most common): core lifecycles, optimisation cycles, maturity progressions
+- **By concern area**: technical vs governance vs operational patterns
+- **By engagement phase**: getting started vs ongoing execution vs scaling
+
+**Pattern Group Structure:**
+```
+Pattern Group Name: [descriptive category — e.g., "Core Lifecycles", NOT practice names]
+Description: [single sentence explaining what patterns in this group have in common]
+Seq: [optional — 0-based presentation order among groups]
+Narrative: [optional — include when the source material provides rationale for why
+  these patterns belong together, how they relate to each other, or how practitioners
+  should navigate between them. Use Essay or Report Narrative type. The narrative
+  should help users understand the group's purpose and when to use each pattern
+  within it. Omit if the grouping is self-explanatory from the name and description.]
+Entries:
+  - Pattern Name: [exact pattern name]
+    Seq: [0-based sort order within group]
+  - Pattern Name: [another pattern name]
+    Seq: [1]
+```
+
+**Naming guidance:**
+- **Good**: "Core Lifecycles", "Maturity Progressions", "Governance & Compliance"
+- **Bad**: "Plant Biology Patterns" (restates source practice name)
+
+**Cross-practice groups:**
+When multiple practices define a PatternGroup with the same canonical name, they merge during method composition (entries merge by `patternName`, overlay seq takes precedence). Use this for intentional category sharing across practices.
+
+**A pattern should appear in at most one group.** Ungrouped patterns remain valid.
 
 ### Step 9: Map Aliases (If Applicable)
 

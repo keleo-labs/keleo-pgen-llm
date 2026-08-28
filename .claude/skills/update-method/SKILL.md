@@ -455,7 +455,7 @@ The mapping guide has clear section headers. Assign sections to parallel subagen
 |----------|----------|---------------|
 | A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
 | B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
-| C: Work Products + Patterns | `workProducts` (LODs, contributesTo), `patterns` (views, alphaStates) | Mapping guide §Work Products, §Patterns |
+| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternGroups` (entries, narratives) | Mapping guide §Work Products, §Patterns, §Pattern Groups |
 | D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |
 
 **Step 3: Launch parallel subagents**

@@ -262,6 +262,7 @@ From mapping guide Alphas section:
           "relationship": "produces",
           "alphaName": "Target alpha name",
           "direction": "outgoing",
+          "relationshipKind": "production",
           "description": "Why this relationship exists"
         }
       ],
@@ -310,6 +311,7 @@ From mapping guide Alphas section:
 | `relationship` | Yes | Verb phrase: "produces", "governed by", "uses", "enables", etc. |
 | `alphaName` | Yes | Target alpha name (must exist in this baseline's alphas array) |
 | `direction` | Yes | `outgoing` (this alpha acts on target), `incoming` (target acts on this), or `mutual` (symmetric) |
+| `relationshipKind` | No | Machine-traversable classification: `dependency`, `production`, `guidance`, `information-flow`, `enabling`, `impact`, `consumption`, `mutual` |
 | `description` | No | Human-readable explanation of why this relationship exists |
 
 **Direction mapping for common relationship verbs:**
@@ -358,6 +360,7 @@ From mapping guide ActivitySpaces section:
         "Competency name 1 (must exist in Step 5 competencies array)",
         "Competency name 2"
       ],
+      "ledBy": "Persona Name",  // Optional — single Persona.name accountable for leading this activity space
       "narratives": [...]  // Optional — same structure as alpha narratives
     }
   ]

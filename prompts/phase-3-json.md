@@ -352,12 +352,14 @@ Add alphas array:
         "relationship": "produces",
         "alphaName": "Platform Asset",
         "direction": "outgoing",
+        "relationshipKind": "production",  // Optional — machine-traversable classification
         "description": "Each capability produces consumable platform assets"
       },
       {
         "relationship": "depends on",
         "alphaName": "Requirements",
-        "direction": "outgoing"
+        "direction": "outgoing",
+        "relationshipKind": "dependency"
       }
     ],
     "tags": {
@@ -483,6 +485,7 @@ Add workProducts array:
   {
     "name": "Work Product Name",
     "description": "Single sentence",
+    "contributesToAlphaNames": ["Alpha 1", "Alpha 2"],  // Optional — purpose-hub summary of which alphas this WP serves (union of all LOD contributesTo alphaNames)
     "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics.md Section 7.4)
     "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics.md Section 7.5
     "levelsOfDetail": [
@@ -693,6 +696,7 @@ Add activities array:
       "Team Name 1",
       "Team Name 2"
     ],
+    "ledBy": "Persona Name",  // Optional — single Persona.name accountable for leading this activity (distinct from involves which maps participating groups)
     "tags": { ... },
     "narratives": [
       {
@@ -803,6 +807,63 @@ Add patterns array:
     "assetNames": ["platform-adoption-workflow-diagram", "maturity-progression-chart"]
   }
   ```
+
+#### 3.11.5 Pattern Groups
+
+If the mapping guide defines pattern groups (Step 8.5), add a `patternGroups` array. PatternGroups organize patterns into navigational categories — most useful when a practice has 3+ patterns or a method will compose 10+.
+
+```json
+"patternGroups": [
+  {
+    "name": "Core Lifecycles",
+    "description": "Primary adoption and maturity journeys for each practice area",
+    "seq": 0,
+    "entries": [
+      { "patternName": "Platform Adoption Lifecycle", "seq": 0 },
+      { "patternName": "Team Formation Journey", "seq": 1 },
+      { "patternName": "Value Realization Cycle", "seq": 2 }
+    ],
+    "narratives": [
+      {
+        "name": "Navigating Core Lifecycles",
+        "description": "How the primary lifecycles relate and when to use each",
+        "narrativeTypeName": "Essay",
+        "narrativeContexts": [
+          {
+            "seq": 1,
+            "narrativeElementName": "Introduction",
+            "context": "Each practice area follows a distinct lifecycle reflecting its primary concern."
+          },
+          {
+            "seq": 2,
+            "narrativeElementName": "Body",
+            "context": "Platform adoption drives technical maturity, team formation builds organizational capability, and value realization tracks business outcomes."
+          },
+          {
+            "seq": 3,
+            "narrativeElementName": "Conclusion",
+            "context": "Start with platform adoption as the foundation, then layer team and value lifecycles as the organization matures."
+          }
+        ],
+        "citationNames": ["..."]
+      }
+    ],
+    "tags": {
+      "lifecycleTags": ["Adoption"]
+    }
+  }
+]
+```
+
+**CRITICAL:**
+
+- `patternName` must exactly match a defined `Pattern.name`
+- `seq` on entries provides sort order within the group (0-based)
+- `seq` on the group provides sort order among groups (0-based); alphabetical when absent
+- A pattern should appear in at most one group
+- Ungrouped patterns remain valid — they render in a default section
+- **Narratives:** Include when the mapping guide provides group-level rationale — why these patterns belong together, how they relate, how to navigate between them. Narratives help users understand the group's purpose. Omit if the grouping is self-explanatory.
+- Cross-practice groups merge by canonical name during method composition (entries merge by `patternName`, overlay seq wins)
 
 #### 3.12 References (Curated External Content)
 

@@ -50,6 +50,7 @@ from utils._shared import (
     load_all_from_keleo,
     load_json,
     merge_by_name,
+    merge_pattern_groups,
     MERGEABLE_ARRAYS,
 )
 
@@ -179,9 +180,14 @@ def merge_tier(accumulated, entries):
             acc_items = accumulated.get(key, [])
             if items or acc_items:
                 acc_source = accumulated.get("_merge_source", "")
-                accumulated[key] = merge_by_name(
-                    acc_items, items, acc_source, source_name
-                )
+                if key == "patternGroups":
+                    accumulated[key] = merge_pattern_groups(
+                        acc_items, items, acc_source, source_name
+                    )
+                else:
+                    accumulated[key] = merge_by_name(
+                        acc_items, items, acc_source, source_name
+                    )
         accumulated["_merge_source"] = source_name
     return accumulated
 

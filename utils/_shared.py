@@ -54,6 +54,7 @@ MERGEABLE_ARRAYS = [
     "narrativeTypes", "narratives", "citations", "assets",
     "workProducts", "patterns", "personas", "personaGroups",
     "alphaInstances", "workProductInstances",
+    "patternGroups", "acknowledgements", "references",
 ]
 
 
@@ -76,6 +77,51 @@ def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None
                 existing = merged[item["name"]]
                 combined = copy.deepcopy(existing)
                 combined.update(copy.deepcopy(item))
+                if overlay_source is not None:
+                    combined["_contributingPracticeName"] = overlay_source
+                merged[item["name"]] = combined
+            else:
+                entry = copy.deepcopy(item)
+                if overlay_source is not None:
+                    entry["_contributingPracticeName"] = overlay_source
+                merged[item["name"]] = entry
+    return list(merged.values())
+
+
+def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_source=None):
+    """Merge PatternGroup lists with entry-level merge by patternName.
+
+    Groups merge by canonical name per merge spec §6.15. Within same-name
+    groups, entries merge by patternName with overlay seq taking precedence.
+    Unique groups from either side are preserved as-is.
+    """
+    merged = OrderedDict()
+    for item in (base_list or []):
+        if "name" in item:
+            entry = copy.deepcopy(item)
+            if base_source is not None and "_contributingPracticeName" not in entry:
+                entry["_contributingPracticeName"] = base_source
+            merged[item["name"]] = entry
+    for item in (overlay_list or []):
+        if "name" in item:
+            if item["name"] in merged:
+                existing = merged[item["name"]]
+                base_entries = OrderedDict()
+                for e in existing.get("entries", []):
+                    pn = e.get("patternName")
+                    if pn:
+                        base_entries[pn] = e
+                for e in (item.get("entries") or []):
+                    pn = e.get("patternName")
+                    if pn:
+                        base_entries[pn] = copy.deepcopy(e)
+
+                combined = copy.deepcopy(existing)
+                overlay_copy = copy.deepcopy(item)
+                overlay_copy.pop("entries", None)
+                combined.update(overlay_copy)
+                combined["entries"] = list(base_entries.values())
+
                 if overlay_source is not None:
                     combined["_contributingPracticeName"] = overlay_source
                 merged[item["name"]] = combined

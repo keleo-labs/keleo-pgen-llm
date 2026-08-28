@@ -192,6 +192,7 @@ Each `relatesTo` entry is an `AlphaRelationship` with required `relationship`, `
 | `relationship` | Yes | Verb phrase (e.g., "produces", "governed by", "uses") |
 | `alphaName` | Yes | Target alpha name (must exist in this baseline) |
 | `direction` | Yes | `outgoing` / `incoming` / `mutual` |
+| `relationshipKind` | No | Machine-traversable classification: `dependency`, `production`, `guidance`, `information-flow`, `enabling`, `impact`, `consumption`, `mutual` |
 | `description` | No | Why this relationship exists |
 
 **Direction values:**
