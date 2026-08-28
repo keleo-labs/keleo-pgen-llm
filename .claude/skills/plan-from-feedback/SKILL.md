@@ -238,7 +238,7 @@ Present the actionable items to the user as a summary table before planning.
 
 For each New issue, determine:
 
-1. **Is this actionable?** Does the issue describe a real problem or improvement? If not (duplicate, cannot reproduce, unclear), mark as Declined.
+1. **Is this actionable and in scope?** Does the issue describe a real problem or improvement to practice/method content or generation? If it's a keleo-studio UI enhancement, **omit it** (see "Omitting Out-of-Scope Issues"). If it's a duplicate, cannot reproduce, or unclear, mark as Declined.
 
 2. **What level(s) of change are needed?**
 
@@ -341,14 +341,53 @@ If multiple issues affect the same document, group them and plan a single update
 
 Work through the plan, one issue at a time (or grouped by document when multiple issues share one).
 
-### L1: Practice/Method Changes
+**Delegation principle:** This skill orchestrates triage and planning. For actual fix execution, delegate to the appropriate specialized skill rather than editing practice/method JSON directly. Each skill handles its own assessment, backup, validation, rebundling, change requests, and downstream impact reporting.
 
-- Load the practice/method JSON
-- Make the specific fix described in the plan
-- Validate with `python3 utils/validate-practice-json.py <file>` or `python3 utils/validate-baseline-json.py <file>`
-- Run `python3 utils/assess-practice.py <file> --summary` to check for regressions
-- Rebundle with `python3 utils/package-keleo.py` if the file is part of a `.keleo` package
-- Record what changed (file paths, nature of change)
+### L1: Practice/Method Changes — Delegate to Skills
+
+**Do not manually edit practice/method/baseline JSON.** Instead, invoke the appropriate skill based on the nature of the fix:
+
+| Fix Nature | Skill to Invoke | When |
+|---|---|---|
+| Fix existing content (wrong states, bad checklists, missing elements, structural issues) | `/update-method` | Most L1 issues — fix, remap, or reanalyze existing documents |
+| Add/update curated reference content | `/update-method` (Mode 3) | Issues requesting exemplar content, templates, or reference links |
+| Generate a new practice from source materials | `/generate-method` | Rare — when the issue reveals a practice should exist but doesn't |
+| Generate a new baseline framework | `/create-baseline-method` | Rare — when a new foundational framework is needed |
+
+**Invocation approach:**
+
+1. **Group issues by document.** Multiple issues affecting the same document become a single skill invocation. Combine the fix requirements into one clear brief.
+
+2. **Invoke the skill via the Skill tool** with a prompt that includes:
+   - The document file path (resolved during Bundle Resolution in Step 2)
+   - The specific fixes needed (from the plan)
+   - The baseline path (for extension practices)
+   - Any constraints or scope boundaries from the plan
+
+3. **Let the skill handle the full lifecycle.** `/update-method` will:
+   - Run assessment to determine update mode (auto-fix, remap, full-reanalysis)
+   - Backup before overwriting
+   - Apply fixes with proper utilities
+   - Validate and re-assess
+   - Rebundle into `.keleo`
+   - Generate ChangeRequests for downstream propagation
+   - Present Downstream Impact Report
+
+4. **Record the skill's output** — capture what changed (file paths, nature of change, version bumps, any downstream impact) for the register update in Step 4.
+
+**Example — fixing checklist quality issues in a practice:**
+
+```
+Invoke /update-method:
+  File: practices/aws-well-architected/aws-well-architected.json
+  Baseline: deps/platform-adoption-kernel.json
+  Fixes needed:
+    - Issue #5: Rewrite checklist names on Reliability alpha (truncated, echo descriptions)
+    - Issue #8: Add missing activity for Operational Excellence alpha
+    - Issue #12: Fix pattern view completeness for Security lifecycle
+```
+
+The update-method skill will assess, determine auto-fix vs remap, and execute the full workflow.
 
 ### L2: Skill/Utility Changes (keleo-pgen-llm)
 
