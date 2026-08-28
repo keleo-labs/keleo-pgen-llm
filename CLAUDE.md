@@ -21,7 +21,9 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── create-baseline-method/       # Baseline practice creation skill
 │       │   └── SKILL.md
-│       └── method-based-report/          # Plain English report generation skill
+│       ├── method-based-report/          # Plain English report generation skill
+│       │   └── SKILL.md
+│       └── plan-from-feedback/          # Issue register triage and resolution skill
 │           └── SKILL.md
 ├── deps/                                   # Symlinks to keleo-studio
 │   ├── language.schema.json               # JSON Schema definition
@@ -494,6 +496,28 @@ The report uses narrative types from the baseline (Report Narrative, Essay Narra
 **Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
 
 The skill is defined in `.claude/skills/method-based-report/SKILL.md`.
+
+### Processing Feedback
+
+Use the `/plan-from-feedback` skill to triage and resolve issues from a feedback register:
+
+```
+/plan-from-feedback
+```
+
+The skill reads an issue register (Google Sheet) and for each "New" item:
+
+1. **Triages** — Assesses the issue and determines the resolution approach
+2. **Plans** — Identifies changes needed at up to three levels:
+   - **L1: Practice/Method** — Direct fix to the reported document
+   - **L2: keleo-pgen-llm** — Skill/utility improvement to prevent recurrence
+   - **L3: keleo-language** — Schema/semantics improvement for systemic issues
+3. **Executes** — Makes the changes, validates, and rebundles as needed
+4. **Updates** — Writes status, rationale, and change details back to the register
+
+The issue register URL is stored per-user in `.claude/user-config.json` (git-ignored). On first use, the skill prompts for the URL.
+
+The skill is defined in `.claude/skills/plan-from-feedback/SKILL.md`.
 
 ### Manual Workflow
 

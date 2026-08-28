@@ -13,6 +13,7 @@ archive
 
 .claude/settings.local.json
 .claude/settings.json
+.claude/user-config.json
 .playwright-mcp/
 __pycache__/
 deps/*-cr.json
