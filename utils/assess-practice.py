@@ -3061,6 +3061,73 @@ def check_pattern_alpha_coverage(data, kind):
     return issues
 
 
+def check_pattern_alpha_progression(data, kind):
+    """Flag non-progressing alphas and single-alpha patterns."""
+    issues = []
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        for pi, pat in enumerate(source.get("patterns", [])):
+            pat_name = pat.get("name", f"<unnamed-{pi}>")
+            views_sorted = sorted(
+                pat.get("patternViews", []),
+                key=lambda v: v.get("seq", 0),
+            )
+            if len(views_sorted) < 2:
+                continue
+
+            alpha_states = {}
+            last_known = {}
+            for view in views_sorted:
+                for astate in view.get("alphaStates", []):
+                    aname = astate.get("alphaName", "")
+                    sname = astate.get("stateName", "")
+                    if aname:
+                        last_known[aname] = sname
+                for aname, sname in last_known.items():
+                    alpha_states.setdefault(aname, set()).add(sname)
+
+            distinct_alphas = set(alpha_states.keys())
+            if len(distinct_alphas) == 1:
+                issues.append({
+                    "severity": "warning",
+                    "category": "pattern-single-alpha",
+                    "path": f"{pfx}patterns[{pat_name}]",
+                    "message": (
+                        f"Pattern '{pat_name}' references only 1 alpha "
+                        f"('{next(iter(distinct_alphas))}'). "
+                        f"Single-alpha state progression is self-documenting "
+                        f"and typically doesn't need a pattern."
+                    ),
+                    "autoFixable": False,
+                })
+
+            for aname, states in sorted(alpha_states.items()):
+                if len(states) == 1:
+                    state = next(iter(states))
+                    issues.append({
+                        "severity": "warning",
+                        "category": "pattern-alpha-progression",
+                        "path": f"{pfx}patterns[{pat_name}]",
+                        "message": (
+                            f"Alpha '{aname}' has state '{state}' in all "
+                            f"{len(views_sorted)} views of pattern "
+                            f"'{pat_name}'. Either progress it through "
+                            f"meaningful states or remove it from the pattern."
+                        ),
+                        "autoFixable": False,
+                    })
+
+    return issues
+
+
 def check_narrative_context_length(data, kind):
     """Flag narrative contexts that exceed 3 sentences."""
     issues = []
@@ -3353,6 +3420,7 @@ def main():
     all_issues.extend(check_keyword_count(data, kind))
     all_issues.extend(check_narrative_name_uniqueness(data, kind))
     all_issues.extend(check_pattern_alpha_coverage(data, kind))
+    all_issues.extend(check_pattern_alpha_progression(data, kind))
     all_issues.extend(check_narrative_context_length(data, kind))
     all_issues.extend(check_narrative_context_self_containment(data, kind))
     all_issues.extend(check_asset_coverage(data))

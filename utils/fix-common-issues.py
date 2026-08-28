@@ -21,6 +21,8 @@ Consolidates structural fixes detected by assess-practice.py:
 - Alias isolation (replace alias names in structural references with canonical names)
 - mapsTo variant naming (strip parent type name from variant alpha names and update refs)
 - Narrative schema (remove invalid kind='narrative', fix narrativeContext field names)
+- Self-referencing backgrounds (remove alphaStates entries that reference the owning alpha)
+- Unknown activity spaces (replace invalid activitySpaceNames with closest baseline match)
 
 Usage:
     # Dry run — show what would be fixed
@@ -64,6 +66,12 @@ Usage:
 
     # Auto-create asset definitions for unresolved assetNames references
     python3 utils/fix-common-issues.py <file.json> --fix --fix-missing-assets
+
+    # Remove self-referencing background alphaStates
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-self-ref-backgrounds
+
+    # Replace unknown activitySpaceNames with closest baseline match
+    python3 utils/fix-common-issues.py <file.json> <baseline.json> --fix --fix-unknown-activity-spaces
 
     # Apply all optional fixes
     python3 utils/fix-common-issues.py <file.json> --fix --all
@@ -1385,6 +1393,88 @@ def fix_missing_assets(data):
     return fixes
 
 
+def fix_self_ref_backgrounds(data):
+    """Remove background alphaStates entries that reference the same alpha the state belongs to.
+
+    A state's background should list *prerequisite* alpha-state pairs from OTHER alphas,
+    not from the alpha that owns the state.  Self-references are tautological and can
+    create acyclicity errors.
+    """
+    fixes = []
+    for alpha in data.get("alphas", []):
+        alpha_name = alpha.get("name", "")
+        for si, state in enumerate(alpha.get("states", [])):
+            bg = state.get("background")
+            if not bg or not isinstance(bg, dict):
+                continue
+            orig = bg.get("alphaStates", [])
+            if not orig:
+                continue
+            filtered = [a for a in orig if a.get("alphaName") != alpha_name]
+            if len(filtered) < len(orig):
+                removed = len(orig) - len(filtered)
+                state_name = state.get("name", f"states[{si}]")
+                if filtered:
+                    bg["alphaStates"] = filtered
+                else:
+                    del bg["alphaStates"]
+                    if not bg.get("given") and not bg.get("workProductLevels"):
+                        del state["background"]
+                fixes.append({
+                    "category": "self-ref-background",
+                    "path": f"alphas['{alpha_name}'].states['{state_name}'].background.alphaStates",
+                    "old": f"{len(orig)} entries ({removed} self-referencing)",
+                    "new": f"{len(filtered)} entries",
+                })
+    return fixes
+
+
+def fix_unknown_activity_spaces(data, baseline):
+    """Replace unknown activitySpaceNames with the closest valid baseline match.
+
+    Uses a simple heuristic: if the unknown name contains keywords that match
+    a baseline activity space, use that.  Falls back to 'Execute the Sales Play'
+    if no heuristic match is found.
+    """
+    if not baseline:
+        return []
+    bl_spaces = {a["name"] for a in baseline.get("activitySpaces", [])}
+    if not bl_spaces:
+        return []
+
+    fixes = []
+    for activity in data.get("activities", []):
+        asn = activity.get("activitySpaceName", "")
+        if not asn or asn in bl_spaces:
+            continue
+        # Heuristic: keyword matching
+        asn_lower = asn.lower()
+        best = None
+        for sp in sorted(bl_spaces):
+            sp_words = set(sp.lower().split())
+            asn_words = set(asn_lower.split())
+            overlap = sp_words & asn_words
+            if len(overlap) >= 2:
+                best = sp
+                break
+        if not best:
+            for sp in sorted(bl_spaces):
+                if any(w in sp.lower() for w in ["execute", "play", "sell"]):
+                    best = sp
+                    break
+        if not best:
+            best = sorted(bl_spaces)[0]
+        act_name = activity.get("name", "")
+        activity["activitySpaceName"] = best
+        fixes.append({
+            "category": "unknown-activity-space",
+            "path": f"activities['{act_name}'].activitySpaceName",
+            "old": asn,
+            "new": best,
+        })
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
@@ -1443,6 +1533,14 @@ def main():
     parser.add_argument(
         "--fix-missing-assets", action="store_true",
         help="Auto-create asset definitions for unresolved assetNames references"
+    )
+    parser.add_argument(
+        "--fix-self-ref-backgrounds", action="store_true",
+        help="Remove background alphaStates that reference the same alpha the state belongs to"
+    )
+    parser.add_argument(
+        "--fix-unknown-activity-spaces", action="store_true",
+        help="Replace unknown activitySpaceNames with closest baseline match (requires baseline arg)"
     )
     parser.add_argument(
         "--all", action="store_true",
@@ -1514,6 +1612,12 @@ def main():
 
     if args.fix_missing_assets or args.all:
         all_fixes.extend(fix_missing_assets(data))
+
+    if args.fix_self_ref_backgrounds or args.all:
+        all_fixes.extend(fix_self_ref_backgrounds(data))
+
+    if args.fix_unknown_activity_spaces or args.all:
+        all_fixes.extend(fix_unknown_activity_spaces(data, baseline))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

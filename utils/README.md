@@ -45,6 +45,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump version | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--fix]` |
 | `align-baseline-states.py` | Align child baseline redeclared alpha states with parent canonical names | `python3 utils/align-baseline-states.py <child>.json <parent>.json [--check] [--mapping JSON]` |
+| `fix-pattern-progression.py` | Remove non-progressing alphas from pattern views and remove degenerate single-alpha patterns | `python3 utils/fix-pattern-progression.py <file>.json [--fix] [--bump minor] [--json]` |
 
 ## Change Management
 

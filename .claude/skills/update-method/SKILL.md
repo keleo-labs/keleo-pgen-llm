@@ -202,6 +202,8 @@ Dependency versions are auto-resolved from all project files in deps/, baselines
 
 **IMPORTANT — Phase 3 subagents must NOT set version:** The generate-method skill tells Phase 3 to set `version: "1.0.0"` for new documents. When updating, this conflicts with `apply-versioning.py`. Override this in the Phase 3 subagent prompt: instruct it to **preserve the existing version** from the source JSON (or omit the version field). The `apply-versioning.py` call after Phase 3 is the sole version manager for updates.
 
+**IMPORTANT — Schema version auto-detection:** Do NOT hardcode a `schemaVersion` in Phase 3 subagent prompts. Instruct subagents to read the schema's `$comment` field to extract the current version (e.g., `"schemaVersion:2.4.0"`). This prevents drift when the schema is updated between planning and execution. `apply-versioning.py --fix` also auto-corrects `schemaVersion` as a fallback.
+
 ### Step 1A: Auto-Fix (No User Interaction)
 
 **When `suggestedUpdateMode: "auto-fix"`** — all issues are programmatically fixable.
@@ -222,6 +224,8 @@ Dependency versions are auto-resolved from all project files in deps/, baselines
    Add `--fix-narrative-placement` to move top-level narratives to matching element's narratives[].
    Add `--fix-pattern-completeness` to ensure final view completeness and compress unchanged carry-forward states.
    Add `--compress-patterns` to remove unchanged carry-forward alpha states from non-final pattern views.
+   Add `--fix-self-ref-backgrounds` to remove background alphaStates that reference the owning alpha.
+   Add `--fix-unknown-activity-spaces` to replace invalid activitySpaceNames with closest baseline match (requires baseline arg).
    Add `--all` to enable all optional fixes.
 
 3. **For extension practices — fix competency levels if needed:**
@@ -418,9 +422,9 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 
 **Step 2C: Run Phase 3 - JSON Generation**
 
-**Size check:** If the existing practice JSON is **>100KB**, use the **Parallel Section Strategy** below instead of single-agent generation. Single-agent generation of large practices (>100KB output) can take many hours.
+**Size note:** Single-agent generation works reliably for practices of any size (300KB+ tested successfully). The **Parallel Section Strategy** below is available as an optional optimization for very large practices but is not required.
 
-#### Standard Phase 3 (practices ≤100KB)
+#### Standard Phase 3 (all practices)
 
 **IMPORTANT:** Follow the `generate-method` skill Phase 3 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 3: Phase 3 - JSON Generation section).
 
@@ -676,6 +680,36 @@ When adding references to a **method** with multiple constituent practices:
 ## Handling Methods (Multiple Practices)
 
 For methods, ask user for scope (all practices, specific practices, or method-level only). Run update workflow per selected practice. Package with `package-keleo.py`.
+
+### Batch Update (All Practices in a Bundle)
+
+When the user requests updating ALL practices in a method/bundle:
+
+**Step 1: Build a Dependency DAG.** Group practices into tiers based on `practiceDependencyNames`:
+
+| Tier | Contents | Depends On |
+|---|---|---|
+| 0 | Baseline | — |
+| 1 | Practices with no `practiceDependencyNames` (or only baseline) | Baseline |
+| 2 | Practices depending only on Tier 1 practices | Tier 1 |
+| 3 | Practices depending on Tier 2 practices | Tier 2 |
+| Final | Method JSON + rebundling | All tiers |
+
+**Step 2: Execute by tier.** Within each tier, all practices can run in parallel:
+- **Augmented analysis:** All practices can be analyzed in parallel (no inter-practice dependencies at analysis stage)
+- **Remapping:** Run Tier 1 in parallel; Tier 2 can start as soon as its specific dependencies complete (not all of Tier 1); Tier 3 similarly
+- **JSON generation:** All practices can run in parallel once all mapping guides are stable (element names finalized)
+- **Validation + versioning:** Run batch `fix-common-issues.py --all --fix` across all practices, then batch `apply-versioning.py --bump minor --fix`
+
+**Step 3: Method JSON + rebundle.** After all practices pass validation:
+1. Update method JSON(s): `schemaVersion`, `version` bump, `dependencyVersions`
+2. Package all `.keleo` bundles with `--verify`
+
+**Key lessons:**
+- Phase 3 agents are fully parallelizable — they read mapping guides (stable by this point) and write independent JSON files
+- Single-agent generation works reliably for practices of any size (>100KB included) — the Parallel Section Strategy is optional complexity
+- Use `fix-common-issues.py --all --fix` with baseline arg to catch unknown activity spaces and self-referencing backgrounds post-generation
+- Phase 3 agents should auto-detect the schema version from `deps/language.schema.json` rather than being told a specific version
 
 ## User Interaction
 
@@ -952,6 +986,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix` or `--all --fix` for batch)
    - `generate-change-request.py` — Generate ChangeRequest JSON from old/new diff (`<old>.json <new>.json --author --status -o`)
    - `apply-change-request.py` — Apply ChangeRequest nameChanges/removals to downstream JSON (`<cr>.json <target>.json [--fix]`)
+   - `fix-common-issues.py` — Now includes `--fix-self-ref-backgrounds` and `--fix-unknown-activity-spaces` (both enabled by `--all`)
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.
