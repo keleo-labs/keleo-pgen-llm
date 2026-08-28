@@ -472,7 +472,7 @@ Never use `_effective-context.json` as a document — it is a build artifact, no
 
 **Output:** `bundles/<name>.keleo` (packaged baseline with dependencies, verified inline)
 
-**Inspection and fix utilities (never use `python3 -c` or `bash -c`):**
+**Inspection and fix utilities (never use `python3 -c`, `bash -c`, or compound bash scripts like `TARGET=... && grep ...`):**
 - Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
 - Resolve all dependencies: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
 - List available files: `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)

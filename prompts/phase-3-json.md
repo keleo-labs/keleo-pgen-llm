@@ -47,6 +47,10 @@ You have access to the following resources via the Read tool:
    - For validation of references
    - For extracting baseline structure
 
+## Tool Call Guidelines
+
+When running Bash commands, use **simple single-command calls** that match auto-approved patterns (e.g., `grep`, `wc`, `head`, `python3 utils/...`). Do NOT combine commands using variable assignments (`TARGET="..." && grep ...`) or shell loops (`for f in ...; do ... done`) — these trigger permission prompts. Make separate tool calls instead.
+
 ## Instructions
 
 ### Step 1: Load Resources

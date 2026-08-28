@@ -1097,6 +1097,8 @@ Read validation output and apply fixes:
 **All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`.**
 Use the Write tool (auto-approved) to create intermediate files, then call utility scripts. This rule applies to subagents too.
 
+**No compound bash scripts.** Avoid `TARGET=... && grep ... && wc ...` or `for f in ...; do ... done` in Bash calls — these trigger permission prompts. Instead, use separate tool calls for each simple command (`grep`, `wc`, `head`, etc.) which are auto-approved. For batch inspection of multiple files, use a utility script.
+
 **When you need functionality that doesn't exist yet**, read `.claude/skills/SKILL-STANDARD.md` §7.4 for the full Utils Self-Extension Protocol, then:
 1. Read `utils/README.md` to check for existing capabilities
 2. Extend an existing script or create a new one (do NOT halt or defer to the user)

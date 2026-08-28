@@ -37,6 +37,10 @@ Extract and organize the key elements from the source methodology into a structu
 - Generalize activities to 6-12 activity types
 - Extract universal competencies (5-10 skill categories)
 
+## Tool Call Guidelines
+
+When running Bash commands, use **simple single-command calls** that match auto-approved patterns (e.g., `grep`, `wc`, `head`, `python3 utils/...`). Do NOT combine commands using variable assignments (`TARGET="..." && grep ...`) or shell loops (`for f in ...; do ... done`) — these trigger permission prompts. Make separate tool calls instead.
+
 ## Instructions
 
 **Follow the complete Phase 1 analysis instructions from `prompts/phase-1-analysis.md` with these additional guidelines:**

@@ -136,6 +136,8 @@ When adding a new Gherkin scenario with a new `@rule:` ID:
 
 Validation logic lives in reusable utility scripts (`utils/`), never as inline `python3 -c` or `bash -c` commands in skill instructions. When a new validation need arises, extend an existing utility rather than creating a new one.
 
+**Compound bash scripts are also prohibited.** Patterns like `TARGET="..." && grep ... && wc ...`, `for f in ...; do ... done`, or variable-assignment-prefixed commands trigger permission prompts because they don't match simple command allow-list patterns (`Bash(grep *)`, `Bash(wc *)`, etc.). Use separate tool calls for each simple command, or write a utility script for batch operations.
+
 ### 7.4 Utils Self-Extension Protocol
 
 `utils/README.md` is the canonical registry of all utility scripts — their purpose, capabilities, and usage. Skills MUST follow this protocol when they need programmatic functionality during execution:
