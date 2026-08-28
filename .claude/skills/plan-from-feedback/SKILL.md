@@ -62,6 +62,28 @@ The issue register URL is stored per-user in `.claude/user-config.json` (git-ign
 2. Use the stored `issueRegisterSpreadsheetId`
 3. If the user provides a different URL, update the config
 
+### Keleo Studio GAS Configuration (Lazy)
+
+The keleo-studio-gas connection is configured **only when needed** — when a bundle referenced in an issue cannot be found locally (see Bundle Resolution below). Do not prompt for these on first use.
+
+When remote bundle access is needed and the config is missing, ask the user for:
+
+1. **Deployment URL** — the base URL of their keleo-studio-gas instance (a Google Apps Script web app URL, e.g., `https://script.google.com/a/macros/.../exec`)
+2. **API token** — a Google OAuth bearer token obtained from the GAS app's help page (Settings → API Token). Tokens expire after ~1 hour.
+
+Save to `.claude/user-config.json`:
+
+```json
+{
+  "issueRegisterUrl": "...",
+  "issueRegisterSpreadsheetId": "...",
+  "keleoStudioGasUrl": "<deployment URL>",
+  "keleoStudioGasToken": "<OAuth bearer token>"
+}
+```
+
+**Token expiry:** If an API call returns a 401 or auth error, inform the user that their token has expired and ask them to provide a fresh one from the GAS app. Update the stored token.
+
 ### Detect Table Structure
 
 After obtaining the spreadsheet ID, fetch the spreadsheet metadata to detect the table:
@@ -253,15 +275,61 @@ Issue #<row>: <Summary>
   L3 Actions: <what to change in schema/semantics> (if applicable)
 ```
 
-### Locating Practice/Method Files
+### Bundle Resolution
 
-Use the Document Name and Document Kind from the register to locate source files:
+Use the Document Name and Document Kind from the register to locate source files. Resolution follows a three-tier strategy — local files first, local bundles second, remote download third.
 
-- **Practices**: `practices/<practice-name>/` or within `.keleo` bundles in `bundles/`
-- **Methods**: `practices/<method-name>/` (methods live alongside practices)
-- **Baselines**: `baselines/<baseline-name>/`
+**Tier 1 — Local files:**
 
-If the document cannot be found locally, inform the user and set the issue to **Planned** (awaiting the document).
+- `practices/<practice-name>/` — practice/method working directories
+- `baselines/<baseline-name>/` — baseline working directories
+
+**Tier 2 — Local bundles:**
+
+- `bundles/<name>.keleo` — packaged bundles
+- Extract with: `unzip -o bundles/<name>.keleo -d /tmp/keleo-extract/`
+
+**Tier 3 — Remote download from keleo-studio-gas:**
+
+If the document is not found locally, attempt to download it from the keleo-studio-gas instance. This triggers the lazy configuration prompt if `keleoStudioGasUrl` and `keleoStudioGasToken` are not yet in `.claude/user-config.json`.
+
+**Step 1 — Search for the bundle:**
+
+```bash
+curl -s -H "Authorization: Bearer <TOKEN>" \
+  '<GAS_URL>?api=packages' | jq '.bundles'
+```
+
+This returns an array of `{ slug, name, version, description, documentCount }`. Match on document name from the register.
+
+**Step 2 — Get the download URL:**
+
+```bash
+curl -s -H "Authorization: Bearer <TOKEN>" \
+  '<GAS_URL>?api=download&name=<DOCUMENT_NAME>'
+```
+
+Returns `{ downloadUrl }` — a Google Drive download URL for the `.keleo` package.
+
+**Step 3 — Download via gws:**
+
+Extract the Drive file ID from the download URL and download using gws:
+
+```bash
+# The download URL is typically: https://drive.google.com/uc?id=<FILE_ID>&export=download
+# Extract FILE_ID and download:
+gws drive files get --params '{"fileId": "<FILE_ID>", "alt": "media"}' --output bundles/<slug>.keleo
+```
+
+**Step 4 — Extract the bundle:**
+
+```bash
+unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/
+```
+
+Read `manifest.json` from the extracted bundle to locate the specific document files.
+
+**If remote download also fails:** Inform the user and set the issue status to **Planned** with a note explaining the document could not be located.
 
 ### Resolution Dependencies
 
@@ -302,6 +370,10 @@ If an issue is declined:
 - Set Status to "Declined"
 - Write a clear rationale in the Resolution Summary explaining why
 - No changes needed in R/S/T columns (leave empty or write "N/A")
+
+### Omitting Out-of-Scope Issues
+
+Issues that are **keleo-studio UI enhancements** (rendering, navigation, layout, or interaction changes that don't affect practice/method content or generation) are outside pgen-llm scope. **Omit them entirely** — do not set Status, do not write resolution columns, leave the register row unchanged for studio-side triage. Do not decline studio enhancements from pgen-llm.
 
 ---
 
@@ -389,19 +461,39 @@ python3 utils/resolve-context.py --transitive <practice-or-method>.json
 
 This resolves baseline dependencies and produces `_effective-context.json` for the full picture.
 
-When the practice files are only available inside a `.keleo` bundle:
+When the practice files were downloaded from keleo-studio-gas or are only available inside a `.keleo` bundle:
 
 ```bash
-# Extract the bundle to inspect
-unzip -l bundles/<name>.keleo  # List contents
-unzip -o bundles/<name>.keleo -d /tmp/keleo-inspect/  # Extract to temp
+# Extract the bundle
+unzip -o bundles/<name>.keleo -d /tmp/keleo-extract/
+
+# Read the manifest to understand document layout
+cat /tmp/keleo-extract/manifest.json | jq '.documents'
+
+# Copy the document you need to edit into the working directory
+cp /tmp/keleo-extract/documents/<doc>.json practices/<name>/<doc>.json
 ```
+
+After making L1 changes to a document that came from a remote bundle, rebundle and optionally re-upload. The skill does NOT auto-upload — inform the user that the updated bundle needs to be uploaded to keleo-studio-gas manually if desired.
+
+### Querying Document Details Remotely
+
+If you need to inspect a specific document without downloading the full bundle, use the document API:
+
+```bash
+curl -s -H "Authorization: Bearer <TOKEN>" \
+  '<GAS_URL>?api=document&bundle=<SLUG>&path=documents/<filename>.json'
+```
+
+This returns the full document JSON directly, useful for read-only inspection during triage.
 
 ---
 
 ## Error Handling
 
-- **Document not found locally**: Set Status to "Planned" with Resolution Summary explaining the document needs to be available locally. Do not guess at changes.
+- **Document not found locally**: Attempt remote download from keleo-studio-gas (triggers lazy config if needed). If remote also fails, set Status to "Planned" with Resolution Summary explaining the document could not be located.
+- **keleo-studio-gas token expired (401/auth error)**: Inform the user their token has expired. Ask for a fresh token from the GAS app (Settings → API Token). Update `.claude/user-config.json` with the new token and retry.
+- **keleo-studio-gas unreachable**: Fall back to setting Status to "Planned". Note the connection issue in the Resolution Summary.
 - **Validation fails after change**: Revert the change, investigate the validation error, and fix properly. Do not suppress validation errors.
 - **Google Sheet write fails**: Report the intended status update to the user in the conversation so they can update manually.
 - **Table schema update fails**: Fall back to plain cell-range writes for data, and inform the user that the table structure may need manual adjustment.
