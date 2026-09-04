@@ -3,7 +3,7 @@
   "name": "Partner Ecosystem Essentials",
   "baselinePracticeName": "Red Hat Sales Essentials",
   "description": "A minimal baseline practice for engaging with partner ecosystems, covering partner lifecycle management, value realization, capability building, trust cultivation, and governance.",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "authors": [
     "Ed Seymour"
   ],
@@ -1401,5 +1401,31 @@
       "fontWeight": "900"
     }
   ],
-  "schemaVersion": "2.0.0"
+  "schemaVersion": "2.5.0",
+  "patternGroups": [
+    {
+      "name": "Core Lifecycles",
+      "description": "Primary end-to-end lifecycle patterns coordinating the main value stream from initiation through completion or retirement.",
+      "entries": [],
+      "seq": 0
+    },
+    {
+      "name": "Maturity Progressions",
+      "description": "Patterns tracking incremental capability growth along a maturity axis, measuring depth of practice adoption rather than progress through lifecycle stages.",
+      "entries": [],
+      "seq": 1
+    },
+    {
+      "name": "Strategic & Cross-Cutting Journeys",
+      "description": "Patterns coordinating multiple concerns across engagements, accounts, or customer segments that span practice boundaries.",
+      "entries": [],
+      "seq": 2
+    },
+    {
+      "name": "Governance & Compliance",
+      "description": "Patterns coordinating oversight, risk management, policy enforcement, and stakeholder accountability across the engagement lifecycle.",
+      "entries": [],
+      "seq": 3
+    }
+  ]
 }

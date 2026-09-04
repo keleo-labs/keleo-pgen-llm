@@ -29,8 +29,8 @@
 This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).
 
 **Key Distinction:**
-- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
-- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns
+- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces, canonical patternGroups)
+- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns (adopting baseline patternGroups)
 
 ### Alpha Instances in Baselines
 
@@ -345,6 +345,8 @@ Fix any FAIL assertions before proceeding to Phase 2.
 
 11. **Define Assets** (icons, diagrams, templates)
 
+12. **Define Canonical PatternGroups** (3-5 template categories with empty entries for extension practices to adopt)
+
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
 **Phase 2 Validation:**
@@ -399,6 +401,7 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - **activitySpaces** - With contributesTo and requiredCompetencies
    - **narratives** - With narrative contexts
    - **citations** - Using Citation Standard
+   - **patternGroups** - Canonical categories with empty entries (extension practices populate)
    - **assets** - Icons, diagrams, templates
 
 5. **Validate Cross-References**:
@@ -513,6 +516,7 @@ Validates that baseline JSON has correct shape, required top-level sections, and
 - When: Phase 3 produces the JSON
 - Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
 - And: These elements belong in extension practices, not baselines
+- And: patternGroups ARE allowed but with empty entries arrays (canonical categories for extensions to adopt)
 
 ### Scenario: Focus count within range (@rule:structural-204)
 - Given: A baseline defines focus areas

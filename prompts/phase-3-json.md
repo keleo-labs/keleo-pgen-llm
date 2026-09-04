@@ -857,6 +857,8 @@ If the mapping guide defines pattern groups (Step 8.5), add a `patternGroups` ar
 
 **CRITICAL:**
 
+- When adopting baseline-defined groups, use the **exact baseline group name** — this is the merge key for cross-practice composition
+- Only include groups that have patterns assigned — do NOT emit empty baseline groups in extension practices (the baseline already defines them)
 - `patternName` must exactly match a defined `Pattern.name`
 - `seq` on entries provides sort order within the group (0-based)
 - `seq` on the group provides sort order among groups (0-based); alphabetical when absent

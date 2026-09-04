@@ -469,6 +469,7 @@ Each subagent receives:
 - The schema (`deps/language.schema.json`) — relevant `$defs` only
 - The effective context for cross-reference names (alpha names, activity space names, etc.)
 - Instruction to output ONLY its assigned section(s) as a standalone JSON object
+- **Subagent C (patternGroups):** Must load the baseline's `patternGroups` and adopt existing baseline group names. Novel groups require justification. Use exact baseline group names — they are the merge key for cross-practice composition.
 
 Example subagent output for Subagent A:
 ```json

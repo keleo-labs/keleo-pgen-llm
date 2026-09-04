@@ -559,6 +559,42 @@ When an element (alpha, activitySpace, etc.) references an asset:
 
 **Add to JSON skeleton.**
 
+### Step 10.5: Build PatternGroups Array
+
+**Transform mapping guide PatternGroups to JSON structure.**
+
+Baselines define canonical pattern group categories with empty entries arrays. Extension practices adopt these groups and populate them with their patterns.
+
+From mapping guide PatternGroups section:
+
+```json
+{
+  "patternGroups": [
+    {
+      "name": "Core Lifecycles",
+      "description": "Primary lifecycle patterns from each practice — the main journey through each value stream",
+      "entries": [],
+      "seq": 0
+    },
+    {
+      "name": "Maturity Progressions",
+      "description": "Patterns tracking growth along a maturity axis within each practice area",
+      "entries": [],
+      "seq": 1
+    }
+  ]
+}
+```
+
+**Quality Checks:**
+- ✓ 3-5 groups (from mapping guide)
+- ✓ Each group has name, description, and `entries: []`
+- ✓ Entries arrays are empty (baselines define categories, extensions populate)
+- ✓ Optional `seq` for group ordering
+- ✓ Optional narratives on groups (same structure as alpha narratives)
+
+**Add to JSON skeleton.**
+
 ### Step 11: Build PracticeElementAliases Array (if applicable)
 
 **If this baseline adapts a parent baseline's terminology for a domain**, add aliases that map canonical element names to domain-appropriate terms. Aliases are presentation-layer substitutions only — all structural references in JSON must use canonical names.
@@ -648,6 +684,7 @@ Before writing the final JSON file, validate:
   "competencies": [...],
   "narratives": [...],
   "citations": [...],
+  "patternGroups": [...],
   "assets": [...]
 }
 ```

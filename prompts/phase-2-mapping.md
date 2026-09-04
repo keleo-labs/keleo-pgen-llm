@@ -1485,14 +1485,48 @@ Pattern Views: [map Phase 1 views]
 - Method will compose 10+ patterns from multiple practices
 - Single-pattern practices generally do NOT need groups
 
-**Grouping strategy** — group by coordination intent that cuts across practices, NOT by source practice (redundant with `sourcePracticeName`):
+**Step 8.5a: Load Baseline PatternGroups**
+
+Before creating any groups, check the baseline practice for existing `patternGroups`. Baselines define canonical groups with empty entries as navigational templates. List the available baseline groups:
+
+```
+Baseline PatternGroups:
+  - [Group Name]: [baseline description]
+  - [Group Name]: [baseline description]
+  ...
+```
+
+If the baseline defines no patternGroups, proceed to Step 8.5b.
+
+**Step 8.5b: Assign Patterns to Baseline Groups**
+
+For each pattern defined in Step 8, assign it to the best-fitting baseline group. The baseline author has identified the coordination categories most useful to consumers — prefer these over inventing new ones.
+
+```
+Pattern Group Assignments:
+  [Baseline Group Name]:
+    - Pattern Name: [exact pattern name]
+      Seq: [0-based sort order within group]
+    - Pattern Name: [another pattern name]
+      Seq: [1]
+  [Baseline Group Name]:
+    - Pattern Name: [exact pattern name]
+      Seq: [0]
+```
+
+**Step 8.5c: Novel Groups (Only When Justified)**
+
+If a pattern represents a coordination concern genuinely absent from all baseline groups, propose a novel group. Document the rationale — why no baseline group fits.
+
+Grouping strategies for novel groups — group by coordination intent that cuts across practices, NOT by source practice (redundant with `sourcePracticeName`):
 - **By lifecycle archetype** (most common): core lifecycles, optimisation cycles, maturity progressions
 - **By concern area**: technical vs governance vs operational patterns
 - **By engagement phase**: getting started vs ongoing execution vs scaling
 
-**Pattern Group Structure:**
+**Novel Pattern Group Structure:**
 ```
-Pattern Group Name: [descriptive category — e.g., "Core Lifecycles", NOT practice names]
+Novel Pattern Group Name: [descriptive category — e.g., "Governance & Compliance"]
+Rationale: [why no baseline group fits this coordination concern]
 Description: [single sentence explaining what patterns in this group have in common]
 Seq: [optional — 0-based presentation order among groups]
 Narrative: [optional — include when the source material provides rationale for why
@@ -1503,16 +1537,14 @@ Narrative: [optional — include when the source material provides rationale for
 Entries:
   - Pattern Name: [exact pattern name]
     Seq: [0-based sort order within group]
-  - Pattern Name: [another pattern name]
-    Seq: [1]
 ```
 
 **Naming guidance:**
 - **Good**: "Core Lifecycles", "Maturity Progressions", "Governance & Compliance"
 - **Bad**: "Plant Biology Patterns" (restates source practice name)
 
-**Cross-practice groups:**
-When multiple practices define a PatternGroup with the same canonical name, they merge during method composition (entries merge by `patternName`, overlay seq takes precedence). Use this for intentional category sharing across practices.
+**Cross-practice merging:**
+Baseline-defined groups are the canonical merge targets. When multiple practices adopt the same baseline group name, their entries merge into a single group during method composition (entries merge by `patternName`, overlay seq takes precedence). Novel groups also merge by canonical name if multiple practices share one, but prefer baseline groups as the shared vocabulary.
 
 **A pattern should appear in at most one group.** Ungrouped patterns remain valid.
 

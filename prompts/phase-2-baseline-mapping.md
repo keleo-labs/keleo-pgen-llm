@@ -561,6 +561,52 @@ Total: [X assets]
 [Asset sections as described above]
 ```
 
+### Step 10.5: Define Canonical PatternGroups
+
+**Identify 3-5 navigational categories that extension practices will use to organise their patterns.**
+
+Baselines define patternGroups as **template categories with empty entries**. Extension practices adopt these groups by defining patternGroups with the same canonical name and populating entries with their patterns. During method composition, groups with matching names merge (see semantics.md §9.3).
+
+**Grouping Strategies** (choose the most natural fit for the domain):
+
+- **By lifecycle archetype** — Core Lifecycles, Optimisation Cycles, Maturity Progressions
+- **By concern area** — Technical Patterns, Governance Patterns, Operational Patterns
+- **By engagement phase** — Getting Started, Ongoing Execution, Scaling & Optimisation
+
+**PatternGroup Structure:**
+
+```markdown
+### PatternGroup: [Category Name]
+- **Description**: [What patterns in this group share — the coordination intent]
+- **Seq**: [0-based ordering among groups]
+- **Entries**: [] (empty — extension practices populate)
+- **Narrative**: [optional — explain the category's purpose and when practitioners should look here]
+  - Narrative Type: [e.g., "Practice Intent"]
+  - Element Mapping:
+    - [Element]: [How this group category maps]
+```
+
+**Naming Guidance:**
+
+- **Good**: "Core Lifecycles", "Maturity Progressions", "Governance & Compliance"
+- **Bad**: "Platform Patterns", "Technology Patterns" (restates focus or alpha names)
+
+**Quality Checks:**
+- ✓ 3-5 groups defined (enough to cover expected extension patterns)
+- ✓ Group names describe coordination intent, not source practice
+- ✓ All entries arrays are empty (baselines define categories, not contents)
+- ✓ Seq values assigned for ordering
+
+**Output Format:**
+
+```markdown
+## PatternGroups
+
+Total: [X canonical groups]
+
+[PatternGroup sections as described above]
+```
+
 ### Step 11: Final Output Structure
 
 **Write to: `baselines/<name>/02-mapping-guide.md`**
@@ -641,6 +687,12 @@ Total: [X assets]
 
 ---
 
+## PatternGroups
+
+[Complete PatternGroups section from Step 10.5]
+
+---
+
 ## Mapping Statistics
 
 - **Focuses**: [X]
@@ -648,6 +700,7 @@ Total: [X assets]
 - **ActivitySpaces**: [X]
 - **Competencies**: [X]
 - **NarrativeTypes**: [X]
+- **PatternGroups**: [X] (canonical categories)
 - **Narratives**: [X]
 - **Citations**: [X]
 - **Assets**: [X]
