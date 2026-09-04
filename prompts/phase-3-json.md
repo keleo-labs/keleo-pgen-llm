@@ -441,7 +441,7 @@ Add alphas array:
   - Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`) — required by schema
   - Optional `description` field explains why the relationship exists
   - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
-- Checklist items are objects {name, description, seq}, NOT strings. Every item must be positive and additive — describes an achievement to reach, never the absence or lack of something (e.g., "Key metrics defined" not "Metrics absent")
+- Checklist items are objects {name, description, seq}, NOT strings. Every item must be positive and additive — describes an achievement to reach, never the absence or lack of something (e.g., "Key metrics defined" not "Metrics absent"). Every item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "All requirements met", "Minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular and must be removed.
 - evidencedBy is optional array of WorkProductContribution
 - **Redeclared alpha state handling (CRITICAL):**
   - Include ALL states from the baseline/parent practice definition — never subset to only enriched states
@@ -1147,15 +1147,20 @@ Once validation passes, verify:
 ]
 ```
 
-### 2. Competency Level Reference
+### 2. Meta-Checklist Items
+❌ Wrong: `"name": "Minimum requirements met", "description": "All thirteen minimum documentation requirements are met"`
+❌ Wrong: `"name": "Standards achieved", "description": "All mandatory criteria satisfied"`
+✅ Right: Each checklist item independently describes a specific, observable achievement. The checklist IS the list of requirements — items that reference or count other items are circular and add no value.
+
+### 3. Competency Level Reference
 ❌ Wrong: `{"competencyName": "Engineering", "level": 3}`
 ✅ Right: `{"competencyName": "Engineering", "competencyLevelName": "Advanced"}`
 
-### 3. Persona Property
+### 4. Persona Property
 ❌ Wrong: `"requiredCompetencies": [...]`
 ✅ Right: `"competencies": [...]`
 
-### 4. Activity Competencies
+### 5. Activity Competencies
 ❌ Wrong: Only `requiredCompetencies` OR only `recommendedCompetencyLevels`
 ✅ Right: BOTH properties present:
 ```json
@@ -1167,11 +1172,11 @@ Once validation passes, verify:
 }
 ```
 
-### 5. PatternView Properties
+### 6. PatternView Properties
 ❌ Wrong: `"alphas": [...]` or `"views": [...]` or `"workProducts": [...]`
 ✅ Right: `"alphaStates": [...]` and `"patternViews": [...]`
 
-### 6. LevelOfDetail.contributesTo
+### 7. LevelOfDetail.contributesTo
 ❌ Wrong: Missing contributesTo
 ✅ Right:
 ```json
@@ -1185,7 +1190,7 @@ Once validation passes, verify:
 }
 ```
 
-### 7. Floating Alphas
+### 8. Floating Alphas
 ❌ Wrong: New alpha without `contributesTo` or `mapsTo`
 ✅ Right (Specialization):
 ```json
@@ -1215,7 +1220,7 @@ Once validation passes, verify:
 }
 ```
 
-### 8. Tags Structure
+### 9. Tags Structure
 ❌ Wrong: `"tags": ["tag1", "tag2"]` OR `"domainTags": [...], "lifecycleTags": [...]` (flat)
 ✅ Right:
 ```json
@@ -1226,17 +1231,17 @@ Once validation passes, verify:
 }
 ```
 
-### 9. Citation Narratives
+### 10. Citation Narratives
 ❌ Wrong: Citations with narratives property
 ✅ Right: Citations with ONLY metadata (no narratives)
 
-### 10. Work Product LOD Names
+### 11. Work Product LOD Names
 ❌ Wrong: `"name": "Level 1: Basic"` (generic numbered prefix)
 ❌ Wrong: `"name": "Work Completed"`, `"name": "Definition of Done Met"`, `"name": "Goal Stated"` (lifecycle/temporal stages — describe where the concern is, not what the document looks like)
 ❌ Wrong: `"name": "Continuously Updated"`, `"name": "Evolved and Optimized"` (process states, not content depth)
 ✅ Right: `"name": "Completion Record"`, `"name": "Quality-Verified Release"`, `"name": "Brief Objective"` (describe document content at that fidelity level)
 
-### 11. Gherkin Structures (background, test, examples)
+### 12. Gherkin Structures (background, test, examples)
 ❌ Wrong: `background` as a string or array
 ✅ Right: `background` is an object with optional `given`, `alphaStates`, `workProductLevels` arrays:
 ```json
@@ -1275,7 +1280,7 @@ Once validation passes, verify:
 ]
 ```
 
-### 12. Activity Properties
+### 13. Activity Properties
 ❌ Wrong: Activities with `seq`, `citationNames`, or `involves` as object array
 ✅ Right:
 - Activities do NOT have `seq` (unlike checklists)
@@ -1293,11 +1298,11 @@ Once validation passes, verify:
 }
 ```
 
-### 13. Work Product Properties
+### 14. Work Product Properties
 ❌ Wrong: Work products with `alphaName` or `focusName`
 ✅ Right: Work products link to alpha states via `contributesTo` on their LODs, not top-level properties
 
-### 13b. Work Product `partOf` and `mapsTo`
+### 14b. Work Product `partOf` and `mapsTo`
 ❌ Wrong: `"partOf": "Same Work Product Name"` (self-reference)
 ❌ Wrong: Circular chain (A partOf B, B partOf A)
 ❌ Wrong: Work product with both `partOf` and `mapsTo` (mutually exclusive)
@@ -1306,11 +1311,11 @@ Once validation passes, verify:
 ✅ Right: `"partOf": "Parent Work Product Name"` — optional string referencing another WorkProduct.name in the same practice, a dependency, or the baseline. Use for containment (component within a larger deliverable), not for "contributes evidence to" relationships.
 ✅ Right: `"mapsTo": "Architecture"` with matching LOD progression (e.g., Outlined → Detailed → Validated) — use for IS-A variant mapping. Variant has domain-specific checklists but same LOD structure as parent. On merge, added to parent's `variants` array.
 
-### 14. Work Product Instances
+### 15. Work Product Instances
 ❌ Wrong: `"instanceName": "Production Platform"`
 ✅ Right: `"name": "Production Platform"` — instances use `name`, not `instanceName`
 
-### 15. Pattern View Alpha State Deduplication
+### 16. Pattern View Alpha State Deduplication
 ❌ Wrong: Same alpha appearing multiple times in a single PatternView's `alphaStates`
 ✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate
 

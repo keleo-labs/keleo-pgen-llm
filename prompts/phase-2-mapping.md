@@ -434,6 +434,9 @@ States: [EXACT baseline states with ADDED checklists]
       Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
       Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
     Checklists: [baseline checklists + NEW practice-specific checklists from Phase 1 criteria]
+      Rules:
+        - Positive/additive items only — what to achieve, never absence of something
+        - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
       Each checklist item may include:
         Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
           Given: [preconditions for this checklist item]
@@ -460,6 +463,9 @@ States: [NEW states from Phase 1 progressive states]
       Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
       Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
     Checklists: [from Phase 1 criteria]
+      Rules:
+        - Positive/additive items only — what to achieve, never absence of something
+        - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
       Each checklist item may include:
         Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
         Examples: [optional - array of concrete scenario Tests]
@@ -480,6 +486,9 @@ States: [EXACT SAME states as the parent alpha — names and sequence MUST match
     contributesToState: [optional — takes equivalence semantics in mapsTo context]
     Background: [variant-specific prerequisites]
     Checklists: [domain-specific checklists for this variant]
+      Rules:
+        - Positive/additive items only — what to achieve, never absence of something
+        - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
       Each checklist item may include:
         Test: [optional - variant-specific verification]
         Examples: [optional - variant-specific scenarios]
@@ -921,7 +930,7 @@ Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT 
       Given: [preconditions that should hold when LOD is reached]
       Alpha States: [prerequisite alpha/state pairs]
       Work Product Levels: [prerequisite work product/LOD pairs]
-    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum; positive/additive items only — what to achieve, never absence of something]
+    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum; positive/additive items only — what to achieve, never absence of something; each item must be independently assessable — no meta-items that summarise or reference other checklist items]
     Contributes To: [AlphaContribution objects - which alpha/state this LOD proves]
       - Alpha Name: [alpha]
         State Name: [state]
