@@ -25,7 +25,7 @@ ARRAY_SECTIONS = [
     "alphas", "workProducts", "activities", "patterns", "citations",
     "activitySpaces", "competencies", "narrativeTypes", "assets",
     "personas", "personaGroups", "practiceElementAliases", "narratives",
-    "focuses", "references",
+    "focuses", "references", "outcomes",
 ]
 
 SCALAR_FIELDS = [

@@ -54,7 +54,7 @@ MERGEABLE_ARRAYS = [
     "narrativeTypes", "narratives", "citations", "assets",
     "workProducts", "patterns", "personas", "personaGroups",
     "alphaInstances", "workProductInstances",
-    "patternGroups", "acknowledgements", "references",
+    "patternGroups", "outcomes", "acknowledgements", "references",
 ]
 
 

@@ -155,6 +155,7 @@ The system is built around the **Platform Adoption Essentials** baseline framewo
 - **Patterns**: Lifecycle orchestrations coordinating activities
 - **Personas & Teams**: Roles with competency requirements
 - **Narratives**: Structured storytelling frameworks (STAR, StoryBrand, etc.)
+- **Outcomes**: Measurable value propositions (1-3 per practice) with optional metric/objective contribution chains
 
 ### Four-Perspective Analysis
 
@@ -279,6 +280,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **WorkProducts** | Defined in practice | NOT PRESENT |
 | **WorkProduct partOf / mapsTo** | Optional on WPs (mutually exclusive) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
+| **Outcomes** | 1-3 per practice with measureDescription; optional metricContributions/objectiveContributions | Optional high-level value propositions (measureDescription only) |
 | **PatternGroups** | Optional (adopt baseline groups, add patterns; novel groups need justification) | Optional (define canonical groups with empty entries as templates for extensions) |
 | **Activity ledBy** | Optional (single Persona.name accountable for leading) | Optional (on ActivitySpace) |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |

@@ -882,6 +882,7 @@ python3 utils/package-keleo.py \
 | 9 | Add/update references | Mode 3 | Map to alpha+state, require ≥1 link per reference |
 | 10 | Add/convert WP partOf/mapsTo | Targeted transform | `transform-workproducts.py --spec '[...]' --fix` |
 | 11 | Batch WP partOf→mapsTo | Targeted transform | `transform-workproducts.py` — set `setMapsTo`, `lodMap`, `rename` |
+| 12 | Add/update outcomes | Remap (Mode 2) | Add 1-3 outcomes with measureDescription + metricContributions or objectiveContributions |
 
 **Scenario 8 details** (packaging-only — most common standalone use):
 - Embedded method: `package-keleo.py --from-embedded <method>.json --baseline <baseline>.json -o bundles/<name>.keleo --verify`
@@ -900,6 +901,17 @@ When assessment flags `checklist-polarity` issues, rewrite items to be positive 
 
 ### Asset Coverage
 When assessment flags `asset-coverage` gaps, add Font Awesome 6 Free icons (`fontWeight: "900"`, naming: `<kebab-case>-icon`). Every NarrativeType and Focus needs an icon. See generate-method SKILL.md Assets section for icon suggestions and JSON structure.
+
+### Outcomes
+When assessment flags `outcomes` warnings (missing outcomes) or `outcome-refs` errors (broken cross-references):
+- Add 1-3 outcomes with `measureDescription` (always required)
+- Each outcome should have `metricContributions` or `objectiveContributions` (never neither)
+- Bias toward at least one objective-based outcome tied to the main lifecycle pattern (broadest alpha coverage)
+- Validate `alphaName`/`stateName` references in metricContributions resolve to defined alphas/states
+- Optional `workProductName` on a metricContribution must match a WorkProduct.name; declare that `metricName` on the work product's `expectedMetrics`
+- Every objectiveContribution MUST include `patternName` (scopes view references to that pattern)
+- Validate `recognizedAtPatternViewName` in objectiveContributions resolves to a view within the named pattern
+- See generate-method SKILL.md @rule:outcome-001 through @rule:outcome-004
 
 ---
 

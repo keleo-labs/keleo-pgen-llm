@@ -58,21 +58,24 @@ Take comprehensive notes organized by the four perspectives.
 
 ### Step 3: Identify Outcomes
 
-**What are the primary objectives?**
+**What value does the methodology deliver, and how is that value measured?**
 
-For the entire source methodology:
-- What outcomes does it promise?
-- What problems does it solve?
-- Who benefits and how?
-- What value does successful adoption deliver?
+For the entire source methodology, identify 3-8 outcome candidates. Each outcome describes a measurable value proposition — the "so what" of adopting this methodology.
 
-Document 3-8 primary outcomes, organized by perspective (Business, Technology, People, Process).
+For each outcome, document:
+- **Name** (2-5 words, value-oriented — e.g., "Reduced Operational Risk", "Accelerated Time to Market")
+- **Description** (single sentence: what value this outcome delivers to adopters)
+- **How Value is Measured** (1-2 sentences: what metric, KPI, or observable demonstrates success)
+- **Related Concerns** (which Step 4 concerns contribute to achieving this outcome)
+- **Perspective** (Business / Technology / People / Process)
+
+Phase 2 will distill these candidates to 1-3 structured Outcomes per practice, each with a `measureDescription` and optionally `metricContributions` or `objectiveContributions` linking to alphas and work products.
 
 ### Step 4: Identify Concerns (Areas of Attention)
 
 **What must be addressed to achieve the outcomes?**
 
-For each outcome, identify the major concerns or areas requiring attention:
+For each outcome identified in Step 3, identify the major concerns or areas requiring attention:
 - What needs to be built, configured, or established? (Technology)
 - What needs to be organized, aligned, or decided? (Business)
 - What skills, teams, or changes are needed? (People)
@@ -381,18 +384,15 @@ Create a markdown file: `practices/<practice-name>/01-analysis-report.md`
 - **Analyst**: [your name]
 
 ## 1. Outcomes
-[Business Perspective]
-- Outcome 1...
-- Outcome 2...
 
-[Technology Perspective]
-- Outcome 3...
+### 1.1 [Outcome Name]
+**Description:** Single sentence describing the value delivered
+**How Value is Measured:** What metric, KPI, or observable demonstrates success
+**Related Concerns:** Concern A, Concern B (from Section 2)
+**Perspective:** Business | Technology | People | Process
 
-[People Perspective]
-- Outcome 4...
-
-[Process Perspective]
-- Outcome 5...
+### 1.2 [Next Outcome Name]
+...
 
 ## 2. Concerns (Areas of Attention)
 

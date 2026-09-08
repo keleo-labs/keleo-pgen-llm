@@ -112,6 +112,20 @@ def extract_citations(data):
     return citations
 
 
+def extract_outcomes(data):
+    return [
+        {
+            "name": o.get("name", ""),
+            "description": o.get("description", ""),
+            "measureDescription": o.get("measureDescription", ""),
+            "metricContributions": o.get("metricContributions", []),
+            "objectiveContributions": o.get("objectiveContributions", []),
+        }
+        for o in data.get("outcomes", [])
+        if isinstance(o, dict)
+    ]
+
+
 def generate_markdown(data):
     meta = extract_metadata(data)
     alphas = extract_alphas(data)
@@ -120,6 +134,7 @@ def generate_markdown(data):
     personas = extract_personas(data)
     patterns = extract_patterns(data)
     citations = extract_citations(data)
+    outcomes = extract_outcomes(data)
 
     lines = [f"# Analysis Report: {meta['name']}", ""]
     lines.append(f"> Extracted from existing {meta['kind']} JSON")
@@ -127,8 +142,30 @@ def generate_markdown(data):
 
     lines.append("## 1. Outcomes")
     lines.append("")
-    lines.append(meta["description"])
-    lines.append("")
+    if outcomes:
+        for i, o in enumerate(outcomes, 1):
+            lines.append(f"### 1.{i} {o['name']}")
+            lines.append(f"**Description:** {o['description']}")
+            if o.get("measureDescription"):
+                lines.append(f"**How Value is Measured:** {o['measureDescription']}")
+            if o.get("metricContributions"):
+                mc_alphas = ", ".join(mc.get("alphaName", "") for mc in o["metricContributions"])
+                lines.append(f"**Metric Contributions:** {mc_alphas}")
+            if o.get("objectiveContributions"):
+                oc_parts = []
+                for oc in o["objectiveContributions"]:
+                    pn = oc.get("patternName", "")
+                    vn = oc.get("recognizedAtPatternViewName", "")
+                    if pn and vn:
+                        oc_parts.append(f"{pn} → {vn}")
+                    elif pn:
+                        oc_parts.append(pn)
+                if oc_parts:
+                    lines.append(f"**Objective Contributions:** {', '.join(oc_parts)}")
+            lines.append("")
+    else:
+        lines.append(meta["description"])
+        lines.append("")
 
     lines.append("## 2. Concerns")
     lines.append("")
@@ -262,7 +299,7 @@ def main():
     if data.get("kind") == "method" and "practices" in data:
         practices = data.get("practices", [])
         merged = dict(data)
-        for key in ["alphas", "workProducts", "activities", "personas", "patterns", "citations", "assets"]:
+        for key in ["alphas", "workProducts", "activities", "personas", "patterns", "citations", "assets", "outcomes"]:
             merged_list = list(data.get(key, []))
             for p in practices:
                 merged_list.extend(p.get(key, []))
@@ -281,6 +318,7 @@ def main():
             "personas": len(extract_personas(data)),
             "patterns": len(extract_patterns(data)),
             "citations": len(extract_citations(data)),
+            "outcomes": len(extract_outcomes(data)),
         }, indent=2))
     else:
         summary = {
@@ -291,6 +329,7 @@ def main():
             "personas": extract_personas(data),
             "patterns": extract_patterns(data),
             "citations": extract_citations(data),
+            "outcomes": extract_outcomes(data),
         }
         print(json.dumps(summary, indent=2))
 

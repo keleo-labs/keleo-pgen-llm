@@ -1549,6 +1549,143 @@ def check_keyword_count(data, kind):
     return issues
 
 
+def check_outcomes(data, kind):
+    """Check that practices have 1-3 outcomes with measureDescription and valid contributions."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    sources = [data]
+    if kind == "method":
+        sources = data.get("practices", [data])
+
+    all_alpha_names = {a.get("name") for a in data.get("alphas", []) if a.get("name")}
+    all_alpha_states = {}
+    for a in data.get("alphas", []):
+        aname = a.get("name")
+        if aname:
+            all_alpha_states[aname] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+    all_pattern_names = set()
+    pattern_views_by_pattern = {}
+    for p in data.get("patterns", []):
+        pname = p.get("name", "")
+        if pname:
+            all_pattern_names.add(pname)
+            pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+            for a in source.get("alphas", []):
+                aname = a.get("name")
+                if aname:
+                    all_alpha_names.add(aname)
+                    all_alpha_states[aname] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+            for p in source.get("patterns", []):
+                pname = p.get("name", "")
+                if pname:
+                    all_pattern_names.add(pname)
+                    pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
+
+        outcomes = source.get("outcomes", [])
+        if not outcomes:
+            issues.append({
+                "severity": "warning",
+                "category": "outcomes",
+                "path": f"{pfx}outcomes",
+                "message": "No outcomes — practices should have 1-3 outcomes describing value delivery",
+                "autoFixable": False,
+            })
+            continue
+
+        if len(outcomes) > 5:
+            issues.append({
+                "severity": "warning",
+                "category": "outcomes",
+                "path": f"{pfx}outcomes",
+                "message": f"{len(outcomes)} outcomes (expected 1-3, max 5)",
+                "autoFixable": False,
+            })
+
+        has_objective = False
+        for idx, o in enumerate(outcomes):
+            oname = o.get("name", f"<index {idx}>")
+            opath = f"{pfx}outcomes[{idx}]"
+
+            if not o.get("measureDescription"):
+                issues.append({
+                    "severity": "warning",
+                    "category": "outcomes",
+                    "path": f"{opath}.measureDescription",
+                    "message": f"Outcome '{oname}' missing measureDescription",
+                    "autoFixable": False,
+                })
+
+            if not o.get("metricContributions") and not o.get("objectiveContributions"):
+                issues.append({
+                    "severity": "error",
+                    "category": "outcome-refs",
+                    "path": opath,
+                    "message": f"Outcome '{oname}' has neither metricContributions nor objectiveContributions",
+                    "autoFixable": False,
+                })
+
+            for mc in o.get("metricContributions", []):
+                aname = mc.get("alphaName", "")
+                if aname and aname not in all_alpha_names:
+                    issues.append({
+                        "severity": "error",
+                        "category": "outcome-refs",
+                        "path": f"{opath}.metricContributions",
+                        "message": f"Outcome '{oname}' references unknown alpha '{aname}'",
+                        "autoFixable": False,
+                    })
+
+            for oc_idx, oc in enumerate(o.get("objectiveContributions", [])):
+                has_objective = True
+                oc_path = f"{opath}.objectiveContributions[{oc_idx}]"
+                pname = oc.get("patternName", "")
+                if not pname:
+                    issues.append({
+                        "severity": "error",
+                        "category": "outcome-refs",
+                        "path": f"{oc_path}.patternName",
+                        "message": f"Outcome '{oname}' objectiveContribution missing required patternName",
+                        "autoFixable": False,
+                    })
+                elif pname not in all_pattern_names:
+                    issues.append({
+                        "severity": "error",
+                        "category": "outcome-refs",
+                        "path": f"{oc_path}.patternName",
+                        "message": f"Outcome '{oname}' references unknown pattern '{pname}'",
+                        "autoFixable": False,
+                    })
+                else:
+                    scoped_views = pattern_views_by_pattern.get(pname, set())
+                    vname = oc.get("recognizedAtPatternViewName", "")
+                    if vname and vname not in scoped_views:
+                        issues.append({
+                            "severity": "error",
+                            "category": "outcome-refs",
+                            "path": f"{oc_path}.recognizedAtPatternViewName",
+                            "message": f"Outcome '{oname}' references view '{vname}' not found in pattern '{pname}'",
+                            "autoFixable": False,
+                        })
+
+        if all_pattern_names and not has_objective:
+            issues.append({
+                "severity": "warning",
+                "category": "outcomes",
+                "path": f"{pfx}outcomes",
+                "message": "Practice has lifecycle patterns but no outcome with objectiveContributions",
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_evidence_coverage(data, kind, baseline_alpha_names=None):
     """Check that alpha states are covered by at least one LOD contributesTo.
 
@@ -3538,6 +3675,7 @@ def main():
         all_issues.extend(check_evidence_coverage(data, kind))
 
     all_issues.extend(check_references(data, kind, baseline_data))
+    all_issues.extend(check_outcomes(data, kind))
 
     if kind == "practiceBaseline" and args.parent:
         parent_merged = None

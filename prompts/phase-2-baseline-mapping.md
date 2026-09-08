@@ -16,6 +16,7 @@ Transform the Phase 1.5 distilled essentials into a mapping specification that:
 - Defines NarrativeTypes with narrative elements
 - Creates comprehensive narratives for baseline elements
 - Maps citations and assets
+- Maps distilled outcomes to baseline Outcomes with framework-level measurement
 - Produces a complete mapping guide for JSON generation (Phase 3)
 
 ## Resources Available
@@ -607,6 +608,44 @@ Total: [X canonical groups]
 [PatternGroup sections as described above]
 ```
 
+### Step 10.7: Map Baseline Outcomes
+
+Transform Phase 1.5 distilled baseline outcomes into baseline Outcome objects.
+
+Baseline outcomes are simpler than extension practice outcomes — they typically have only `name`, `description`, and `measureDescription` (no metricContributions or objectiveContributions, since baselines lack work product instances and patterns).
+
+For each Phase 1.5 baseline outcome:
+- **name**: The distilled outcome name (2-5 words, framework-level)
+- **description**: Value proposition (single sentence)
+- **measureDescription**: How value delivery is tracked at the framework level
+
+Baseline outcomes serve as templates — extension practices will specialize them with specific metrics and contribution mechanisms.
+
+Document in the mapping guide:
+
+```markdown
+### Baseline Outcome Mappings
+
+#### Outcome: [Name]
+- **Description:** [Value proposition]
+- **Measure Description:** [Framework-level measurement approach]
+```
+
+**Quality Checks:**
+- 1-3 outcomes (warning if 0, max 5)
+- Every outcome has measureDescription
+- Names are value-oriented (2-5 words)
+
+**Output Format:**
+
+```markdown
+## Outcomes
+
+Total: [X outcomes]
+
+[Outcome sections as described above]
+```
+
 ### Step 11: Final Output Structure
 
 **Write to: `baselines/<name>/02-mapping-guide.md`**
@@ -693,6 +732,12 @@ Total: [X canonical groups]
 
 ---
 
+## Outcomes
+
+[Complete Outcomes section from Step 10.7]
+
+---
+
 ## Mapping Statistics
 
 - **Focuses**: [X]
@@ -701,6 +746,7 @@ Total: [X canonical groups]
 - **Competencies**: [X]
 - **NarrativeTypes**: [X]
 - **PatternGroups**: [X] (canonical categories)
+- **Outcomes**: [X]
 - **Narratives**: [X]
 - **Citations**: [X]
 - **Assets**: [X]
@@ -743,4 +789,5 @@ Phase 3 will transform this mapping into schema-compliant JSON structure.
 ✅ All narrative types have sequential elements with howToUse
 ✅ Baseline-level narrative present
 ✅ All cross-references valid
+✅ 1-3 baseline outcomes mapped with measureDescription
 ✅ Output file: `baselines/<name>/02-mapping-guide.md` (~40-60K words)

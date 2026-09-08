@@ -52,6 +52,7 @@ PHASE_2_REQUIRED_SECTIONS = [
     (["Activity Mappings", "Activities"], "activities"),
     (["Pattern Mappings", "Patterns"], "patterns"),
     (["Citations"], "citations"),
+    (["Outcome Mappings", "Outcomes"], "outcomes"),
 ]
 
 KNOWN_COMPETENCY_LEVELS = {

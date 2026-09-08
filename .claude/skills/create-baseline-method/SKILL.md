@@ -211,7 +211,7 @@ These documents must be readable for all phases:
    - Technical documentation
 
 3. **Extract Elements** (using four-perspective framework):
-   - **Outcomes** (3-8 primary objectives)
+   - **Structured Outcomes** (3-8 candidates with Name, Description, Value Measurement, Related Concerns)
    - **Concerns** (5-15+ areas of attention) - extract comprehensively
    - **Progressive States** (5-7 maturity levels per concern)
    - **Work Products** (artifacts with 3-5 levels of detail)
@@ -273,7 +273,13 @@ Fix any FAIL assertions before proceeding.
    - Extract skill categories (not role titles)
    - Define 5-level progressions: Basic → Applies → Masters → Adapts → Innovating
 
-6. **Identify Narrative Frameworks** (3-5 storytelling structures):
+6. **Distill Baseline Outcomes** (1-3 universal value propositions with measurement approach):
+   - Reduce Phase 1's 3-8 outcome candidates to 1-3 foundational outcomes
+   - Each outcome captures a universal value proposition for the domain
+   - Define measurement approach for each outcome (how success is observed)
+   - Map outcomes to the essential concerns they depend on
+
+7. **Identify Narrative Frameworks** (3-5 storytelling structures):
    - Universal frameworks (STAR, Hero's Journey, Three-Act, ABT)
    - Domain-specific frameworks (if source suggests)
    - Define narrative elements with howToUse guidance
@@ -343,9 +349,14 @@ Fix any FAIL assertions before proceeding to Phase 2.
 
 10. **Map Acknowledgements** (optional — recognize contributors, research groups, or supporting organizations that are not published sources)
 
-11. **Define Assets** (icons, diagrams, templates)
+11. **Map Distilled Outcomes → Outcome Objects**:
+   - Each outcome from Phase 1.5 becomes an Outcome with `name`, `description`, `measureDescription`
+   - `measureDescription` explains how the outcome's achievement is observed or measured
+   - 1-3 outcomes total (universal value propositions, not practice-specific KPIs)
 
-12. **Define Canonical PatternGroups** (3-5 template categories with empty entries for extension practices to adopt)
+12. **Define Assets** (icons, diagrams, templates)
+
+13. **Define Canonical PatternGroups** (3-5 template categories with empty entries for extension practices to adopt)
 
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
@@ -401,6 +412,7 @@ Fix any FAIL assertions before proceeding to Phase 3.
    - **activitySpaces** - With contributesTo and requiredCompetencies
    - **narratives** - With narrative contexts
    - **citations** - Using Citation Standard
+   - **outcomes** - Universal value propositions with measureDescription (1-3)
    - **patternGroups** - Canonical categories with empty entries (extension practices populate)
    - **assets** - Icons, diagrams, templates
 
@@ -522,6 +534,12 @@ Validates that baseline JSON has correct shape, required top-level sections, and
 - Given: A baseline defines focus areas
 - When: Phase 3 generates the JSON
 - Then: The focuses array contains 2-4 focus definitions
+
+### Scenario: Baseline outcomes structural integrity (@rule:structural-207)
+- Given: A baseline practice JSON with outcomes array
+- Then: Each outcome has name and description
+- And: Each outcome has measureDescription
+- And: Outcomes count is between 1 and 3
 
 ### Scenario: Competency level count (@rule:structural-205)
 - Given: A baseline defines competencies

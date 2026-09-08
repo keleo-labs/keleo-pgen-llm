@@ -208,6 +208,35 @@ Total: [X concerns] across [Y focuses]
 [Repeat for 8-15 essential concerns]
 ```
 
+### Step 3.5: Distill Baseline Outcomes
+
+Review the Phase 1 Outcomes section and consolidate to **1-3 baseline-level outcomes** that represent the universal value propositions of this framework domain.
+
+For each baseline outcome:
+- **Name** (2-5 words, value-oriented, framework-level terminology)
+- **Description** (single sentence: what value this framework delivers)
+- **Measurement Approach** (how value delivery is tracked at the framework level — general enough for any extension practice to specialize)
+- **Related Essential Concerns** (which Step 3 essential concerns contribute to this outcome)
+- **Source Phase 1 Outcomes** (which Phase 1 outcomes were consolidated)
+
+**Quality checks:**
+- 1-3 outcomes (not one per concern — outcomes are value propositions, not activities)
+- Framework-level terminology (not vendor-specific)
+- Measurable at a general level (extension practices will add specific metrics)
+- Each outcome maps to at least one essential concern
+
+**Output Section:**
+
+```markdown
+## Baseline Outcomes (Future Outcome Templates)
+
+### [Outcome Name]
+**Description:** ...
+**Measurement Approach:** ...
+**Related Essential Concerns:** ...
+**Source Phase 1 Outcomes:** ...
+```
+
 ### Step 4: Distill Generalizable Activity Types
 
 **Activity Types are high-level execution boundaries that will become baseline ActivitySpaces.**
@@ -396,6 +425,12 @@ Before finalizing, validate the distillation:
 - [ ] Focus distribution is balanced (no single focus >50% of concerns)
 - [ ] Rationale documented for default vs custom focuses
 
+**Outcome Validation:**
+- [ ] 1-3 baseline-level outcomes distilled from Phase 1
+- [ ] Each outcome has a measurement approach
+- [ ] Terminology is framework-level (not vendor-specific)
+- [ ] Each outcome maps to at least one essential concern
+
 **Essential Concerns Validation:**
 - [ ] 8-15 essential concerns (not more, not fewer)
 - [ ] Terminology is neutral, framework-level (no vendor names)
@@ -464,6 +499,16 @@ Before finalizing, validate the distillation:
 
 ---
 
+## Baseline Outcomes (Future Outcome Templates)
+
+### [Outcome Name]
+**Description:** ...
+**Measurement Approach:** ...
+**Related Essential Concerns:** ...
+**Source Phase 1 Outcomes:** ...
+
+---
+
 ## Generalizable Activity Types (Future ActivitySpaces)
 
 [Complete Activity Types section from Step 4]
@@ -484,6 +529,8 @@ Before finalizing, validate the distillation:
 
 ## Distillation Statistics
 
+- **Phase 1 Outcomes Analyzed**: [X]
+- **Baseline Outcomes Identified**: [Y]
 - **Phase 1 Concerns Analyzed**: [X]
 - **Essential Concerns Identified**: [Y] (distillation ratio: [Y/X])
 - **Phase 1 Activities Analyzed**: [X]
@@ -501,6 +548,7 @@ This distilled essentials report serves as the PRIMARY input for Phase 2: Baseli
 
 Phase 2 will transform these distilled elements into:
 - **Focuses** array (JSON structure)
+- **Outcomes** array (from baseline outcomes with measurement approaches)
 - **Alphas** array (with relatesTo relationships from concern relationships)
 - **ActivitySpaces** array (from activity types with contributesTo mappings)
 - **Competencies** array (with 5-level competencyLevels structure)

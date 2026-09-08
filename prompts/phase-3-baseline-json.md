@@ -377,6 +377,29 @@ From mapping guide ActivitySpaces section:
 
 **Add to JSON skeleton.**
 
+### Step 7.5: Build Outcomes Array
+
+Build the `outcomes` array from the baseline mapping guide. Baseline outcomes are high-level value propositions — simpler than extension practice outcomes.
+
+```json
+"outcomes": [
+  {
+    "name": "Outcome Name",
+    "description": "Framework-level value proposition",
+    "measureDescription": "How value delivery is tracked at the framework level"
+  }
+]
+```
+
+Baseline outcomes serve as templates. Extension practices specialize them with specific `metricContributions` and `objectiveContributions`. Do NOT include contribution arrays on baseline outcomes.
+
+**Quality Checks:**
+- ✓ 1-3 outcomes (from mapping guide)
+- ✓ Each outcome has `name`, `description`, and `measureDescription`
+- ✓ No `metricContributions` or `objectiveContributions` (reserved for extension practices)
+
+**Add to JSON skeleton.**
+
 ### Step 8: Build Baseline-Level Narratives
 
 **Add ONLY baseline-level narratives to the top-level `narratives[]` array.**
@@ -627,6 +650,7 @@ Before writing the final JSON file, validate:
 **Schema Compliance:**
 - ✓ `"kind": "practiceBaseline"` discriminator present
 - ✓ All required properties present (name, description, version, focuses, narrativeTypes, alphas, activitySpaces, competencies)
+- ✓ `outcomes` array present (1-3 outcomes; warn if empty)
 - ✓ NO `baselinePracticeName` (unless extending another baseline)
 - ✓ Property types correct (strings, arrays, objects per schema)
 
@@ -682,6 +706,7 @@ Before writing the final JSON file, validate:
   "alphas": [...],
   "activitySpaces": [...],
   "competencies": [...],
+  "outcomes": [...],
   "narratives": [...],
   "citations": [...],
   "patternGroups": [...],

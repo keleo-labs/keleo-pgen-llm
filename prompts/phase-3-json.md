@@ -486,6 +486,9 @@ Add workProducts array:
     "name": "Work Product Name",
     "description": "Single sentence",
     "contributesToAlphaNames": ["Alpha 1", "Alpha 2"],  // Optional — purpose-hub summary of which alphas this WP serves (union of all LOD contributesTo alphaNames)
+    "expectedMetrics": [  // Optional — declare metric names that instances may carry. Include when outcomes reference this work product via metricContributions
+      { "name": "metric-name", "description": "What this metric measures", "unit": "USD" }
+    ],
     "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics.md Section 7.4)
     "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics.md Section 7.5
     "levelsOfDetail": [
@@ -537,6 +540,7 @@ Add workProducts array:
 - `mapsTo` is optional — include when the mapping guide identifies a variant relationship (IS-A). The value must exactly match a WorkProduct.name. `mapsTo` and `partOf` are **mutually exclusive** — never set both on the same work product
 - **`mapsTo` work products**: LODs MUST exactly match the target work product (same LOD names, same sequence). The variant has domain-specific checklists but shares the parent's LOD structure. On merge, variants are added to the parent's `variants` array.
 - **`mapsTo` naming convention**: Variant work product names MUST NOT repeat the parent type name — `mapsTo` reads as "is a type of", so including the type is redundant (e.g., "Cloud Architecture" not "Cloud Architecture Document" when mapping to "Architecture")
+- **`expectedMetrics` consistency**: When an outcome's `metricContributions` references a `metricName`, the work product whose instances will carry that metric SHOULD declare it in `expectedMetrics`. This validates the metric chain: Outcome → MetricContribution → alpha → evidenceBy → WorkProductInstance → metrics. The `metricName` values must match exactly.
 
 **Asset Linking:**
 
@@ -765,6 +769,12 @@ Add patterns array:
             ]
           }
         ],
+        "workProductLevels": [  // Optional — work product LOD objectives for this phase
+          {
+            "workProductName": "Work Product",
+            "levelOfDetailName": "Level Name"
+          }
+        ],
         "activities": [  // Array of activity names (strings)
           "Activity Name 1",
           "Activity Name 2"
@@ -792,7 +802,7 @@ Add patterns array:
 - Use `patternViews` NOT `views`
 - Use `alphaStates` NOT `alphas`
 - PatternView.seq is REQUIRED
-- NO `workProducts` property on PatternView (not in schema)
+- NO `workProducts` property on PatternView — use `workProductLevels` (array of `{workProductName, levelOfDetailName}`) to declare work product LOD objectives per phase
 - activities are string names, not objects
 - **Each alpha MUST target at most 1 state per patternView** — if a phase advances an alpha through multiple states, split into sub-views using `Phase: Sub-step` naming (e.g., "Enable: Train", "Enable: Certify"). Each sub-view gets its own seq, activities, and narrative context.
 - **State compression:** In non-final views, only include alpha states that CHANGE from the previous view. Omit unchanged carry-forward states — they are implicit. The FINAL view MUST include ALL alphas (even if unchanged) as a complete end-state snapshot.
@@ -866,6 +876,63 @@ If the mapping guide defines pattern groups (Step 8.5), add a `patternGroups` ar
 - Ungrouped patterns remain valid — they render in a default section
 - **Narratives:** Include when the mapping guide provides group-level rationale — why these patterns belong together, how they relate, how to navigate between them. Narratives help users understand the group's purpose. Omit if the grouping is self-explanatory.
 - Cross-practice groups merge by canonical name during method composition (entries merge by `patternName`, overlay seq wins)
+
+#### 3.11.7 Outcomes
+
+Build the `outcomes` array from the mapping guide's Outcome Mappings section. Each practice should have 1-3 outcomes describing how it creates value and how that value is measured.
+
+```json
+"outcomes": [
+  {
+    "name": "Outcome Name",
+    "description": "Single sentence describing the value this practice delivers",
+    "measureDescription": "How success is measured — clear enough for teams to set meaningful targets",
+    "metricContributions": [
+      {
+        "alphaName": "Alpha Name",
+        "metricName": "metric-name",
+        "workProductName": "Work Product Name",
+        "recognizedAtStateName": "State Name",
+        "forecastWeights": [
+          { "stateName": "Earlier State", "weight": 0.3 },
+          { "stateName": "Later State", "weight": 1.0 }
+        ]
+      }
+    ],
+    "objectiveContributions": [
+      {
+        "patternName": "Pattern Name",
+        "recognizedAtPatternViewName": "View Name",
+        "forecastWeights": [
+          { "patternViewName": "Foundation", "weight": 0.25 },
+          { "patternViewName": "Optimized", "weight": 1.0 }
+        ]
+      }
+    ]
+  }
+]
+```
+
+**CRITICAL:**
+- Every outcome MUST have at least one of `metricContributions` or `objectiveContributions` — an outcome with neither is a validation error
+- `measureDescription` is always required — describes the measurement framework
+- Omit empty arrays entirely rather than including `"metricContributions": []`
+- All `alphaName` values must match an alpha defined in this practice, baseline, or dependency
+- All `stateName` values must match a state on the referenced alpha
+- Optional `workProductName` on a metricContribution filters which evidencing work product type supplies the metric; when set it must match a WorkProduct.name
+- `patternName` is REQUIRED on every objectiveContribution — it scopes all patternViewName references to views within that pattern (analogous to alphaName on MetricContribution)
+- All `patternViewName` values must match a PatternView.name within the named pattern
+- The `recognizedAtStateName` entry MUST have weight 1.0 in `forecastWeights`
+
+**Deriving forecastWeights:**
+- Use `metricContributions` when the outcome tracks a numerical aggregate (revenue, count, capacity) through the alpha evidence chain
+- Use `objectiveContributions` when the outcome tracks lifecycle phase completion (readiness, maturity, compliance) through pattern views
+- Weights represent the probability or proportion of the outcome value recognized at each state/view — earlier states get lower weights, the recognition state gets 1.0
+- For sales-type pipelines: map weights to conversion probability (e.g., Identified=0.05, Qualified=0.25, Validated=0.5, Committed=0.8, Won=1.0)
+- For maturity-type outcomes: map weights to cumulative progress (e.g., initial=0.1, developing=0.3, established=0.6, optimized=0.85, transformational=1.0)
+- Include a weight entry for every state/view where partial recognition is meaningful — states not listed have implicit weight 0
+
+**Lifecycle pattern outcome bias:** If the practice has at least one lifecycle pattern, at least one outcome SHOULD use `objectiveContributions` tied to the main lifecycle pattern (broadest alpha coverage). Set `patternName` to the pattern name, `recognizedAtPatternViewName` to the final view, and assign monotonically increasing `forecastWeights` across all views. This is the most natural way to track practice adoption maturity.
 
 #### 3.12 References (Curated External Content)
 
@@ -1028,6 +1095,7 @@ Before proceeding to validation, verify ALL sections from 3.1-3.14 are complete:
 - [ ] 3.9: **personaGroups array populated** ← Often missed!
 - [ ] 3.10: activities array populated
 - [ ] 3.11: patterns array populated (REQUIRED: minimum 1 pattern per practice)
+- [ ] 3.11.7: `outcomes` array (1-3 per practice; warn if empty)
 - [ ] 3.12: references array (if mapping guide has Reference Content Mappings)
 - [ ] 3.13: practiceElementAliases array (if applicable)
 
@@ -1318,6 +1386,11 @@ Once validation passes, verify:
 ### 16. Pattern View Alpha State Deduplication
 ❌ Wrong: Same alpha appearing multiple times in a single PatternView's `alphaStates`
 ✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate
+
+### 17. Outcomes
+**Missing:** `outcomes` array absent — practices should have 1-3 outcomes describing value delivery
+**Wrong:** Outcome with only `measureDescription` and no contribution mechanism; `metricContributions` referencing non-existent alphas or states; `objectiveContributions` missing `patternName`; empty contribution arrays instead of omitting; `recognizedAt` state without weight 1.0 in forecastWeights
+**Right:** 1-3 outcomes with `measureDescription` plus at least one of `metricContributions` or `objectiveContributions`; every objectiveContribution has `patternName` scoping its view references; valid symbolic references; `recognizedAt` entry has weight 1.0; empty arrays omitted
 
 ## Text Cleaning
 

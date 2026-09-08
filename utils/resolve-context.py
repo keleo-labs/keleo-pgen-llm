@@ -243,6 +243,7 @@ def apply_alias_context(effective, aliases):
         "Pattern": "patterns",
         "Persona": "personas",
         "PersonaGroup": "personaGroups",
+        "Outcome": "outcomes",
     }
 
     for element_type, array_key in type_to_array.items():
@@ -376,6 +377,7 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
             "workProductCount": len(effective.get("workProducts", [])),
             "patternCount": len(effective.get("patterns", [])),
             "personaCount": len(effective.get("personas", [])),
+            "outcomeCount": len(effective.get("outcomes", [])),
             "aliasCount": len(aliases),
         },
     }
@@ -399,6 +401,7 @@ OUTPUT_SCHEMA = {
         "personas": "array — personas (name, description, aliases[], competencies[])",
         "personaGroups": "array — persona groups (name, description, personaNames[])",
         "workProductInstances": "array — curated work product instances",
+        "outcomes": "array — practice-defined measurable value outcomes (name, description, measureDescription, metricContributions, objectiveContributions)",
         "_aliasContext": "object — {description, aliases[]} mapping domainName to canonicalName",
         "practiceElementAliases": "array — raw alias entries from all sources",
         "_provenance": "object — {mergeOrder[], tiers{}, elementSources{}} tracking where each element came from",

@@ -14,6 +14,8 @@ You are conducting **Phase 1: Analysis** of a **baseline practice creation** wor
 - Identify **generally applicable** patterns (not niche edge cases)
 - Focus on **foundational concerns** (not tactical execution details)
 
+**Baseline Outcomes:** Outcomes should describe high-level value propositions of the framework domain (e.g., "Reduced Platform Operational Costs", "Improved Team Autonomy") rather than specific measurable targets (e.g., "Reduce MTTR by 40%"). Specific measurable targets belong in extension practices that specialize the baseline.
+
 **Simplified Scope:**
 - NO practice hierarchy determination (baselines are always single cohesive frameworks)
 - Concerns should be **essential** to the domain (not every detail from source)
@@ -95,7 +97,7 @@ When extracting elements, prefer general terms over specific implementations:
 
 1. **Executive Summary**
 2. **Methodology Overview**
-3. **Outcomes** (organized by perspective)
+3. **Outcomes** (organized by perspective — use structured template below)
 4. **Concerns** (with states, work products, relationships)
 5. **Work Products** (with levels of detail)
 6. **Activities** (with technique narratives, outcomes)
@@ -117,6 +119,16 @@ When extracting elements, prefer general terms over specific implementations:
 - Flag any vendor/tool-specific terminology
 - Document why specific terms are used (if intentional)
 - Phase 1.5 will distill to neutral terminology
+
+**Outcome Extraction Template:**
+For each outcome candidate in Section 3, use this structured format:
+- **Name:** Short noun-phrase label (e.g., "Reduced Platform Operational Costs")
+- **Description:** One sentence stating the value proposition
+- **Value Measurement:** How success would be measured at the domain level (qualitative description, not specific targets)
+- **Related Concerns:** Which extracted concerns contribute to this outcome
+- **Perspective:** Business / Technology / People / Process
+
+Extract 3-8 outcome candidates. Phase 1.5 will distill to 1-3. Focus on high-level domain value propositions, not specific measurable targets (those belong in extension practices).
 
 **Comprehensiveness:**
 - Extract ALL relevant content (don't pre-filter for essentials)

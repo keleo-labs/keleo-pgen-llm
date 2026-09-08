@@ -12,6 +12,7 @@ Transform the Phase 1 analysis into a mapping specification that:
 - Maps source activities to baseline Activities and Activity Spaces
 - Maps source personas to baseline Personas and Persona Groups
 - Maps source workflows to baseline Patterns
+- Maps source outcomes to practice Outcomes with value measurement
 - Creates a comprehensive mapping guide for JSON generation (Phase 3)
 
 ## Resources Available
@@ -935,6 +936,13 @@ Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT 
       - Alpha Name: [alpha]
         State Name: [state]
   Level 2: ...
+Expected Metrics: [optional — declare named quantitative fields that instances of this
+  work product may carry. Include when outcomes define metricContributions referencing
+  this work product's instances. Each entry has Name, Description (optional), Unit (optional).
+  The metric names here MUST match the metricName values in Outcome.metricContributions.]
+  - Name: [metric name, e.g., "acv", "quality-score"]
+    Description: [what this metric measures]
+    Unit: [e.g., "GBP", "USD", "percentage"]
 Narrative: [if Phase 1 provided additional context]
 ```
 
@@ -1474,6 +1482,9 @@ Pattern Views: [map Phase 1 views]
           - Instance Name: [work product variant]
             Work Product Name: [work product]
             Level Of Detail Name: [level]
+    Work Product Levels: [optional — work product LOD objectives for this phase]
+      - Work Product Name: [work product]
+        Level Of Detail Name: [expected LOD in this phase]
     Activities: [array of activity names active in this phase]
     Narrative Contexts: [narrative slices for this phase]
       - Seq: [1, 2, 3...]
@@ -1556,6 +1567,77 @@ Entries:
 Baseline-defined groups are the canonical merge targets. When multiple practices adopt the same baseline group name, their entries merge into a single group during method composition (entries merge by `patternName`, overlay seq takes precedence). Novel groups also merge by canonical name if multiple practices share one, but prefer baseline groups as the shared vocabulary.
 
 **A pattern should appear in at most one group.** Ungrouped patterns remain valid.
+
+### Step 8.7: Map Outcomes
+
+Transform Phase 1 outcome candidates into 1-3 structured Outcome objects per practice. Outcomes describe how using the practice creates value and how that value is measured.
+
+**Step 8.7a: Review Phase 1 Outcomes**
+
+Read the Phase 1 analysis report's Outcomes section. Identify which outcome candidates are most relevant to this practice's primary alpha and concern space.
+
+**Step 8.7b: Distill to 1-3 Outcomes**
+
+Each Outcome requires:
+- **name** (2-5 words, value-oriented — e.g., "Reduced Operational Risk")
+- **description** (single sentence: what value this practice delivers)
+- **measureDescription** (ALWAYS REQUIRED — how success is measured, clear enough for teams to set targets)
+
+Each Outcome optionally includes:
+- **metricContributions** — when a clear alpha → work product → metric chain exists:
+  - `alphaName`: must match an alpha defined in this practice or baseline
+  - `metricName`: the metric name that will appear on work product instances
+  - `workProductName`: optional filter — which work product type carries the metric (must match a WorkProduct.name)
+  - `recognizedAtStateName`: the alpha state at which the metric contribution is fully recognized (weight = 1.0)
+  - `forecastWeights`: array of `{stateName, weight}` mapping each alpha state to a 0-1 probability weight
+- **objectiveContributions** — when patterns have well-defined views representing lifecycle phases:
+  - `patternName`: the pattern whose views are used to measure progress (REQUIRED — scopes all view references)
+  - `recognizedAtPatternViewName`: the pattern view at which the objective is fully achieved
+  - `forecastWeights`: array of `{patternViewName, weight}` mapping each view to cumulative progress (0-1)
+
+For initial generation, `measureDescription` alone is acceptable — contributions are optional but recommended when the practice defines clear metric chains or lifecycle patterns.
+
+**Lifecycle pattern outcome (STRONGLY RECOMMENDED):** If the practice defines at least one lifecycle pattern (Step 8), at least one outcome SHOULD use `objectiveContributions` tied to the **main lifecycle pattern**. This connects value delivery to lifecycle progression — the most natural way to measure practice adoption maturity.
+
+To identify the main lifecycle pattern:
+1. Select the pattern with the **broadest alpha coverage** (most distinct alphas across its views)
+2. If coverage is equal, prefer the pattern whose objectives most closely align with the practice's **primary alpha**
+3. If still unclear, ask the user which pattern represents the core adoption lifecycle
+
+The objective-based outcome should:
+- Set `patternName` to the **main lifecycle pattern** name (required — scopes all view references)
+- Set `recognizedAtPatternViewName` to the **final view** of that pattern (the view representing full maturity/adoption)
+- Assign `forecastWeights` with **monotonically increasing weights** across views (earlier views = lower weight, final view = 1.0)
+- Use a `measureDescription` that frames value in terms of lifecycle phase completion (e.g., "Percentage of adoption lifecycle milestones achieved")
+
+**Step 8.7c: Method-Level Outcomes (Methods Only)**
+
+For methods with multiple practices, identify 1-2 method-level outcomes that:
+- Emerge from practice composition (cross-cutting value no single practice delivers alone)
+- Span multiple practices' concern spaces
+- Have their own `measureDescription` distinct from practice-level outcomes
+
+**Document each outcome in the mapping guide:**
+
+```markdown
+### Outcome Mappings
+
+#### Outcome: [Outcome Name]
+- **Description:** [Single sentence]
+- **Measure Description:** [How success is measured]
+- **Metric Contributions:**
+  - Alpha Name: [alpha name]
+    Metric Name: [metric name]
+    Recognized At State Name: [state name]
+    Forecast Weights:
+      - [State]: [weight]
+      - [State]: [weight]
+- **Objective Contributions:**
+  - Recognized At Pattern View Name: [view name]
+    Forecast Weights:
+      - [View]: [weight]
+      - [View]: [weight]
+```
 
 ### Step 9: Map Aliases (If Applicable)
 
@@ -2049,6 +2131,27 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 **Pattern: [Next Pattern]**
 ...
 
+### Outcome Mappings
+
+#### Outcome: [Outcome Name]
+- **Description:** [Single sentence]
+- **Measure Description:** [How success is measured]
+- **Metric Contributions:** [optional]
+  - Alpha Name: [alpha name]
+    Metric Name: [metric name]
+    Recognized At State Name: [state name]
+    Forecast Weights:
+      - [State]: [weight]
+      - [State]: [weight]
+- **Objective Contributions:** [optional]
+  - Recognized At Pattern View Name: [view name]
+    Forecast Weights:
+      - [View]: [weight]
+      - [View]: [weight]
+
+#### Outcome: [Next Outcome]
+...
+
 ### Reference Content Mappings
 
 **Reference: TOGAF-Based Platform Architecture**
@@ -2124,6 +2227,14 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] All symbolic references are exact string matches
 - [ ] Reference content mapped with valid alpha/state/work-product anchors and links
 - [ ] Every reference has at least one `links` entry with a URI
+- [ ] 1-3 outcomes per practice (warning if 0, max 5)
+- [ ] Every outcome has measureDescription
+- [ ] MetricContribution alphaName references valid alpha from Step 4
+- [ ] MetricContribution recognizedAtStateName references valid state on named alpha
+- [ ] ObjectiveContribution patternName references valid pattern from Step 8
+- [ ] ObjectiveContribution recognizedAtPatternViewName references valid pattern view within the named pattern
+- [ ] At least one outcome has objectiveContributions tied to the main lifecycle pattern (if practice has lifecycle patterns)
+- [ ] Method-level outcomes (if method) describe cross-cutting value
 - [ ] Gherkin structures (background, test, examples) used where verification logic adds value
 - [ ] Background.given preconditions are prose descriptions (not checklist assertions)
 - [ ] Test.when clauses on activities describe triggers/decision points (not state names)

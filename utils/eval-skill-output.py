@@ -113,6 +113,8 @@ ASSESS_CATEGORY_MAP = {
     "qual:alias-uniqueness": ("alias-uniqueness",),
     "qual:alias-isolation": ("alias-isolation",),
     "qual:keyword-count": ("keyword-count",),
+    "qual:outcomes": ("outcomes",),
+    "xref:outcome-refs": ("outcome-refs",),
 }
 
 ERROR_ASSERTIONS = {
@@ -125,6 +127,7 @@ ERROR_ASSERTIONS = {
     "bref:narrativetype", "bref:alias",
     "rel:contributes-to-state",
     "schema:valid", "schema:baseline-refs", "schema:integrity",
+    "xref:outcome-refs",
 }
 
 ASSERTION_TEXTS = {
@@ -205,6 +208,8 @@ ASSERTION_TEXTS = {
     "qual:alias-uniqueness": "One alias per element maximum",
     "qual:alias-isolation": "Alias names not in structural references",
     "qual:keyword-count": "Keywords count within 10-20 range",
+    "qual:outcomes": "Practice has 1-3 outcomes with measureDescription",
+    "xref:outcome-refs": "Outcome contribution references resolve",
 }
 
 
