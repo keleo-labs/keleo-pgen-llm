@@ -36,14 +36,14 @@ You have access to the following resources via the Read tool:
    - `practiceDependencyNames` is auto-populated with the parent practice name(s)
    - All structural references (`contributesTo`, `mapsTo`, `alphaName`, etc.) use canonical names — if `_aliasContext` is present, aliases inform semantic understanding only
 
-3. **references/semantics.md**
-   - Comprehensive semantic guidance for Practice Language
-   - Rules for alpha handling (redeclaration vs specialization vs variant mapping)
-   - Orthogonal tagging taxonomy
-   - Checklist standards
-   - Narrative management
-   - Pattern orchestration
-   - READ THIS THOROUGHLY before mapping
+3. **Semantic Guidance** (sub-documents in `references/semantics/`)
+   - `references/semantics/composition.md` — Redeclaration vs specialization vs variant mapping (§4)
+   - `references/semantics/practice-elements.md` — Orthogonal tagging taxonomy, checklist standards, Gherkin test model (§5)
+   - `references/semantics/alphas.md` — Alpha-state trajectory, baseline isolation, reference content (§6)
+   - `references/semantics/work-products.md` — Work product elements, partOf, mapsTo (§7)
+   - `references/semantics/execution-and-patterns.md` — Activities, patterns, pattern groups, outcomes (§8-9)
+   - `references/semantics/narrative-and-assets.md` — Narrative management, assets (§10-11)
+   - READ RELEVANT SUB-DOCUMENTS THOROUGHLY before mapping
 
 ## Tool Call Guidelines
 
@@ -162,16 +162,13 @@ At the TOP of the mapping guide output (after Metadata, before Baseline Practice
    - Build semantic index, not just name list - descriptions reveal nuances critical for mapping decisions
    - Example: Don't just note "Team" alpha exists - understand its full description to assess if source content enriches it or specializes it
 
-3. **Read `references/semantics.md`**
-   - Focus on sections:
-     - Section 3.1.2: Orthogonal Tagging Taxonomy
-     - Section 3.3: Checklists and Dynamic State-Gating
-     - Section 4: Alpha-State Trajectory (especially 4.1: Baseline Isolation Rules)
-     - Section 5: Work Product Elements (including 5.3: Gherkin-Inspired Test Model)
-     - Section 6: Execution Boundaries and Organizational Roles
-     - Section 7: Narrative Management
-     - Section 8: Lifecycle Orchestration (Patterns), especially 8.1.1: Gherkin on Activities
-     - Section 9.2.5: Redeclaration vs Specialization Decision Framework
+3. **Read relevant semantics sub-documents:**
+   - `references/semantics/composition.md` — Redeclaration vs Specialization Decision Framework (§4.4)
+   - `references/semantics/practice-elements.md` — Orthogonal Tagging Taxonomy (§5.1), Checklists and Dynamic State-Gating (§5.2), Gherkin-Inspired Test Model (§5.3)
+   - `references/semantics/alphas.md` — Alpha-State Trajectory (§6), Defining Core Alphas and Baseline Isolation (§6.1)
+   - `references/semantics/work-products.md` — Work Product Elements (§7)
+   - `references/semantics/execution-and-patterns.md` — Execution Boundaries (§8), Gherkin on Activities (§8.1.1), Lifecycle Orchestration and Patterns (§9)
+   - `references/semantics/narrative-and-assets.md` — Narrative Management (§10)
 
 ### Step 2: Map Metadata (For Each Practice)
 
@@ -358,7 +355,7 @@ Create "Assets" section listing all identified visual artifacts:
 
 ### Step 4: Map Concerns to Alphas
 
-For EACH concern from Phase 1, apply the **Redeclaration vs Specialization vs Variant Mapping Decision Framework** (semantics.md Section 4.4):
+For EACH concern from Phase 1, apply the **Redeclaration vs Specialization vs Variant Mapping Decision Framework** (semantics/composition.md §4.4):
 
 **CRITICAL FIRST STEP: Semantic Comparison**
 
@@ -547,7 +544,7 @@ States:
     Checklists: [AI portfolio optimized, AI best practices shared across plays]
 ```
 
-**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` OR `mapsTo` pointing to a valid parent alpha (NO FLOATING ALPHAS). `contributesTo` and `mapsTo` are mutually exclusive — never set both on the same alpha.
+**CRITICAL RULE:** ALL new alphas MUST have `contributesTo` OR `mapsTo` pointing to a valid parent alpha (NO FLOATING ALPHAS). `contributesTo` and `mapsTo` may coexist on the same alpha but must reference different targets.
 
 **Valid `contributesTo` / `mapsTo` Targets:**
 
@@ -608,7 +605,7 @@ If any alpha uses `contributesTo` or `mapsTo` referencing an external practice, 
 
 **Semantic Validation for `contributesTo` / `mapsTo` Decisions:**
 
-For EACH new alpha (specialization or variant), validate the relationship choice using the **State Alignment Heuristic** (semantics.md Section 9.2.5):
+For EACH new alpha (specialization or variant), validate the relationship choice using the **State Alignment Heuristic** (semantics/composition.md §4.4):
 
 1. **List candidate parent alphas** that could semantically relate to this new alpha:
    - **Baseline alphas** (from baseline practice JSON)
@@ -675,7 +672,7 @@ Alternative considered: Platform - rejected due to 0% state alignment (Platform 
 **Validation Checklist for New Alphas:**
 
 - [ ] `contributesTo` OR `mapsTo` field present and references valid parent alpha (baseline, practice-local, or external)
-- [ ] `contributesTo` and `mapsTo` are NOT both set on the same alpha (mutually exclusive)
+- [ ] If both `contributesTo` and `mapsTo` are set on the same alpha, they reference different targets
 - [ ] **If `mapsTo`:** States EXACTLY match the target alpha (same names, same sequence)
 - [ ] **If `mapsTo`:** IS-A semantics confirmed (this alpha IS a variant of the parent)
 - [ ] State alignment calculated and ≥50%
@@ -741,7 +738,7 @@ The `relatesTo` property captures non-hierarchical relationships between alphas.
 
 Only for NEW alphas (with `contributesTo` or `mapsTo`), define semantic relationships:
 
-**Relationship Type Selection** (from semantics.md Section 6.1):
+**Relationship Type Selection** (from semantics/alphas.md §6.1):
 
 1. **Dependency Patterns** - "depends on", "requires", "validated by", "evidenced by"
    - Direction: `outgoing` for "depends on"/"requires"; `incoming` for "validated by"/"evidenced by"
@@ -841,7 +838,7 @@ States: [...]
 ### Alpha: [New Alpha Name]
 - Description: [...]
 - Focus Name: [Value | Solution | Endeavor]
-- contributesTo: [Parent Alpha]   # OR mapsTo: [Parent Alpha] (mutually exclusive)
+- contributesTo: [Parent Alpha]   # AND/OR mapsTo: [Parent Alpha] (may coexist on different targets)
 - relatesTo:
   - relationship: "[verb phrase]"
     alphaName: "[Alpha Name]"
@@ -948,7 +945,7 @@ Narrative: [if Phase 1 provided additional context]
 
 **Work Product Composition (`partOf`):**
 
-When a work product is logically contained within another work product, declare the containment using `partOf`. See semantics.md Section 7.4 for full guidance.
+When a work product is logically contained within another work product, declare the containment using `partOf`. See semantics/work-products.md §7.5 for full guidance.
 
 **When to use:**
 - Work product represents a distinct, independently trackable component of a larger deliverable
@@ -1010,7 +1007,7 @@ Rejection Rationale: [why none qualify as containment]
 
 **Work Product Variant Mapping (`mapsTo`):**
 
-When a work product is a named variant of another work product — following the same LOD progression with domain-specific checklists — declare the relationship using `mapsTo`. See semantics.md Section 7.5 for full guidance.
+When a work product is a named variant of another work product — following the same LOD progression with domain-specific checklists — declare the relationship using `mapsTo`. See semantics/work-products.md §7.6 for full guidance.
 
 This mirrors the `mapsTo` relationship on Alphas (Step 4). The variant IS-A type of the parent work product: "Cloud Architecture" IS an "Architecture" with cloud-specific checklists. On merge, `mapsTo` work products are embedded in the parent's `variants` array.
 
@@ -1500,7 +1497,7 @@ Pattern Views: [map Phase 1 views]
 
 ### Step 8.5: Map Pattern Groups (If Applicable)
 
-**When to create PatternGroups** (see semantics.md §9.3):
+**When to create PatternGroups** (see semantics/execution-and-patterns.md §9.3):
 - Practice contributes 3+ patterns
 - Method will compose 10+ patterns from multiple practices
 - Single-pattern practices generally do NOT need groups
@@ -1673,7 +1670,7 @@ Read the "Reference Content Candidates" section from `01-analysis-report.md`. Fo
 4. **Validate links and pages:** Ensure the URL is present. If Phase 1 recorded a URL, carry it forward. If not, search for it. **If Phase 1 identified specific pages/sections containing the actionable content, carry the `pages` value forward into the link.** A link to a large document without `pages` is rarely a valid reference — it is usually documentation.
 5. **Assign tags:** Use the orthogonal tag structure to enable filtering by domain, lifecycle, and organizational context.
 
-**Step 10.2: Apply Naming Conventions (from semantics.md §6.6)**
+**Step 10.2: Apply Naming Conventions (from semantics/alphas.md §6.6)**
 
 - Reference names should be specific and descriptive, identifying the source (e.g., "TOGAF-Based Platform Architecture" not "Platform Example 1")
 - Work product instance names within `evidenceBy` should identify the specific artifact (e.g., "TOGAF Architecture Document Template" not "Architecture Template")
@@ -1730,7 +1727,7 @@ For each reference, document in the mapping guide:
 
 **Before finalizing, check:**
 
-1. **All new alphas have `contributesTo` or `mapsTo`** (no floating alphas; mutually exclusive)
+1. **All new alphas have `contributesTo` or `mapsTo`** (no floating alphas; may coexist on different targets)
 2. **All `mapsTo` alphas have EXACT state names matching target alpha**
 3. **All baseline references use EXACT names** (case-sensitive)
 3. **Competency names are canonical** (not descriptions)
@@ -2206,7 +2203,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 
 ## Validation Checklist
 
-- [ ] All new alphas have `contributesTo` or `mapsTo` (mutually exclusive; no floating alphas)
+- [ ] All new alphas have `contributesTo` or `mapsTo` (may coexist on different targets; no floating alphas)
 - [ ] All `mapsTo` alphas have exact state name matches with target alpha
 - [ ] All baseline references use exact canonical names
 - [ ] Competency names are exact baseline names (not descriptions)
@@ -2270,10 +2267,10 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 
 ## Execution Notes
 
-1. **Read semantics.md THOROUGHLY** - Understand all mapping rules before starting
+1. **Read relevant semantics sub-documents thoroughly** - Understand all mapping rules before starting (composition.md, practice-elements.md, alphas.md, work-products.md, execution-and-patterns.md, narrative-and-assets.md)
 2. **Load baseline practice completely** - Build mental index of all elements
 3. **Work systematically** - Metadata → Citations → Alphas → Work Products → Personas → Activities → Patterns → Aliases
-4. **Validate continuously** - Check each mapping against semantics rules
+4. **Validate continuously** - Check each mapping against semantics sub-document rules
 5. **Preserve source terminology** - Use aliases for different terms, not structural name changes
 6. **Document rationale** - When making mapping decisions, note reasoning
 7. **Cross-reference Phase 1** - Ensure all Phase 1 content is mapped (no omissions)
@@ -2303,8 +2300,8 @@ Write to: `practices/<practice-name>/02-mapping-guide.md`
 - ✓ Validation checklist completely satisfied
 - ✓ Delineation Analysis section present with justified practice structure decision
 - ✓ If broad coverage (8+ alphas, all focuses), explicit justification provided for practice structure
-- ✓ Gherkin structures used selectively where verification logic adds value (see semantics.md Section 5.3.5)
-- ✓ Activities with complex triggers include test.when clauses (see semantics.md Section 8.1.1)
+- ✓ Gherkin structures used selectively where verification logic adds value (see semantics/practice-elements.md §5.3.5)
+- ✓ Activities with complex triggers include test.when clauses (see semantics/execution-and-patterns.md §8.1.1)
 - ✓ Reference content candidates mapped to alphas/states/work products with links
 
 This mapping guide will be used as input for Phase 3 (JSON Generation).

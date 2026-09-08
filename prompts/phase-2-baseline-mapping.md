@@ -43,12 +43,12 @@ You have access to the following resources via the Read tool:
    - Read if this baseline extends another baseline
    - Understand parent focuses, alphas, competencies
 
-4. **references/semantics.md**
-   - Comprehensive semantic guidance for Practice Language
-   - Section 3: Structural foundations
-   - Section 4: Alpha-state trajectory
-   - Section 7: Narrative management
-   - READ THIS THOROUGHLY before mapping
+4. **Semantic Guidance** (sub-documents in `references/semantics/`)
+   - `references/semantics/practice-elements.md` — PracticeElement foundations, tags, checklists (§5)
+   - `references/semantics/alphas.md` — Alpha-state trajectory, baseline isolation (§6)
+   - `references/semantics/narrative-and-assets.md` — Narrative management (§10)
+   - `references/semantics/composition.md` — Decision frameworks, redeclaration vs specialization (§4)
+   - Read relevant sub-documents thoroughly before mapping
 
 ## Tool Call Guidelines
 
@@ -79,13 +79,11 @@ When running Bash commands, use **simple single-command calls** that match auto-
    - Understand parent structure to avoid duplication
    - Note: Most baselines do NOT extend another baseline
 
-4. **Read `references/semantics.md`**
-   - Focus on sections:
-     - Section 3: PracticeElement, tags, checklists
-     - Section 4: Alpha-State Trajectory
-     - Section 5.3: Gherkin-Inspired Test Model (for optional background on states)
-     - Section 7: Narrative Management
-     - Section 9: Decision frameworks
+4. **Read relevant semantics sub-documents:**
+   - `references/semantics/practice-elements.md` — PracticeElement, tags, checklists (§5); Gherkin-Inspired Test Model for optional background on states (§5.3)
+   - `references/semantics/alphas.md` — Alpha-state trajectory, baseline isolation (§6)
+   - `references/semantics/narrative-and-assets.md` — Narrative management (§10)
+   - `references/semantics/composition.md` — Decision frameworks, redeclaration vs specialization (§4)
 
 ### Step 2: Map Metadata
 
@@ -566,7 +564,7 @@ Total: [X assets]
 
 **Identify 3-5 navigational categories that extension practices will use to organise their patterns.**
 
-Baselines define patternGroups as **template categories with empty entries**. Extension practices adopt these groups by defining patternGroups with the same canonical name and populating entries with their patterns. During method composition, groups with matching names merge (see semantics.md §9.3).
+Baselines define patternGroups as **template categories with empty entries**. Extension practices adopt these groups by defining patternGroups with the same canonical name and populating entries with their patterns. During method composition, groups with matching names merge (see semantics/execution-and-patterns.md §9.3).
 
 **Grouping Strategies** (choose the most natural fit for the domain):
 

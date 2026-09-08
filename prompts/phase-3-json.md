@@ -34,14 +34,13 @@ You have access to the following resources via the Read tool:
    - Defines structure, required fields, types
    - READ THIS to understand exact JSON structure
 
-3. **references/semantics.md** (Semantic Guidance)
-   - Section 3: Structural Foundations (PracticeElement, tags, checklists)
-   - Section 4: Alpha-State Trajectory
-   - Section 5: Work Product Elements
-   - Section 6: Activities and Personas
-   - Section 7: Narratives
-   - Section 8: Patterns and PatternViews
-   - READ relevant sections for JSON structure guidance
+3. **Semantic Guidance** (sub-documents in `references/semantics/`)
+   - `references/semantics/practice-elements.md` — PracticeElement foundations, tags, checklists (§5)
+   - `references/semantics/alphas.md` — Alpha-state trajectory (§6)
+   - `references/semantics/work-products.md` — Work product elements, partOf, mapsTo (§7)
+   - `references/semantics/execution-and-patterns.md` — Activities, personas, patterns, outcomes (§8-9)
+   - `references/semantics/narrative-and-assets.md` — Narratives and assets (§10-11)
+   - Read relevant sections for JSON structure guidance
 
 4. **Baseline Practice JSON** (same as Phase 2)
    - For validation of references
@@ -67,9 +66,12 @@ When running Bash commands, use **simple single-command calls** that match auto-
    - Understand property types (string, array, object)
    - Understand symbolic references vs embedded objects
 
-3. **Read `references/semantics.md` (relevant sections)**
-   - Focus on JSON structure examples
-   - Note schema-specific rules (e.g., checklist format, competency references)
+3. **Read relevant semantics sub-documents:**
+   - `references/semantics/practice-elements.md` — checklist format, tagging taxonomy (§5)
+   - `references/semantics/alphas.md` — alpha structure, state semantics (§6)
+   - `references/semantics/work-products.md` — work product LODs, partOf, mapsTo (§7)
+   - `references/semantics/execution-and-patterns.md` — activity structure, pattern views, outcomes (§8-9)
+   - `references/semantics/narrative-and-assets.md` — narrative structure, citation format (§10-11)
 
 ### Step 2: Determine Output Type
 
@@ -345,8 +347,8 @@ Add alphas array:
     "name": "Alpha Name",
     "description": "Single sentence",
     "focusName": "Value | Solution | Endeavor",
-    "contributesTo": "baseline-alpha-name",  // REQUIRED for specializations (mutually exclusive with mapsTo)
-    // OR: "mapsTo": "parent-alpha-name",    // REQUIRED for variant mappings (mutually exclusive with contributesTo)
+    "contributesTo": "baseline-alpha-name",  // REQUIRED for specializations (may coexist with mapsTo on different target)
+    // AND/OR: "mapsTo": "parent-alpha-name",    // REQUIRED for variant mappings (may coexist with contributesTo on different target)
     "relatesTo": [  // ONLY for new alphas (NOT redeclarations)
       {
         "relationship": "produces",
@@ -432,7 +434,7 @@ Add alphas array:
 
 **CRITICAL:**
 
-- New alphas MUST have `contributesTo` OR `mapsTo` (NO FLOATING ALPHAS). These are mutually exclusive — never set both.
+- New alphas MUST have `contributesTo` OR `mapsTo` (NO FLOATING ALPHAS). Both may coexist on the same alpha but must reference different targets.
 - **`mapsTo` alphas**: States MUST exactly match the target alpha (same names, same sequence). Use for IS-A variants.
 - **relatesTo ONLY on new alphas**: Do NOT add relatesTo to baseline alpha redeclarations
   - Redeclarations inherit baseline relationships automatically
@@ -489,8 +491,8 @@ Add workProducts array:
     "expectedMetrics": [  // Optional — declare metric names that instances may carry. Include when outcomes reference this work product via metricContributions
       { "name": "metric-name", "description": "What this metric measures", "unit": "USD" }
     ],
-    "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics.md Section 7.4)
-    "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics.md Section 7.5
+    "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics/work-products.md §7.5)
+    "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics/work-products.md §7.6
     "levelsOfDetail": [
       {
         "name": "Level Name",  // NO "Level X:" prefix
@@ -658,7 +660,7 @@ Add activities array:
         { "workProductName": "Work Product", "levelOfDetailName": "Level" }
       ]
     },
-    "test": {  // Optional - structured execution scenario (see semantics.md Section 8.1.1)
+    "test": {  // Optional - structured execution scenario (see semantics/execution-and-patterns.md §8.1.1)
       "name": "Execution scenario name",
       "description": "What triggers and outcomes this test captures",
       "given": ["Preconditions for the activity"],
@@ -1280,11 +1282,11 @@ Once validation passes, verify:
   "states": [...]  // Must match Sales Play states exactly
 }
 ```
-❌ Wrong: Both set on same alpha
+❌ Wrong: Both set to same target
 ```json
 {
   "contributesTo": "Platform",
-  "mapsTo": "Platform"  // INVALID — mutually exclusive!
+  "mapsTo": "Platform"  // INVALID — must reference different alphas!
 }
 ```
 
@@ -1426,13 +1428,13 @@ Once validation passes, verify:
 - Activity Space names: Exact matches
 
 ### Required Fields
-- `contributesTo` OR `mapsTo`: REQUIRED on all new alphas (mutually exclusive). `contributesTo`: REQUIRED on all LODs.
+- `contributesTo` OR `mapsTo`: REQUIRED on all new alphas (may coexist on different targets). `contributesTo`: REQUIRED on all LODs.
 - Both requiredCompetencies AND recommendedCompetencyLevels on activities
 - patternViews.seq: REQUIRED on all pattern views
 
 ### Prohibited Patterns
 - NO floating alphas (all new alphas have `contributesTo` or `mapsTo`)
-- NO `contributesTo` AND `mapsTo` on same alpha (mutually exclusive)
+- NO `contributesTo` AND `mapsTo` referencing the same target alpha (must be different targets)
 - NO `partOf` AND `mapsTo` on same work product (mutually exclusive)
 - NO `mapsTo` work product with LOD names/sequences that differ from the target
 - NO markdown in JSON strings

@@ -31,11 +31,11 @@ You have access to the following resources via the Read tool:
    - Defines structure, required fields, types
    - READ THIS to understand exact JSON structure
 
-3. **references/semantics.md** (Semantic Guidance)
-   - Section 3: Structural Foundations (PracticeElement, tags, checklists)
-   - Section 4: Alpha-State Trajectory
-   - Section 7: Narratives
-   - READ relevant sections for JSON structure guidance
+3. **Semantic Guidance** (sub-documents in `references/semantics/`)
+   - `references/semantics/practice-elements.md` — PracticeElement foundations, tags, checklists (§5)
+   - `references/semantics/alphas.md` — Alpha-state trajectory (§6)
+   - `references/semantics/narrative-and-assets.md` — Narratives and assets (§10-11)
+   - Read relevant sections for JSON structure guidance
 
 4. **Example Baseline JSONs** (for reference)
    - `deps/platform-adoption-kernel.json`
@@ -62,9 +62,10 @@ When running Bash commands, use **simple single-command calls** that match auto-
    - Understand property types (string, array, object)
    - Understand symbolic references vs embedded objects
 
-3. **Read `references/semantics.md` (relevant sections)**
-   - Focus on JSON structure examples
-   - Note schema-specific rules (e.g., checklist format, competency structure)
+3. **Read relevant semantics sub-documents:**
+   - `references/semantics/practice-elements.md` — checklist format, tagging taxonomy (§5)
+   - `references/semantics/alphas.md` — alpha structure, baseline isolation rules (§6)
+   - `references/semantics/narrative-and-assets.md` — narrative structure, asset declarations (§10-11)
 
 4. **Read example baselines** (optional, for structure reference)
    - `deps/platform-adoption-kernel.json`

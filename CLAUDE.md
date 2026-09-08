@@ -31,7 +31,17 @@ keleo-pgen-llm/
 │   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
 ├── references/                             # Analysis framework documentation
 │   ├── domain-framework.md
-│   ├── semantics.md
+│   ├── semantics.md                       # Hub document (index to sub-documents)
+│   ├── semantics/                         # Semantic guidance sub-documents
+│   │   ├── composition.md                 # §4 — Practice composition and dependencies
+│   │   ├── practice-elements.md           # §5 — Practice element semantics
+│   │   ├── alphas.md                      # §6 — Alpha relationships and references
+│   │   ├── work-products.md               # §7 — Work product semantics
+│   │   ├── execution-and-patterns.md      # §8-9 — Execution model and patterns
+│   │   ├── narrative-and-assets.md        # §10-11 — Narratives and assets
+│   │   ├── project-tracking.md            # §12 — Project tracking
+│   │   ├── change-requests.md             # §13 — Change requests
+│   │   └── acyclicity.md                  # §14 — Acyclicity constraints
 │   └── workproduct-assessment-rubric.csv
 ├── prompts/                                # Prompt system (extension practices)
 │   ├── phase-1-analysis.md                # Phase 1: Analysis
@@ -125,7 +135,7 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 ### Key Improvements Over v1
 
 1. **Simplified Architecture:** 3 phases instead of 8-phase pipeline
-2. **Reference-Driven:** Reads semantics.md, schema.json, domain-framework.md explicitly
+2. **Reference-Driven:** Reads semantics.md (hub + sub-documents), schema.json, domain-framework.md explicitly
 3. **Single Validation:** One unified validation script instead of 4+ separate utilities
 4. **Cleaner Output:** 3 files per practice instead of 8+ modules
 5. **Better for Parallelism:** Suitable for multi-agent parallel execution
@@ -176,7 +186,7 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 
 ### Reference Documentation
 - `references/domain-framework.md` - Modern enterprise architecture perspectives combining Open Agile, SAFe, Gartner CEA, Zachman, TOGAF
-- `references/semantics.md` - Comprehensive semantic guidance for the Practice Language JSON Schema
+- `references/semantics.md` - Hub document indexing semantic guidance sub-documents in `references/semantics/`
 - `references/workproduct-assessment-rubric.csv` - 5-level maturity rubric (Level 0: Non-Existent → Level 4: Comprehensive/Automated)
 
 ### Dependencies (Symlinks to keleo-studio)
@@ -267,7 +277,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **kind property** | `"practice"` or `"method"` | `"practiceBaseline"` |
 | **baselinePracticeName** | REQUIRED (references parent) | OPTIONAL (may reference parent baseline) |
 | **Focuses** | Referenced from baseline | DEFINED in baseline (2-4 focuses) |
-| **Alpha contributesTo / mapsTo** | REQUIRED on new alphas (mutually exclusive) | NOT PRESENT (root-level) |
+| **Alpha contributesTo / mapsTo** | REQUIRED on new alphas (may coexist on different targets) | NOT PRESENT (root-level) |
 | **Alpha relatesTo** | Optional (new alphas only) | REQUIRED (show interconnections) |
 | **AlphaRelationship direction** | Required on all relatesTo entries | Required on all relatesTo entries |
 | **State contributesToState** | Optional (maps child state → parent state) | NOT PRESENT |
@@ -302,12 +312,12 @@ All files for a baseline are co-located in `baselines/<baseline-name>/`:
 
 ### Extension Practice Constraints
 
-These constraints apply to **extension practices** created with `/generate-method`. Full details in `references/semantics.md` Sections 4.1-4.5, 6.1-6.2, 7.4-7.5.
+These constraints apply to **extension practices** created with `/generate-method`. Full details in `references/semantics/composition.md` §4.1-4.5, `references/semantics/alphas.md` §6.1-6.2, `references/semantics/work-products.md` §7.4-7.5.
 
 ### Alpha Handling
 - **Redeclaration**: Enrich baseline alphas with checklists/narratives; preserve baseline structure
 - **Specialization** (`contributesTo`): New alphas with distinct state progression contributing to parent
-- **Variant** (`mapsTo`): Named variants with exact same states as parent (IS-A semantics). `mapsTo` and `contributesTo` are mutually exclusive. Variant names MUST NOT repeat parent type name.
+- **Variant** (`mapsTo`): Named variants with exact same states as parent (IS-A semantics). `mapsTo` and `contributesTo` may coexist on the same alpha but must reference different targets.
 - **NO FLOATING ALPHAS**: All new alphas MUST have `contributesTo` OR `mapsTo`
 - **`relatesTo`**: Required on new alphas. Fields: `relationship`, `alphaName`, `direction` (`outgoing`|`incoming`|`mutual`)
 
@@ -317,7 +327,7 @@ Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-
 ### Schema Rules
 - All symbolic references are exact, case-sensitive string matches
 - Minimums: ≥3 states per alpha, ≥2 LODs per work product
-- WorkProduct `mapsTo` and `partOf` are mutually exclusive (see semantics.md §7.4-7.5)
+- WorkProduct `mapsTo` and `partOf` are mutually exclusive (see `semantics/work-products.md` §7.4-7.5)
 
 ### Versioning
 
@@ -351,7 +361,7 @@ The Practice Language uses three versioning mechanisms:
 
 ### Gherkin-Inspired Structured Guidance
 
-The schema supports optional Gherkin-inspired properties for structured verification and execution scenarios (see `references/semantics.md` Section 5.3 and 8.1.1):
+The schema supports optional Gherkin-inspired properties for structured verification and execution scenarios (see `references/semantics/practice-elements.md` §5.3 and `references/semantics/execution-and-patterns.md` §8.1.1):
 
 - **`background`** (on State, LevelOfDetail, ActivitySpace, Activity): Shared prerequisites — object with optional `given` (string[]), `alphaStates` (AlphaContribution[]), `workProductLevels` (WorkProductContribution[])
 - **`test`** (on Checklist, Activity): Structured Given/When/Then verification scenario — extends PracticeElement (has `name`, `description`) plus optional `given`, `when`, `then` (string[])
@@ -367,7 +377,7 @@ Every practice must include comprehensive citations using the "Citation Standard
 Optional `acknowledgements` array on Practice, PracticeBaseline, and Method. Recognizes individuals, groups, or institutions that contributed to the methodology. Distinct from citations — attributes human contributions rather than published works. Each entry has `name`, `description`, and optional `url`.
 
 ### References (Curated External Content)
-Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content illustrating alphas at specific states. Every reference MUST have at least one `links` entry. See `references/semantics.md` §6.6 for naming conventions, instance naming, merge rules, and two-level link architecture.
+Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content illustrating alphas at specific states. Every reference MUST have at least one `links` entry. See `references/semantics/alphas.md` §6.6 for naming conventions, instance naming, merge rules, and two-level link architecture.
 
 ### Assets
 Visual assets use `AssetReference` objects (`{assetName, type}`) on elements, resolved against a top-level `assets` array. Types: `icon`, `illustrative`, `template`, `diagram`. Asset formats: `font-character`, `image`, `diagram`, `template` (with `path`/`url`/`dataUri`). See `deps/language.schema.json` `$defs/Asset` and `$defs/AssetReference` for schema.
@@ -391,7 +401,7 @@ The Practice Language schema includes constructs that are not directly relevant 
 - **Project**: Root type for tracking real-world execution against a practice/method (team, plan, current/target state, checklists)
 - **ChangeRequest / ChangeSet**: PR-like change proposals for modifying practices/baselines/methods with review lifecycle
 
-See `references/semantics.md` Sections 12-13 for details.
+See `references/semantics/project-tracking.md` §12 and `references/semantics/change-requests.md` §13 for details.
 
 ## Dependencies
 
@@ -466,7 +476,7 @@ This skill automates the three-phase pipeline:
 
 **3. Phase 2 - Mapping:**
 - Maps analyzed elements to baseline practice
-- Uses semantic guidance from `references/semantics.md`
+- Uses semantic guidance from `references/semantics.md` (hub) and sub-documents in `references/semantics/`
 - Outputs `practices/<name>/02-mapping-guide.md` (~40-60K words)
 
 **4. Phase 3 - JSON Generation + Packaging:**
@@ -534,7 +544,7 @@ If working manually outside the skill:
 
 **Phase 2 - Mapping:**
 4. Use `prompts/phase-2-mapping.md` to map to baseline practice
-5. Read `references/semantics.md` for semantic guidance
+5. Read `references/semantics.md` (hub) and relevant sub-documents in `references/semantics/` for semantic guidance
 6. Output: `02-mapping-guide.md`
 
 **Phase 3 - JSON Generation + Packaging:**
@@ -547,7 +557,7 @@ If working manually outside the skill:
 The prompts in `prompts/` are optimized for the `/generate-method` skill:
 
 **Key Features:**
-- Reference-driven: Explicitly read semantics.md, schema.json, domain-framework.md
+- Reference-driven: Explicitly read semantics.md (hub + sub-documents), schema.json, domain-framework.md
 - Self-contained: Each phase prompt includes all necessary instructions
 - Operate within Claude Code skill context with Read tool for loading resources
 

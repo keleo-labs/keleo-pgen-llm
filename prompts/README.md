@@ -27,7 +27,7 @@ Analyzes source methodology documentation and structures it into:
 **File:** `phase-2-mapping.md`
 
 Maps analyzed elements to the baseline practice using Practice Language semantics:
-- Reads `references/semantics.md` for semantic guidance
+- Reads `references/semantics/` sub-documents for semantic guidance
 - Maps to baseline alphas, states, activities, work products
 - Creates citation mappings
 - Defines personas and teams
@@ -49,7 +49,8 @@ Generates schema-compliant JSON from the mapping guide:
 All prompts reference these documents (loaded via Read tool):
 
 - `references/domain-framework.md` - Four-perspective analysis framework
-- `references/semantics.md` - Practice Language semantic guidance
+- `references/semantics.md` - Practice Language semantic guidance (hub with table of contents)
+- `references/semantics/` - Sub-documents: composition, practice-elements, alphas, work-products, execution-and-patterns, narrative-and-assets
 - `references/workproduct-assessment-rubric.csv` - Maturity rubric
 - `deps/language.schema.json` - JSON Schema definition
 - `deps/platform-adoption-kernel.json` - Baseline framework
@@ -64,7 +65,7 @@ All prompts reference these documents (loaded via Read tool):
 
 **v2 (Current):**
 - Simple 3-phase workflow
-- Reference-driven (reads semantics.md, schema.json)
+- Reference-driven (reads semantics/ sub-documents, schema.json)
 - Single validation script
 - Direct generation without assembly steps
 

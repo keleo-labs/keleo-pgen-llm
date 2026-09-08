@@ -321,7 +321,7 @@ This resolves blockers (missing `kind`, tags nesting, persona property normaliza
 
 **Key reference files (read from generate-method skill):**
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
-- Semantics guide: `references/semantics.md`
+- Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
@@ -392,7 +392,7 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 
 **Key reference files (read from generate-method skill):**
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
-- Semantics guide: `references/semantics.md`
+- Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
@@ -580,7 +580,7 @@ For each discovered reference, map to the Practice Language structure:
 
 ---
 
-**Reference conventions** — see `references/semantics.md` §6.6 for full naming rules, instance naming, and merge logic. Key rules:
+**Reference conventions** — see `references/semantics/alphas.md` §6.6 for full naming rules, instance naming, and merge logic. Key rules:
 
 - **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — concept-centric, not content-centric
 - **Description:** Semantic role in terms of alpha state progression, NOT what the linked content contains
@@ -877,7 +877,7 @@ python3 utils/package-keleo.py \
 | 4 | Practice needs restructuring | Full Reanalysis (Mode 1) | Identify primary alphas, split practices |
 | 5 | Quality issues (names, assets, citations) | Auto-fix → Remap | `fix-common-issues.py --fix --all`, then remap for remaining |
 | 6 | Citation name format (Author-Date → Title) | Auto-fix | `fix-citation-names.py --rename "Old=New"` or `--map renames.json` |
-| 7 | Add Gherkin guidance | Remap (Mode 2) | Read semantics.md §5.3, §8.1.1; add background/test/examples |
+| 7 | Add Gherkin guidance | Remap (Mode 2) | Read semantics/practice-elements.md §5.3, semantics/execution-and-patterns.md §8.1.1; add background/test/examples |
 | 8 | Convert to .keleo package | Packaging only | `package-keleo.py --from-embedded` or `--documents` |
 | 9 | Add/update references | Mode 3 | Map to alpha+state, require ≥1 link per reference |
 | 10 | Add/convert WP partOf/mapsTo | Targeted transform | `transform-workproducts.py --spec '[...]' --fix` |

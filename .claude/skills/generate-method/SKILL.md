@@ -92,7 +92,13 @@ This skill relies on reference documents (READ via Read tool, NOT embedded):
 ### Required References
 
 1. **references/domain-framework.md** - Four-perspective analysis framework
-2. **references/semantics.md** - Practice Language semantic guidance
+2. **references/semantics/** — Practice Language semantic guidance (sub-documents):
+   - `semantics/composition.md` — aliasing, alpha hierarchies, dependencies (§4)
+   - `semantics/practice-elements.md` — PracticeElement foundations, Gherkin guidance (§5)
+   - `semantics/alphas.md` — alpha-state semantics, references/instances (§6)
+   - `semantics/work-products.md` — work product rules (§7)
+   - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
+   - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
 3. **deps/language.schema.json** - JSON Schema definition
 4. **Baseline Practice JSON** - User-provided (e.g., `deps/platform-adoption-kernel.json`)
 
@@ -235,7 +241,7 @@ In plan mode:
 
 4. **Use Agent tool for parallelism** (for methods with 2+ practices):
    - **Phase 2**: Launch one agent per practice (parallel execution)
-     - Each agent reads: analysis report, baseline JSON, semantics.md
+     - Each agent reads: analysis report, baseline JSON, relevant semantics sub-documents
      - Each agent generates: complete practice mapping (alphas + work products + activities)
      - Write to separate files or sections
      - Agents run concurrently (no token budget sharing)
@@ -288,7 +294,7 @@ Then combine into method JSON and validate
 Each phase is designed to be **stateless** and **file-driven**:
 
 - Phase 1 reads: source materials, domain-framework.md
-- Phase 2 reads: 01-analysis-report.md, baseline JSON, semantics.md
+- Phase 2 reads: 01-analysis-report.md, baseline JSON, semantics sub-documents (`composition.md`, `practice-elements.md`, `alphas.md`, `execution-and-patterns.md`)
 - Phase 3 reads: 02-mapping-guide.md, baseline JSON, language.schema.json
 
 No conversational context is required - only file contents.
@@ -427,7 +433,7 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 **Process for Single Practice:**
 
-1. Read `prompts/phase-2-mapping.md`, analysis report, effective context JSON (`_effective-context.json` from Step 0.5), semantics.md
+1. Read `prompts/phase-2-mapping.md`, analysis report, effective context JSON (`_effective-context.json` from Step 0.5), and the relevant semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
    - The effective context contains ALL merged elements (baselines + parent practices + methods) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements (ontology context) from practice elements (primary `contributesTo`/`mapsTo` targets). If the context has `_aliasContext`, use aliases for semantic understanding but always use canonical names in structural references.
 2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
    - **Parent practice mode:** Document which parent practice alphas are being extended and which (if any) baseline alphas are being addressed directly.
@@ -486,12 +492,12 @@ Acceptable heading levels: `###`, `####`, or `#####`. The key format is `<headin
 
 2. **Each agent prompt must include:**
    - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
-   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-context-path>` (from Step 0.5), `references/semantics.md`, `prompts/phase-2-mapping.md`
+   - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-context-path>` (from Step 0.5), `references/semantics/composition.md`, `references/semantics/practice-elements.md`, `references/semantics/alphas.md`, `references/semantics/execution-and-patterns.md`, `prompts/phase-2-mapping.md`
    - Add to agent prompt: "The effective context contains ALL merged elements (baselines + parent practices) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements from practice elements. Practice-level alphas are your primary `contributesTo`/`mapsTo` targets. Baseline-level alphas provide ontology context. Use canonical names for all structural references. Use `contributesTo` for specializations (different states) and `mapsTo` for variant mappings (exact same states, IS-A semantics). IMPORTANT: `practiceDependencyNames` must only include parent practices whose unique alphas (those NOT contributed by baselines per `_contributingPracticeName`) are actually referenced via `contributesTo` or `mapsTo`."
    - If the effective context has `_aliasContext`, include in the agent prompt: "The context includes domain-specific aliases (e.g., 'Platform' is known as 'Automation Platform' in this domain). Use domain terms for semantic understanding but always use canonical names in structural references."
    - What to generate: Complete practice mapping with metadata, terminology aliases, alphas (with relatesTo), work products, activities, patterns
    - Output location: Write to `practices/<method-name>/02-mapping-guide-practice-N.md` OR append to shared file with clear section markers
-   - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships (include relationshipKind where applicable); (4) Work products (include contributesToAlphaNames where applicable); (5) Activities (include ledBy where source identifies clear single-person accountability); (6) PATTERNS with complete matrix coverage; (7) PATTERN GROUPS if practice has 3+ patterns — load baseline patternGroups first and assign patterns to existing baseline groups before creating new ones (novel groups require justification); include narratives when source material supports rationale for the grouping; (8) OUTCOMES — 1-3 per practice with measureDescription; optional metricContributions (alphaName + metricName + recognizedAtStateName) and objectiveContributions (patternName + recognizedAtPatternViewName) when clear chains exist (see semantics.md §9.4). If the practice has lifecycle patterns, at least one outcome SHOULD use objectiveContributions tied to the main lifecycle pattern (broadest alpha coverage) with monotonically increasing forecastWeights across views. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics.md Section 8.1.1)."
+   - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships (include relationshipKind where applicable); (4) Work products (include contributesToAlphaNames where applicable); (5) Activities (include ledBy where source identifies clear single-person accountability); (6) PATTERNS with complete matrix coverage; (7) PATTERN GROUPS if practice has 3+ patterns — load baseline patternGroups first and assign patterns to existing baseline groups before creating new ones (novel groups require justification); include narratives when source material supports rationale for the grouping; (8) OUTCOMES — 1-3 per practice with measureDescription; optional metricContributions (alphaName + metricName + recognizedAtStateName) and objectiveContributions (patternName + recognizedAtPatternViewName) when clear chains exist (see semantics/execution-and-patterns.md §9.4). If the practice has lifecycle patterns, at least one outcome SHOULD use objectiveContributions tied to the main lifecycle pattern (broadest alpha coverage) with monotonically increasing forecastWeights across views. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics/execution-and-patterns.md §8.1.1)."
 
 3. **After all agents complete:**
    - **Assemble mapping guides** (REQUIRED — never use heredocs, cat, or shell loops):
@@ -517,7 +523,7 @@ Acceptable heading levels: `###`, `####`, or `#####`. The key format is `<headin
 
 **Aliases bridge the gap between baseline practice terminology and source methodology vocabulary.**
 
-From `references/semantics.md` Section 9.2:
+From `references/semantics/composition.md` §4.3:
 
 **When to Create Aliases:**
 - Source methodology uses different term for same baseline concept
@@ -552,7 +558,7 @@ From `references/semantics.md` Section 9.2:
   - OR new alpha with `mapsTo` pointing to parent (same states, IS-A variant)
   - Example (contributesTo): Automation Controller, Execution Environment are specialized facets of Platform with unique lifecycles
   - Example (mapsTo): "AI-Ready Enterprise" IS a "Sales Play" — same states, domain-specific checklists
-  - **mapsTo naming convention:** Do NOT repeat the parent type name in the variant alpha name. Since `mapsTo` reads as "is a type of", including the type is redundant (e.g., "AI-Ready Enterprise" not "AI-Ready Enterprise Play"; "Container Management" not "Container Management TDP"). This convention applies to both the alpha `name` and any `aliasName`. It does NOT apply to `contributesTo` alphas, where including the type helps distinguish the specialized concept.
+  - **mapsTo naming convention:** `mapsTo` variant alpha names may include or omit the parent type name. Including it can aid clarity in some domains (e.g., "AI-Ready Enterprise Play" or just "AI-Ready Enterprise" for a variant of Sales Play). This convention applies to both the alpha `name` and any `aliasName`. For `contributesTo` alphas, including the type name is recommended to distinguish the specialized concept.
   - May have aliases if domain uses shortened forms
 
 **Alias can be combined with:**
@@ -587,7 +593,7 @@ From `references/semantics.md` Section 9.2:
 4. Named variant with same states (IS-A)? → **Variant Mapping** (`mapsTo`, name omits parent type)
 5. Acronym/abbreviation/synonym? → **Keywords** (10-20 per practice)
 
-See `references/semantics.md` Section 4.3 for comprehensive aliasing rules with worked examples across domains.
+See `references/semantics/composition.md` §4.3 for comprehensive aliasing rules with worked examples across domains.
 
 **Quality Target:** 3-8 aliases + 10-20 keywords per practice.
 
@@ -597,8 +603,8 @@ Validation rules are defined in `references/practice-rules.feature` (8 Features,
 
 **Key rules to keep in mind during orchestration:**
 - No floating alphas: every new alpha needs `contributesTo` or `mapsTo` (@rule:semantic-001)
-- `contributesTo` and `mapsTo` are mutually exclusive (@rule:semantic-002)
-- `mapsTo` variants must match parent states exactly and omit parent type name (@rule:semantic-003, -010)
+- `contributesTo` and `mapsTo` may coexist on the same alpha but must reference different targets (@rule:semantic-002)
+- `mapsTo` variants must match parent states exactly (@rule:semantic-003)
 - Competency level names must exactly match baseline (@rule:semantic-006)
 - `relatesTo` only on new alphas, with required `direction` field (@rule:semantic-007, -008)
 - Narratives must have `citationNames`, be placed on correct elements, and describe subject matter not template type (@rule:narrative-001 through -006)
@@ -612,11 +618,11 @@ Validation rules are defined in `references/practice-rules.feature` (8 Features,
 - Outcome objectiveContribution.patternName is REQUIRED and must match valid pattern; recognizedAtPatternViewName must match a view within that pattern (@rule:outcome-003)
 - Practices with lifecycle patterns should have at least one outcome with objectiveContributions tied to the main lifecycle pattern (@rule:outcome-004)
 
-**Relationship guidance:** `contributesTo` = specialization (different states), `mapsTo` = named variant (same states, IS-A). Valid targets: baseline, practice-local, or dependency alphas. `partOf` = HAS-A containment on work products (mutually exclusive with `mapsTo`).
+**Relationship guidance:** `contributesTo` = specialization (different states), `mapsTo` = named variant (same states, IS-A). Both may coexist on the same alpha but must reference different targets. Valid targets: baseline, practice-local, or dependency alphas. `partOf` = HAS-A containment on work products (mutually exclusive with `mapsTo`).
 
 **relatesTo directionality:** Source alpha declares relationships. Use `outgoing` for acts-upon, `incoming` for acted-upon, `mutual` for symmetric. Prefer active voice from provider perspective.
 
-**Gherkin structured guidance:** Optional `background`, `test`, `examples` properties on states, LODs, checklists, activities (see semantics.md Section 5.3).
+**Gherkin structured guidance:** Optional `background`, `test`, `examples` properties on states, LODs, checklists, activities (see semantics/practice-elements.md §5.3).
 
 **Narrative Citation Rules**
 
@@ -1125,7 +1131,7 @@ Run `python3 utils/<script>.py --help` for detailed usage of any script.
 This skill does NOT embed knowledge. Instead:
 
 - **Phase 1:** Reads `references/domain-framework.md` for perspectives
-- **Phase 2:** Reads `references/semantics.md` for mapping rules
+- **Phase 2:** Reads semantics sub-documents (`references/semantics/composition.md`, `practice-elements.md`, `alphas.md`, `execution-and-patterns.md`) for mapping rules
 - **Phase 3:** Reads `deps/language.schema.json` for structure
 - **All phases:** Use prompts in `prompts/` directory for instructions
 
@@ -1246,7 +1252,7 @@ Common PAE mappings: "Advanced"→"Masters", "Expert"→"Innovating", "Intermedi
 
 ## Cross-Practice Dependencies
 
-Alpha hierarchies and cross-practice dependencies are covered in `references/semantics.md` Section 4.4-4.5 and `references/practice-method-strategy.md`.
+Alpha hierarchies and cross-practice dependencies are covered in `references/semantics/composition.md` §4.4-4.5 and `references/practice-method-strategy.md`.
 
 **Key rules:**
 - **Practice-local chains**: `Platform Service → Platform Capability → Platform (baseline)` — referenced alpha must be defined earlier in the mapping guide
@@ -1270,7 +1276,7 @@ Full delineation strategy with worked examples is in `references/practice-method
 
 **Core principle:** Each practice focuses on ONE primary alpha + its directly related alphas (via `relatesTo`, 1-level deep). No "everything else" catch-all practices.
 
-**Cross-baseline methods:** Use `bindings.alphaBindings` when composing practices from different baseline families (see `references/semantics.md` Section 4.8).
+**Cross-baseline methods:** Use `bindings.alphaBindings` when composing practices from different baseline families (see `references/semantics/composition.md` §4.8).
 
 ---
 

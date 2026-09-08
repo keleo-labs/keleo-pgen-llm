@@ -187,7 +187,12 @@ baselines/
 These documents must be readable for all phases:
 
 1. **`references/domain-framework.md`** - Four-perspective analysis (Business, Technology, People, Process)
-2. **`references/semantics.md`** - Practice Language semantic guidance
+2. **`references/semantics/`** — Practice Language semantic guidance (sub-documents):
+   - `semantics/composition.md` — aliasing, alpha hierarchies, dependencies (§4)
+   - `semantics/practice-elements.md` — PracticeElement foundations, Gherkin guidance (§5)
+   - `semantics/alphas.md` — alpha-state semantics, references/instances (§6)
+   - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
+   - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
 3. **`deps/language.schema.json`** - JSON Schema definition
 4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
 
@@ -307,7 +312,10 @@ Fix any FAIL assertions before proceeding to Phase 2.
    Read baselines/<name>/01.5-distilled-essentials.md (PRIMARY SOURCE)
    Read baselines/<name>/01-analysis-report.md (supporting detail)
    Read effective parent baseline (from Baseline Dependency Resolution, if this baseline extends others)
-   Read references/semantics.md
+   Read references/semantics/composition.md (aliasing, hierarchies)
+   Read references/semantics/practice-elements.md (elements, Gherkin)
+   Read references/semantics/alphas.md (alpha semantics)
+   Read references/semantics/execution-and-patterns.md (patterns, outcomes)
    ```
    If the effective parent has `_aliasContext`, use domain aliases for semantic understanding of inherited elements. The new baseline's elements should use canonical names in structural references (`relatesTo`, etc.).
 
@@ -324,7 +332,7 @@ Fix any FAIL assertions before proceeding to Phase 2.
    - REQUIRED `relatesTo` arrays (from Phase 1.5 relationships)
    - 5-7 states per alpha with checklists (positive/additive items only — achievements to reach, not absences)
    - Assign to appropriate focus
-   - Optional `background` on states (use sparingly — practice layer adds detailed Gherkin; see semantics.md Section 5.3.5)
+   - Optional `background` on states (use sparingly — practice layer adds detailed Gherkin; see semantics/practice-elements.md §5.3.5)
 
 5. **Transform Activity Types → ActivitySpaces**:
    - Each has `contributesTo` (points to alpha states)
@@ -378,7 +386,9 @@ Fix any FAIL assertions before proceeding to Phase 3.
    ```
    Read baselines/<name>/02-mapping-guide.md (PRIMARY SOURCE)
    Read deps/language.schema.json
-   Read references/semantics.md
+   Read references/semantics/composition.md (aliasing, hierarchies)
+   Read references/semantics/alphas.md (alpha semantics)
+   Read references/semantics/narrative-and-assets.md (narratives, assets)
    ```
 
 2. **Read schema and baseline metadata** using utility commands (never parse `$comment` manually):
@@ -649,7 +659,7 @@ Validates that the four-phase baseline pipeline is executed correctly.
 ❌ **Missing relatesTo**: All alphas should have inter-alpha relationships
 ❌ **Incomplete contributesTo coverage**: Every alpha state needs ≥1 activity space
 ❌ **Generic narratives**: Element mappings should be substantive
-❌ **Over-using Gherkin structures**: Baselines should keep background/test/examples minimal — the practice layer is the natural place for detailed Gherkin structure (semantics.md Section 5.3.5)
+❌ **Over-using Gherkin structures**: Baselines should keep background/test/examples minimal — the practice layer is the natural place for detailed Gherkin structure (semantics/practice-elements.md §5.3.5)
 
 ### Phase 3 Pitfalls
 

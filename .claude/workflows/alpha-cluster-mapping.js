@@ -79,7 +79,7 @@ const clusterResults = await parallel(clusters.clusters.map((c, i) => () =>
 
 **Analysis report:** \`${analysisReport}\`
 **Baseline:** \`${baseline}\`
-**Also read:** \`references/semantics.md\`
+**Also read:** \`references/semantics/composition.md\` (aliasing, hierarchies), \`references/semantics/practice-elements.md\` (elements), \`references/semantics/alphas.md\` (alpha semantics), \`references/semantics/execution-and-patterns.md\` (patterns, outcomes)
 
 **YOUR CLUSTER: "${c.name}"**
 - Primary Alpha: ${c.primaryAlpha}

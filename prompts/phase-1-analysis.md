@@ -220,7 +220,7 @@ Map activities to **Involved Persona Groups**.
 
 **CRITICAL: Patterns are REQUIRED for practices with multiple concerns.** Patterns coordinate how multiple alphas/concerns mature together through a lifecycle.
 
-#### Pattern Requirements (Read references/semantics.md Section 8.1.1)
+#### Pattern Requirements (Read references/semantics/execution-and-patterns.md §9.1)
 
 **Multi-Alpha Coordination (REQUIRED):**
 
