@@ -33,7 +33,7 @@
     },
     {
       "id": "semantic-002",
-      "name": "contributesTo and mapsTo are mutually exclusive",
+      "name": "contributesTo and mapsTo may coexist on different targets",
       "feature": "Alpha Relationship Integrity",
       "given": [
         "A new alpha declares a parent relationship"
@@ -42,7 +42,7 @@
         "The alpha JSON is generated"
       ],
       "then": [
-        "The alpha has `contributesTo` or `mapsTo` but never both"
+        "If both `contributesTo` and `mapsTo` are present, they reference different alphas"
       ],
       "line": 881,
       "assess_categories": [
@@ -71,7 +71,7 @@
     },
     {
       "id": "semantic-010",
-      "name": "mapsTo variant names omit parent type",
+      "name": "mapsTo variant names may include or omit parent type",
       "feature": "Alpha Relationship Integrity",
       "given": [
         "A new alpha has `mapsTo` pointing to a parent alpha"
@@ -80,8 +80,7 @@
         "The alpha name is chosen"
       ],
       "then": [
-        "The alpha name does not contain the parent alpha's name",
-        "The alias name (if present) does not contain the parent alpha's name"
+        "The alpha name may include or omit the parent alpha's type name"
       ],
       "line": 891,
       "assess_categories": [

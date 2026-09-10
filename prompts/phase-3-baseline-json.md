@@ -279,9 +279,9 @@ From mapping guide Alphas section:
             ]
           },
           "checklists": [
-            "Checklist item 1 from mapping guide criteria",
-            "Checklist item 2 from mapping guide criteria",
-            "Checklist item 3 from mapping guide criteria"
+            "Actionable task 1 from mapping guide (imperative verb phrase)",
+            "Actionable task 2 from mapping guide (imperative verb phrase)",
+            "Actionable task 3 from mapping guide (imperative verb phrase)"
           ]
         }
       ],
@@ -326,7 +326,7 @@ From mapping guide Alphas section:
 - ✓ ALL alphas have `relatesTo` array (not empty)
 - ✓ Every `relatesTo` entry has `direction` field
 - ✓ Each alpha has 5-7 states
-- ✓ Each state has 3-5 checklist items (positive/additive — achievements to reach, not absences)
+- ✓ Each state has 3-5 checklist items (imperative verb phrases, positive/additive — actions to perform, not absences); each checklist text adds actionable specificity beyond what the state description already conveys
 - ✓ All `focusName` references exist in Step 3 focuses
 - ✓ All `relatesTo.alphaName` references exist in alphas array
 

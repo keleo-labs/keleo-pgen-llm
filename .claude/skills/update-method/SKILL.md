@@ -71,13 +71,20 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ## Execution Workflow
 
-### Step 0: Assess (Single Command)
+### Step 0: Assess and Detect Gaps
 
 Run the consolidated assessment utility — this replaces ALL manual inspection steps:
 
 ```bash
 python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json
 ```
+
+**Schema gap detection (optional, complements assessment):**
+```bash
+python3 utils/detect-schema-gaps.py <file.json>
+python3 utils/detect-schema-gaps.py --dir <dir>/    # batch mode
+```
+Compares the practice's `schemaVersion` against the current schema and checks for missing features (outcomes, patternGroups, checklist priorities, references, acknowledgements, dependencyVersions, Gherkin structures). Outputs `suggestedUpdateMode` ("none", "auto-fix", "remap") based on gap severity.
 
 For extension practices with a baseline:
 ```bash
@@ -386,6 +393,27 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 - "Extracted existing content as Phase 1 analysis report"
 - "Preserved X alphas, Y work products, Z activities"
 
+**Step 2A.5: Generate Practice Summaries (Batch Updates)**
+
+When updating multiple practices in a method, generate structural summaries for subagent prompt construction:
+
+```bash
+# Generate summaries for all practices in the method directory
+for f in practices/<method>/*.json; do
+  [[ "$(basename "$f")" == _* || "$(basename "$f")" == change-request* ]] && continue
+  python3 utils/practice-summary.py "$f" --baseline <baseline>.json --json > "practices/<method>/_summary-$(basename "$f")"
+done
+```
+
+Each summary contains: metadata, alphas (with relationship types, targets, states, priority distribution), patterns (with view names), patternGroups, outcomes (with forecastWeights), work products, activities, and schema feature coverage flags. Use these summaries in Phase 2/3 subagent prompts instead of ad hoc structural inspection.
+
+**Determine parallelization strategy using dependency tiers:**
+```bash
+python3 utils/discover-dependencies.py --tiers practices/<method>/<method>.json
+```
+
+This classifies practices into Tier 1 (baseline-only, can run in parallel) and Tier 2 (depends on other practices, run after Tier 1).
+
 **Step 2B: Run Phase 2 - Mapping with Latest Guidance**
 
 **IMPORTANT:** Follow the `generate-method` skill Phase 2 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 2: Phase 2 - Mapping section).
@@ -395,6 +423,7 @@ This saves the top-level `narratives` array to a standalone JSON file compatible
 - Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
 - **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
+- **Practice summary context:** If practice summaries were generated (Step 2A.5), include the JSON summary in each subagent prompt. This provides alpha names, pattern views, outcomes, dependencies without requiring ad hoc inspection.
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
 
 **Apply ALL latest guidance from generate-method skill to extracted content:**
@@ -865,6 +894,34 @@ python3 utils/package-keleo.py \
   -o bundles/<name>.keleo --verify
 ```
 
+### Post-Update Cross-Method Sync
+
+After version bump and rebundling, sync updated practices to all consuming methods:
+
+```bash
+# Show what would be synced (dry run)
+python3 utils/sync-practices.py practices/<method>/
+
+# Apply sync and rebuild affected bundles
+python3 utils/sync-practices.py practices/<method>/ --fix --rebuild-bundles
+```
+
+This scans all `practices/*/` directories for JSON files with matching `name` fields, compares versions (semver), and copies newer files to targets — preserving target filenames (handles cases like `build-run-applications.json` → `build-and-run-applications.json`).
+
+**Ensure versions are ahead of all copies** (e.g., after branched versions were created):
+```bash
+# Show current versions across all copies
+python3 utils/apply-versioning.py --show --dir practices/<method>/
+
+# Bump to be ahead of all copies
+python3 utils/apply-versioning.py --dir practices/<method>/ --ahead-of-copies --fix
+```
+
+**Find which methods consume a specific practice:**
+```bash
+python3 utils/discover-dependencies.py --consumers "Practice Name"
+```
+
 ---
 
 ## Common Update Scenarios
@@ -883,6 +940,7 @@ python3 utils/package-keleo.py \
 | 10 | Add/convert WP partOf/mapsTo | Targeted transform | `transform-workproducts.py --spec '[...]' --fix` |
 | 11 | Batch WP partOf→mapsTo | Targeted transform | `transform-workproducts.py` — set `setMapsTo`, `lodMap`, `rename` |
 | 12 | Add/update outcomes | Remap (Mode 2) | Add 1-3 outcomes with measureDescription + metricContributions or objectiveContributions |
+| 13 | Criteria-style checklists | Remap (Mode 2) | Rewrite checklist names from past-participle criteria to imperative verb phrases; add test completion criteria where missing |
 
 **Scenario 8 details** (packaging-only — most common standalone use):
 - Embedded method: `package-keleo.py --from-embedded <method>.json --baseline <baseline>.json -o bundles/<name>.keleo --verify`
@@ -895,9 +953,28 @@ python3 utils/package-keleo.py \
 ## Remap Phase: Quality Fixes
 
 ### Checklist Name Quality
-When assessment flags `checklist-quality` issues, rewrite names as short Title Case noun phrases (3-8 words) capturing WHAT is checked, not HOW. Names must not echo descriptions. Apply consistently across all alphas.
+When assessment flags `checklist-quality` issues, rewrite names as imperative verb phrases (3-8 words) describing WHAT to do, not what condition exists. Names must not echo descriptions. Apply consistently across all alphas and work product LODs.
 
-When assessment flags `checklist-polarity` issues, rewrite items to be positive and additive — describing an achievement to reach, not the absence or lack of something. For example, "Metrics absent" → "Key Metrics Defined". Use the state/LOD description and narratives to characterize level qualities including limitations.
+When assessment flags `checklist-polarity` issues, rewrite items to be positive and additive — describing an action to perform, not the absence or lack of something. For example, "Metrics absent" → "Define Key Metrics". Use the state/LOD description and narratives to characterize level qualities including limitations.
+
+### Checklist Style Modernization
+When assessment flags `checklist-style` issues, rewrite checklist items from criteria-style (past-participle conditions) to action-oriented (imperative verb phrases):
+
+**Name transformation**: Convert past-participle names to imperative verb phrases.
+- "Architecture documented" → "Document the Architecture"
+- "Security review completed" → "Complete Security Review"
+- "Cost model validated" → "Validate Cost Model"
+- "SLOs defined and monitored" → "Define and Monitor SLOs"
+
+**Description enrichment**: After transforming names, verify descriptions carry information beyond them. If a description merely restates the name as a sentence, rewrite to add rationale, scope, method, or context. Do NOT mechanically transform old descriptions into sentences that echo the new name.
+- Anti-pattern: name "Document the Architecture" + description "Document the architecture approach." (echo — adds nothing)
+- Correct: name "Document the Architecture" + description "Create a reference architecture capturing technology stack decisions, rationale, and alternatives considered."
+
+**Test enrichment (not test promotion)**: Do NOT mechanically create tests from descriptions. Only create or retain a test when you can populate `given` with meaningful preconditions, `when` with a meaningful trigger, and `then` with independently observable evidence beyond the description. A test with empty `given`/`when` and `then` that restates the description in past tense is a skeleton test — it adds no verification value.
+
+**Skeleton test cleanup**: When assessment flags `checklist-skeleton-test` or `checklist-echo` issues, or when encountering tests where `test.description` is literally "Definition of done.", `given` and `when` are both empty, and `then` echoes the description — either enrich the test with real preconditions, triggers, and independently verifiable evidence, or remove the test entirely. Removal is preferred when the checklist item is straightforward enough that name + description are self-sufficient.
+
+Apply consistently across all alphas and work product LODs.
 
 ### Asset Coverage
 When assessment flags `asset-coverage` gaps, add Font Awesome 6 Free icons (`fontWeight: "900"`, naming: `<kebab-case>-icon`). Every NarrativeType and Focus needs an icon. See generate-method SKILL.md Assets section for icon suggestions and JSON structure.
@@ -992,14 +1069,19 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
 2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`. See generate-method SKILL.md "Key Utilities" table for the full utility reference. Run `python3 utils/<script>.py --help` for detailed usage. Additional update-specific utilities:
+   - `practice-summary.py` — Structured practice summaries for subagent prompts (`--json`, `--dir`, `--baseline`)
+   - `sync-practices.py` — Sync shared practices across method directories (`<source-dir>/ [--fix] [--rebuild-bundles]`)
+   - `detect-schema-gaps.py` — Schema evolution gap detection (`<file>.json`, `--dir`, `--json`)
    - `transform-alphas.py` — Batch alpha transforms: `rename`, `setMapsTo`, `setContributesTo`, `stateMap`, `addStates`
    - `transform-workproducts.py` — Batch WP transforms: `rename`, `setMapsTo`, `setPartOf`, `lodMap`, `addLods`
    - `build-references.py` — Validate and expand reference specs into AlphaInstance JSON (`--spec`, `--fix`)
    - `fix-citation-names.py` — Rename citation names (`--rename "Old=New"` or `--map renames.json`)
-   - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix` or `--all --fix` for batch)
+   - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix`, `--show`, `--set-version X.Y.Z`, `--ahead-of-copies`)
    - `generate-change-request.py` — Generate ChangeRequest JSON from old/new diff (`<old>.json <new>.json --author --status -o`)
    - `apply-change-request.py` — Apply ChangeRequest nameChanges/removals to downstream JSON (`<cr>.json <target>.json [--fix]`)
    - `fix-common-issues.py` — Now includes `--fix-self-ref-backgrounds` and `--fix-unknown-activity-spaces` (both enabled by `--all`)
+   - `discover-dependencies.py` — Now includes `--tiers <method>.json` (Tier 1/2 classification) and `--consumers "Name"` (find all copies)
+   - `extract-reference-names.py` — Now includes `--sections outcomes pattern-views` for outcome and pattern view extraction
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.

@@ -17,6 +17,12 @@ Usage:
 
     # List all discoverable JSON files in the project
     python3 utils/discover-dependencies.py --list
+
+    # Compute dependency tiers for a method's practices
+    python3 utils/discover-dependencies.py --tiers practices/red-hat-sales-plays/red-hat-sales-plays.json
+
+    # Find all methods/practices that contain a given practice name
+    python3 utils/discover-dependencies.py --consumers "AI Platform TDP"
 """
 
 import argparse
@@ -337,6 +343,202 @@ def cmd_dependents(target_name, index):
     }
 
 
+def _load_practices_from_method_dir(method_data, method_path):
+    """Load practice JSON files from a method's directory, matched by name field.
+
+    Args:
+        method_data: Parsed method JSON dict.
+        method_path: Path to the method JSON file.
+
+    Returns:
+        Dict mapping practice name to (data, file_path) tuples.
+        Practices not found in the directory are omitted.
+    """
+    practice_names = set(method_data.get("practiceNames", []))
+    method_dir = Path(method_path).parent
+    practices = {}
+
+    for json_file in method_dir.glob("*.json"):
+        if json_file.name.startswith("_"):
+            continue
+        if "backup" in str(json_file).lower():
+            continue
+        data, err = load_json_pair(json_file)
+        if err:
+            continue
+        name = data.get("name")
+        if name and name in practice_names:
+            practices[name] = (data, json_file)
+
+    return practices
+
+
+def cmd_tiers(file_path):
+    """Compute dependency tiers for all practices in a method.
+
+    Tier 1: practices whose practiceDependencyNames contains no other
+            practice in the method's practiceNames.
+    Tier 2: practices that depend on other practices within the method.
+    """
+    data, err = load_json_pair(file_path)
+    if err:
+        return {"error": err}
+
+    kind = detect_kind(data)
+    if kind != "method":
+        return {"error": f"Expected a method JSON, got kind '{kind}'"}
+
+    method_name = data.get("name", Path(file_path).stem)
+    practice_names = set(data.get("practiceNames", []))
+    if not practice_names:
+        return {"error": "Method has no practiceNames"}
+
+    practices = _load_practices_from_method_dir(data, file_path)
+
+    tier1 = []
+    tier2 = []
+    not_found = []
+
+    for pname in sorted(practice_names):
+        if pname not in practices:
+            not_found.append(pname)
+            continue
+
+        pdata, _ = practices[pname]
+        dep_names = pdata.get("practiceDependencyNames", [])
+        intra_method_deps = [d for d in dep_names if d in practice_names]
+
+        if intra_method_deps:
+            tier2.append({"name": pname, "dependsOn": sorted(intra_method_deps)})
+        else:
+            tier1.append(pname)
+
+    return {
+        "method": method_name,
+        "tier1": tier1,
+        "tier2": tier2,
+        "notFound": not_found if not_found else None,
+    }
+
+
+def fmt_tiers(result):
+    """Format tier result as human-readable text."""
+    if "error" in result:
+        return f"Error: {result['error']}"
+
+    lines = [f"Dependency Tiers for {result['method']}:", ""]
+
+    lines.append("Tier 1 (baseline-only, can run in parallel):")
+    if result["tier1"]:
+        for name in result["tier1"]:
+            lines.append(f"  - {name}")
+    else:
+        lines.append("  (none)")
+
+    lines.append("")
+    lines.append("Tier 2 (depends on other practices, run after Tier 1):")
+    if result["tier2"]:
+        for entry in result["tier2"]:
+            deps_str = ", ".join(entry["dependsOn"])
+            lines.append(f"  - {entry['name']} (depends on: {deps_str})")
+    else:
+        lines.append("  (none)")
+
+    if result.get("notFound"):
+        lines.append("")
+        lines.append("Not found in directory:")
+        for name in result["notFound"]:
+            lines.append(f"  - {name}")
+
+    return "\n".join(lines)
+
+
+def cmd_consumers(target_name, search_dirs):
+    """Find all methods/practices that contain or reference a given practice name.
+
+    Scans practice directories for JSON files whose name field matches, and
+    checks whether any method in the same directory includes the name in
+    practiceNames.
+    """
+    consumers = []
+
+    for search_dir in search_dirs:
+        search_path = Path(search_dir)
+        if not search_path.is_dir():
+            continue
+        if search_path.name not in ("practices", "baselines"):
+            continue
+
+        for subdir in sorted(search_path.iterdir()):
+            if not subdir.is_dir():
+                continue
+
+            matching_files = []
+            methods_containing = []
+
+            for json_file in subdir.glob("*.json"):
+                if json_file.name.startswith("_"):
+                    continue
+                if "backup" in str(json_file).lower():
+                    continue
+
+                data, err = load_json_pair(json_file)
+                if err:
+                    continue
+
+                name = data.get("name")
+                kind = detect_kind(data)
+
+                if name == target_name:
+                    matching_files.append({
+                        "fileName": json_file.name,
+                        "version": data.get("version"),
+                        "kind": kind,
+                    })
+
+                if kind == "method" and target_name in (data.get("practiceNames") or []):
+                    methods_containing.append(name or json_file.stem)
+
+            if matching_files or methods_containing:
+                consumer = {
+                    "directory": str(subdir),
+                    "files": matching_files,
+                    "methods": methods_containing,
+                }
+                consumers.append(consumer)
+
+    return {
+        "practiceName": target_name,
+        "consumers": consumers,
+        "count": len(consumers),
+    }
+
+
+def fmt_consumers(result):
+    """Format consumers result as human-readable text."""
+    if "error" in result:
+        return f"Error: {result['error']}"
+
+    lines = [f'Consumers of "{result["practiceName"]}":']
+
+    if not result["consumers"]:
+        lines.append("  (none found)")
+        return "\n".join(lines)
+
+    for consumer in result["consumers"]:
+        lines.append("")
+        lines.append(f"  {consumer['directory']}/")
+
+        for f in consumer["files"]:
+            version_str = f" (v{f['version']})" if f.get("version") else ""
+            lines.append(f"    file: {f['fileName']}{version_str}")
+
+        for method_name in consumer["methods"]:
+            lines.append(f"    method: {method_name} (in practiceNames)")
+
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Discover and resolve Practice Language JSON dependencies"
@@ -355,12 +557,24 @@ def main():
         help="Find all practices/methods depending on a named baseline or practice"
     )
     group.add_argument(
+        "--tiers", metavar="FILE",
+        help="Compute dependency tiers for a method's practices"
+    )
+    group.add_argument(
+        "--consumers", metavar="NAME",
+        help="Find all methods/practices containing or referencing a named practice"
+    )
+    group.add_argument(
         "--list", action="store_true",
         help="List all discoverable JSON files with names and kinds"
     )
     parser.add_argument(
         "--transitive", action="store_true",
         help="Recursively resolve transitive baseline dependencies (with --resolve-from)"
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="Output as JSON instead of human-readable text (for --tiers, --consumers)"
     )
     parser.add_argument(
         "--search-dirs", nargs="+", default=DEFAULT_SEARCH_DIRS,
@@ -372,9 +586,23 @@ def main():
     )
     args = parser.parse_args()
 
-    index, skipped = build_index(args.search_dirs)
-
     prefer_fs = not getattr(args, 'include_bundles', False)
+
+    if args.tiers:
+        if not Path(args.tiers).is_file():
+            print(json.dumps({"error": f"File not found: {args.tiers}"}) if args.json
+                  else f"Error: File not found: {args.tiers}")
+            sys.exit(1)
+        result = cmd_tiers(args.tiers)
+        print(json.dumps(result, indent=2) if args.json else fmt_tiers(result))
+        sys.exit(0)
+
+    if args.consumers:
+        result = cmd_consumers(args.consumers, args.search_dirs)
+        print(json.dumps(result, indent=2) if args.json else fmt_consumers(result))
+        sys.exit(0)
+
+    index, skipped = build_index(args.search_dirs)
 
     if args.list:
         result = cmd_list(index, skipped)

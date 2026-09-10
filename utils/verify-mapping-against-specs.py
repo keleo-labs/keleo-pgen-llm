@@ -298,37 +298,25 @@ def check_no_floating_alphas(extracted):
 
 
 def check_mutual_exclusivity(extracted):
-    """@rule:semantic-002 — contributesTo and mapsTo are mutually exclusive."""
+    """@rule:semantic-002 — contributesTo and mapsTo may coexist but must reference different targets."""
     findings = []
     for alpha in extracted["alphas"]:
         if alpha["contributesTo"] and alpha["mapsTo"]:
-            findings.append(_finding(
-                "semantic-002", "error",
-                f"Alpha '{alpha['name']}' has both contributesTo ('{alpha['contributesTo']}') "
-                f"and mapsTo ('{alpha['mapsTo']}') — must be one or the other",
-            ))
+            if alpha["contributesTo"] == alpha["mapsTo"]:
+                findings.append(_finding(
+                    "semantic-002", "error",
+                    f"Alpha '{alpha['name']}' has both contributesTo and mapsTo "
+                    f"referencing the same target ('{alpha['contributesTo']}') — must reference different alphas",
+                ))
     return findings
 
 
 def check_mapsto_naming(extracted, baseline=None):
-    """@rule:semantic-010 — mapsTo variant names must not repeat parent type name."""
-    findings = []
-    all_alpha_names = {a["name"] for a in extracted["alphas"]}
-    baseline_names = set()
-    if baseline:
-        baseline_names = {a["name"] for a in baseline.get("alphas", [])}
-
-    for alpha in extracted["alphas"]:
-        if not alpha["mapsTo"]:
-            continue
-        parent_name = alpha["mapsTo"]
-        if parent_name.lower() in alpha["name"].lower():
-            findings.append(_finding(
-                "semantic-010", "warning",
-                f"mapsTo variant '{alpha['name']}' contains parent type name '{parent_name}' — "
-                f"mapsTo reads as 'is a type of', so redundant",
-            ))
-    return findings
+    """@rule:semantic-010 — mapsTo variant alpha names may include or omit parent type name."""
+    # This rule was relaxed for alphas in schema 2.11.0.
+    # Alpha mapsTo variant names may now include or omit the parent type name.
+    # No findings are generated — this check is retained for structural compatibility.
+    return []
 
 
 def check_relatesto_present(extracted):

@@ -388,15 +388,15 @@ Add alphas array:
         },
         "checklist": [
           {
-            "name": "Checklist item name",
-            "description": "One sentence verification criterion",
+            "name": "Imperative verb phrase (action to take)",
+            "description": "WHY and HOW — rationale, scope, method (must add information beyond the name)",
             "seq": 1,
-            "test": {  // Optional - structured Given/When/Then verification
-              "name": "Verification scenario name",
-              "description": "What this test verifies",
-              "given": ["Specific precondition for this check"],
-              "when": ["Condition or trigger to evaluate"],
-              "then": ["Expected outcome"]
+            "test": {  // Optional - completion criteria / definition of done
+              "name": "What is being verified (not mechanical '{fragment} verification')",
+              "description": "Specific verification purpose (not 'Definition of done.')",
+              "given": ["Meaningful precondition (omit test entirely if empty)"],
+              "when": ["Meaningful trigger or evaluation point (omit test entirely if empty)"],
+              "then": ["Independently observable evidence (not description in past tense)"]
             },
             "examples": [  // Optional - concrete scenario Tests
               {
@@ -443,7 +443,7 @@ Add alphas array:
   - Every relatesTo entry MUST include `direction` (`outgoing`, `incoming`, or `mutual`) — required by schema
   - Optional `description` field explains why the relationship exists
   - Validate every alphaName in relatesTo references a valid alpha (baseline or practice-defined)
-- Checklist items are objects {name, description, seq}, NOT strings. Every item must be positive and additive — describes an achievement to reach, never the absence or lack of something (e.g., "Key metrics defined" not "Metrics absent"). Every item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "All requirements met", "Minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular and must be removed.
+- Checklist items are objects {name, description, seq}, NOT strings. Every item name must be an imperative verb phrase describing an action to take (e.g., "Define key metrics" not "Metrics defined"; "Establish security controls" not "Security controls established"). Every item must be positive and additive — describes an action to perform, never the absence or lack of something (e.g., "Define key metrics" not "Metrics absent"). When `test` is present, it defines the completion criteria (definition of done); the `then` clauses specify what "done" looks like. Every item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "All requirements met", "Minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular and must be removed. The `description` must carry information not present in the `name` — rationale, scope, method, or context that a practitioner needs before starting. A description that restates the name as a longer sentence is redundant and must be rewritten. When `test` is present, `test.then` must describe independently observable evidence — not the description in past tense. `test.given` and `test.when` must be populated with meaningful preconditions and triggers; if they cannot be, omit the `test` entirely. `test.description` must describe the specific verification purpose — not the literal string "Definition of done."
 - evidencedBy is optional array of WorkProductContribution
 - **Redeclared alpha state handling (CRITICAL):**
   - Include ALL states from the baseline/parent practice definition — never subset to only enriched states
@@ -511,8 +511,8 @@ Add workProducts array:
         },
         "checklist": [
           {
-            "name": "Characteristic name",
-            "description": "One sentence quality criterion",
+            "name": "Imperative verb phrase (action to take)",
+            "description": "What to accomplish and why (one sentence)",
             "seq": 1
           }
         ],
@@ -1206,21 +1206,59 @@ Once validation passes, verify:
 
 ### 1. Checklist Format
 ❌ Wrong: `"checklist": ["Item 1", "Item 2"]`
+❌ Wrong: `"name": "Architecture documented"` (criteria-style, past participle)
 ✅ Right:
 ```json
 "checklist": [
   {
-    "name": "Item name",
-    "description": "One sentence description",
+    "name": "Document the architecture",
+    "description": "Create a reference architecture with technology stack decisions and rationale.",
     "seq": 1
   }
 ]
 ```
+Names must be imperative verb phrases (actions to take), not past-participle conditions.
 
 ### 2. Meta-Checklist Items
-❌ Wrong: `"name": "Minimum requirements met", "description": "All thirteen minimum documentation requirements are met"`
-❌ Wrong: `"name": "Standards achieved", "description": "All mandatory criteria satisfied"`
-✅ Right: Each checklist item independently describes a specific, observable achievement. The checklist IS the list of requirements — items that reference or count other items are circular and add no value.
+❌ Wrong: `"name": "Meet minimum requirements", "description": "Complete all thirteen minimum documentation requirements"`
+❌ Wrong: `"name": "Achieve standards", "description": "Satisfy all mandatory criteria"`
+✅ Right: Each checklist item independently describes a specific, actionable task. The checklist IS the list of tasks — items that reference or count other items are circular and add no value.
+
+### 2b. Checklist Information Echo
+
+**Bad:** Description restates name; test restates description in past tense:
+
+```json
+{
+  "name": "Identify Target AI Personas",
+  "description": "Identify target AI personas across the organization.",
+  "test": {
+    "name": "Target AI Personas verification",
+    "description": "Definition of done.",
+    "given": [], "when": [],
+    "then": ["target AI personas identified across the organization"]
+  }
+}
+```
+
+**Good:** Each field carries distinct information:
+
+```json
+{
+  "name": "Identify Target AI Personas",
+  "description": "Map organizational roles that will interact with AI capabilities to inform platform configuration and adoption sequencing.",
+  "test": {
+    "name": "AI persona coverage verification",
+    "description": "Verify persona mapping spans all relevant organizational functions.",
+    "given": ["Customer has active or planned AI initiatives"],
+    "when": ["Account team prepares AI platform engagement plan"],
+    "then": [
+      "Each business unit with AI initiatives has at least one mapped persona",
+      "Persona-capability mapping informs platform configuration priorities"
+    ]
+  }
+}
+```
 
 ### 3. Competency Level Reference
 ❌ Wrong: `{"competencyName": "Engineering", "level": 3}`
@@ -1332,14 +1370,14 @@ Once validation passes, verify:
 ```
 ✅ Right: Only cross-element dependencies in `alphaStates` and `workProductLevels`
 ❌ Wrong: `test` as a string or using `test` on elements that don't support it
-✅ Right: `test` is a Test object (extends PracticeElement) — only on Checklist and Activity:
+✅ Right: `test` is a Test object (extends PracticeElement) — only on Checklist and Activity. On checklists, test defines the completion criteria (definition of done); on activities, test captures triggers and observable results:
 ```json
 "test": {
-  "name": "Verification scenario",
-  "description": "What this verifies",
+  "name": "Completion criteria scenario",
+  "description": "Definition of done for this task",
   "given": ["Precondition"],
   "when": ["Trigger or condition"],
-  "then": ["Expected outcome"]
+  "then": ["What 'done' looks like — observable outcome"]
 }
 ```
 ❌ Wrong: `examples` as a flat string array

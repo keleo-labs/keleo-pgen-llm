@@ -169,10 +169,10 @@ Total: [X focuses]
     - **Background**: [optional - populate from Phase 1.5 state Prerequisites; use sparingly in baselines — the practice layer is the natural place for detailed Gherkin structure]
       - Given: [from Phase 1.5 Prerequisites: contextual conditions and natural-language preconditions]
       - Alpha States: [from Phase 1.5 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
-    - **Checklists**:
-      - [ ] [Criteria 1 from Phase 1.5]
-      - [ ] [Criteria 2 from Phase 1.5]
-      - [ ] [Criteria 3-5 from Phase 1.5]
+    - **Checklists**: [imperative verb phrases — actionable tasks, not criteria; each description must add rationale/scope/method beyond the name, not restate it as a sentence]
+      - [ ] [Actionable task 1 from Phase 1.5]
+      - [ ] [Actionable task 2 from Phase 1.5]
+      - [ ] [Actionable tasks 3-5 from Phase 1.5]
   - **State 2: [Name]**
     - [Same structure, 5-7 states total]
 - **Narrative**: [Practice-level narrative using a narrative type from Phase 1.5]
@@ -210,7 +210,7 @@ Each `relatesTo` entry is an `AlphaRelationship` with required `relationship`, `
 - ✓ ALL alphas have `relatesTo` arrays (show interconnections)
 - ✓ Every `relatesTo` entry has `direction` field
 - ✓ 5-7 states per alpha (not more than 7, not fewer than 5)
-- ✓ Each state has 3-5 checklist items (from Phase 1.5 criteria), all positive/additive (achievements to reach, not absences to observe)
+- ✓ Each state has 3-5 checklist items (imperative verb phrases from Phase 1.5), all positive/additive (actions to perform, not absences to observe); each checklist text adds actionable specificity beyond what the state description already conveys
 - ✓ 8-15 total alphas (from Phase 1.5 essential concerns)
 
 **Output Format:**

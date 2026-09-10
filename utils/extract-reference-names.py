@@ -76,7 +76,7 @@ VALID_SECTIONS = [
     "summary", "structure", "focuses", "alphas", "activitySpaces", "competencies",
     "narrativeTypes", "narratives", "citations", "assets", "activities",
     "workProducts", "personas", "personaGroups", "patterns", "aliases",
-    "practices",
+    "practices", "outcomes", "pattern-views",
 ]
 
 
@@ -553,6 +553,55 @@ def print_patterns(data):
             print(f"    View {v.get('seq', '?')}: {v.get('name', 'N/A')} ({len(states)} alphaStates)")
 
 
+def print_outcomes(data):
+    outcomes = data.get("outcomes", [])
+    if not outcomes:
+        print("=== OUTCOMES === (none)")
+        return
+    print(f"=== OUTCOMES ({len(outcomes)}) ===")
+    for o in outcomes:
+        print(f"  {o.get('name', '?')}")
+        measure = o.get("measureDescription", "")
+        if measure:
+            print(f"    measure: {measure}")
+        for oc in o.get("objectiveContributions", []):
+            pn = oc.get("patternName", "?")
+            rpv = oc.get("recognizedAtPatternViewName", "?")
+            print(f"    objective: {pn} -> {rpv}")
+            fw = oc.get("forecastWeights", [])
+            if fw:
+                weight_parts = [f"{w.get('patternViewName', '?')} ({w.get('weight', '?')})"
+                                for w in fw]
+                print(f"      weights: {', '.join(weight_parts)}")
+        for mc in o.get("metricContributions", []):
+            alpha = mc.get("alphaName", "?")
+            metric = mc.get("metricName", "?")
+            recognized = mc.get("recognizedAtStateName", "?")
+            wp = mc.get("workProductName")
+            line = f"    metric: {alpha}.{metric} -> {recognized}"
+            if wp:
+                line += f" (workProduct: {wp})"
+            print(line)
+            fw = mc.get("forecastWeights", [])
+            if fw:
+                weight_parts = [f"{w.get('stateName', '?')} ({w.get('weight', '?')})"
+                                for w in fw]
+                print(f"      weights: {', '.join(weight_parts)}")
+
+
+def print_pattern_views(data):
+    patterns = data.get("patterns", [])
+    if not patterns:
+        print("=== PATTERN VIEWS === (none)")
+        return
+    print("=== PATTERN VIEWS ===")
+    for p in patterns:
+        views = sorted(p.get("patternViews", []), key=lambda v: v.get("seq", 0))
+        print(f"  {p.get('name', '?')} ({len(views)} views):")
+        for v in views:
+            print(f"    {v.get('seq', '?')}. {v.get('name', '?')}")
+
+
 def print_aliases(data):
     aliases = data.get("practiceElementAliases", [])
     alias_ctx = data.get("_aliasContext", {})
@@ -786,6 +835,42 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
                 "activityCount": len(p.get("activities", [])),
                 "workProductCount": len(p.get("workProducts", [])),
             } for p in data.get("practices", [])]
+        elif section == "outcomes":
+            result["outcomes"] = []
+            for o in data.get("outcomes", []):
+                entry = {
+                    "name": o.get("name"),
+                    "measureDescription": o.get("measureDescription", ""),
+                    "objectiveContributions": [{
+                        "patternName": oc.get("patternName"),
+                        "recognizedAtPatternViewName": oc.get("recognizedAtPatternViewName"),
+                        "forecastWeights": [{
+                            "patternViewName": w.get("patternViewName"),
+                            "weight": w.get("weight"),
+                        } for w in oc.get("forecastWeights", [])],
+                    } for oc in o.get("objectiveContributions", [])],
+                    "metricContributions": [{
+                        "alphaName": mc.get("alphaName"),
+                        "metricName": mc.get("metricName"),
+                        **({"workProductName": mc["workProductName"]} if mc.get("workProductName") else {}),
+                        "recognizedAtStateName": mc.get("recognizedAtStateName"),
+                        "forecastWeights": [{
+                            "stateName": w.get("stateName"),
+                            "weight": w.get("weight"),
+                        } for w in mc.get("forecastWeights", [])],
+                    } for mc in o.get("metricContributions", [])],
+                }
+                result["outcomes"].append(entry)
+        elif section == "pattern-views":
+            result["patternViews"] = []
+            for p in data.get("patterns", []):
+                views = sorted(p.get("patternViews", []),
+                               key=lambda v: v.get("seq", 0))
+                result["patternViews"].append({
+                    "patternName": p.get("name"),
+                    "views": [{"name": v.get("name"), "seq": v.get("seq")}
+                              for v in views],
+                })
     return result
 
 
@@ -1236,6 +1321,8 @@ def main():
         "patterns": lambda: print_patterns(data),
         "aliases": lambda: print_aliases(data),
         "practices": lambda: print_practices(data),
+        "outcomes": lambda: print_outcomes(data),
+        "pattern-views": lambda: print_pattern_views(data),
     }
 
     for section in sections:

@@ -15,21 +15,20 @@ Feature: Alpha Relationship Integrity
     Then the alpha has exactly one of contributesTo or mapsTo
     And the target resolves to a baseline, practice-local, or dependency alpha
 
-  Scenario: contributesTo and mapsTo are mutually exclusive (@rule:semantic-002)
+  Scenario: contributesTo and mapsTo may coexist on different targets (@rule:semantic-002)
     Given a new alpha declares a parent relationship
     When the alpha JSON is generated
-    Then the alpha has contributesTo or mapsTo but never both
+    Then if both contributesTo and mapsTo are present they reference different alphas
 
   Scenario: mapsTo variants match parent states exactly (@rule:semantic-003)
     Given a new alpha has mapsTo pointing to a parent alpha
     When the alpha's states are generated
     Then the state names and sequence exactly match the parent alpha's states
 
-  Scenario: mapsTo variant names omit parent type (@rule:semantic-010)
+  Scenario: mapsTo variant names may include or omit parent type (@rule:semantic-010)
     Given a new alpha has mapsTo pointing to a parent alpha
     When the alpha name is chosen
-    Then the alpha name does not contain the parent alpha's name
-    And the alias name (if present) does not contain the parent alpha's name
+    Then the alpha name may include or omit the parent alpha's type name
 
   Scenario: Redeclared alphas have no contributesTo or mapsTo (@rule:semantic-005)
     Given an alpha name matches a baseline or parent practice alpha

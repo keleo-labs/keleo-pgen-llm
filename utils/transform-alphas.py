@@ -18,10 +18,15 @@ Spec format (JSON array of objects):
         {
             "alpha": "Current Alpha Name",        # required: which alpha to transform
             "rename": "New Alpha Name",            # optional: rename the alpha
-            "setMapsTo": "Parent Alpha",           # optional: set mapsTo (removes contributesTo)
-            "setContributesTo": "Parent Alpha",    # optional: set contributesTo (removes mapsTo)
+            "setMapsTo": "Parent Alpha",           # optional: set mapsTo (preserves contributesTo)
+            "setContributesTo": "Parent Alpha",    # optional: set contributesTo (preserves mapsTo)
+            "removeContributesTo": true,           # optional: remove contributesTo field
+            "removeMapsTo": true,                  # optional: remove mapsTo field
             "stateMap": {"OldState": "NewState"},  # optional: rename states (1:1 or many:1 merge)
-            "addStates": [{"name":"S","description":"D","seq":N,"checklist":[]}]  # optional: new states
+            "addStates": [{"name":"S","description":"D","seq":N,"checklist":[]}],  # optional: new states
+            "setRelatesTo": [{"alphaName":"X","relationship":"R","direction":"outgoing"}],  # optional: replace relatesTo array
+            "stripContributesToState": true,        # optional: remove contributesToState from all states
+            "remove": true                         # optional: remove alpha and all cross-references
         }
     ]
 
@@ -65,9 +70,106 @@ def _deep_rename_strings(obj, old_val, new_val):
     return count
 
 
+def remove_alpha(practice, alpha_name):
+    """Remove an alpha and all its cross-references. Returns list of changes."""
+    changes = []
+    alphas = practice.get("alphas", [])
+    alpha = next((a for a in alphas if a["name"] == alpha_name), None)
+    if not alpha:
+        return [], f"Alpha '{alpha_name}' not found"
+
+    practice["alphas"] = [a for a in alphas if a["name"] != alpha_name]
+    changes.append(f"  removed alpha: {alpha_name}")
+
+    # Remove relatesTo entries referencing this alpha on other alphas
+    for a in practice.get("alphas", []):
+        orig = len(a.get("relatesTo", []))
+        a["relatesTo"] = [r for r in a.get("relatesTo", []) if r.get("alphaName") != alpha_name]
+        removed = orig - len(a.get("relatesTo", []))
+        if removed:
+            changes.append(f"  removed {removed} relatesTo on {a['name']}")
+        if not a.get("relatesTo"):
+            a.pop("relatesTo", None)
+
+    # Remove contributesTo/mapsTo targeting this alpha on other alphas
+    for a in practice.get("alphas", []):
+        if a.get("contributesTo") == alpha_name:
+            a.pop("contributesTo")
+            changes.append(f"  cleared contributesTo on {a['name']}")
+        if a.get("mapsTo") == alpha_name:
+            a.pop("mapsTo")
+            changes.append(f"  cleared mapsTo on {a['name']}")
+
+    # Clean activities: remove contributesTo/worksOn entries referencing this alpha
+    for act in practice.get("activities", []):
+        for key in ("contributesTo", "worksOn"):
+            orig = len(act.get(key, []))
+            act[key] = [c for c in act.get(key, []) if not (isinstance(c, dict) and c.get("alphaName") == alpha_name)]
+            removed = orig - len(act.get(key, []))
+            if removed:
+                changes.append(f"  removed {removed} {key} on activity {act['name']}")
+            if not act.get(key):
+                act.pop(key, None)
+
+    # Clean work product LOD contributesTo
+    for wp in practice.get("workProducts", []):
+        for lod in wp.get("levelsOfDetail", []):
+            orig = len(lod.get("contributesTo", []))
+            lod["contributesTo"] = [c for c in lod.get("contributesTo", []) if not (isinstance(c, dict) and c.get("alphaName") == alpha_name)]
+            if not lod.get("contributesTo"):
+                lod.pop("contributesTo", None)
+
+    # Clean pattern alphaStates
+    for pat in practice.get("patterns", []):
+        for view in pat.get("patternViews", []):
+            orig = len(view.get("alphaStates", []))
+            view["alphaStates"] = [s for s in view.get("alphaStates", []) if not (isinstance(s, dict) and s.get("alphaName") == alpha_name)]
+            removed = orig - len(view.get("alphaStates", []))
+            if removed:
+                changes.append(f"  removed {removed} alphaStates in pattern view {view.get('name', '?')}")
+
+    # Clean background alphaStates on states and activities
+    for a in practice.get("alphas", []):
+        for s in a.get("states", []):
+            bg = s.get("background", {})
+            bg["alphaStates"] = [astate for astate in bg.get("alphaStates", []) if not (isinstance(astate, dict) and astate.get("alphaName") == alpha_name)]
+            if not bg.get("alphaStates"):
+                bg.pop("alphaStates", None)
+            if not bg:
+                s.pop("background", None)
+
+    for act in practice.get("activities", []):
+        bg = act.get("background", {})
+        if bg:
+            bg["alphaStates"] = [astate for astate in bg.get("alphaStates", []) if not (isinstance(astate, dict) and astate.get("alphaName") == alpha_name)]
+            if not bg.get("alphaStates"):
+                bg.pop("alphaStates", None)
+            if not bg:
+                act.pop("background", None)
+
+    # Clean outcomes (metricContributions referencing removed alpha)
+    for outcome in practice.get("outcomes", []):
+        for mc in outcome.get("metricContributions", []):
+            if mc.get("alphaName") == alpha_name:
+                mc.pop("alphaName", None)
+                mc.pop("stateName", None)
+
+    # Clean practiceElementAliases
+    practice["practiceElementAliases"] = [a for a in practice.get("practiceElementAliases", []) if a.get("practiceElementName") != alpha_name]
+    if not practice.get("practiceElementAliases"):
+        practice.pop("practiceElementAliases", None)
+
+    return changes, None
+
+
 def transform_alpha(practice, spec):
     """Apply a single alpha transformation. Returns (changes, error)."""
     alpha_name = spec["alpha"]
+
+    # Handle removal
+    if spec.get("remove"):
+        return remove_alpha(practice, alpha_name)
+
     new_name = spec.get("rename")
     set_mapsto = spec.get("setMapsTo")
     set_contributesto = spec.get("setContributesTo")
@@ -130,22 +232,52 @@ def transform_alpha(practice, spec):
         # Re-sort states by seq
         alpha["states"].sort(key=lambda s: s.get("seq", 0))
 
-    # 1. Change relationship type
+    # 1. Change relationship type (schema 2.11.0: mapsTo and contributesTo may coexist)
     if set_mapsto:
-        old_rel = alpha.pop("contributesTo", None)
+        old_val = alpha.get("mapsTo")
         alpha["mapsTo"] = set_mapsto
-        if old_rel:
-            changes.append(f"  relationship: contributesTo:{old_rel} → mapsTo:{set_mapsto}")
-        else:
+        if old_val and old_val != set_mapsto:
+            changes.append(f"  relationship: mapsTo:{old_val} → mapsTo:{set_mapsto}")
+        elif not old_val:
             changes.append(f"  relationship: set mapsTo:{set_mapsto}")
 
     if set_contributesto:
-        old_rel = alpha.pop("mapsTo", None)
+        old_val = alpha.get("contributesTo")
         alpha["contributesTo"] = set_contributesto
-        if old_rel:
-            changes.append(f"  relationship: mapsTo:{old_rel} → contributesTo:{set_contributesto}")
-        else:
+        if old_val and old_val != set_contributesto:
+            changes.append(f"  relationship: contributesTo:{old_val} → contributesTo:{set_contributesto}")
+        elif not old_val:
             changes.append(f"  relationship: set contributesTo:{set_contributesto}")
+
+    # 1a2. Remove relationship fields
+    if spec.get("removeContributesTo"):
+        old_val = alpha.pop("contributesTo", None)
+        if old_val:
+            changes.append(f"  relationship: removed contributesTo:{old_val}")
+
+    if spec.get("removeMapsTo"):
+        old_val = alpha.pop("mapsTo", None)
+        if old_val:
+            changes.append(f"  relationship: removed mapsTo:{old_val}")
+
+    # 1b. Replace relatesTo array
+    set_relates_to = spec.get("setRelatesTo")
+    if set_relates_to is not None:
+        old_relates = alpha.get("relatesTo", [])
+        alpha["relatesTo"] = set_relates_to
+        old_names = [r.get("alphaName", "?") for r in old_relates]
+        new_names = [r.get("alphaName", "?") for r in set_relates_to]
+        changes.append(f"  relatesTo: [{', '.join(old_names)}] → [{', '.join(new_names)}]")
+
+    # 1c. Strip contributesToState from all states
+    if spec.get("stripContributesToState"):
+        stripped = 0
+        for state in alpha.get("states", []):
+            if "contributesToState" in state:
+                del state["contributesToState"]
+                stripped += 1
+        if stripped:
+            changes.append(f"  stripped contributesToState from {stripped} states")
 
     # 2. Rename states (within the alpha AND across all cross-references)
     if state_map:
@@ -215,6 +347,32 @@ def transform_alpha(practice, spec):
                 if "background" in act:
                     _fix_bg(act["background"])
 
+            # LevelOfDetail backgrounds
+            for wp in practice.get("workProducts", []):
+                for lod in wp.get("levelsOfDetail", []):
+                    if "background" in lod:
+                        _fix_bg(lod["background"])
+
+            # References (AlphaInstance) stateName
+            for ref in practice.get("references", []):
+                if ref.get("alphaName") in (alpha_name, new_name):
+                    if ref.get("stateName") == old_state:
+                        ref["stateName"] = new_state
+                    for ev in ref.get("evidenceBy", []):
+                        if ev.get("stateName") == old_state:
+                            ev["stateName"] = new_state
+
+            # Outcomes metricContributions/objectiveContributions stateName
+            for outcome in practice.get("outcomes", []):
+                for mc in outcome.get("metricContributions", []):
+                    if mc.get("alphaName") in (alpha_name, new_name):
+                        if mc.get("stateName") == old_state:
+                            mc["stateName"] = new_state
+                for oc in outcome.get("objectiveContributions", []):
+                    if oc.get("alphaName") in (alpha_name, new_name):
+                        if oc.get("stateName") == old_state:
+                            oc["stateName"] = new_state
+
     # 3. Rename the alpha itself (must be done AFTER state renames to not break lookups)
     if new_name and new_name != alpha_name:
         # Update the alpha's own name
@@ -252,8 +410,13 @@ def transform_alpha(practice, spec):
                     c["alphaName"] = new_name
                     ref_count += 1
 
-        # WorkProduct LOD contributesTo
+        # WorkProduct LOD contributesTo and contributesToAlphaNames
         for wp in practice.get("workProducts", []):
+            can = wp.get("contributesToAlphaNames", [])
+            for i, name in enumerate(can):
+                if name == alpha_name:
+                    can[i] = new_name
+                    ref_count += 1
             for lod in wp.get("levelsOfDetail", []):
                 for c in lod.get("contributesTo", []):
                     if isinstance(c, dict) and c.get("alphaName") == alpha_name:
@@ -286,8 +449,22 @@ def transform_alpha(practice, spec):
                 alias["name"] = new_name
                 ref_count += 1
 
-        # Narrative contexts that reference alpha by name (in narrativeContexts strings)
-        # These are caught by a broader string scan if needed, but usually not structural
+        # references (AlphaInstance objects)
+        for ref in practice.get("references", []):
+            if ref.get("alphaName") == alpha_name:
+                ref["alphaName"] = new_name
+                ref_count += 1
+
+        # outcomes (metricContributions/objectiveContributions)
+        for outcome in practice.get("outcomes", []):
+            for mc in outcome.get("metricContributions", []):
+                if mc.get("alphaName") == alpha_name:
+                    mc["alphaName"] = new_name
+                    ref_count += 1
+            for oc in outcome.get("objectiveContributions", []):
+                if oc.get("alphaName") == alpha_name:
+                    oc["alphaName"] = new_name
+                    ref_count += 1
 
         changes.append(f"  references updated: {ref_count}")
 

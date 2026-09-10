@@ -416,55 +416,14 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
 
 def check_mapsto_naming(data, kind, baseline_data=None):
-    """Check that mapsTo variant names don't repeat the parent type name (alphas and work products)."""
+    """Check that mapsTo variant names don't repeat the parent type name (work products only).
+
+    Note: Alpha mapsTo naming was relaxed in schema 2.11.0 — alpha variant names
+    may now include or omit the parent type name. This check only applies to work products.
+    """
     issues = []
     if kind == "practiceBaseline":
         return issues
-
-    all_alphas = {}
-    for a in data.get("alphas", []):
-        all_alphas[a.get("name", "")] = a
-    if baseline_data:
-        for a in baseline_data.get("alphas", []):
-            all_alphas.setdefault(a.get("name", ""), a)
-
-    for idx, alpha in enumerate(data.get("alphas", [])):
-        maps_to = alpha.get("mapsTo")
-        if not maps_to:
-            continue
-
-        alpha_name = alpha.get("name", "")
-        parent = all_alphas.get(maps_to)
-        if not parent:
-            continue
-
-        parent_name = parent.get("name", maps_to)
-        parent_words = set(parent_name.lower().split())
-
-        if parent_name.lower() in alpha_name.lower():
-            issues.append({
-                "severity": "warning",
-                "category": "mapsto-naming",
-                "path": f"alphas[{idx}].name",
-                "message": f"mapsTo variant '{alpha_name}' contains parent type name '{parent_name}' — "
-                           f"mapsTo reads as 'is a type of', so the type name is redundant",
-                "autoFixable": True,
-            })
-
-        alias_name = None
-        for alias in data.get("practiceElementAliases", data.get("aliases", [])):
-            if alias.get("name") == alpha_name and alias.get("elementType") == "Alpha":
-                alias_name = alias.get("aliasName", "")
-                break
-
-        if alias_name and parent_name.lower() in alias_name.lower():
-            issues.append({
-                "severity": "warning",
-                "category": "mapsto-naming",
-                "path": f"alphas[{idx}].aliasName",
-                "message": f"mapsTo variant alias '{alias_name}' contains parent type name '{parent_name}'",
-                "autoFixable": False,
-            })
 
     all_wps = {}
     for wp in data.get("workProducts", []):
@@ -898,13 +857,13 @@ def _normalize_checklist_name(name):
 
 _NEGATIVE_POLARITY_PATTERNS = [
     re.compile(r'\babsent\b', re.IGNORECASE),
-    re.compile(r'\bmissing\b', re.IGNORECASE),
+    re.compile(r'\bmissing\b(?!\s+[A-Z])', re.IGNORECASE),
     re.compile(r'\blacking\b', re.IGNORECASE),
     re.compile(r'\bundefined\b', re.IGNORECASE),
     re.compile(r'\bunresolved\b', re.IGNORECASE),
     re.compile(r'\bunaddressed\b', re.IGNORECASE),
     re.compile(r'\bincomplete\b', re.IGNORECASE),
-    re.compile(r'\bnot\s+(?:defined|established|documented|identified|created|completed|present|available)\b', re.IGNORECASE),
+    re.compile(r'\bnot\s+(?:defined|established|documented|identified|created|completed|present)\b', re.IGNORECASE),
     re.compile(r'^no\s+', re.IGNORECASE),
     re.compile(r'^without\s+', re.IGNORECASE),
     re.compile(r'\bgaps?\s+(?:identified|noted|exist|present|remain)', re.IGNORECASE),
@@ -921,6 +880,53 @@ def _is_negative_polarity(name, desc):
     return False
 
 
+_CRITERIA_STYLE_ENDINGS = re.compile(
+    r'\b(?:defined|documented|established|completed|validated|created|'
+    r'specified|identified|approved|reviewed|assessed|configured|'
+    r'implemented|deployed|provisioned|monitored|verified|aligned|'
+    r'agreed|determined|selected|recognized|achieved|maintained|'
+    r'measured|published|integrated|secured|tested|scoped|bounded|'
+    r'catalogued|quantified|mapped|formalized|articulated|'
+    r'gathered|initiated|represented|acknowledged|analyzed|captured|'
+    r'conducted|connected|consolidated|constructed|covered|'
+    r'demonstrated|designed|developed|embedded|enabled|enforced|'
+    r'engaged|evaluated|executed|explored|framed|guided|launched|'
+    r'managed|met|migrated|negotiated|operationalized|optimized|'
+    r'organized|performed|planned|positioned|prepared|presented|'
+    r'prioritized|produced|qualified|refined|reinforced|requested|'
+    r'resolved|scheduled|scored|standardized|structured|submitted|'
+    r'tailored|targeted|traced|tracked|trained)$',
+    re.IGNORECASE,
+)
+
+
+def _is_criteria_style(name):
+    """Check if a checklist name uses past-participle criteria phrasing."""
+    return bool(_CRITERIA_STYLE_ENDINGS.search(name.strip()))
+
+
+def _extract_content_tokens(text):
+    """Extract content tokens for similarity comparison.
+
+    Lowercase, strip punctuation, remove stop words (articles, prepositions,
+    auxiliaries, conjunctions), return a set of content-bearing tokens.
+    """
+    import re as _re
+    _STOP_WORDS = frozenset({
+        "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "up", "about", "into", "through", "during",
+        "before", "after", "above", "below", "between", "under", "is", "are",
+        "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+        "did", "will", "would", "shall", "should", "may", "might", "must", "can",
+        "could", "that", "which", "who", "whom", "this", "these", "those", "it",
+        "its", "not", "no", "nor", "so", "as", "if", "then", "than", "each",
+        "every", "all", "any", "both", "few", "more", "most", "other", "some",
+        "such", "only", "also", "how", "when", "where", "why", "what",
+    })
+    text = _re.sub(r"[^\w\s]", "", text.lower())
+    return {w for w in text.split() if w not in _STOP_WORDS and len(w) > 1}
+
+
 def check_checklist_quality(data, kind):
     issues = []
     total = 0
@@ -928,6 +934,10 @@ def check_checklist_quality(data, kind):
     echo_count = 0
     duplicate_count = 0
     negative_items = []
+    criteria_style_items = []
+    desc_echo_items = []
+    test_echo_items = []
+    skeleton_test_items = []
 
     sources = [data]
     if kind == "method":
@@ -988,6 +998,53 @@ def check_checklist_quality(data, kind):
                             f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
                         )
 
+                    # --- Criteria-style name detection ---
+                    if _is_criteria_style(name):
+                        criteria_style_items.append(
+                            f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
+                        )
+
+                    # --- Description-echoes-name detection ---
+                    if name and desc:
+                        name_tokens = _extract_content_tokens(name)
+                        desc_tokens = _extract_content_tokens(desc)
+                        if name_tokens and desc_tokens:
+                            overlap = len(name_tokens & desc_tokens) / max(len(name_tokens), len(desc_tokens))
+                            if overlap > 0.85:
+                                desc_echo_items.append(
+                                    f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
+                                )
+
+                    # --- Test echo and skeleton detection ---
+                    test = cl.get("test")
+                    if test and isinstance(test, dict):
+                        test_desc = test.get("description", "")
+                        test_given = test.get("given", [])
+                        test_when = test.get("when", [])
+                        test_then = test.get("then", [])
+
+                        is_skeleton = (
+                            test_desc.strip().lower() in ("definition of done.", "definition of done", "")
+                            and (not test_given or test_given == [])
+                            and (not test_when or test_when == [])
+                        )
+                        if is_skeleton:
+                            skeleton_test_items.append(
+                                f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
+                            )
+
+                        if test_then and desc:
+                            desc_tokens_t = _extract_content_tokens(desc)
+                            for tc in test_then:
+                                then_tokens = _extract_content_tokens(tc)
+                                if desc_tokens_t and then_tokens:
+                                    t_overlap = len(desc_tokens_t & then_tokens) / max(len(desc_tokens_t), len(then_tokens))
+                                    if t_overlap > 0.80:
+                                        test_echo_items.append(
+                                            f"  alpha '{alpha_name}' / state '{state_name}': \"{name}\""
+                                        )
+                                        break
+
                     norm = _normalize_checklist_name(name)
                     if len(norm) >= 2 and norm in seen_normalized:
                         issues.append({
@@ -1017,6 +1074,51 @@ def check_checklist_quality(data, kind):
                         negative_items.append(
                             f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
                         )
+                    if name and _is_criteria_style(name):
+                        criteria_style_items.append(
+                            f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
+                        )
+
+                    # --- Description-echoes-name detection (WP LOD) ---
+                    if name and desc:
+                        name_tokens = _extract_content_tokens(name)
+                        desc_tokens = _extract_content_tokens(desc)
+                        if name_tokens and desc_tokens:
+                            overlap = len(name_tokens & desc_tokens) / max(len(name_tokens), len(desc_tokens))
+                            if overlap > 0.85:
+                                desc_echo_items.append(
+                                    f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
+                                )
+
+                    # --- Test echo and skeleton detection (WP LOD) ---
+                    test = cl.get("test")
+                    if test and isinstance(test, dict):
+                        test_desc = test.get("description", "")
+                        test_given = test.get("given", [])
+                        test_when = test.get("when", [])
+                        test_then = test.get("then", [])
+
+                        is_skeleton = (
+                            test_desc.strip().lower() in ("definition of done.", "definition of done", "")
+                            and (not test_given or test_given == [])
+                            and (not test_when or test_when == [])
+                        )
+                        if is_skeleton:
+                            skeleton_test_items.append(
+                                f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
+                            )
+
+                        if test_then and desc:
+                            desc_tokens_t = _extract_content_tokens(desc)
+                            for tc in test_then:
+                                then_tokens = _extract_content_tokens(tc)
+                                if desc_tokens_t and then_tokens:
+                                    t_overlap = len(desc_tokens_t & then_tokens) / max(len(desc_tokens_t), len(then_tokens))
+                                    if t_overlap > 0.80:
+                                        test_echo_items.append(
+                                            f"  workProduct '{wp_name}' / LOD '{lod_name}': \"{name}\""
+                                        )
+                                        break
 
     if truncated_count > 0:
         issues.append({
@@ -1037,7 +1139,7 @@ def check_checklist_quality(data, kind):
             "path": "alphas[*].states[*].checklist",
             "message": (
                 f"{echo_count}/{total} checklist names echo their description "
-                f"(name is a prefix of description, should be a noun-phrase label)"
+                f"(name is a prefix of description, should be an imperative verb phrase)"
             ),
             "autoFixable": False,
         })
@@ -1066,9 +1168,84 @@ def check_checklist_quality(data, kind):
             "message": (
                 f"{len(negative_items)}/{total} checklist items use negative/absence "
                 f"framing (e.g., 'absent', 'missing', 'undefined'). Checklists must "
-                f"be positive and additive — describe achievements to reach, not "
+                f"be positive and additive — describe actions to perform, not "
                 f"deficiencies to observe. Use description/narratives for level "
                 f"qualities including limitations.\n{detail}{suffix}"
+            ),
+            "autoFixable": False,
+        })
+
+    if criteria_style_items:
+        detail = "\n".join(criteria_style_items[:10])
+        suffix = ""
+        if len(criteria_style_items) > 10:
+            suffix = f"\n  ... and {len(criteria_style_items) - 10} more"
+        issues.append({
+            "severity": "warning",
+            "category": "checklist-style",
+            "path": "alphas[*].states[*].checklist | workProducts[*].levelsOfDetail[*].checklist",
+            "message": (
+                f"{len(criteria_style_items)}/{total} checklist names use criteria-style "
+                f"phrasing (past participle, e.g., 'Architecture documented'). "
+                f"Checklist names should be imperative verb phrases describing "
+                f"actions to take (e.g., 'Document the architecture'). "
+                f"When test/examples are present, they define the completion "
+                f"criteria.\n{detail}{suffix}"
+            ),
+            "autoFixable": False,
+        })
+
+    if desc_echo_items:
+        detail = "\n".join(desc_echo_items[:10])
+        suffix = ""
+        if len(desc_echo_items) > 10:
+            suffix = f"\n  ... and {len(desc_echo_items) - 10} more"
+        issues.append({
+            "severity": "warning",
+            "category": "checklist-desc-echo",
+            "path": "alphas[*].states[*].checklist | workProducts[*].levelsOfDetail[*].checklist",
+            "message": (
+                f"{len(desc_echo_items)}/{total} checklist descriptions restate "
+                f"the name (>85% content-token overlap). Descriptions must carry "
+                f"information beyond the name — rationale, scope, method, or "
+                f"context.\n{detail}{suffix}"
+            ),
+            "autoFixable": False,
+        })
+
+    if skeleton_test_items:
+        detail = "\n".join(skeleton_test_items[:10])
+        suffix = ""
+        if len(skeleton_test_items) > 10:
+            suffix = f"\n  ... and {len(skeleton_test_items) - 10} more"
+        issues.append({
+            "severity": "warning",
+            "category": "checklist-skeleton-test",
+            "path": "alphas[*].states[*].checklist[*].test | workProducts[*].levelsOfDetail[*].checklist[*].test",
+            "message": (
+                f"{len(skeleton_test_items)}/{total} checklist tests are skeletons "
+                f"(test.description='Definition of done.', given=[], when=[]). "
+                f"Either enrich with meaningful preconditions and triggers, or "
+                f"remove the test entirely.\n{detail}{suffix}"
+            ),
+            "autoFixable": False,
+        })
+
+    if test_echo_items:
+        detail = "\n".join(test_echo_items[:10])
+        suffix = ""
+        if len(test_echo_items) > 10:
+            suffix = f"\n  ... and {len(test_echo_items) - 10} more"
+        issues.append({
+            "severity": "warning",
+            "category": "checklist-echo",
+            "path": "alphas[*].states[*].checklist[*].test | workProducts[*].levelsOfDetail[*].checklist[*].test",
+            "message": (
+                f"{len(test_echo_items)}/{total} checklist tests echo the "
+                f"description in past tense (test.then >=80% token overlap "
+                f"with description). Either enrich with preconditions, triggers, "
+                f"and independently observable evidence, or remove the "
+                f"test.\n{detail}{suffix}"
             ),
             "autoFixable": False,
         })
@@ -3403,7 +3580,10 @@ def check_narrative_context_self_containment(data, kind):
     return issues
 
 
-REMAP_WARNING_CATEGORIES = {"checklist-quality", "asset-coverage", "citation-name-format"}
+REMAP_WARNING_CATEGORIES = {
+    "checklist-quality", "checklist-style", "asset-coverage", "citation-name-format",
+    "checklist-desc-echo", "checklist-echo", "checklist-skeleton-test",
+}
 
 
 def suggest_update_mode(issues, counts, kind):

@@ -431,15 +431,19 @@ States: [EXACT baseline states with ADDED checklists]
       Given: [from Phase 1 Prerequisites: contextual conditions and natural-language preconditions]
       Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
       Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
-    Checklists: [baseline checklists + NEW practice-specific checklists from Phase 1 criteria]
+    Checklists: [baseline checklists + NEW practice-specific actionable tasks from Phase 1 criteria]
       Rules:
+        - Each item name must be an imperative verb phrase (3-8 words) describing an action to take
+        - Each item description explains what to do and why (1-2 sentences)
         - Positive/additive items only — what to achieve, never absence of something
         - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
+        - Information independence: the description must carry information not present in the name (rationale, scope, method, context) — do not restate the name as a longer sentence
+        - Test independence: when including a test, `then` clauses must describe observable evidence not already in the description — do not restate the description in past tense. Populate `given` and `when` with meaningful preconditions and triggers — if you cannot, omit the test
       Each checklist item may include:
-        Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
-          Given: [preconditions for this checklist item]
-          When: [trigger or condition to verify]
-          Then: [expected outcomes]
+        Test: [optional — include ONLY when you can add verification information beyond the description]
+          Given: [preconditions — what must be true before evaluation is meaningful]
+          When: [trigger — decision point or lifecycle moment that initiates evaluation]
+          Then: [observable evidence of completion — must NOT be the description in past tense]
         Examples: [optional - array of concrete scenario Tests]
   State 2: ...
 Narrative: [NEW practice-specific context]
@@ -460,12 +464,16 @@ States: [NEW states from Phase 1 progressive states]
       Given: [from Phase 1 Prerequisites: contextual conditions and natural-language preconditions]
       Alpha States: [from Phase 1 Prerequisites: cross-concern dependencies → {alphaName, stateName} pairs — NEVER the previous state of the SAME alpha (sequential progression is implicit in seq ordering)]
       Work Product Levels: [prerequisite work product/LOD pairs — NEVER the previous LOD of the SAME work product]
-    Checklists: [from Phase 1 criteria]
+    Checklists: [actionable tasks from Phase 1 criteria]
       Rules:
+        - Each item name must be an imperative verb phrase (3-8 words) describing an action to take
+        - Each item description explains what to do and why (1-2 sentences)
         - Positive/additive items only — what to achieve, never absence of something
         - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
+        - Information independence: the description must carry information not present in the name (rationale, scope, method, context) — do not restate the name as a longer sentence
+        - Test independence: when including a test, `then` clauses must describe observable evidence not already in the description — do not restate the description in past tense. Populate `given` and `when` with meaningful preconditions and triggers — if you cannot, omit the test
       Each checklist item may include:
-        Test: [optional - structured Given/When/Then verification, seeded from concern Concreteness Test]
+        Test: [optional — include ONLY when you can add verification information beyond the description]
         Examples: [optional - array of concrete scenario Tests]
   State 2: ...
 Narrative: [from Phase 1 narrative]
@@ -483,12 +491,16 @@ States: [EXACT SAME states as the parent alpha — names and sequence MUST match
     Description: [parent state description]
     contributesToState: [optional — takes equivalence semantics in mapsTo context]
     Background: [variant-specific prerequisites]
-    Checklists: [domain-specific checklists for this variant]
+    Checklists: [domain-specific actionable tasks for this variant]
       Rules:
+        - Each item name must be an imperative verb phrase (3-8 words) describing an action to take
+        - Each item description explains what to do and why (1-2 sentences)
         - Positive/additive items only — what to achieve, never absence of something
         - Each item must be independently assessable — no meta-items that summarise or reference other checklist items (e.g., "all requirements met", "minimum standards achieved", "N criteria satisfied"). The checklist IS the requirements; items that restate that fact are circular.
+        - Information independence: the description must carry information not present in the name (rationale, scope, method, context) — do not restate the name as a longer sentence
+        - Test independence: when including a test, `then` clauses must describe observable evidence not already in the description — do not restate the description in past tense. Populate `given` and `when` with meaningful preconditions and triggers — if you cannot, omit the test
       Each checklist item may include:
-        Test: [optional - variant-specific verification]
+        Test: [optional — include ONLY when you can add verification information beyond the description]
         Examples: [optional - variant-specific scenarios]
   State 2: ...
 Narrative: [variant-specific narrative]
@@ -928,7 +940,7 @@ Levels of Detail: [map Phase 1 levels — names describe document fidelity, NOT 
       Given: [preconditions that should hold when LOD is reached]
       Alpha States: [prerequisite alpha/state pairs]
       Work Product Levels: [prerequisite work product/LOD pairs]
-    Checklists: [distinct observable characteristics from Phase 1; typical 3-5, no hard minimum; positive/additive items only — what to achieve, never absence of something; each item must be independently assessable — no meta-items that summarise or reference other checklist items]
+    Checklists: [actionable tasks from Phase 1; typical 3-5, no hard minimum; imperative verb phrases describing what to do; positive/additive items only — what to achieve, never absence of something; each item must be independently assessable — no meta-items that summarise or reference other checklist items; descriptions must carry information beyond the name (rationale, scope, method) — not restate it as a sentence; tests must add observable evidence beyond the description — omit if you cannot populate given/when meaningfully]
     Contributes To: [AlphaContribution objects - which alpha/state this LOD proves]
       - Alpha Name: [alpha]
         State Name: [state]
@@ -2217,7 +2229,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] `mapsTo` and `partOf` are not both set on any work product
 - [ ] Narrative contexts are 1-3 sentences (not paragraphs)
 - [ ] Citations have NO narratives property
-- [ ] Checklists are distinct observable criteria, one sentence each (typical 3-7/state, error if >10; typical 3-5/LOD). No same-state near-duplicates. Every item is positive and additive — describes something to achieve, never the absence or lack of something (use description/narratives for level qualities including limitations).
+- [ ] Checklists are imperative verb phrases describing actionable tasks, one sentence description each (typical 3-7/state, error if >10; typical 3-5/LOD). No same-state near-duplicates. Every item is positive and additive — describes something to achieve, never the absence or lack of something (use description/narratives for level qualities including limitations).
 - [ ] Practice narrative uses baseline narrative type
 - [ ] Persona/PersonaGroup/Pattern narratives included where Phase 1 provides substantive source material (not invented)
 - [ ] Asset icons specified for personas, persona groups, and competencies

@@ -16,6 +16,15 @@ Usage:
     python3 utils/apply-versioning.py practices/name/name.json --bump patch --fix
     python3 utils/apply-versioning.py practices/name/name.json --bump minor --fix
 
+    # Set an explicit version:
+    python3 utils/apply-versioning.py practices/name/name.json --set-version 2.0.0 --fix
+
+    # Show current versions without modifying:
+    python3 utils/apply-versioning.py --all --show
+
+    # Ensure versions are ahead of all copies across the tree:
+    python3 utils/apply-versioning.py --all --ahead-of-copies --fix
+
     # Update multiple files:
     python3 utils/apply-versioning.py deps/*.json baselines/*/*.json practices/*/*.json --fix
 
@@ -24,6 +33,7 @@ Usage:
 """
 import argparse
 import json
+import re
 import sys
 from collections import OrderedDict
 from datetime import date, datetime, timezone
@@ -86,7 +96,7 @@ def get_dependency_names(data, kind):
     return deps
 
 
-def apply_versioning(data, schema_version, version_index, today, bump=None):
+def apply_versioning(data, schema_version, version_index, today, bump=None, set_version=None):
     """Apply versioning fields to a document dict. Returns list of changes."""
     changes = []
     kind = detect_kind(data)
@@ -100,7 +110,17 @@ def apply_versioning(data, schema_version, version_index, today, bump=None):
         changes.append(f"updated schemaVersion {old} → {schema_version}")
 
     old_version = data.get("version", "")
-    if bump:
+    if set_version:
+        if old_version != set_version:
+            data["version"] = set_version
+            changes.append(f"set version {old_version or '(empty)'} → {set_version}")
+            if not data.get("updatedAt"):
+                data["updatedAt"] = today
+                changes.append(f"added updatedAt={today}")
+            else:
+                data["updatedAt"] = today
+                changes.append(f"updated updatedAt={today}")
+    elif bump:
         normalized = normalize_version(old_version)
         new_version = increment_version(normalized, bump)
         data["version"] = new_version
@@ -125,7 +145,7 @@ def apply_versioning(data, schema_version, version_index, today, bump=None):
         }
         new_dvs = []
         for name in dep_names:
-            if bump:
+            if bump or set_version:
                 dep_version = resolve_dependency_version(name, version_index)
                 if dep_version:
                     vr = f"^{dep_version}"
@@ -158,7 +178,7 @@ def apply_versioning(data, schema_version, version_index, today, bump=None):
                 if not any(c.startswith(("added dependency", "refreshed dependency")) for c in changes):
                     changes.append("updated dependencyVersions")
 
-    if not bump and data.get("updatedAt"):
+    if not bump and not set_version and data.get("updatedAt"):
         data["updatedAt"] = today
         changes.append(f"updated updatedAt={today}")
 
@@ -202,6 +222,50 @@ def collect_all_files():
             files.append(str(f))
 
     return files
+
+
+def scan_all_copies():
+    """Walk practices/, baselines/, deps/ and build {name: [(version, path)]} index."""
+    copies = {}
+    dirs = [Path("practices"), Path("baselines"), Path("deps")]
+    for base_dir in dirs:
+        if not base_dir.exists():
+            continue
+        for f in sorted(base_dir.rglob("*.json")):
+            if f.name == "language.schema.json" or f.name.startswith("_") or "backup" in str(f):
+                continue
+            data, err = load_json_pair(f)
+            if err or not isinstance(data, dict):
+                continue
+            name = data.get("name", "")
+            version = data.get("version", "")
+            if name and version:
+                copies.setdefault(name, []).append((normalize_version(version), str(f)))
+    return copies
+
+
+def parse_version_tuple(version_str):
+    """Parse a semver string into (major, minor, patch) ints."""
+    parts = version_str.split(".")
+    return int(parts[0]), int(parts[1]), int(parts[2])
+
+
+def show_versions(file_paths):
+    """Display current versions of all target files (read-only)."""
+    for path in file_paths:
+        data, err = load_json_pair(path)
+        if err:
+            print(f"SKIP {path}: {err}")
+            continue
+        if not isinstance(data, dict):
+            print(f"SKIP {path}: not a JSON object")
+            continue
+
+        kind = detect_kind(data)
+        name = data.get("name", Path(path).stem)
+        version = data.get("version", "(none)")
+        schema_ver = data.get("schemaVersion", "(none)")
+        print(f"{Path(path).name}: {name} v{version} ({kind}, schema={schema_ver})")
 
 
 def topo_sort_files(file_paths):
@@ -258,16 +322,35 @@ def main():
         "--all", action="store_true",
         help="Process all JSON files in deps/, baselines/, practices/"
     )
-    parser.add_argument(
+    version_group = parser.add_mutually_exclusive_group()
+    version_group.add_argument(
         "--bump", choices=["patch", "minor", "major"],
         help="Increment version by bump level (patch/minor/major)"
+    )
+    version_group.add_argument(
+        "--set-version", metavar="X.Y.Z",
+        help="Set an explicit version (must match X.Y.Z format)"
     )
     parser.add_argument(
         "--fix", action="store_true",
         help="Write changes to files (default is dry-run)"
     )
+    parser.add_argument(
+        "--show", action="store_true",
+        help="Display current versions without modifying (read-only)"
+    )
+    parser.add_argument(
+        "--ahead-of-copies", action="store_true",
+        help="Bump version to be ahead of all copies across practices/, baselines/, deps/"
+    )
 
     args = parser.parse_args()
+
+    if args.show and (args.fix or args.bump or args.set_version):
+        parser.error("--show is incompatible with --fix, --bump, and --set-version")
+
+    if args.set_version and not re.match(r"^\d+\.\d+\.\d+$", args.set_version):
+        parser.error(f"--set-version must match X.Y.Z format, got {args.set_version!r}")
 
     if args.all:
         file_paths = collect_all_files()
@@ -288,10 +371,17 @@ def main():
         print("No files to process.")
         return
 
+    if args.show:
+        show_versions(file_paths)
+        return
+
     schema_version = get_schema_version() or "1.0.0"
     today = date.today().isoformat()
 
-    if args.bump and not args.all:
+    # Build the copy index for --ahead-of-copies before processing
+    copy_index = scan_all_copies() if args.ahead_of_copies else {}
+
+    if (args.bump or args.set_version) and not args.all:
         all_files = collect_all_files()
         version_index = build_version_index(all_files)
         for path in all_files:
@@ -330,7 +420,26 @@ def main():
         kind = detect_kind(data)
         name = data.get("name", Path(path).stem)
 
-        changes = apply_versioning(data, schema_version, version_index, today, bump=args.bump)
+        # Determine effective set_version for this file
+        effective_set_version = args.set_version
+
+        # --ahead-of-copies: compute version that is ahead of all other copies
+        if args.ahead_of_copies and name in copy_index:
+            current_version = normalize_version(data.get("version", ""))
+            current_tuple = parse_version_tuple(current_version)
+            max_tuple = (0, 0, 0)
+            for copy_ver, copy_path in copy_index[name]:
+                if str(Path(copy_path).resolve()) == str(Path(path).resolve()):
+                    continue
+                copy_tuple = parse_version_tuple(copy_ver)
+                if copy_tuple > max_tuple:
+                    max_tuple = copy_tuple
+            if max_tuple > (0, 0, 0) and current_tuple <= max_tuple:
+                ahead_version = f"{max_tuple[0]}.{max_tuple[1] + 1}.0"
+                effective_set_version = ahead_version
+
+        changes = apply_versioning(data, schema_version, version_index, today,
+                                   bump=args.bump, set_version=effective_set_version)
 
         if changes:
             total_changes += len(changes)
