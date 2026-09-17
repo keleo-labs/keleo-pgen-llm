@@ -3174,6 +3174,39 @@ def check_asset_urls(assets):
     return issues
 
 
+def check_citation_urls(citations):
+    import urllib.request
+    import urllib.error
+
+    issues = []
+    for i, cit in enumerate(citations):
+        url = cit.get("url")
+        if not url or not url.startswith("http"):
+            continue
+        try:
+            req = urllib.request.Request(url, method="HEAD")
+            req.add_header("User-Agent", "PracticeValidator/1.0")
+            resp = urllib.request.urlopen(req, timeout=10)
+        except urllib.error.HTTPError as e:
+            severity = "error" if e.code in (404, 410) else "warning"
+            issues.append({
+                "severity": severity,
+                "category": "citation-url",
+                "path": f"citations[{i}].url",
+                "message": f"Citation '{cit.get('name')}' URL returned {e.code}: {url}",
+                "autoFixable": True,
+            })
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            issues.append({
+                "severity": "warning",
+                "category": "citation-url",
+                "path": f"citations[{i}].url",
+                "message": f"Citation '{cit.get('name')}' URL unreachable: {url} ({e})",
+                "autoFixable": True,
+            })
+    return issues
+
+
 def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
@@ -3606,7 +3639,17 @@ def suggest_update_mode(issues, counts, kind):
 
     structural_errors = [i for i in errors if i["category"] == "structure"]
     if structural_errors:
-        return "full-reanalysis", f"{len(structural_errors)} structural errors require full reanalysis"
+        affected_paths = {
+            i.get("path", "").split("[")[0] for i in structural_errors
+        }
+        affected_paths.discard("")
+        if len(affected_paths) <= 3:
+            areas = ", ".join(sorted(affected_paths)) if affected_paths else "unknown"
+            return (
+                "light-reanalysis",
+                f"{len(structural_errors)} structural error(s) in {len(affected_paths)} area(s) ({areas}) — targeted re-research recommended",
+            )
+        return "full-reanalysis", f"{len(structural_errors)} structural errors across {len(affected_paths)} areas require full reanalysis"
 
     remap_count = len(manual_fix) + len(remap_warnings)
     reasons = []
@@ -3745,6 +3788,7 @@ def main():
 
     if args.online:
         all_issues.extend(check_asset_urls(data.get("assets", [])))
+        all_issues.extend(check_citation_urls(data.get("citations", [])))
 
     baseline_data = None
     if args.baseline:

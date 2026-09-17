@@ -433,6 +433,8 @@ For the full Primary Alpha Focus Strategy with worked examples, see the **Practi
 
 **Process for Single Practice:**
 
+**Subagent directive (when delegating to an agent):** "Proceed with FULL mapping guide generation immediately. Do NOT present options, ask for confirmation, or offer partial generation. Write ALL sections completely — never use placeholder text like `[...]`. If existing mapping guides are present, OVERWRITE them with new content."
+
 1. Read `prompts/phase-2-mapping.md`, analysis report, effective context JSON (`_effective-context.json` from Step 0.5), and the relevant semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
    - The effective context contains ALL merged elements (baselines + parent practices + methods) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements (ontology context) from practice elements (primary `contributesTo`/`mapsTo` targets). If the context has `_aliasContext`, use aliases for semantic understanding but always use canonical names in structural references.
 2. **Document primary alpha decision** at top of mapping guide (Delineation Analysis section)
@@ -491,6 +493,7 @@ Acceptable heading levels: `###`, `####`, or `#####`. The key format is `<headin
    ```
 
 2. **Each agent prompt must include:**
+   - **Execution directive:** "Proceed with FULL mapping guide generation immediately. Do NOT present options, ask for confirmation, or offer partial generation. Write ALL sections completely — never use placeholder text like `[...]` or `[... continuing ...]`. Write sections incrementally using Write/Edit tools if needed."
    - **Delineation context from Step 1.5:** "You are mapping Practice N of M in a method. Your primary alpha is [X], covering alphas [list]. Validate this delineation in your Step 0 of phase-2-mapping.md."
    - File paths to read: `practices/<method-name>/01-analysis-report.md` (practice-specific section), `<effective-context-path>` (from Step 0.5), `references/semantics/composition.md`, `references/semantics/practice-elements.md`, `references/semantics/alphas.md`, `references/semantics/execution-and-patterns.md`, `prompts/phase-2-mapping.md`
    - Add to agent prompt: "The effective context contains ALL merged elements (baselines + parent practices) with `_contributingPracticeName` on each element. Use `_provenance.tiers` to distinguish baseline elements from practice elements. Practice-level alphas are your primary `contributesTo`/`mapsTo` targets. Baseline-level alphas provide ontology context. Use canonical names for all structural references. Use `contributesTo` for specializations (different states) and `mapsTo` for variant mappings (exact same states, IS-A semantics). IMPORTANT: `practiceDependencyNames` must only include parent practices whose unique alphas (those NOT contributed by baselines per `_contributingPracticeName`) are actually referenced via `contributesTo` or `mapsTo`."
@@ -500,6 +503,11 @@ Acceptable heading levels: `###`, `####`, or `#####`. The key format is `<headin
    - Explicit instruction: "Generate COMPLETE mapping including: (0) Delineation Analysis section validating your practice boundaries; (1) Keywords section with 10-20 domain terms/acronyms; (2) Terminology Aliases section identifying 3-8 domain canonical terms (ONE alias per element - use keywords for synonyms/acronyms, use instances for multiple variants); (3) Alphas (if any) WITH relatesTo relationships (include relationshipKind where applicable); (4) Work products (include contributesToAlphaNames where applicable); (5) Activities (include ledBy where source identifies clear single-person accountability); (6) PATTERNS with complete matrix coverage; (7) PATTERN GROUPS if practice has 3+ patterns — load baseline patternGroups first and assign patterns to existing baseline groups before creating new ones (novel groups require justification); include narratives when source material supports rationale for the grouping; (8) OUTCOMES — 1-3 per practice with measureDescription; optional metricContributions (alphaName + metricName + recognizedAtStateName) and objectiveContributions (patternName + recognizedAtPatternViewName) when clear chains exist (see semantics/execution-and-patterns.md §9.4). If the practice has lifecycle patterns, at least one outcome SHOULD use objectiveContributions tied to the main lifecycle pattern (broadest alpha coverage) with monotonically increasing forecastWeights across views. CRITICAL: Map concern interactions from Phase 1 to alpha relatesTo arrays using directionality pattern. Every practice MUST have at least ONE pattern coordinating multiple alphas/concerns (see semantics/execution-and-patterns.md §8.1.1)."
 
 3. **After all agents complete:**
+   - **Check for placeholder sections** in each mapping guide:
+     ```bash
+     grep -n '\[\.\.\..*\]' practices/<method-name>/02-mapping-guide-practice-*.md
+     ```
+     If placeholders found, resume the agent: "Complete all placeholder sections. Write the full content for each `[...]` block using the Edit tool."
    - **Assemble mapping guides** (REQUIRED — never use heredocs, cat, or shell loops):
      ```bash
      python3 utils/assemble-mapping-guide.py \
@@ -888,6 +896,7 @@ If `narratives` is missing, review Phase 1 analysis for overarching lifecycle an
    ```
 
 2. **Each agent prompt must include:**
+   - **Execution directive:** "Generate the COMPLETE practice JSON immediately. You MUST include ALL element arrays: alphas, workProducts, activities, patterns, personas, personaGroups, citations, outcomes, assets, and narratives. Do NOT ask for confirmation or present options. Only use competency names from the baseline/effective-context — do NOT invent new competency names. If the JSON is large, write it incrementally using Write/Edit tools."
    - File paths: `practices/<method-name>/02-mapping-guide.md` (practice section), `deps/language.schema.json`, `<effective-context-path>` (from Step 0.5, or user-provided baseline if no dependencies)
    - **Parent practice mode:** Include in the agent prompt: "Set `baselinePracticeName` to '<inherited baseline name>' (inherited from parent practice). `contributesTo`/`mapsTo` targets reference parent practice alphas using canonical names. Use `contributesTo` for specializations (different states) and `mapsTo` for variant mappings (exact same states, IS-A). Set `practiceDependencyNames` to ONLY those parent practices whose unique alphas (not in baseline) are actually referenced via `contributesTo` or `mapsTo` — see 'Determining practiceDependencyNames' section."
    - If the effective baseline has `_aliasContext`, include in the agent prompt: "The baseline uses domain aliases for semantic context. All structural references in the JSON (contributesTo, mapsTo, alphaName, stateName, etc.) MUST use canonical names, not alias names."

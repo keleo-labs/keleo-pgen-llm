@@ -53,12 +53,19 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ## Workflow Overview
 
-**Four Update Modes (auto-detected or user-requested):**
+**Five Update Modes (auto-detected or user-requested):**
 
 1. **Auto-Fix** — All issues are programmatically fixable. Run fix utilities and validate. No phase re-execution needed.
 2. **Remap & Regenerate** (Phase 2 → 3) — Use existing content, apply latest mapping guidance, regenerate JSON
 3. **Full Reanalysis** (Phase 1 → 2 → 3) — Revisit source materials, update citations, complete rework
+3B. **Light Reanalysis** (Phase 1B → 2 → 3) — Re-research specific analysis sections; preserve unchanged sections
 4. **Add/Update References** — Discover and map reference content without full remap. Lightweight mode that adds curated external content (templates, case studies, reference architectures) to the `references` array.
+
+**Mode instructions are in separate files** — read only the selected mode's file:
+- Mode 1: `.claude/skills/update-method/modes/mode-1-full-reanalysis.md`
+- Mode 1B: `.claude/skills/update-method/modes/mode-1b-light-reanalysis.md`
+- Mode 2: `.claude/skills/update-method/modes/mode-2-remap.md`
+- Mode 3: `.claude/skills/update-method/modes/mode-3-references.md`
 
 ## Input Requirements
 
@@ -182,6 +189,7 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
 4. **Check assessment output** — read `recommendations.suggestedUpdateMode`:
    - `"auto-fix"` → proceed to **Step 1A: Auto-Fix**
    - `"remap"` → proceed to **Step 1B** recommending Mode 2
+   - `"light-reanalysis"` → proceed to **Step 1B** recommending Mode 1B
    - `"full-reanalysis"` → proceed to **Step 1B** recommending Mode 1
 
 ### Version Incrementing
@@ -193,6 +201,7 @@ When updating an existing document, increment its `version` based on the update 
 | **Auto-Fix** | `patch` (e.g. 1.0.0 → 1.0.1) | Structural fixes, no content changes |
 | **Remap & Regenerate** | `minor` (e.g. 1.0.0 → 1.1.0) | Remapped content, new guidance applied |
 | **Full Reanalysis** | `minor` (e.g. 1.0.0 → 1.1.0) | Content reworked from source materials |
+| **Light Reanalysis** | `minor` (e.g. 1.0.0 → 1.1.0) | Targeted content rework from source materials |
 | **Add/Update References** | `patch` (e.g. 1.0.0 → 1.0.1) | New reference content, no structural changes |
 
 **Single command handles all versioning steps** (increment, schemaVersion, dependencyVersions, updatedAt):
@@ -233,11 +242,19 @@ Dependency versions are auto-resolved from all project files in deps/, baselines
    Add `--compress-patterns` to remove unchanged carry-forward alpha states from non-final pattern views.
    Add `--fix-self-ref-backgrounds` to remove background alphaStates that reference the owning alpha.
    Add `--fix-unknown-activity-spaces` to replace invalid activitySpaceNames with closest baseline match (requires baseline arg).
+   Add `--fix-narrative-types` to replace invalid narrativeTypeName values with closest baseline match (requires baseline arg).
+   Add `--fix-competency-refs` to fix invalid competency names/levels via `fix-competency-levels.py --partial` (requires baseline arg).
    Add `--all` to enable all optional fixes.
 
-3. **For extension practices — fix competency levels if needed:**
+3. **For extension practices — fix remaining competency issues:**
    ```bash
-   python3 utils/fix-competency-levels.py <file.json> <baseline.json> --fix
+   # --partial fixes what it can, reports unmapped names without failing
+   python3 utils/fix-competency-levels.py <file.json> <baseline.json> --fix --partial
+   ```
+   If unmapped names are reported, add explicit mappings:
+   ```bash
+   python3 utils/fix-competency-levels.py <file.json> <baseline.json> --fix \
+     --map-name "InvalidName=ValidName"
    ```
 
 4. **Re-assess to confirm fixes:**
@@ -259,19 +276,26 @@ Dependency versions are auto-resolved from all project files in deps/, baselines
 Assessment found issues requiring manual intervention:
 [List non-auto-fixable issues from assessment]
 
-Recommended mode: [remap/full-reanalysis] — [modeReason from assessment]
+Recommended mode: [remap/light-reanalysis/full-reanalysis] — [modeReason from assessment]
 
 Options:
 1. Remap & Regenerate (Phase 2 → 3) — preserves existing analysis
-2. Full Reanalysis (Phase 1 → 2 → 3) — revisits source materials
+2. Full Reanalysis (Phase 1 → 2 → 3) — revisits all source materials from scratch
+2B. Light Reanalysis (Phase 1B → 2 → 3) — targeted re-research of specific analysis sections
 3. Add/Update References — discover and add reference content only
 
 Which mode?
 ```
 
-**Wait for user response, then proceed to Mode 1, Mode 2, or Mode 3 below.**
+**Mode 1B prerequisite:** Only offer Light Reanalysis if `01-analysis-report.md` exists in the practice/baseline directory. If it doesn't exist, omit option 2B.
 
-**Pre-Flight Fix (Mode 1 & 2 only):** Before entering remap or reanalysis, apply only structural schema fixes — NOT content fixes that Phase 3 will regenerate:
+**Wait for user response, then read the corresponding mode instructions file:**
+- Mode 1 → Read `.claude/skills/update-method/modes/mode-1-full-reanalysis.md`
+- Mode 1B → Read `.claude/skills/update-method/modes/mode-1b-light-reanalysis.md`
+- Mode 2 → Read `.claude/skills/update-method/modes/mode-2-remap.md`
+- Mode 3 → Read `.claude/skills/update-method/modes/mode-3-references.md`
+
+**Pre-Flight Fix (Mode 1, 1B & 2 only):** Before entering remap or reanalysis, apply only structural schema fixes — NOT content fixes that Phase 3 will regenerate:
 
 ```bash
 python3 utils/backup-practice.py <directory>/
@@ -284,426 +308,25 @@ This resolves blockers (missing `kind`, tags nesting, persona property normaliza
 
 ### Mode 1: Full Reanalysis (Phase 1 → 2 → 3)
 
-**Step 2A: Gather Source Materials**
+**Read:** `.claude/skills/update-method/modes/mode-1-full-reanalysis.md` for detailed instructions.
 
-1. **Extract citation URLs/sources from existing JSON:**
-   ```bash
-   python3 utils/extract-practice-content.py <file>.json
-   ```
-   The `citations` array in the output contains author, title, source, and date for each citation.
+---
 
-2. **Ask user for source materials:**
-   ```
-   I found the following citations in your existing practice:
-   [List citations]
-   
-   Please provide the original source materials:
-   - URLs to online documentation
-   - PDF files
-   - Markdown files
-   - Or confirm I should use the existing citations as references
-   ```
+### Mode 1B: Light Reanalysis (Phase 1B → 2 → 3)
 
-**Step 2B: Run Phase 1 - Analysis**
-
-**IMPORTANT:** Follow the `generate-method` skill Phase 1 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 1: Phase 1 - Analysis section).
-
-**Key reference files (read from generate-method skill):**
-- Phase 1 prompt: `prompts/phase-1-analysis.md`
-- Domain framework: `references/domain-framework.md`
-- Process: See generate-method SKILL.md "Step 1: Phase 1 - Analysis" section
-
-**Update-specific additions:**
-- **Update citations:** Search for latest authoritative sources (official docs, recent editions). Enrich all citations with `url` fields — use user-provided URLs, official websites, DOI references (`https://doi.org/10.xxxx/xxxxx`), or publisher pages. Only omit when no stable link exists.
-- **Output directory:** `practices/<name>/` for extension practices, `baselines/<name>/` for baselines
-- **Output:** `<dir>/01-analysis-report.md` (OVERWRITE existing if present)
-- **Baselines only:** Also run Phase 1.5 distillation after Phase 1 (output: `<dir>/01.5-distilled-essentials.md`)
-- **Comparison:** Note major differences from existing JSON content, inform user if significant restructuring needed
-
-**Validation:** Apply Phase 1 Validation from generate-method skill
-
-**Step 2C: Run Phase 2 - Mapping**
-
-**IMPORTANT:** Follow the `generate-method` skill Phase 2 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 2: Phase 2 - Mapping section).
-
-**Key reference files (read from generate-method skill):**
-- Phase 2 prompt: `prompts/phase-2-mapping.md`
-- Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
-- Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
-
-**Apply ALL latest guidance from generate-method skill:**
-- Primary alpha focus strategy (see "Practice vs Method Handling" section)
-- Competency level validation (see "Feature: Alpha Relationship Integrity" @rule:semantic-006)
-- Terminology aliases (see "CRITICAL: Terminology Aliasing" section)
-- Pattern completeness - FOUR-PASS construction (see "Pattern Completeness Requirements" section)
-- Alpha relationships and relatesTo (see "Feature: Alpha Relationship Integrity" section)
-- All Critical Mapping Rules (see "Critical JSON Rules" section)
-
-**Output:** `practices/<name>/02-mapping-guide.md` (OVERWRITE existing)
-
-**Validation:** Apply Phase 2 Validation from generate-method skill
-
-**Step 2D: Run Phase 3 - JSON Generation**
-
-**IMPORTANT:** Follow the `generate-method` skill Phase 3 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 3: Phase 3 - JSON Generation section).
-
-**Key reference files (read from generate-method skill):**
-- Phase 3 prompt: `prompts/phase-3-json.md`
-- Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
-
-**Apply ALL latest validations from generate-method skill:**
-- Critical JSON Rules (see "Critical JSON Rules" section)
-- Phase 3 Validation (see "Phase 3 Validation" section)
-
-**Output:** `practices/<name>/<name>.json` (OVERWRITE existing)
-
-**Comparison Report:** Show what changed vs existing (see "Comparison Report" section below)
+**Read:** `.claude/skills/update-method/modes/mode-1b-light-reanalysis.md` for detailed instructions.
 
 ---
 
 ### Mode 2: Remap & Regenerate (Phase 2 → 3)
 
-**Step 2A: Extract Existing Content as Phase 1 Analysis**
-
-**Reverse-engineer JSON to analysis format using the extraction utility:**
-
-```bash
-python3 utils/extract-practice-content.py practices/<name>/<name>.json --output practices/<name>/01-analysis-report.md
-```
-
-This extracts all practice elements (metadata, alphas with states, work products with LODs, activities with competencies, personas, patterns with views, citations) and generates a Phase 1 analysis report markdown file. For methods, it merges all embedded practices into a single document.
-
-Without `--output`, prints a structured JSON summary to stdout for review:
-```bash
-python3 utils/extract-practice-content.py practices/<name>/<name>.json
-```
-
-**For methods — also extract method-level narratives** for later packaging:
-```bash
-python3 utils/extract-practice-content.py practices/<name>/<name>.json \
-  --extract-narratives practices/<name>/_method-narrative.json
-```
-This saves the top-level `narratives` array to a standalone JSON file compatible with `package-keleo.py --method-narrative-file`.
-
-**User Feedback:**
-- "Extracted existing content as Phase 1 analysis report"
-- "Preserved X alphas, Y work products, Z activities"
-
-**Step 2A.5: Generate Practice Summaries (Batch Updates)**
-
-When updating multiple practices in a method, generate structural summaries for subagent prompt construction:
-
-```bash
-# Generate summaries for all practices in the method directory
-for f in practices/<method>/*.json; do
-  [[ "$(basename "$f")" == _* || "$(basename "$f")" == change-request* ]] && continue
-  python3 utils/practice-summary.py "$f" --baseline <baseline>.json --json > "practices/<method>/_summary-$(basename "$f")"
-done
-```
-
-Each summary contains: metadata, alphas (with relationship types, targets, states, priority distribution), patterns (with view names), patternGroups, outcomes (with forecastWeights), work products, activities, and schema feature coverage flags. Use these summaries in Phase 2/3 subagent prompts instead of ad hoc structural inspection.
-
-**Determine parallelization strategy using dependency tiers:**
-```bash
-python3 utils/discover-dependencies.py --tiers practices/<method>/<method>.json
-```
-
-This classifies practices into Tier 1 (baseline-only, can run in parallel) and Tier 2 (depends on other practices, run after Tier 1).
-
-**Step 2B: Run Phase 2 - Mapping with Latest Guidance**
-
-**IMPORTANT:** Follow the `generate-method` skill Phase 2 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 2: Phase 2 - Mapping section).
-
-**Key reference files (read from generate-method skill):**
-- Phase 2 prompt: `prompts/phase-2-mapping.md`
-- Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
-- Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
-- **Practice summary context:** If practice summaries were generated (Step 2A.5), include the JSON summary in each subagent prompt. This provides alpha names, pattern views, outcomes, dependencies without requiring ad hoc inspection.
-- Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
-
-**Apply ALL latest guidance from generate-method skill to extracted content:**
-- Primary alpha focus strategy (see "Practice vs Method Handling" section)
-- Competency level validation (see "Feature: Alpha Relationship Integrity" @rule:semantic-006)
-- Terminology aliases (see "CRITICAL: Terminology Aliasing" section)
-- Pattern completeness - FOUR-PASS construction (see "Pattern Completeness Requirements" section)
-- Alpha relationships and relatesTo (see "Feature: Alpha Relationship Integrity" section)
-- All Critical Mapping Rules (see "Critical JSON Rules" section)
-
-**Mode 2 specific approach:**
-- Start with existing content as base
-- Apply latest guidance to refine/fix/enhance
-- Preserve valid existing mappings
-- Document changes made
-
-**Output:** `practices/<name>/02-mapping-guide.md` (OVERWRITE existing if present)
-
-**Validation:** Apply Phase 2 Validation from generate-method skill
-
-**User Feedback:**
-- "Applied latest mapping guidance to existing content"
-- "Updated X competency levels, added Y aliases, completed Z pattern matrices"
-- "Identified primary alpha: <Alpha Name> with N related alphas"
-
-**Step 2C: Run Phase 3 - JSON Generation**
-
-**Size note:** Single-agent generation works reliably for practices of any size (300KB+ tested successfully). The **Parallel Section Strategy** below is available as an optional optimization for very large practices but is not required.
-
-#### Standard Phase 3 (all practices)
-
-**IMPORTANT:** Follow the `generate-method` skill Phase 3 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 3: Phase 3 - JSON Generation section).
-
-**Key reference files (read from generate-method skill):**
-- Phase 3 prompt: `prompts/phase-3-json.md`
-- Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
-- Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
-
-**Apply ALL latest validations from generate-method skill:**
-- Critical JSON Rules (see "Critical JSON Rules" section)
-- Phase 3 Validation (see "Phase 3 Validation" section)
-
-**Output:** `practices/<name>/<name>.json` (OVERWRITE existing)
-
-#### Parallel Section Strategy (practices >100KB)
-
-For large practices, split Phase 3 into parallel subagents that each generate one JSON section. This reduces per-agent output from ~200KB to ~30-50KB and enables parallel execution.
-
-**Step 1: Create scaffold from existing JSON**
-
-Copy the existing JSON as the base. The subagents will generate replacement sections:
-```bash
-cp practices/<name>/<name>.json practices/<name>/<name>.json.bak
-```
-
-**Step 2: Extract section assignments from mapping guide**
-
-The mapping guide has clear section headers. Assign sections to parallel subagents:
-
-| Subagent | Sections | Key Reference |
-|----------|----------|---------------|
-| A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
-| B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
-| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternGroups` (entries, narratives) | Mapping guide §Work Products, §Patterns, §Pattern Groups |
-| D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |
-
-**Step 3: Launch parallel subagents**
-
-Each subagent receives:
-- Its section(s) of the mapping guide
-- The schema (`deps/language.schema.json`) — relevant `$defs` only
-- The effective context for cross-reference names (alpha names, activity space names, etc.)
-- Instruction to output ONLY its assigned section(s) as a standalone JSON object
-- **Subagent C (patternGroups):** Must load the baseline's `patternGroups` and adopt existing baseline group names. Novel groups require justification. Use exact baseline group names — they are the merge key for cross-practice composition.
-
-Example subagent output for Subagent A:
-```json
-{"alphas": [...]}
-```
-
-**Step 4: Merge sections into base JSON**
-
-Use `patch-practice-json.py` to merge each section into the base:
-```bash
-python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key alphas --patch-file _section-alphas.json
-python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key activities --patch-file _section-activities.json
-python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key workProducts --patch-file _section-workproducts.json
-python3 utils/patch-practice-json.py practices/<name>/<name>.json --set-key patterns --patch-file _section-patterns.json
-# ... metadata sections
-```
-
-**Step 5: Run auto-fix + validation**
-
-After merging, run `fix-common-issues.py --all --fix` and validate as normal. The merged JSON may need element-kind discriminators and pattern completeness fixes.
-
-**Comparison Report:**
-
-Generate a structured diff showing changes:
-
-```bash
-python3 utils/diff-practice-json.py <old-file>.json <new-file>.json --json
-```
-
-This compares scalar fields, element counts across all sections, diffs competency level names, lists aliases, and reports added/removed elements by name. Use `--changes-only` for human-readable output showing only changed sections.
+**Read:** `.claude/skills/update-method/modes/mode-2-remap.md` for detailed instructions.
 
 ---
 
 ### Mode 3: Add/Update References
 
-A lightweight mode that adds or updates curated reference content without requiring full remap or reanalysis. References are `AlphaInstance` objects in the `references` array — curated external content (templates, case studies, reference architectures, sample artifacts) that illustrate alphas at specific states.
-
-**When to use:**
-- Practice has no `references` array and would benefit from exemplar content
-- User wants to add specific references they've found
-- Practice has been through initial generation and alpha/state mappings are established
-- User explicitly requests "add references" or "find references"
-
-**Prerequisites:** The practice must already have established alpha/state/work-product mappings (i.e., Phase 2 has been completed at some point). This mode uses those mappings as the search framework.
-
-**Step 3A: Load Practice Context**
-
-1. **Read the existing practice JSON:**
-   ```bash
-   python3 utils/extract-reference-names.py <practice>.json --structure
-   ```
-   Review existing alphas, states, work products, and any existing references.
-
-2. **Read the Phase 2 mapping guide** (if available):
-   - `practices/<name>/02-mapping-guide.md` — contains alpha/state/work-product mappings
-   - If no mapping guide exists, extract mappings from JSON:
-     ```bash
-     python3 utils/extract-practice-content.py <practice>.json
-     ```
-
-3. **Load baseline and dependencies:**
-   ```bash
-   python3 utils/discover-dependencies.py --resolve-from <practice>.json --transitive
-   ```
-
-4. **Check existing references:**
-   ```bash
-   python3 utils/extract-reference-names.py <practice>.json --sections references
-   ```
-   If references already exist, review them for gaps, outdated links, or missing alpha coverage.
-
-**Step 3B: Discover Reference Content**
-
-Use the established alpha/state/work-product mappings to guide discovery. Three sources, in order of priority:
-
-1. **User-provided references:**
-   - Ask user if they have specific references to add (URLs, documents, templates)
-   - Map each to the appropriate alpha/state anchor
-
-2. **Re-examine source materials:**
-   - If original source materials are accessible (from citations or user), scan for:
-     - Templates, starter documents, sample configurations
-     - Reference architectures, design patterns with concrete examples
-     - Case studies, exemplary implementations
-     - Links to downloadable artifacts (repos, templates, tools)
-   - Focus on content that illustrates a specific alpha at a specific state
-
-3. **Secondary research (opt-in):**
-   - Ask user whether to conduct secondary research for references
-   - If approved, search for:
-     - Official templates and starter kits from methodology authors
-     - Community tools, reference implementations, open-source exemplars
-     - Industry case studies demonstrating the methodology
-   - Focus on alphas/states that have no references from other sources
-   - Present findings to user for approval before including
-
-**Step 3C: Map References to Anchors**
-
-For each discovered reference, map to the Practice Language structure:
-
-1. **Alpha + State anchor:** Which alpha does this reference illustrate, and at what state of maturity?
-2. **Evidence (`evidenceBy`):** Map document artifacts to `WorkProductInstance` entries (see guidance below)
-3. **Alpha-level links:** Landing pages, introductory or overview resources about the concern
-4. **Tags (optional):** Apply domain/lifecycle/organizational tags if applicable
-5. **Naming:** Follow the conventions below (concept-oriented names, not content-centric)
-
-**Discovery principle — scope drives search:** The alpha's scope tells you what kind of content is relevant (the concern area at a state), and the work product's scope tells you which specific documents fit as evidence. When browsing a content source, use the alpha scope to identify relevant content at the right maturity level, then examine each document's purpose to determine which work product it evidences. This two-level scoping approach (alpha concern → work product artifact) naturally produces well-structured references.
-
----
-
-**Reference conventions** — see `references/semantics/alphas.md` §6.6 for full naming rules, instance naming, and merge logic. Key rules:
-
-- **Name pattern:** `"Standard [Qualifier] <AlphaName>"` — concept-centric, not content-centric
-- **Description:** Semantic role in terms of alpha state progression, NOT what the linked content contains
-- **Instance names scope to the example, NOT the state/LOD** — same real-world instance at different maturity levels shares ONE name
-- **Two-level links:** Alpha-level `links` = navigation/overview; `evidenceBy[].links` = specific artifacts
-- **Link names:** Use the actual content title, never generic platform labels
-- **`evidenceBy` entries:** Each requires `name`, `description`, `workProductName`, `levelOfDetailName`, `links`. Spelled `evidenceBy` (NOT `evidencedBy`).
-- **Hub/landing pages:** Alpha-level links only, no `evidenceBy`
-- **For methods:** Present one consolidated mapping covering all practices; do NOT prompt per-practice. Wait for user confirmation.
-
-**Step 3D: Update Practice JSON**
-
-For a **single practice**, follow steps 1-5 below. For a **method** (multiple practices), see **Step 3E: Method-Level Orchestration** instead.
-
-1. **Backup first:**
-   ```bash
-   python3 utils/backup-practice.py <directory>/
-   ```
-
-2. **Write a compact spec file** and apply with `build-references.py`:
-   ```bash
-   # Write compact spec (see build-references.py header for format)
-   # Then validate + merge into practice in one step:
-   python3 utils/build-references.py <practice>.json --spec refs-spec.json --fix
-   ```
-   The utility validates all anchors (alphaName, stateName, workProductName, levelOfDetailName) against the practice, expands compact shorthand to full AlphaInstance objects, and handles same-name merge automatically (highest state wins, links and evidenceBy aggregated).
-
-   Link shorthand: `"https://url|Label"` expands to `{"name": "Label", "uri": "https://url"}`.
-
-   Alternative: output expanded JSON without applying:
-   ```bash
-   python3 utils/build-references.py <practice>.json --spec refs-spec.json -o _references.json
-   python3 utils/patch-practice-json.py <practice>.json --set-key references --patch-file _references.json
-   ```
-
-3. **Validate updated practice:**
-   ```bash
-   python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --schema deps/language.schema.json
-   ```
-
-5. **Bump version (patch):**
-   ```bash
-   python3 utils/apply-versioning.py <practice>.json --bump patch --fix
-   ```
-
-6. **Re-package into `.keleo`:**
-   Follow the standard packaging process from Post-Update Packaging section.
-
-7. **Report results:**
-   ```
-   Added N references to "<practice-name>":
-   - [Reference 1]: [alphaName] at [stateName] — [link]
-   - [Reference 2]: [alphaName] at [stateName] — [link]
-   ...
-   
-   Version bumped: X.Y.Z → X.Y.(Z+1)
-   Package updated: bundles/<name>.keleo
-   ```
-
-**Step 3E: Method-Level Orchestration (Mode 3)**
-
-When adding references to a **method** with multiple constituent practices:
-
-1. **Backup the method directory:**
-   ```bash
-   python3 utils/backup-practice.py practices/<method-name>/
-   ```
-
-2. **Identify all constituent practices** from the method JSON's `practiceNames` array. List them with their alpha structures so content can be mapped accurately.
-
-3. **Batch discovery:** Browse the content source once for all practices, grouping discovered content by practice. Present a single consolidated mapping to the user for approval — do NOT prompt per-practice.
-
-4. **Apply references to each practice** using compact specs:
-   ```bash
-   # Repeat for each practice with references
-   python3 utils/build-references.py <practice>.json --spec <practice>-refs-spec.json --fix
-   ```
-
-5. **Batch version bump** all modified practices plus the method JSON in one command:
-   ```bash
-   python3 utils/apply-versioning.py --dir practices/<method-name>/ --bump patch --fix
-   ```
-
-6. **Repackage** the full method into `.keleo`:
-   ```bash
-   python3 utils/package-keleo.py \
-     --documents <baseline>.json <practice1>.json ... <method>.json \
-     --name <method-name> --version <new-version> \
-     --description "..." -o bundles/<method-name>.keleo --verify
-   ```
-
-7. **Report results** with a summary table showing references per practice.
-
-8. **Clean up** any temporary reference JSON files created during patching.
+**Read:** `.claude/skills/update-method/modes/mode-3-references.md` for detailed instructions.
 
 ---
 
@@ -738,8 +361,10 @@ When the user requests updating ALL practices in a method/bundle:
 **Key lessons:**
 - Phase 3 agents are fully parallelizable — they read mapping guides (stable by this point) and write independent JSON files
 - Single-agent generation works reliably for practices of any size (>100KB included) — the Parallel Section Strategy is optional complexity
-- Use `fix-common-issues.py --all --fix` with baseline arg to catch unknown activity spaces and self-referencing backgrounds post-generation
+- Use `fix-common-issues.py --all --fix` with baseline arg to catch unknown activity spaces, self-referencing backgrounds, invalid narrative types, and invalid competency refs post-generation
 - Phase 3 agents should auto-detect the schema version from `deps/language.schema.json` rather than being told a specific version
+- Phase 3 agents commonly invent competency names, competency levels, and narrative type names instead of using baseline values — always run `--all` post-generation to catch these
+- When effective context is generated before dependency practices are regenerated, dependent practices may reference stale alpha/state names — regenerate effective context after dependencies complete
 
 ## User Interaction
 
@@ -754,7 +379,19 @@ When the user requests updating ALL practices in a method/bundle:
 
 ## Post-Update Validation
 
-After any update, run the eval harness to confirm clean state:
+### Pre-Validation Completeness Gate
+
+Before running the eval harness, verify that Phase 3 output did not drop any element arrays. This catches output truncation issues (e.g., agent hit output limits before generating personas/personaGroups):
+
+```bash
+python3 utils/diff-practice-json.py <backup-dir>/<name>.json <dir>/<name>.json --gate
+```
+
+**If gate fails:** See the mode-specific Step 2D instructions for recovery patterns. Do NOT proceed to eval until the gate passes.
+
+### Eval Harness
+
+After the completeness gate passes, run the eval harness to confirm clean state:
 
 **For extension practices:**
 ```bash
@@ -771,12 +408,27 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 
 **Expected result:** `error_pass_rate: 1.0`. Warning assertions are advisory — address where practical.
 
+### Citation URL Validation
+
+After the eval harness passes, test citation URLs for reachability:
+
+```bash
+python3 utils/fix-citation-urls.py <dir>/<name>.json
+```
+
+**If broken URLs are found (exit code 1):**
+1. Try to find a corrected URL (search for the citation title/source)
+2. If a replacement exists: `python3 utils/fix-citation-urls.py <file>.json --fix --replace "old-url=new-url"`
+3. If no replacement exists: `python3 utils/fix-citation-urls.py <file>.json --fix` (removes the broken URL field, preserves the citation)
+4. If the citation is no longer valid at all: `python3 utils/fix-citation-urls.py <file>.json --fix --remove-citations` (removes entire citation and all citationNames references)
+
 ### ChangeRequest Generation (MANDATORY)
 
 After any update that modifies a practice/baseline/method JSON, generate a ChangeRequest capturing the delta between the backup version and the updated version. ChangeRequests enable automatic downstream propagation of renames and structural changes via `apply-change-request.py`.
 
 **When to generate:**
 - **Mode 1 (Full Reanalysis):** Always — content is reworked from source
+- **Mode 1B (Light Reanalysis):** Always — analysis content is reworked within scope
 - **Mode 2 (Remap & Regenerate):** Always — mappings and structure change
 - **Mode 1A (Auto-Fix):** Only if the fix introduced nameChanges (LOD renames, alpha renames, state renames). Pure structural fixes (missing `kind`, tags nesting, persona property normalization) do not need a ChangeRequest.
 - **Mode 3 (Add/Update References):** Not needed — references are additive with no downstream impact
@@ -941,6 +593,9 @@ python3 utils/discover-dependencies.py --consumers "Practice Name"
 | 11 | Batch WP partOf→mapsTo | Targeted transform | `transform-workproducts.py` — set `setMapsTo`, `lodMap`, `rename` |
 | 12 | Add/update outcomes | Remap (Mode 2) | Add 1-3 outcomes with measureDescription + metricContributions or objectiveContributions |
 | 13 | Criteria-style checklists | Remap (Mode 2) | Rewrite checklist names from past-participle criteria to imperative verb phrases; add test completion criteria where missing |
+| 14 | Source material updated (specific chapter/edition) | Light Reanalysis (Mode 1B) | Scope to affected sections, provide updated source URLs |
+| 15 | Skill/language changes affecting specific elements | Light Reanalysis (Mode 1B) | Scope to affected element types (concerns, activities, etc.) |
+| 16 | User-identified gaps in analysis quality | Light Reanalysis (Mode 1B) | Scope to weak sections, describe what's missing |
 
 **Scenario 8 details** (packaging-only — most common standalone use):
 - Embedded method: `package-keleo.py --from-embedded <method>.json --baseline <baseline>.json -o bundles/<name>.keleo --verify`
@@ -949,46 +604,6 @@ python3 utils/discover-dependencies.py --consumers "Practice Name"
 **Scenario 10/11 key rules**: `mapsTo` and `partOf` are mutually exclusive. `mapsTo` requires identical LOD names. `mapsTo` variant names omit parent type.
 
 ---
-
-## Remap Phase: Quality Fixes
-
-### Checklist Name Quality
-When assessment flags `checklist-quality` issues, rewrite names as imperative verb phrases (3-8 words) describing WHAT to do, not what condition exists. Names must not echo descriptions. Apply consistently across all alphas and work product LODs.
-
-When assessment flags `checklist-polarity` issues, rewrite items to be positive and additive — describing an action to perform, not the absence or lack of something. For example, "Metrics absent" → "Define Key Metrics". Use the state/LOD description and narratives to characterize level qualities including limitations.
-
-### Checklist Style Modernization
-When assessment flags `checklist-style` issues, rewrite checklist items from criteria-style (past-participle conditions) to action-oriented (imperative verb phrases):
-
-**Name transformation**: Convert past-participle names to imperative verb phrases.
-- "Architecture documented" → "Document the Architecture"
-- "Security review completed" → "Complete Security Review"
-- "Cost model validated" → "Validate Cost Model"
-- "SLOs defined and monitored" → "Define and Monitor SLOs"
-
-**Description enrichment**: After transforming names, verify descriptions carry information beyond them. If a description merely restates the name as a sentence, rewrite to add rationale, scope, method, or context. Do NOT mechanically transform old descriptions into sentences that echo the new name.
-- Anti-pattern: name "Document the Architecture" + description "Document the architecture approach." (echo — adds nothing)
-- Correct: name "Document the Architecture" + description "Create a reference architecture capturing technology stack decisions, rationale, and alternatives considered."
-
-**Test enrichment (not test promotion)**: Do NOT mechanically create tests from descriptions. Only create or retain a test when you can populate `given` with meaningful preconditions, `when` with a meaningful trigger, and `then` with independently observable evidence beyond the description. A test with empty `given`/`when` and `then` that restates the description in past tense is a skeleton test — it adds no verification value.
-
-**Skeleton test cleanup**: When assessment flags `checklist-skeleton-test` or `checklist-echo` issues, or when encountering tests where `test.description` is literally "Definition of done.", `given` and `when` are both empty, and `then` echoes the description — either enrich the test with real preconditions, triggers, and independently verifiable evidence, or remove the test entirely. Removal is preferred when the checklist item is straightforward enough that name + description are self-sufficient.
-
-Apply consistently across all alphas and work product LODs.
-
-### Asset Coverage
-When assessment flags `asset-coverage` gaps, add Font Awesome 6 Free icons (`fontWeight: "900"`, naming: `<kebab-case>-icon`). Every NarrativeType and Focus needs an icon. See generate-method SKILL.md Assets section for icon suggestions and JSON structure.
-
-### Outcomes
-When assessment flags `outcomes` warnings (missing outcomes) or `outcome-refs` errors (broken cross-references):
-- Add 1-3 outcomes with `measureDescription` (always required)
-- Each outcome should have `metricContributions` or `objectiveContributions` (never neither)
-- Bias toward at least one objective-based outcome tied to the main lifecycle pattern (broadest alpha coverage)
-- Validate `alphaName`/`stateName` references in metricContributions resolve to defined alphas/states
-- Optional `workProductName` on a metricContribution must match a WorkProduct.name; declare that `metricName` on the work product's `expectedMetrics`
-- Every objectiveContribution MUST include `patternName` (scopes view references to that pattern)
-- Validate `recognizedAtPatternViewName` in objectiveContributions resolves to a view within the named pattern
-- See generate-method SKILL.md @rule:outcome-001 through @rule:outcome-004
 
 ---
 
@@ -1000,11 +615,11 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 - Given: An existing JSON file is provided for update
 - When: The update workflow begins
 - Then: assess-practice.py is run first to determine suggestedUpdateMode
-- And: The update mode is auto-fix, remap, or full-reanalysis based on assessment output
+- And: The update mode is auto-fix, remap, light-reanalysis, or full-reanalysis based on assessment output
 
 ### Scenario: Backup before overwrite (@rule:process-402)
 - Given: The update will overwrite existing files
-- When: Any mode (auto-fix, remap, or full-reanalysis) begins
+- When: Any mode (auto-fix, remap, light-reanalysis, or full-reanalysis) begins
 - Then: backup-practice.py has created a timestamped backup of the directory
 - And: The backup contains all JSON and markdown files
 
@@ -1033,7 +648,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 - And: The result is reported to the user with any remaining warnings
 
 ### Scenario: Comparison report after update (@rule:process-407)
-- Given: A remap or full-reanalysis update has completed
+- Given: A remap, light-reanalysis, or full-reanalysis update has completed
 - When: The new JSON is generated
 - Then: diff-practice-json.py shows what changed vs the original
 - And: The user sees added, removed, and modified elements
@@ -1041,7 +656,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 ### Scenario: User confirms update mode when auto-fix insufficient (@rule:process-408)
 - Given: Assessment shows non-auto-fixable issues
 - When: Step 1B presents mode options
-- Then: The user is asked to choose between remap and full-reanalysis
+- Then: The user is asked to choose between remap, light-reanalysis, and full-reanalysis
 - And: The recommended mode and reason from assessment are presented
 
 ### Scenario: ChangeRequest generated after update (@rule:process-409)
@@ -1065,6 +680,13 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 - Then: A dry-run is shown to the user first
 - And: Changes are only applied after user confirms
 
+### Scenario: Content preservation during light reanalysis (@rule:process-412)
+- Given: The update uses light reanalysis mode (Phase 1B → 2 → 3)
+- When: Sections are classified as PRESERVE or UPDATE based on user scope
+- Then: PRESERVE sections appear verbatim in the updated analysis report
+- And: UPDATE sections retain valid existing entries as baseline
+- And: New content is traceable to source materials or the stated change context
+
 ## Key Principles
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
@@ -1079,7 +701,8 @@ Validates that the update workflow follows correct assessment-first, backup-safe
    - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix`, `--show`, `--set-version X.Y.Z`, `--ahead-of-copies`)
    - `generate-change-request.py` — Generate ChangeRequest JSON from old/new diff (`<old>.json <new>.json --author --status -o`)
    - `apply-change-request.py` — Apply ChangeRequest nameChanges/removals to downstream JSON (`<cr>.json <target>.json [--fix]`)
-   - `fix-common-issues.py` — Now includes `--fix-self-ref-backgrounds` and `--fix-unknown-activity-spaces` (both enabled by `--all`)
+   - `fix-common-issues.py` — Now includes `--fix-self-ref-backgrounds`, `--fix-unknown-activity-spaces`, `--fix-narrative-types`, and `--fix-competency-refs` (all enabled by `--all`)
+   - `fix-competency-levels.py` — Fixes competency names (`--map-name`) and levels (`--map`), with fuzzy matching and deduplication. Use `--partial` to fix what can be auto-matched and report the rest
    - `discover-dependencies.py` — Now includes `--tiers <method>.json` (Tier 1/2 classification) and `--consumers "Name"` (find all copies)
    - `extract-reference-names.py` — Now includes `--sections outcomes pattern-views` for outcome and pattern view extraction
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.

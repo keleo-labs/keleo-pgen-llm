@@ -23,6 +23,8 @@ Consolidates structural fixes detected by assess-practice.py:
 - Narrative schema (remove invalid kind='narrative', fix narrativeContext field names)
 - Self-referencing backgrounds (remove alphaStates entries that reference the owning alpha)
 - Unknown activity spaces (replace invalid activitySpaceNames with closest baseline match)
+- Invalid narrative types (replace narrativeTypeName values not in baseline with closest match)
+- Invalid competency refs (fix competency names and levels not in baseline, with deduplication)
 
 Usage:
     # Dry run — show what would be fixed
@@ -81,6 +83,7 @@ Output: JSON report to stdout. Exit 0 on success, 1 on error.
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -1475,6 +1478,138 @@ def fix_unknown_activity_spaces(data, baseline):
     return fixes
 
 
+def fix_narrative_types(data, baseline):
+    """Replace narrativeTypeName values not in baseline with closest match."""
+    if not baseline:
+        return []
+    from difflib import SequenceMatcher
+    valid_types = {nt["name"] for nt in baseline.get("narrativeTypes", [])}
+    if not valid_types:
+        return []
+    fixes = []
+
+    def _best_match(invalid_name):
+        best, best_score = None, 0.0
+        for vt in valid_types:
+            score = SequenceMatcher(None, invalid_name.lower(), vt.lower()).ratio()
+            if score > best_score:
+                best_score = score
+                best = vt
+        return best if best_score >= 0.3 else None
+
+    def _walk(obj, path=""):
+        if isinstance(obj, dict):
+            ntn = obj.get("narrativeTypeName")
+            if ntn and ntn not in valid_types:
+                replacement = _best_match(ntn)
+                if replacement:
+                    obj["narrativeTypeName"] = replacement
+                    fixes.append({
+                        "category": "narrative-type",
+                        "path": f"{path}.narrativeTypeName" if path else "narrativeTypeName",
+                        "old": ntn,
+                        "new": replacement,
+                    })
+            for k, v in obj.items():
+                _walk(v, f"{path}.{k}" if path else k)
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                _walk(item, f"{path}[{i}]")
+
+    _walk(data)
+    return fixes
+
+
+def fix_competency_refs(data, baseline, file_path):
+    """Fix invalid competency names and levels by delegating to fix-competency-levels.py."""
+    if not baseline:
+        return []
+    valid_comp_names = {c.get("name") for c in baseline.get("competencies", [])}
+    valid_levels = set()
+    for c in baseline.get("competencies", []):
+        for lv in c.get("competencyLevels", c.get("levels", [])):
+            if lv.get("name"):
+                valid_levels.add(lv["name"])
+    if not valid_comp_names:
+        return []
+
+    has_invalid = False
+    for act in data.get("activities", []):
+        for rc in act.get("requiredCompetencies", []):
+            if rc not in valid_comp_names:
+                has_invalid = True
+                break
+        if has_invalid:
+            break
+        for rcl in act.get("recommendedCompetencyLevels", []):
+            if rcl.get("competencyName") not in valid_comp_names or rcl.get("competencyLevelName") not in valid_levels:
+                has_invalid = True
+                break
+        if has_invalid:
+            break
+    if not has_invalid:
+        for p in data.get("personas", []):
+            for c in p.get("competencies", []):
+                if c.get("competencyName") not in valid_comp_names or c.get("competencyLevelName") not in valid_levels:
+                    has_invalid = True
+                    break
+            if has_invalid:
+                break
+
+    if not has_invalid:
+        return []
+
+    script = Path(__file__).resolve().parent / "fix-competency-levels.py"
+    baseline_path = None
+    for d in [Path("deps"), Path("baselines")]:
+        for f in d.glob("**/*.json"):
+            try:
+                with open(f) as fh:
+                    bd = json.load(fh)
+                if bd.get("name") == baseline.get("name"):
+                    baseline_path = str(f)
+                    break
+            except Exception:
+                continue
+        if baseline_path:
+            break
+
+    if not baseline_path:
+        return [{"category": "competency-refs", "path": "competencies", "old": "invalid refs detected", "new": "cannot auto-fix: baseline file path unknown"}]
+
+    result = subprocess.run(
+        [sys.executable, str(script), str(file_path), baseline_path, "--fix", "--partial"],
+        capture_output=True, text=True
+    )
+
+    fixes = []
+    if result.returncode == 0:
+        try:
+            output = json.loads(result.stdout)
+            name_map = output.get("nameMapping", {})
+            level_map = output.get("levelMapping", {})
+            deduped = output.get("deduplicated", 0)
+            for old, new in name_map.items():
+                fixes.append({"category": "competency-name", "path": "competencies", "old": old, "new": new})
+            for old, new in level_map.items():
+                fixes.append({"category": "competency-level", "path": "competencies", "old": old, "new": new})
+            if deduped:
+                fixes.append({"category": "competency-dedup", "path": "competencies", "old": f"{deduped} duplicates", "new": "removed"})
+            unmapped_names = output.get("unmappedNames", [])
+            unmapped_levels = output.get("unmappedLevels", [])
+            for name in unmapped_names:
+                fixes.append({"category": "competency-name-unmapped", "path": "competencies", "old": name, "new": f"UNMAPPED — use --map-name '{name}=ValidName'"})
+            for level in unmapped_levels:
+                fixes.append({"category": "competency-level-unmapped", "path": "competencies", "old": level, "new": f"UNMAPPED — use --map '{level}=ValidLevel'"})
+            with open(file_path, "r") as f:
+                reloaded = json.load(f)
+            data.clear()
+            data.update(reloaded)
+        except json.JSONDecodeError:
+            pass
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
@@ -1541,6 +1676,14 @@ def main():
     parser.add_argument(
         "--fix-unknown-activity-spaces", action="store_true",
         help="Replace unknown activitySpaceNames with closest baseline match (requires baseline arg)"
+    )
+    parser.add_argument(
+        "--fix-narrative-types", action="store_true",
+        help="Replace invalid narrativeTypeName values with closest baseline match (requires baseline arg)"
+    )
+    parser.add_argument(
+        "--fix-competency-refs", action="store_true",
+        help="Fix invalid competency names and levels via fix-competency-levels.py (requires baseline arg)"
     )
     parser.add_argument(
         "--all", action="store_true",
@@ -1618,6 +1761,12 @@ def main():
 
     if args.fix_unknown_activity_spaces or args.all:
         all_fixes.extend(fix_unknown_activity_spaces(data, baseline))
+
+    if args.fix_narrative_types or args.all:
+        all_fixes.extend(fix_narrative_types(data, baseline))
+
+    if args.fix_competency_refs or args.all:
+        all_fixes.extend(fix_competency_refs(data, baseline, file_path))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

@@ -33,6 +33,15 @@ Feature: Practice/Method Update to Latest Guidance
     Then outputs follow same quality gates as generate-method
     And version is bumped (minor)
 
+  Scenario: Light reanalysis mode (Phase 1B → 2 → 3)
+    Given existing 01-analysis-report.md is available in practice directory
+    And user describes change scope (section categories or free text)
+    When light analysis re-researches in-scope sections using existing citations
+    Then updated 01-analysis-report.md preserves out-of-scope sections verbatim
+    And Phase 2 mapping applies latest guidance (from generate-method SKILL.md)
+    And Phase 3 generates updated JSON
+    And version is bumped (minor)
+
   Scenario: Add/update references (Mode 3)
     Given user requests reference discovery
     When references are mapped to alpha+state anchors

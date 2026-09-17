@@ -6,7 +6,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only]` |
+| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; `--online` checks asset and citation URL reachability | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--online]` |
 | `audit-method-references.py` | Cross-practice reference auditing within a method (alpha refs, duplicates, persona consistency) | `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json [--json]` |
 | `validate-practice-json.py` | Schema validation for practices/methods | `python3 utils/validate-practice-json.py <file>.json` |
 | `validate-baseline-json.py` | Schema validation for baselines | `python3 utils/validate-baseline-json.py <file>.json` |
@@ -24,7 +24,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, outcomes, pattern-views, etc.) | `python3 utils/extract-reference-names.py <file>.json [--sections alphas activities outcomes pattern-views ...] [--alpha-details] [--structure] [--metadata]` |
 | `extract-practice-content.py` | Extract practice content from methods or resolve dependencies | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
-| `diff-practice-json.py` | Diff two practice JSON files by element type | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only]` |
+| `diff-practice-json.py` | Diff two practice JSON files by element type; `--gate` mode checks for element arrays that dropped to 0 (post-Phase-3 completeness gate, exit 1 on critical) | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only] [--gate]` |
 
 ## Resolution & Merging
 
@@ -43,6 +43,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `fix-competency-levels.py` | Fix invalid competency level names against baseline | `python3 utils/fix-competency-levels.py <file>.json <baseline>.json [--fix] [--map "Old=New"]` |
 | `fix-alpha-refs.py` | Add/remap/remove alpha references in practice JSON | `python3 utils/fix-alpha-refs.py <file>.json <baseline>.json [--add-redeclaration NAME] [--remap OLD NEW --state-map JSON] [--remove-alpha NAME] [--fix]` |
 | `fix-citation-names.py` | Fix citation name fields to use work titles | `python3 utils/fix-citation-names.py <file>.json [--fix]` |
+| `fix-citation-urls.py` | Test citation URLs and fix/remove broken ones (4xx/5xx); `--remove-citations` removes entire citation + references | `python3 utils/fix-citation-urls.py <file>.json [--fix] [--remove-citations] [--replace "old=new"] [--json]` |
 | `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type, set/remove relationships, set relatesTo, strip contributesToState, remove). State renames cascade to checklists, activities, patterns, LOD backgrounds, references, outcomes, and contributesToAlphaNames. | `python3 utils/transform-alphas.py <file>.json --spec-file <spec>.json [--fix]` |
 | `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |

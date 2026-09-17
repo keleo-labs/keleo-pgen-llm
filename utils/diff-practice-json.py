@@ -219,6 +219,97 @@ def print_report(diff, changes_only=False):
         print()
 
 
+GATE_SECTIONS = [
+    "alphas", "workProducts", "activities", "patterns", "citations",
+    "personas", "personaGroups", "outcomes",
+]
+
+
+def run_gate(diff):
+    """Completeness gate: check for element arrays that dropped to 0 or decreased significantly.
+
+    Returns (critical_issues, warning_issues) lists.
+    """
+    critical = []
+    warnings = []
+
+    for section in GATE_SECTIONS:
+        info = diff["sections"].get(section)
+        if not info:
+            continue
+        old_count = info["old"]
+        new_count = info["new"]
+
+        if old_count > 0 and new_count == 0:
+            critical.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": f"{section} dropped from {old_count} to 0",
+            })
+        elif old_count > 0 and new_count < old_count * 0.5:
+            warnings.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": f"{section} decreased by >{int((1 - new_count/old_count) * 100)}% ({old_count} → {new_count})",
+            })
+
+    return critical, warnings
+
+
+def print_gate_report(diff, critical, warnings):
+    """Print gate-style pass/fail summary."""
+    print("=== COMPLETENESS GATE ===\n")
+
+    for section in GATE_SECTIONS:
+        info = diff["sections"].get(section, {"old": 0, "new": 0, "delta": 0})
+        old_count = info["old"]
+        new_count = info["new"]
+
+        is_crit = any(c["section"] == section for c in critical)
+        is_warn = any(w["section"] == section for w in warnings)
+
+        if is_crit:
+            marker = "CRITICAL"
+        elif is_warn:
+            marker = "WARNING"
+        elif new_count >= old_count:
+            marker = "OK"
+        else:
+            marker = "ok"
+
+        sign = "+" if info["delta"] > 0 else ""
+        print(f"  [{marker:>8}] {section}: {old_count} → {new_count} ({sign}{info['delta']})")
+
+    print()
+
+    if critical:
+        print("CRITICAL — element arrays dropped to 0:")
+        for c in critical:
+            print(f"  • {c['issue']}")
+            removed = diff["sections"][c["section"]].get("removed", [])
+            if removed:
+                for name in removed[:5]:
+                    print(f"    - {name}")
+                if len(removed) > 5:
+                    print(f"    ... and {len(removed) - 5} more")
+        print()
+
+    if warnings:
+        print("WARNING — significant element count decreases:")
+        for w in warnings:
+            print(f"  • {w['issue']}")
+        print()
+
+    if not critical and not warnings:
+        print("PASS — all element arrays maintained or grew\n")
+    elif critical:
+        print("FAIL — recover missing elements before proceeding\n")
+    else:
+        print("WARN — review element decreases for correctness\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Compare two practice/baseline JSON files structurally"
@@ -229,6 +320,8 @@ def main():
                         help="Output as JSON instead of human-readable report")
     parser.add_argument("--changes-only", action="store_true",
                         help="Only show sections with changes")
+    parser.add_argument("--gate", action="store_true",
+                        help="Completeness gate: exit 1 if element arrays dropped to 0")
     args = parser.parse_args()
 
     old_data = load_json(args.old)
@@ -236,7 +329,19 @@ def main():
 
     diff = diff_files(old_data, new_data)
 
-    if args.json:
+    if args.gate:
+        critical, warnings = run_gate(diff)
+        if args.json:
+            print(json.dumps({
+                "gate": "FAIL" if critical else ("WARN" if warnings else "PASS"),
+                "critical": critical,
+                "warnings": warnings,
+                "sections": {s: diff["sections"].get(s, {}) for s in GATE_SECTIONS},
+            }, indent=2))
+        else:
+            print_gate_report(diff, critical, warnings)
+        sys.exit(1 if critical else 0)
+    elif args.json:
         print(json.dumps(diff, indent=2))
     else:
         print_report(diff, args.changes_only)

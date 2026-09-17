@@ -17,7 +17,7 @@
       ],
       "then": [
         "assess-practice.py is run first to determine suggestedUpdateMode",
-        "The update mode is auto-fix, remap, or full-reanalysis based on assessment output"
+        "The update mode is auto-fix, remap, light-reanalysis, or full-reanalysis based on assessment output"
       ],
       "line": 825,
       "assess_categories": [],
@@ -31,7 +31,7 @@
         "The update will overwrite existing files"
       ],
       "when": [
-        "Any mode (auto-fix, remap, or full-reanalysis) begins"
+        "Any mode (auto-fix, remap, light-reanalysis, or full-reanalysis) begins"
       ],
       "then": [
         "backup-practice.py has created a timestamped backup of the directory",
@@ -118,7 +118,7 @@
       "name": "Comparison report after update",
       "feature": "Update Process Integrity",
       "given": [
-        "A remap or full-reanalysis update has completed"
+        "A remap, light-reanalysis, or full-reanalysis update has completed"
       ],
       "when": [
         "The new JSON is generated"
@@ -142,21 +142,40 @@
         "Step 1B presents mode options"
       ],
       "then": [
-        "The user is asked to choose between remap and full-reanalysis",
+        "The user is asked to choose between remap, light-reanalysis, and full-reanalysis",
         "The recommended mode and reason from assessment are presented"
       ],
       "line": 867,
       "assess_categories": [],
       "automatable": false
+    },
+    {
+      "id": "process-412",
+      "name": "Content preservation during light reanalysis",
+      "feature": "Update Process Integrity",
+      "given": [
+        "The update uses light reanalysis mode (Phase 1B → 2 → 3)"
+      ],
+      "when": [
+        "Sections are classified as PRESERVE or UPDATE based on user scope"
+      ],
+      "then": [
+        "PRESERVE sections appear verbatim in the updated analysis report",
+        "UPDATE sections retain valid existing entries as baseline",
+        "New content is traceable to source materials or the stated change context"
+      ],
+      "line": 647,
+      "assess_categories": [],
+      "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 8,
+    "total_scenarios": 9,
     "total_features": 1,
     "automatable": 0,
-    "manual_only": 8,
+    "manual_only": 9,
     "by_category": {
-      "process": 8
+      "process": 9
     }
   }
 }
