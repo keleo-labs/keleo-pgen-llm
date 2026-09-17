@@ -92,6 +92,41 @@ def discover_schema():
     return str(candidate) if candidate.exists() else None
 
 
+def discover_parents(practice_path, baseline_path=None):
+    """Resolve parent practice paths from practiceDependencyNames."""
+    try:
+        data = load_json(practice_path, exit_on_error=False)
+        dep_names = data.get("practiceDependencyNames", [])
+        if not dep_names:
+            return []
+
+        parents = []
+        for name in dep_names:
+            # Try discover-dependencies.py --resolve
+            result = subprocess.run(
+                [sys.executable, str(UTILS_DIR / "discover-dependencies.py"), "--resolve", name],
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0:
+                try:
+                    report = json.loads(result.stdout)
+                    if report.get("status") == "found" and report.get("path"):
+                        parents.append(report["path"])
+                        continue
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Fallback: check _effective-context.json in practice directory
+            practice_dir = Path(practice_path).parent
+            ec_path = practice_dir / "_effective-context.json"
+            if ec_path.exists():
+                parents.append(str(ec_path))
+                break  # effective context covers all parents
+        return parents
+    except Exception:
+        return []
+
+
 def run_validator(practice, baseline, schema):
     """Run validate-practice-json.py and return (error_count, warning_count, report)."""
     cmd = [
@@ -149,7 +184,7 @@ def run_fix_competency(practice, baseline):
         return 0
 
 
-def run_assess(practice, baseline):
+def run_assess(practice, baseline, parents=None):
     """Run assess-practice.py --errors-only. Returns error count."""
     cmd = [
         sys.executable,
@@ -159,6 +194,8 @@ def run_assess(practice, baseline):
         str(baseline),
         "--errors-only",
     ]
+    for p in (parents or []):
+        cmd.extend(["--parent", str(p)])
     result = subprocess.run(cmd, capture_output=True, text=True)
     try:
         report = json.loads(result.stdout)
@@ -187,6 +224,17 @@ def main():
         action="store_true",
         help="Print one-line summary instead of JSON",
     )
+    parser.add_argument(
+        "--parent",
+        action="append",
+        default=[],
+        help="Parent practice JSON (repeatable; auto-discovered from practiceDependencyNames if omitted)",
+    )
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Structured JSON output (default behaviour — flag exists for discoverability)",
+    )
     args = parser.parse_args()
 
     practice = Path(args.practice)
@@ -203,6 +251,8 @@ def main():
     if not schema:
         print(json.dumps({"error": "No schema found. Provide schema path or ensure deps/language.schema.json exists."}))
         sys.exit(1)
+
+    parents = args.parent if args.parent else discover_parents(practice, baseline)
 
     initial_errors, initial_warnings, initial_report = run_validator(practice, baseline, schema)
     fixes_applied = []
@@ -233,7 +283,7 @@ def main():
 
     assess_errors = 0
     if baseline:
-        assess_errors = run_assess(practice, baseline)
+        assess_errors = run_assess(practice, baseline, parents)
 
     final_errors = current_errors + assess_errors
     status = "PASS" if final_errors == 0 else "FAIL"
@@ -246,6 +296,7 @@ def main():
     report = {
         "practice": str(practice),
         "baseline": str(baseline),
+        "parents": [str(p) for p in parents],
         "iterations": iterations,
         "initial_errors": initial_errors,
         "final_errors": final_errors,

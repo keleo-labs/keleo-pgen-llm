@@ -143,82 +143,12 @@ The register is a structured Google Sheets table with two column zones — **inp
 
 ### Ensure Table Schema Is Current
 
-On each run, verify the table includes the resolution columns. If the table's `endColumnIndex` is 16 (only input columns), extend it:
+On each run, verify the table includes the resolution columns. If the table's `endColumnIndex` is 16 (only input columns), extend it using `gws sheets spreadsheets batchUpdate`:
 
-**Step 1a: Extend the table range and add resolution column definitions:**
+1. **Extend table range** to `endColumnIndex: 20` and add resolution column definitions (indices 16-19: Resolution Summary, Practice/Method Changes, keleo-pgen-llm Changes, keleo-language Changes)
+2. **Update Status dropdown** (column index 15) to include all six values: New, Planned, In Progress, Resolved, Closed, Declined
 
-```bash
-gws sheets spreadsheets batchUpdate \
-  --params '{"spreadsheetId": "<ID>"}' \
-  --json '{
-    "requests": [
-      {
-        "updateTable": {
-          "table": {
-            "tableId": "<TABLE_ID>",
-            "range": {
-              "sheetId": 0,
-              "startRowIndex": 0,
-              "startColumnIndex": 0,
-              "endRowIndex": <CURRENT_END_ROW>,
-              "endColumnIndex": 20
-            },
-            "columnProperties": [
-              {"columnIndex": 16, "columnName": "Resolution Summary"},
-              {"columnIndex": 17, "columnName": "Practice/Method Changes"},
-              {"columnIndex": 18, "columnName": "keleo-pgen-llm Changes"},
-              {"columnIndex": 19, "columnName": "keleo-language Changes"}
-            ]
-          },
-          "fields": "range,columnProperties"
-        }
-      }
-    ]
-  }'
-```
-
-**Step 1b: Update Status column dropdown to include all status values:**
-
-The Status column (index 15) is a DROPDOWN type. Update its data validation to include all six status values:
-
-```bash
-gws sheets spreadsheets batchUpdate \
-  --params '{"spreadsheetId": "<ID>"}' \
-  --json '{
-    "requests": [
-      {
-        "updateTable": {
-          "table": {
-            "tableId": "<TABLE_ID>",
-            "columnProperties": [
-              {
-                "columnIndex": 15,
-                "columnName": "Status",
-                "columnType": "DROPDOWN",
-                "dataValidationRule": {
-                  "condition": {
-                    "type": "ONE_OF_LIST",
-                    "values": [
-                      {"userEnteredValue": "New"},
-                      {"userEnteredValue": "Planned"},
-                      {"userEnteredValue": "In Progress"},
-                      {"userEnteredValue": "Resolved"},
-                      {"userEnteredValue": "Closed"},
-                      {"userEnteredValue": "Declined"}
-                    ]
-                  }
-                }
-              }
-            ]
-          },
-          "fields": "columnProperties"
-        }
-      }
-    ]
-  }'
-```
-
-Steps 1a and 1b can be combined into a single batchUpdate with both requests if both are needed.
+Both can be combined into a single `batchUpdate` with two `updateTable` requests.
 
 **Idempotency:** If the table already has 20 columns and the Status dropdown already has all values, skip the schema update. Check by inspecting the table metadata from Step 0.
 
@@ -277,57 +207,24 @@ Issue #<row>: <Summary>
 
 ### Bundle Resolution
 
-Use the Document Name and Document Kind from the register to locate source files. Resolution follows a three-tier strategy — local files first, local bundles second, remote download third.
+Use the Document Name and Document Kind from the register to locate source files. Resolution follows a three-tier strategy — local first, local bundles second, remote download third.
 
-**Tier 1 — Local files:**
+**Tiers 1-2 — Local resolution:**
 
-- `practices/<practice-name>/` — practice/method working directories
-- `baselines/<baseline-name>/` — baseline working directories
+```bash
+python3 utils/discover-dependencies.py --resolve "<Document Name>"
+```
 
-**Tier 2 — Local bundles:**
-
-- `bundles/<name>.keleo` — packaged bundles
-- Extract with: `unzip -o bundles/<name>.keleo -d /tmp/keleo-extract/`
+This searches `practices/`, `baselines/`, `deps/`, and `bundles/*.keleo` automatically. If found, use the returned path. For bundle hits, extract with `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/`.
 
 **Tier 3 — Remote download from keleo-studio-gas:**
 
-If the document is not found locally, attempt to download it from the keleo-studio-gas instance. This triggers the lazy configuration prompt if `keleoStudioGasUrl` and `keleoStudioGasToken` are not yet in `.claude/user-config.json`.
+If `discover-dependencies.py` returns `"status": "not_found"`, attempt remote download. This triggers the lazy configuration prompt if `keleoStudioGasUrl` and `keleoStudioGasToken` are not yet in `.claude/user-config.json`.
 
-**Step 1 — Search for the bundle:**
-
-```bash
-curl -s -H "Authorization: Bearer <TOKEN>" \
-  '<GAS_URL>?api=packages' | jq '.bundles'
-```
-
-This returns an array of `{ slug, name, version, description, documentCount }`. Match on document name from the register.
-
-**Step 2 — Get the download URL:**
-
-```bash
-curl -s -H "Authorization: Bearer <TOKEN>" \
-  '<GAS_URL>?api=download&name=<DOCUMENT_NAME>'
-```
-
-Returns `{ downloadUrl }` — a Google Drive download URL for the `.keleo` package.
-
-**Step 3 — Download via gws:**
-
-Extract the Drive file ID from the download URL and download using gws:
-
-```bash
-# The download URL is typically: https://drive.google.com/uc?id=<FILE_ID>&export=download
-# Extract FILE_ID and download:
-gws drive files get --params '{"fileId": "<FILE_ID>", "alt": "media"}' --output bundles/<slug>.keleo
-```
-
-**Step 4 — Extract the bundle:**
-
-```bash
-unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/
-```
-
-Read `manifest.json` from the extracted bundle to locate the specific document files.
+1. Search: `curl -s -H "Authorization: Bearer <TOKEN>" '<GAS_URL>?api=packages'` → match on document name
+2. Get download URL: `curl -s -H "Authorization: Bearer <TOKEN>" '<GAS_URL>?api=download&name=<DOCUMENT_NAME>'` → returns `{ downloadUrl }`
+3. Download: extract Drive file ID from URL, use `gws drive files get --params '{"fileId": "<FILE_ID>", "alt": "media"}' --output bundles/<slug>.keleo`
+4. Extract: `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/` and read `manifest.json` for document layout
 
 **If remote download also fails:** Inform the user and set the issue status to **Planned** with a note explaining the document could not be located.
 

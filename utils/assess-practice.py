@@ -859,11 +859,18 @@ _NEGATIVE_POLARITY_PATTERNS = [
     re.compile(r'\babsent\b', re.IGNORECASE),
     re.compile(r'\bmissing\b(?!\s+[A-Z])', re.IGNORECASE),
     re.compile(r'\blacking\b', re.IGNORECASE),
+    re.compile(r'\blacks?\b', re.IGNORECASE),
     re.compile(r'\bundefined\b', re.IGNORECASE),
     re.compile(r'\bunresolved\b', re.IGNORECASE),
     re.compile(r'\bunaddressed\b', re.IGNORECASE),
     re.compile(r'\bincomplete\b', re.IGNORECASE),
+    re.compile(r'\binadequate\b', re.IGNORECASE),
+    re.compile(r'\binsufficient\b', re.IGNORECASE),
+    re.compile(r'\bunmet\b', re.IGNORECASE),
     re.compile(r'\bnot\s+(?:defined|established|documented|identified|created|completed|present)\b', re.IGNORECASE),
+    re.compile(r'\bdoes\s+not\b', re.IGNORECASE),
+    re.compile(r'\bhas\s+not\b', re.IGNORECASE),
+    re.compile(r'\bfails?\s+to\b', re.IGNORECASE),
     re.compile(r'^no\s+', re.IGNORECASE),
     re.compile(r'^without\s+', re.IGNORECASE),
     re.compile(r'\bgaps?\s+(?:identified|noted|exist|present|remain)', re.IGNORECASE),
@@ -1808,16 +1815,53 @@ def check_outcomes(data, kind):
                     "autoFixable": False,
                 })
 
-            for mc in o.get("metricContributions", []):
+            all_wp_names = {wp.get("name") for wp in source.get("workProducts", []) if wp.get("name")}
+            wp_metrics = {}
+            for wp in source.get("workProducts", []):
+                wpn = wp.get("name", "")
+                if wpn:
+                    wp_metrics[wpn] = {m.get("name") for m in wp.get("expectedMetrics", []) if m.get("name")}
+
+            for mc_idx, mc in enumerate(o.get("metricContributions", [])):
+                mc_path = f"{opath}.metricContributions[{mc_idx}]"
                 aname = mc.get("alphaName", "")
                 if aname and aname not in all_alpha_names:
                     issues.append({
                         "severity": "error",
                         "category": "outcome-refs",
-                        "path": f"{opath}.metricContributions",
+                        "path": mc_path,
                         "message": f"Outcome '{oname}' references unknown alpha '{aname}'",
                         "autoFixable": False,
                     })
+                rstate = mc.get("recognizedAtStateName", "")
+                if aname and rstate and aname in all_alpha_states:
+                    if rstate not in all_alpha_states[aname]:
+                        issues.append({
+                            "severity": "error",
+                            "category": "outcome-refs",
+                            "path": f"{mc_path}.recognizedAtStateName",
+                            "message": f"Outcome '{oname}' references state '{rstate}' not found on alpha '{aname}'",
+                            "autoFixable": False,
+                        })
+                wpname = mc.get("workProductName", "")
+                if wpname and wpname not in all_wp_names:
+                    issues.append({
+                        "severity": "error",
+                        "category": "outcome-refs",
+                        "path": f"{mc_path}.workProductName",
+                        "message": f"Outcome '{oname}' references unknown work product '{wpname}'",
+                        "autoFixable": False,
+                    })
+                mname = mc.get("metricName", "")
+                if mname and wpname and wpname in wp_metrics:
+                    if mname not in wp_metrics[wpname]:
+                        issues.append({
+                            "severity": "warning",
+                            "category": "outcome-refs",
+                            "path": f"{mc_path}.metricName",
+                            "message": f"Outcome '{oname}' metricName '{mname}' not declared in '{wpname}'.expectedMetrics",
+                            "autoFixable": False,
+                        })
 
             for oc_idx, oc in enumerate(o.get("objectiveContributions", [])):
                 has_objective = True

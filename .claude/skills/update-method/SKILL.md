@@ -690,21 +690,7 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 ## Key Principles
 
 1. **Automate First** — Use `assess-practice.py` and fix utilities before asking the user anything. Only prompt when auto-fix is insufficient.
-2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`. See generate-method SKILL.md "Key Utilities" table for the full utility reference. Run `python3 utils/<script>.py --help` for detailed usage. Additional update-specific utilities:
-   - `practice-summary.py` — Structured practice summaries for subagent prompts (`--json`, `--dir`, `--baseline`)
-   - `sync-practices.py` — Sync shared practices across method directories (`<source-dir>/ [--fix] [--rebuild-bundles]`)
-   - `detect-schema-gaps.py` — Schema evolution gap detection (`<file>.json`, `--dir`, `--json`)
-   - `transform-alphas.py` — Batch alpha transforms: `rename`, `setMapsTo`, `setContributesTo`, `stateMap`, `addStates`
-   - `transform-workproducts.py` — Batch WP transforms: `rename`, `setMapsTo`, `setPartOf`, `lodMap`, `addLods`
-   - `build-references.py` — Validate and expand reference specs into AlphaInstance JSON (`--spec`, `--fix`)
-   - `fix-citation-names.py` — Rename citation names (`--rename "Old=New"` or `--map renames.json`)
-   - `apply-versioning.py` — Stamp versions (`--bump patch|minor --fix`, `--show`, `--set-version X.Y.Z`, `--ahead-of-copies`)
-   - `generate-change-request.py` — Generate ChangeRequest JSON from old/new diff (`<old>.json <new>.json --author --status -o`)
-   - `apply-change-request.py` — Apply ChangeRequest nameChanges/removals to downstream JSON (`<cr>.json <target>.json [--fix]`)
-   - `fix-common-issues.py` — Now includes `--fix-self-ref-backgrounds`, `--fix-unknown-activity-spaces`, `--fix-narrative-types`, and `--fix-competency-refs` (all enabled by `--all`)
-   - `fix-competency-levels.py` — Fixes competency names (`--map-name`) and levels (`--map`), with fuzzy matching and deduplication. Use `--partial` to fix what can be auto-matched and report the rest
-   - `discover-dependencies.py` — Now includes `--tiers <method>.json` (Tier 1/2 classification) and `--consumers "Name"` (find all copies)
-   - `extract-reference-names.py` — Now includes `--sections outcomes pattern-views` for outcome and pattern view extraction
+2. **No Inline Scripts** — All programmatic actions use reusable scripts in `utils/`, never `python3 -c` or `bash -c`. **Canonical registry:** `utils/README.md` — read this for the full, current list of all utilities. Run `python3 utils/<script>.py --help` for detailed usage.
 3. **Preserve Content** — Retain all valuable analysis, activities, narratives unless superseded.
 4. **Backup First** — Never overwrite without running `utils/backup-practice.py` first.
 5. **Validate Rigorously** — Re-run `assess-practice.py` after every fix to confirm clean state.

@@ -34,40 +34,9 @@ This skill automates the creation of **baseline practice JSON** files - foundati
 
 ### Alpha Instances in Baselines
 
-Baseline alphas are intentionally broad to support reuse across multiple extension practices. **Alpha Instances** illustrate how a broad alpha applies within the baseline's specific domain without narrowing the alpha itself.
+Baseline alphas are intentionally broad. **Alpha Instances** illustrate how a broad alpha applies within the baseline's domain without narrowing the alpha itself. See `references/semantics/alphas.md` §6.6 for the full instance vs alias vs new alpha decision framework, naming conventions, and structural examples.
 
-**When to use Alpha Instances vs Aliases vs New Alphas:**
-
-| Technique | Use When | Example |
-|---|---|---|
-| **Alpha Instance** | The parent alpha is correct but has multiple domain-specific manifestations worth naming | Stakeholders → instances: "Application Developer", "Platform Engineer", "Budget Owner" |
-| **Alias** | The parent alpha maps 1:1 to a domain term that is universally used in the domain | Platform → "Internal Developer Platform" |
-| **New Alpha** | A genuinely new root-level concern exists that is present in every implementation of this domain | A concern not covered by any parent alpha, even with domain-specific interpretation |
-| **Redeclaration** | The parent alpha is correct but needs domain-specific states, checklists, or narratives | Platform alpha redeclared with IDP-specific maturity states |
-
-**Alpha Instance structure** (in the baseline JSON):
-```json
-{
-  "alphaInstances": [
-    {
-      "name": "Application Developer",
-      "description": "Engineers who build and deploy applications on the platform",
-      "alphaName": "Stakeholders"
-    },
-    {
-      "name": "Platform Engineer",
-      "description": "Engineers who build and maintain the platform itself",
-      "alphaName": "Stakeholders"
-    }
-  ]
-}
-```
-
-**Guidelines:**
-- Instances are examples, not subdivisions — they show how the alpha manifests in practice
-- Each instance references its parent alpha via `alphaName`
-- Instances can be used for any alpha where the domain has well-known specific manifestations
-- Document instances during Phase 1.5 distillation when mapping concerns to parent alphas
+Document instances during Phase 1.5 distillation when mapping concerns to parent alphas.
 
 ## Four-Phase Workflow
 
@@ -156,19 +125,7 @@ This skill orchestrates a 4-phase pipeline:
    - **Phase 2:** Read effective parent to avoid duplicating elements and to use correct cross-references
    - **Phase 3:** Reference parent elements for cross-reference validation
 
-**Merging semantics (overlay, name-keyed union):**
-- Start with root baseline (no parents)
-- Layer each child on top: child elements with same name override parent, new elements are added
-- Metadata (name, description) comes from the leaf parent
-- Result is the complete set of inherited elements this new baseline can reference
-
-**CRITICAL:** The NEW baseline being created does NOT need to redeclare all parent elements. It can:
-- Redeclare parent elements with domain-specific descriptions (override)
-- Add entirely new elements not in any parent
-- Reference parent elements in `relatesTo` without redeclaring them
-- Define its own `practiceElementAliases` to rename inherited elements for its domain
-
-The effective parent baseline provides the complete context for understanding what is inherited.
+**Merging semantics:** `resolve-context.py` uses overlay, name-keyed union (root-first layering). See the utility's `--help` for merge rules. The NEW baseline does NOT need to redeclare all parent elements — it can redeclare (override), add new elements, reference parent elements in `relatesTo`, or define `practiceElementAliases` for its domain.
 
 ### Directory Structure
 
@@ -497,13 +454,7 @@ Never use `_effective-context.json` as a document — it is a build artifact, no
 
 **Output:** `bundles/<name>.keleo` (packaged baseline with dependencies, verified inline)
 
-**Inspection and fix utilities (never use `python3 -c`, `bash -c`, or compound bash scripts like `TARGET=... && grep ...`):**
-- Discover dependency by name: `python3 utils/discover-dependencies.py --resolve "Practice Name"` (find file path by name)
-- Resolve all dependencies: `python3 utils/discover-dependencies.py --resolve-from <file>.json --transitive` (extract and resolve all deps recursively)
-- List available files: `python3 utils/discover-dependencies.py --list` (index all JSON files in baselines/, practices/, deps/)
-- Top-level structure overview: `python3 utils/extract-reference-names.py <file>.json --structure`
-- Structural inspection: `python3 utils/extract-reference-names.py <file>.json --sections focuses alphas activitySpaces competencies narrativeTypes --alpha-details`
-- Errors-only assessment: `python3 utils/assess-practice.py <file>.json --errors-only`
+**Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
 
 ## Token Budget Management
 
