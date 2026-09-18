@@ -22,7 +22,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `practice-summary.py` | Structured practice summary for subagent prompt construction (metadata, alphas, patterns, outcomes, feature coverage) | `python3 utils/practice-summary.py <file>.json [--baseline <baseline>.json] [--json] \| --dir <dir>/` |
 | `detect-schema-gaps.py` | Schema evolution gap detection (outcomes, patternGroups, priorities, references vs current schema) | `python3 utils/detect-schema-gaps.py <file>.json [--schema <schema>.json] [--json] \| --dir <dir>/` |
 | `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, outcomes, pattern-views, etc.) | `python3 utils/extract-reference-names.py <file>.json [--sections alphas activities outcomes pattern-views ...] [--alpha-details] [--structure] [--metadata]` |
-| `extract-practice-content.py` | Extract practice content from methods or resolve dependencies | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--extract-narratives <out>.json]` |
+| `extract-practice-content.py` | Extract practice content from methods or resolve dependencies; `--summary` prints a human-readable text overview | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--summary] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
 | `diff-practice-json.py` | Diff two practice JSON files by element type; `--gate` mode checks for element arrays that dropped to 0 (post-Phase-3 completeness gate, exit 1 on critical) | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only] [--gate]` |
 
@@ -50,6 +50,10 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump/set version, ahead-of-copies | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--set-version X.Y.Z] [--show] [--ahead-of-copies] [--fix]` |
 | `align-baseline-states.py` | Align child baseline redeclared alpha states with parent canonical names | `python3 utils/align-baseline-states.py <child>.json <parent>.json [--check] [--mapping JSON]` |
 | `fix-pattern-progression.py` | Remove non-progressing alphas from pattern views and remove degenerate single-alpha patterns | `python3 utils/fix-pattern-progression.py <file>.json [--fix] [--bump minor] [--json]` |
+| `manage-pattern-groups.py` | Manage patternGroups: init canonical groups in baselines (`--groups`), or adopt baseline groups in extensions (`--assignments`). Auto-detects mode from target's `kind` | `python3 utils/manage-pattern-groups.py <target>.json [<baseline>.json] [--groups <groups>.json] [--assignments <map>.json] [--fix] [--dry-run]` |
+| `modernize-checklists.py` | Transform checklist item names from past-participle to imperative verb phrases; supports batch mode | `python3 utils/modernize-checklists.py <file>.json [--fix] [--dir <dir>]` |
+| `harmonize-personas.py` | Ensure redeclared personas preserve competencies from dependencies; detect personaGroup composition opportunities | `python3 utils/harmonize-personas.py <practice>.json <dep1>.json [<dep2>.json ...] [--fix]` |
+| `checklist-priorities.py` | Extract checklist items for priority review or apply priority assignments | `python3 utils/checklist-priorities.py <file>.json [--extract] [--apply <assignments>.json] [--fix]` |
 
 ## Change Management
 
@@ -66,6 +70,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `add-element-icons.py` | Add Font Awesome icon assets to elements in bulk from an icon mapping file | `python3 utils/add-element-icons.py <file>.json --map <icons>.json [--fix] [--skip-existing]` |
 | `apply-narratives.py` | Apply narrative JSON to matching elements by name in a practice/baseline JSON | `python3 utils/apply-narratives.py <target>.json --map <narratives>.json [--fix]` |
 | `build-references.py` | Build schema-compliant AlphaInstance references from a compact spec, validating anchors against the practice | `python3 utils/build-references.py <practice>.json --spec <spec>.json [--fix] [-o <output>.json]` |
+| `enrich-references.py` | Generate build-references specs from a content inventory; requires `--config` with URL templates and category mappings | `python3 utils/enrich-references.py <inventory>.json --config <config>.json [--apply] [-o <dir>]` |
 
 ## Packaging
 

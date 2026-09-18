@@ -29,6 +29,7 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
 - `create-baseline-method`: 200–399
 - `update-method`: 400–599
 - `method-based-report`: 600–799
+- `improve-tooling`: 800–999
 
 ### 1.2 Feature Grouping
 
@@ -150,11 +151,13 @@ Validation logic lives in reusable utility scripts (`utils/`), never as inline `
 - **Existing script is close but missing a feature:** Extend that script with the new capability. Follow the script's existing patterns (argument style, output format, `_shared.py` usage). Add a test run to confirm the extension works.
 - **No existing script covers it:** Create a new utility in `utils/`. Import from `_shared.py` where applicable. Include `--help` documentation via `argparse`. Keep the interface consistent with peer scripts (positional file args, `--fix` for writes, `--dry-run` for previews).
 
+For non-trivial extensions or new scripts, skills may invoke `/improve-tooling` via the Skill tool to delegate the work. The `improve-tooling` skill applies the same protocol with added assessment, verification, and registry discipline. In mid-execution mode it auto-proceeds without user interaction.
+
 **Step 3 — Update the registry.** After extending or creating a script, update `utils/README.md` to reflect the change. Add new scripts to the appropriate section. Update existing entries if capabilities were extended.
 
 **Step 4 — Continue processing.** Do not halt or defer to the user. The skill should seamlessly create/extend the utility and proceed with its workflow.
 
-**Scope guard:** Only create utilities for operations that are generalizable across practices/baselines. One-off data transformations specific to a single source methodology belong in the skill's workflow, not in a reusable script.
+**Scope guard:** Only create utilities for operations that are mechanical and generalizable across practices/baselines. Scripts must not make semantic decisions — those belong in the LLM layer. One-off data transformations specific to a single source methodology belong in the skill's workflow, not in a reusable script. Practice-specific data (mappings, IDs, URLs) must be externalized into config files, not hardcoded.
 
 **Post-completion:** The Post-Completion Review (Section 11) validates that no ad-hoc inline logic slipped through. If it did, remediate immediately rather than proposing.
 

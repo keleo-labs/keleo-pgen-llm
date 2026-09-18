@@ -267,6 +267,40 @@ def generate_markdown(data):
     return "\n".join(lines)
 
 
+def generate_summary(data):
+    meta = extract_metadata(data)
+    alphas = extract_alphas(data)
+    activities = extract_activities(data)
+    work_products = extract_work_products(data)
+    personas = extract_personas(data)
+    patterns = extract_patterns(data)
+    citations = extract_citations(data)
+    outcomes = extract_outcomes(data)
+
+    lines = [f"\n=== {meta['name']} (v{data.get('version', '?')}) ===\n"]
+    lines.append(f"Description: {meta['description']}\n")
+    lines.append(f"Outcomes: {len(outcomes)}")
+    lines.append(f"Alphas: {len(alphas)}")
+    for alpha in alphas:
+        ct = alpha.get("contributesTo", "")
+        mt = ""
+        lines.append(f"  - {alpha['name']}: {len(alpha['states'])} states, contributesTo={ct or 'N/A'}, mapsTo={mt or 'N/A'}")
+    lines.append(f"\nActivities: {len(activities)}")
+    for act in activities:
+        lines.append(f"  - {act['name']} ({act.get('activitySpaceName', '')})")
+    lines.append(f"\nWork Products: {len(work_products)}")
+    for wp in work_products:
+        lines.append(f"  - {wp['name']}: {len(wp.get('levels', []))} LODs")
+    lines.append(f"\nPersonas: {len(personas)}")
+    for p in personas:
+        lines.append(f"  - {p['name']}")
+    lines.append(f"\nPatterns: {len(patterns)}")
+    for pat in patterns:
+        lines.append(f"  - {pat['name']}: {len(pat.get('views', []))} views")
+    lines.append(f"\nCitations: {len(citations)}")
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract content from practice/method JSON for reverse-engineering"
@@ -275,6 +309,11 @@ def main():
     parser.add_argument(
         "--output",
         help="Write Phase 1 analysis report markdown to this path (default: print JSON summary to stdout)",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a human-readable text summary of practice elements",
     )
     parser.add_argument(
         "--extract-narratives",
@@ -305,6 +344,10 @@ def main():
                 merged_list.extend(p.get(key, []))
             merged[key] = merged_list
         data = merged
+
+    if args.summary:
+        print(generate_summary(data))
+        return
 
     if args.output:
         md = generate_markdown(data)

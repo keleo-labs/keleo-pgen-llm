@@ -23,7 +23,9 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── method-based-report/          # Plain English report generation skill
 │       │   └── SKILL.md
-│       └── plan-from-feedback/          # Issue register triage and resolution skill
+│       ├── plan-from-feedback/          # Issue register triage and resolution skill
+│       │   └── SKILL.md
+│       └── improve-tooling/             # Utils and skill improvement skill
 │           └── SKILL.md
 ├── deps/                                   # Symlinks to keleo-studio
 │   ├── language.schema.json               # JSON Schema definition
@@ -321,6 +323,14 @@ These constraints apply to **extension practices** created with `/generate-metho
 - **NO FLOATING ALPHAS**: All new alphas MUST have `contributesTo` OR `mapsTo`
 - **`relatesTo`**: Required on new alphas. Fields: `relationship`, `alphaName`, `direction` (`outgoing`|`incoming`|`mutual`)
 
+### Persona Handling
+- **Redeclaration**: Enrich existing personas with additional competencies, narratives, tags; preserve name. Name match = redeclaration.
+- **New creation**: Only when no existing persona in the effective context covers the role
+- **PersonaGroup composition**: Use `personaGroupNames` for hierarchical grouping (groups of groups). The resulting graph must be acyclic (DAG).
+- **Aspirational cardinality**: 3–6 personas, 1–3 persona groups per practice
+- **Narratives**: Include on personas/groups when source provides substantive role detail (responsibilities, decision authority, operating context)
+- See `references/semantics/execution-and-patterns.md` §8.2.2–8.2.3 for full guidance
+
 ### Practice Structure
 Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-level deep), 3-7 total. See `references/practice-method-strategy.md` for full strategy and worked examples.
 
@@ -532,6 +542,23 @@ The skill reads an issue register (Google Sheet) and for each "New" item:
 The issue register URL is stored per-user in `.claude/user-config.json` (git-ignored). On first use, the skill prompts for the URL.
 
 The skill is defined in `.claude/skills/plan-from-feedback/SKILL.md`.
+
+### Improving Skills and Utilities
+
+Use the `/improve-tooling` skill to create, extend, refactor, or consolidate utility scripts, and to improve skill instructions:
+
+```
+/improve-tooling
+```
+
+The skill operates in two modes:
+
+- **Direct invocation**: User requests an improvement. Util changes are applied directly; skill instruction changes go through plan mode for approval.
+- **Mid-execution invocation**: Another skill discovers it needs a mechanical helper that doesn't exist. It invokes `/improve-tooling` via the Skill tool, which auto-proceeds and reports back.
+
+The skill enforces a mechanical-vs-semantic gate: only operations whose input/output is fully determined by rules and data are scriptable. Semantic decisions (meaning, quality, fitness) remain in the LLM layer.
+
+The skill is defined in `.claude/skills/improve-tooling/SKILL.md`.
 
 ### Manual Workflow
 
