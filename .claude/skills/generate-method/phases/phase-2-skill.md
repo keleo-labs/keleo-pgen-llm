@@ -149,18 +149,20 @@ For EACH concern from Phase 1, apply the decision framework:
 - States: [EXACT SAME states as parent -- names and sequence MUST match]
 - Narrative: [variant-specific narrative]
 
-### State Detail Requirements
+### State Detail Requirements (includes Checklist Authoring Rules)
 
 For each state (all three types), include:
 
 - **Name**, **Description** (max 12 words), **Seq**
 - **Background** (optional): `given` (prose preconditions), `alphaStates` (cross-concern dependencies as {alphaName, stateName} pairs -- NEVER the previous state of the SAME alpha), `workProductLevels` (prerequisite WP/LOD pairs -- NEVER the previous LOD of the SAME work product)
-- **Checklists**: Imperative verb phrases (3-8 words) with 1-2 sentence descriptions
+- **Checklists** — `Checklist` is a single schema type used on both alpha states AND work product LODs. These rules apply uniformly:
+  - Imperative verb phrases (3-8 words) with 1-2 sentence descriptions
   - Positive/additive items only -- what to achieve, never absence of something
   - Each item independently assessable -- no meta-items summarizing other checklist items
   - Information independence: description carries information beyond the name (rationale, scope, method)
   - Test independence: if including `test`, `then` clauses describe observable evidence not already in description
   - Optional `test` (Given/When/Then) and `examples` (array of concrete scenario Tests) on each checklist item
+  - **Priority** (optional): read `references/semantics/practice-elements.md` §5.2.2 for MoSCoW-derived priority scheme. Default is `"must"` (omit field). Mark `"should"` for important-but-deferrable items, `"could"` for supplementary items. Assess each item: is it essential for the state/LOD to be achieved, or could a team reasonably defer it?
 
 ### State Alignment Validation (Required for New Alphas)
 
@@ -228,7 +230,7 @@ Levels of Detail:
     Description: [max 12 words]
     Seq: [1, 2, 3...]
     Background: [optional prerequisites]
-    Checklists: [typical 3-5 items; imperative verb phrases; positive/additive only]
+    Checklists: [typical 3-5 items — same Checklist Authoring Rules as alpha states (Step 2 State Detail Requirements)]
     Contributes To: [{alphaName, stateName} objects -- REQUIRED on every LOD]
   Level 2: ...
 Expected Metrics: [optional -- named quantitative fields for outcome metric chains]
@@ -633,6 +635,7 @@ All PracticeElement names must be unique across ALL element types within the pra
 - [ ] Narrative contexts are 1-3 sentences, self-contained, no self-references
 - [ ] Citations have NO narratives property (metadata only)
 - [ ] Checklists: imperative verb phrases, positive/additive only, independently assessable, information-independent descriptions
+- [ ] Checklist priority: deferrable/supplementary items marked `should`/`could`; essential items have no priority (defaults to `must`)
 - [ ] 1-3 outcomes per practice, each with measureDescription
 - [ ] Outcome metricContribution.alphaName matches valid alpha; workProductName matches valid WP with expectedMetrics
 - [ ] Outcome objectiveContribution.patternName matches valid pattern; recognizedAtPatternViewName matches valid view

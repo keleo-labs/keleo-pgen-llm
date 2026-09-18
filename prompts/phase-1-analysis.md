@@ -119,7 +119,7 @@ For each state:
 - **Name** (2-4 words, describing the waypoint)
 - **Description** (single sentence)
 - **Prerequisites** (what must already hold before this state is relevant? List 1-3 preconditions — cross-concern dependencies or contextual conditions. These seed `background.given` and `background.alphaStates` in Phase 3. Do NOT list the previous state of the same concern — sequential progression is implicit in state ordering and restating it is redundant.)
-- **Criteria** (distinct observable verification criteria — what must be demonstrably true? Typical 3-7 per state; error if >10 unless justified. Same-state near-duplicate names are a fail. Extract unique criteria globally, then assign to states — do not invent per-state.)
+- **Criteria** (distinct observable verification criteria — what must be demonstrably true? Typical 3-7 per state; error if >10 unless justified. Same-state near-duplicate names are a fail. Extract unique criteria globally, then assign to states — do not invent per-state. For each criterion, note whether the source treats it as essential, important-but-deferrable, or supplementary — this feeds checklist `priority` assignment in Phase 2.)
 
 ### Step 6: Identify Work Products
 

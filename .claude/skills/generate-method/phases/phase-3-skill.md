@@ -181,12 +181,13 @@ Translate each alpha from the mapping guide.
 - Add checklists ONLY to states the mapping guide explicitly enriches
 - Unenriched states: include with empty `"checklist": []`
 
-**Checklist items** (on states):
+**Checklist items** (on alpha states AND work product LODs — same schema type):
 - Objects `{name, description, seq}`, NEVER strings
 - `name`: imperative verb phrase ("Define key metrics" not "Metrics defined")
 - `description`: must add information beyond the name (rationale, scope, method)
 - Positive/additive only — never describe absence ("Define key metrics" not "Metrics absent")
 - No meta-items referencing other checklist items ("All requirements met" is circular)
+- `priority` (optional): `"should"` or `"could"` per `references/semantics/practice-elements.md` §5.2.2. Omit for essential items (defaults to `"must"`). Only emit the field when the mapping guide marks an item as deferrable or supplementary.
 - `test` (optional): `{name, description, given[], when[], then[]}` — completion criteria. `then` must be independently observable evidence, not the description in past tense. Omit test entirely if given/when would be empty.
 - `examples` (optional): array of Test objects for concrete scenarios
 - `evidencedBy` (optional): array of `{workProductName, levelOfDetailName}`
@@ -212,7 +213,7 @@ Translate each alpha from the mapping guide.
       "name": "Level Name",
       "description": "Max 12 words",
       "seq": 1,
-      "checklist": [{"name": "...", "description": "...", "seq": 1}],
+      "checklist": [{"name": "...", "description": "...", "seq": 1}],  // same Checklist rules as alpha states (§4.6) — including optional priority
       "contributesTo": [{"alphaName": "Alpha", "stateName": "State"}]
     }
   ]
@@ -542,7 +543,7 @@ These are experience-based gotchas — the most frequent errors observed in Phas
 | # | Mistake | Correct Form |
 |---|---|---|
 | 1 | Missing `"kind": "practice"` at root | Always include the discriminator property |
-| 2 | Checklist items as strings | Objects `{name, description, seq}` |
+| 2 | Checklist items as strings | Objects `{name, description, seq}` with optional `priority` |
 | 3 | Competency refs as `{competencyName, level}` | `{competencyName, competencyLevelName}` — use baseline names exactly |
 | 4 | `views` / `alphas` / `workProducts` on patterns | `patternViews` / `alphaStates` / `workProductLevels` |
 | 5 | Missing `contributesTo` on LevelOfDetail | Required on every LOD |
