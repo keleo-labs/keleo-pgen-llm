@@ -183,6 +183,42 @@ STAR elements → plain headings (for a section, not the whole report):
 - Action → "What Was Done" or domain-specific
 - Result → "Outcomes" or "Impact"
 
+#### 2.4 Build Citation Pool
+
+Extract citations from the effective context to support claims and recommendations in the report. These are the original source documents cited by the practice — methodology papers, technical guides, vendor documentation, research — not references to the practice itself.
+
+**Step 1 — Collect candidates:** Read the `citations` array from the effective context. Each citation has `name`, `authors` (array), `date`, `source`, and optional `url`.
+
+**Step 2 — Filter for relevance:** Not every citation in the practice belongs in the report. Include a citation when:
+- It is referenced by `citationNames` on a narrative attached to an alpha, activity, or element that the report covers
+- Its `name` or `description` is directly relevant to the report's subject matter
+- It supports a specific claim, recommendation, or framework reference in the report
+
+Aim for **5–15 citations** in a standard report. Fewer is fine for focused topics; more is acceptable for comprehensive analyses. Do not pad the list with tangentially relevant citations.
+
+**Step 3 — Format for APA 7:** Build a lookup from citation name to formatted reference. Use these rules to convert the citation fields:
+
+| Citation field | APA 7 usage |
+|---|---|
+| `authors` | Author names. Corporate/organizational names stay as-is (e.g., "Red Hat", "Dell Technologies"). Personal names use surname-first format: `Surname, A. A.` |
+| `date` | Extract the 4-digit year from strings like `"2024"`, `"December 2023"`, `"April 2026"` |
+| `name` | Work title — italicized in the reference entry |
+| `source` | Publisher or site name |
+| `url` | Appended to the reference entry when present |
+
+**In-text shorthand** (used when writing the report):
+- Single personal author: `(Surname, 2024)`
+- Two personal authors: `(Surname & Surname, 2024)`
+- Three or more personal authors: `(Surname et al., 2024)`
+- Corporate author: `(Organization Name, 2024)`
+- Narrative form: `Surname (2024) found that...` or `According to Organization Name (2024),...`
+
+**Full reference format** (used in the References section):
+```
+Surname, A. A. (Year). *Title of work*. Source. URL
+Organization Name. (Year). *Title of work*. URL
+```
+
 ---
 
 ### Step 3: Generate the Report
@@ -209,6 +245,7 @@ The practice/method provides the **analytical framework** — the structured way
 - **Patterns** → translated into recommended sequences or lifecycle approaches
 - **Existing narratives on elements** → used as domain context and framing inspiration
 - **Competencies** → translated into skills or capability requirements
+- **Citations** → used as APA 7 in-text references to support factual claims, technical recommendations, and framework references (see §3.6)
 
 #### 3.3 Structure
 
@@ -228,6 +265,10 @@ The practice/method provides the **analytical framework** — the structured way
 ...
 
 ## <Final section>
+
+## References
+
+<APA 7 formatted entries, alphabetical by first author surname>
 
 ---
 
@@ -259,7 +300,42 @@ Tell the user:
 1. Where the report was saved
 2. Which practice/method provided the analytical framework
 3. Which narrative structure(s) shaped the report
-4. Total word count
+4. Total word count and citation count
+
+#### 3.6 Citations and References
+
+**In-text citations** support the report's credibility by linking claims and recommendations to their source documents. Use APA 7 parenthetical format:
+
+- Place the citation at the end of the relevant sentence or paragraph, before the period: `...reducing provisioning time by 80% (Red Hat, 2025).`
+- Use narrative form when the source is the subject: `According to Dell Technologies (2024), the recommended architecture uses...`
+- When multiple citations support the same point: `(Red Hat, 2025; Dell Technologies, 2024)`
+
+**What to cite:**
+- Specific factual claims, statistics, or benchmarks
+- Technical recommendations or best practices attributed to a source
+- Framework descriptions or methodology references
+- Architecture patterns or design decisions from vendor documentation
+
+**What not to cite:**
+- General knowledge or widely accepted facts
+- Your own analysis, synthesis, or recommendations (these are the report's original contribution)
+- Every sentence — aim for natural density, not exhaustive attribution
+
+**Density:** 5–15 in-text citations for a standard report. A focused report on a single practice may use 5–8; a comprehensive multi-practice analysis may use 10–15.
+
+**References section:** After the final content section and before the optional framework attribution, include a `## References` section listing every cited source in full APA 7 format, alphabetized by first author surname:
+
+```markdown
+## References
+
+Dell Technologies. (2024). *Red Hat OpenShift Virtualization with Dell PowerFlex*. Dell Technologies. https://infohub.delltechnologies.com/...
+
+Red Hat. (2025). *OpenShift Security Best Practices for Kubernetes Cluster Design*. Red Hat Blog. https://www.redhat.com/en/blog/...
+
+Surname, A. A., & Surname, B. B. (2023). *Title of the work*. Publisher Name. https://example.com/...
+```
+
+**Only include references that were actually cited in the text.** The References section is not a bibliography — every entry must have a corresponding in-text citation.
 
 ---
 
@@ -306,6 +382,29 @@ Tell the user:
 - And: suggests how the user can provide valid input (path to .json or .keleo file)
 
 ---
+
+## Feature: Citations and References
+
+### Scenario: Report includes in-text citations in APA 7 format (@rule:report-606)
+- Given: the effective context contains citations relevant to the report subject
+- When: the report makes factual claims, technical recommendations, or framework references
+- Then: those claims are supported by APA 7 parenthetical citations (Author, Year)
+- And: 5–15 citations appear in a standard report
+- And: citations are placed at the end of the relevant sentence, before the period
+
+### Scenario: Report ends with a References section (@rule:report-607)
+- Given: the report contains in-text citations
+- When: the report is finalized
+- Then: a "## References" section appears after the final content section
+- And: every in-text citation has a corresponding full reference entry
+- And: entries are in APA 7 format: `Author. (Year). *Title*. Source. URL`
+- And: entries are alphabetized by first author surname
+
+### Scenario: References are source documents, not practice metadata (@rule:report-608)
+- Given: citations are selected from the effective context
+- When: the citation pool is built
+- Then: citations reference the original source documents (methodology papers, vendor documentation, technical guides)
+- And: no citations reference the Keleo practice, method, or baseline itself
 
 ---
 
