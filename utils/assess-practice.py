@@ -3423,6 +3423,80 @@ def check_citation_urls(citations):
     return issues
 
 
+def check_reference_uris(data):
+    import urllib.request
+    import urllib.error
+
+    issues = []
+    for ri, ref in enumerate(data.get("references", [])):
+        ref_name = ref.get("name", f"references[{ri}]")
+        all_links = []
+        for li, link in enumerate(ref.get("links", [])):
+            all_links.append((f"references[{ri}].links[{li}].uri", ref_name, link))
+        for ei, ev in enumerate(ref.get("evidenceBy", [])):
+            ev_name = ev.get("name", f"evidenceBy[{ei}]")
+            for li, link in enumerate(ev.get("links", [])):
+                all_links.append((
+                    f"references[{ri}].evidenceBy[{ei}].links[{li}].uri",
+                    f"{ref_name} / {ev_name}",
+                    link,
+                ))
+        for path, label, link in all_links:
+            uri = link.get("uri")
+            if not uri or not uri.startswith("http"):
+                continue
+            try:
+                req = urllib.request.Request(uri, method="HEAD")
+                req.add_header("User-Agent", "PracticeValidator/1.0")
+                urllib.request.urlopen(req, timeout=10)
+            except urllib.error.HTTPError as e:
+                severity = "error" if e.code in (404, 410) else "warning"
+                issues.append({
+                    "severity": severity,
+                    "category": "reference-uri",
+                    "path": path,
+                    "message": f"Reference '{label}' URI returned {e.code}: {uri}",
+                    "autoFixable": True,
+                })
+            except (urllib.error.URLError, TimeoutError, OSError) as e:
+                issues.append({
+                    "severity": "warning",
+                    "category": "reference-uri",
+                    "path": path,
+                    "message": f"Reference '{label}' URI unreachable: {uri} ({e})",
+                    "autoFixable": True,
+                })
+    return issues
+
+
+_MISSING_URL_SOURCE_PATTERNS = [
+    "blog", "press release", "documentation", "website",
+    "web page", "online", "newsroom",
+]
+
+
+def check_citation_missing_urls(citations):
+    issues = []
+    for i, cit in enumerate(citations):
+        if cit.get("url"):
+            continue
+        source = (cit.get("source") or "").lower()
+        for pattern in _MISSING_URL_SOURCE_PATTERNS:
+            if pattern in source:
+                issues.append({
+                    "severity": "warning",
+                    "category": "citation-missing-url",
+                    "path": f"citations[{i}].url",
+                    "message": (
+                        f"Citation '{cit.get('name')}' has source '{cit.get('source')}' "
+                        f"but no URL — expected a public URL for this source type"
+                    ),
+                    "autoFixable": False,
+                })
+                break
+    return issues
+
+
 def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
@@ -4016,6 +4090,8 @@ def main():
     if args.online:
         all_issues.extend(check_asset_urls(data.get("assets", [])))
         all_issues.extend(check_citation_urls(data.get("citations", [])))
+        all_issues.extend(check_reference_uris(data))
+        all_issues.extend(check_citation_missing_urls(data.get("citations", [])))
 
     baseline_data = None
     if args.baseline:
