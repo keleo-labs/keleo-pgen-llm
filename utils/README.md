@@ -39,12 +39,12 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `fix-common-issues.py` | Fix structural issues: kind, narratives, citations, contributesTo, schema violations, narrative placement, pattern compression, missing assets | `python3 utils/fix-common-issues.py <file>.json [--fix] [--all] [--compress-patterns] [--fix-missing-assets]` |
+| `fix-common-issues.py` | Fix structural issues: kind, narratives, citations, contributesTo, schema violations, narrative placement, pattern compression, missing assets, nested narrative wrappers, missing versions | `python3 utils/fix-common-issues.py <file>.json [--fix] [--all] [--compress-patterns] [--fix-missing-assets] [--fix-nested-narratives] [--fix-versions]` |
 | `fix-competency-levels.py` | Fix invalid competency level names against baseline | `python3 utils/fix-competency-levels.py <file>.json <baseline>.json [--fix] [--map "Old=New"]` |
 | `fix-alpha-refs.py` | Add/remap/remove alpha references in practice JSON | `python3 utils/fix-alpha-refs.py <file>.json <baseline>.json [--add-redeclaration NAME] [--remap OLD NEW --state-map JSON] [--remove-alpha NAME] [--fix]` |
 | `fix-citation-names.py` | Fix citation name fields to use work titles | `python3 utils/fix-citation-names.py <file>.json [--fix]` |
 | `fix-citation-urls.py` | Test citation URLs and fix/remove broken ones (4xx/5xx); `--remove-citations` removes entire citation + references | `python3 utils/fix-citation-urls.py <file>.json [--fix] [--remove-citations] [--replace "old=new"] [--json]` |
-| `patch-practice-json.py` | Apply targeted JSON patches to practice files | `python3 utils/patch-practice-json.py <file>.json <patch>.json [--fix]` |
+| `patch-practice-json.py` | Apply targeted JSON patches to practice files; `--batch-file` applies multiple element patches from a spec | `python3 utils/patch-practice-json.py <file>.json [--element-path PATH --patch-file <patch>.json] [--batch-file <spec>.json] [--rename-in COLL OLD NEW] [--dry-run]` |
 | `transform-alphas.py` | Batch alpha transformations (rename, reparent, convert type, set/remove relationships, set relatesTo, strip contributesToState, remove). State renames cascade to checklists, activities, patterns, LOD backgrounds, references, outcomes, and contributesToAlphaNames. | `python3 utils/transform-alphas.py <file>.json --spec-file <spec>.json [--fix]` |
 | `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump/set version, ahead-of-copies | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--set-version X.Y.Z] [--show] [--ahead-of-copies] [--fix]` |
@@ -52,7 +52,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `fix-pattern-progression.py` | Remove non-progressing alphas from pattern views and remove degenerate single-alpha patterns | `python3 utils/fix-pattern-progression.py <file>.json [--fix] [--bump minor] [--json]` |
 | `manage-pattern-groups.py` | Manage patternGroups: init canonical groups in baselines (`--groups`), or adopt baseline groups in extensions (`--assignments`). Auto-detects mode from target's `kind` | `python3 utils/manage-pattern-groups.py <target>.json [<baseline>.json] [--groups <groups>.json] [--assignments <map>.json] [--fix] [--dry-run]` |
 | `modernize-checklists.py` | Transform checklist item names from past-participle to imperative verb phrases; supports batch mode | `python3 utils/modernize-checklists.py <file>.json [--fix] [--dir <dir>]` |
-| `harmonize-personas.py` | Ensure redeclared personas preserve competencies from dependencies; detect personaGroup composition opportunities | `python3 utils/harmonize-personas.py <practice>.json <dep1>.json [<dep2>.json ...] [--fix]` |
+| `harmonize-personas.py` | Ensure redeclared personas preserve competencies from dependencies; detect personaGroup composition opportunities | `python3 utils/harmonize-personas.py <practice>.json --deps <dep1>.json [<dep2>.json ...] [--fix] [--json]` |
 | `checklist-priorities.py` | Extract checklist items for priority review or apply priority assignments | `python3 utils/checklist-priorities.py <file>.json [--extract] [--apply <assignments>.json] [--fix]` |
 
 ## Change Management
@@ -83,7 +83,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `backup-practice.py` | Create timestamped backup of a practice directory | `python3 utils/backup-practice.py <directory>/` |
+| `backup-practice.py` | Create timestamped backup of a practice directory; `--prune N` keeps only the N most recent | `python3 utils/backup-practice.py <directory>/ [--prune N] [--prune-only]` |
 | `assemble-mapping-guide.py` | Assemble Phase 2 mapping guide from cluster fragments | `python3 utils/assemble-mapping-guide.py <cluster1>.md [<cluster2>.md...] -o <output>.md` |
 
 ## Ingestion

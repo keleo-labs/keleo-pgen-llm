@@ -3,7 +3,7 @@
 
 Consolidates structural fixes detected by assess-practice.py:
 - Missing 'kind' discriminator property
-- Method-invalid properties (strips authors/version/etc. from method-kind docs)
+- Method-invalid properties (strips authors/etc. from method-kind docs)
 - Narrative structure (missing name/description from PracticeElement)
 - Citation structure (missing PracticeElement fields)
 - Empty contributesTo on baseline alphas (should not exist)
@@ -25,6 +25,8 @@ Consolidates structural fixes detected by assess-practice.py:
 - Unknown activity spaces (replace invalid activitySpaceNames with closest baseline match)
 - Invalid narrative types (replace narrativeTypeName values not in baseline with closest match)
 - Invalid competency refs (fix competency names and levels not in baseline, with deduplication)
+- Nested narrative wrappers (flatten narratives[i].narratives[] into top-level, merge citations)
+- Missing version/schemaVersion (add version 1.0.0 and schemaVersion from schema)
 
 Usage:
     # Dry run — show what would be fixed
@@ -75,6 +77,12 @@ Usage:
     # Replace unknown activitySpaceNames with closest baseline match
     python3 utils/fix-common-issues.py <file.json> <baseline.json> --fix --fix-unknown-activity-spaces
 
+    # Flatten nested narrative wrappers (narratives[i].narratives[])
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-nested-narratives
+
+    # Add missing version and schemaVersion
+    python3 utils/fix-common-issues.py <file.json> --fix --fix-versions
+
     # Apply all optional fixes
     python3 utils/fix-common-issues.py <file.json> --fix --all
 
@@ -88,7 +96,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json_pair
+from utils._shared import load_json_pair, get_schema_version
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
@@ -328,7 +336,7 @@ def fix_narrative_citations(data):
     return fixes
 
 
-METHOD_INVALID_PROPERTIES = {"authors", "createdAt", "updatedAt", "version", "keywords"}
+METHOD_INVALID_PROPERTIES = {"authors", "createdAt", "updatedAt", "keywords"}
 
 
 def fix_method_properties(data):
@@ -1610,6 +1618,155 @@ def fix_competency_refs(data, baseline, file_path):
     return fixes
 
 
+def fix_nested_narratives(data):
+    """Flatten narratives[i] wrappers that contain a 'narratives' sub-array."""
+    fixes = []
+    top_narratives = data.get("narratives", [])
+    if not top_narratives:
+        return fixes
+
+    replacement = []
+    top_citations = data.get("citations", [])
+    top_citation_names = {c.get("name") for c in top_citations if c.get("name")}
+    top_citation_urls = {}
+    for c in top_citations:
+        url = c.get("url")
+        if url and c.get("name"):
+            top_citation_urls[url] = c["name"]
+
+    changed = False
+    for i, item in enumerate(top_narratives):
+        inner = item.get("narratives")
+        if isinstance(inner, list):
+            changed = True
+            inner_citations = item.get("citations", [])
+            for ic in inner_citations:
+                ic_name = ic.get("name")
+                if ic_name and ic_name not in top_citation_names:
+                    ic_url = ic.get("url")
+                    if ic_url and ic_url in top_citation_urls:
+                        pass
+                    else:
+                        top_citations.append(ic)
+                        top_citation_names.add(ic_name)
+                        fixes.append({
+                            "category": "nested-narrative",
+                            "path": f"citations",
+                            "old": None,
+                            "new": f"merged inner citation '{ic_name}' to top-level",
+                        })
+
+            for j, narr in enumerate(inner):
+                cn_list = narr.get("citationNames", [])
+                remapped = []
+                for cn in cn_list:
+                    if cn in top_citation_names:
+                        remapped.append(cn)
+                    else:
+                        matched = False
+                        for ic in inner_citations:
+                            if ic.get("name") == cn:
+                                ic_url = ic.get("url")
+                                if ic_url and ic_url in top_citation_urls:
+                                    remapped.append(top_citation_urls[ic_url])
+                                    fixes.append({
+                                        "category": "nested-narrative",
+                                        "path": f"narratives[{i}].narratives[{j}].citationNames",
+                                        "old": cn,
+                                        "new": top_citation_urls[ic_url],
+                                    })
+                                    matched = True
+                                    break
+                        if not matched:
+                            remapped.append(cn)
+                if remapped != cn_list:
+                    narr["citationNames"] = remapped
+                replacement.append(narr)
+            fixes.append({
+                "category": "nested-narrative",
+                "path": f"narratives[{i}]",
+                "old": f"wrapper with {len(inner)} inner narrative(s) and {len(inner_citations)} citation(s)",
+                "new": f"flattened {len(inner)} narrative(s) to top level",
+            })
+        else:
+            replacement.append(item)
+
+    if changed:
+        data["narratives"] = replacement
+        if top_citations:
+            data["citations"] = top_citations
+
+    return fixes
+
+
+def fix_versions(data):
+    """Add missing version and schemaVersion."""
+    fixes = []
+    if not data.get("version"):
+        data["version"] = "1.0.0"
+        fixes.append({
+            "category": "versioning",
+            "path": "version",
+            "old": None,
+            "new": "1.0.0",
+        })
+    schema_ver = get_schema_version()
+    if schema_ver and not data.get("schemaVersion"):
+        data["schemaVersion"] = schema_ver
+        fixes.append({
+            "category": "versioning",
+            "path": "schemaVersion",
+            "old": None,
+            "new": schema_ver,
+        })
+    return fixes
+
+
+def fix_narrative_element_names(data, baseline):
+    """Remap narrativeElementName values to match the baseline narrativeType's elements."""
+    if not baseline:
+        return []
+    type_elements = {}
+    for nt in baseline.get("narrativeTypes", []):
+        elems = nt.get("narrativeElements", [])
+        if elems:
+            type_elements[nt["name"]] = [e["name"] for e in elems]
+
+    if not type_elements:
+        return []
+
+    fixes = []
+
+    def _walk(obj, path=""):
+        if isinstance(obj, dict):
+            ntn = obj.get("narrativeTypeName")
+            contexts = obj.get("narrativeContexts")
+            if ntn and ntn in type_elements and contexts:
+                expected = type_elements[ntn]
+                for ctx in contexts:
+                    elem_name = ctx.get("narrativeElementName", "")
+                    if elem_name and elem_name not in expected:
+                        seq = ctx.get("seq")
+                        if seq is not None and 1 <= seq <= len(expected):
+                            new_name = expected[seq - 1]
+                            ctx_path = f"{path}.narrativeContexts[seq={seq}]" if path else f"narrativeContexts[seq={seq}]"
+                            fixes.append({
+                                "category": "narrative-element-name",
+                                "path": ctx_path,
+                                "old": elem_name,
+                                "new": new_name,
+                            })
+                            ctx["narrativeElementName"] = new_name
+            for k, v in obj.items():
+                _walk(v, f"{path}.{k}" if path else k)
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj):
+                _walk(item, f"{path}[{i}]")
+
+    _walk(data)
+    return fixes
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Auto-fix common practice/method/baseline JSON issues"
@@ -1684,6 +1841,14 @@ def main():
     parser.add_argument(
         "--fix-competency-refs", action="store_true",
         help="Fix invalid competency names and levels via fix-competency-levels.py (requires baseline arg)"
+    )
+    parser.add_argument(
+        "--fix-nested-narratives", action="store_true",
+        help="Flatten nested narrative wrappers (narratives[i].narratives[]) into top-level"
+    )
+    parser.add_argument(
+        "--fix-versions", action="store_true",
+        help="Add missing version (1.0.0) and schemaVersion (from schema)"
     )
     parser.add_argument(
         "--all", action="store_true",
@@ -1762,11 +1927,20 @@ def main():
     if args.fix_unknown_activity_spaces or args.all:
         all_fixes.extend(fix_unknown_activity_spaces(data, baseline))
 
+    if args.fix_nested_narratives or args.all:
+        all_fixes.extend(fix_nested_narratives(data))
+
     if args.fix_narrative_types or args.all:
-        all_fixes.extend(fix_narrative_types(data, baseline))
+        nt_fixes = fix_narrative_types(data, baseline)
+        all_fixes.extend(nt_fixes)
+        if nt_fixes:
+            all_fixes.extend(fix_narrative_element_names(data, baseline))
 
     if args.fix_competency_refs or args.all:
         all_fixes.extend(fix_competency_refs(data, baseline, file_path))
+
+    if args.fix_versions or args.all:
+        all_fixes.extend(fix_versions(data))
 
     if args.fix and all_fixes:
         with open(file_path, "w", encoding="utf-8") as f:

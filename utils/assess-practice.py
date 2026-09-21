@@ -415,6 +415,55 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
     return issues
 
 
+def check_contributesto_concentration(data, kind, baseline_alpha_names=None):
+    """Warn when >2 new alphas target the same contributesTo parent."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    baseline_alpha_names = baseline_alpha_names or set()
+
+    sources = []
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+    else:
+        sources.append(data)
+
+    for source in sources:
+        pfx = ""
+        if kind == "method":
+            pn = source.get("name", "")
+            pfx = f"practices[{pn}]." if pn else ""
+
+        target_counts = {}
+        for alpha in source.get("alphas", []):
+            name = alpha.get("name", "")
+            is_redeclaration = name in baseline_alpha_names
+            if is_redeclaration:
+                continue
+            ct = alpha.get("contributesTo")
+            if ct:
+                target_counts.setdefault(ct, []).append(name)
+
+        for parent, children in target_counts.items():
+            if len(children) > 2:
+                issues.append({
+                    "severity": "warning",
+                    "category": "contributesto-concentration",
+                    "path": f"{pfx}alphas",
+                    "message": (
+                        f"{len(children)} new alphas target the same "
+                        f"contributesTo parent '{parent}': "
+                        f"{', '.join(children)}. "
+                        f"Verify each independently — defaulting all "
+                        f"to one parent is a common mapping smell."
+                    ),
+                    "autoFixable": False,
+                })
+
+    return issues
+
+
 def check_mapsto_naming(data, kind, baseline_data=None):
     """Check that mapsTo variant names don't repeat the parent type name (work products only).
 
@@ -671,6 +720,20 @@ def check_competency_levels(data, baseline_data, kind):
 def check_narrative_structure(data):
     issues = []
     for i, narrative in enumerate(data.get("narratives", [])):
+        if isinstance(narrative.get("narratives"), list):
+            inner_count = len(narrative["narratives"])
+            issues.append({
+                "severity": "error",
+                "category": "narrative-structure",
+                "path": f"narratives[{i}]",
+                "message": (
+                    f"Narrative wrapper contains nested narratives[] array "
+                    f"with {inner_count} inner narrative(s) — should be "
+                    f"flattened to top-level (fix with --fix-nested-narratives)"
+                ),
+                "autoFixable": True,
+            })
+            continue
         if "name" not in narrative:
             issues.append({
                 "severity": "error",
@@ -850,8 +913,9 @@ _STOP_WORDS = frozenset({
 
 
 def _normalize_checklist_name(name):
-    """Lowercase, strip stop words, sort remaining tokens."""
-    tokens = name.lower().split()
+    """Lowercase, strip punctuation and stop words, sort remaining tokens."""
+    cleaned = re.sub(r"[^\w\s]", "", name.lower())
+    tokens = cleaned.split()
     return frozenset(t for t in tokens if t not in _STOP_WORDS)
 
 
@@ -1698,6 +1762,29 @@ def check_alias_isolation(data, kind):
     return issues
 
 
+def check_versioning(data, kind):
+    """Check for missing version and schemaVersion."""
+    issues = []
+    if not data.get("version"):
+        severity = "warning" if kind == "method" else "error"
+        issues.append({
+            "severity": severity,
+            "category": "versioning",
+            "path": "version",
+            "message": "Missing 'version' property (fix with --fix-versions or apply-versioning.py)",
+            "autoFixable": True,
+        })
+    if not data.get("schemaVersion"):
+        issues.append({
+            "severity": "warning",
+            "category": "versioning",
+            "path": "schemaVersion",
+            "message": "Missing 'schemaVersion' property (fix with --fix-versions or apply-versioning.py)",
+            "autoFixable": True,
+        })
+    return issues
+
+
 def check_keyword_count(data, kind):
     """Check that keywords array has 10-20 entries."""
     issues = []
@@ -2159,6 +2246,63 @@ def check_references(data, kind, baseline_data=None):
     return issues
 
 
+def check_persona_group_acyclicity(data, kind, baseline_data=None):
+    """Detect cycles in the personaGroupNames directed graph (must be a DAG)."""
+    issues = []
+
+    all_groups = {}
+    if baseline_data:
+        for pg in baseline_data.get("personaGroups", []):
+            name = pg.get("name", "")
+            if name:
+                all_groups[name] = [
+                    n for n in pg.get("personaGroupNames", []) if n
+                ]
+
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        for pg in source.get("personaGroups", []):
+            name = pg.get("name", "")
+            if name:
+                all_groups[name] = [
+                    n for n in pg.get("personaGroupNames", []) if n
+                ]
+
+    def _has_cycle(start, graph):
+        visited = set()
+        stack = [start]
+        while stack:
+            node = stack.pop()
+            if node in visited:
+                continue
+            visited.add(node)
+            for child in graph.get(node, []):
+                if child == start:
+                    return True
+                stack.append(child)
+        return False
+
+    for group_name, children in all_groups.items():
+        if not children:
+            continue
+        if _has_cycle(group_name, all_groups):
+            issues.append({
+                "severity": "error",
+                "category": "acyclicity-persona-group",
+                "path": f"personaGroups[name='{group_name}'].personaGroupNames",
+                "message": (
+                    f"PersonaGroup '{group_name}' is part of a cycle "
+                    f"in the personaGroupNames graph (must be a DAG)"
+                ),
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_internal_crossrefs(data, kind, baseline_data=None):
     """Validate all internal symbolic cross-references within a practice/method."""
     issues = []
@@ -2442,6 +2586,34 @@ def check_internal_crossrefs(data, kind, baseline_data=None):
                         ),
                         "autoFixable": False,
                     })
+            for pgni, pgname in enumerate(pg.get("personaGroupNames", [])):
+                if pgname not in all_persona_group_names:
+                    src_issues.append({
+                        "severity": "error",
+                        "category": "crossref-persona-group",
+                        "path": f"{pg_path}.personaGroupNames[{pgni}]",
+                        "message": (
+                            f"PersonaGroup '{pg_name}' references "
+                            f"unknown sub-group '{pgname}'"
+                        ),
+                        "autoFixable": False,
+                    })
+
+        for ai, act in enumerate(source.get("activities", [])):
+            act_path = f"{prefix}activities[{ai}]" if prefix else f"activities[{ai}]"
+            act_name = act.get("name", f"<unnamed-{ai}>")
+            led_by = act.get("ledBy")
+            if led_by and led_by not in all_persona_names:
+                src_issues.append({
+                    "severity": "error",
+                    "category": "crossref-activity-persona",
+                    "path": f"{act_path}.ledBy",
+                    "message": (
+                        f"Activity '{act_name}' ledBy references "
+                        f"unknown persona '{led_by}'"
+                    ),
+                    "autoFixable": False,
+                })
 
         def _check_narrative_citations(narrs, base_path):
             for ni, narr in enumerate(narrs):
@@ -3432,22 +3604,24 @@ def check_pattern_alpha_coverage(data, kind):
                     })
 
                 # Max 2 states per alpha per view
-                alpha_state_counts = {}
-                for astate in view.get("alphaStates", []):
-                    aname = astate.get("alphaName", "")
-                    alpha_state_counts[aname] = alpha_state_counts.get(aname, 0) + 1
-                for alpha, count in sorted(alpha_state_counts.items()):
-                    if count > 2:
-                        issues.append({
-                            "severity": "warning",
-                            "category": "pattern-view-state-density",
-                            "path": f"{pfx}patterns[{pat_name}].patternViews[{view_seq}]",
-                            "message": (
-                                f"Pattern '{pat_name}' view {view_seq}: "
-                                f"alpha '{alpha}' has {count} states (max 2)"
-                            ),
-                            "autoFixable": False,
-                        })
+                for view in views_sorted:
+                    vs = view.get("seq", "?")
+                    alpha_state_counts = {}
+                    for astate in view.get("alphaStates", []):
+                        aname = astate.get("alphaName", "")
+                        alpha_state_counts[aname] = alpha_state_counts.get(aname, 0) + 1
+                    for alpha, count in sorted(alpha_state_counts.items()):
+                        if count > 2:
+                            issues.append({
+                                "severity": "warning",
+                                "category": "pattern-view-state-density",
+                                "path": f"{pfx}patterns[{pat_name}].patternViews[{vs}]",
+                                "message": (
+                                    f"Pattern '{pat_name}' view {vs}: "
+                                    f"alpha '{alpha}' has {count} states (max 2)"
+                                ),
+                                "autoFixable": False,
+                            })
 
     return issues
 
@@ -3666,7 +3840,15 @@ REMAP_WARNING_CATEGORIES = {
 def suggest_update_mode(issues, counts, kind):
     errors = [i for i in issues if i["severity"] == "error"]
     auto_fixable = [i for i in issues if i.get("autoFixable")]
-    manual_fix = [i for i in errors if not i.get("autoFixable")]
+    has_structural_auto_fix = any(
+        i.get("autoFixable") and i.get("category") in ("narrative-structure", "versioning")
+        for i in errors
+    )
+    manual_fix = [
+        i for i in errors
+        if not i.get("autoFixable")
+        and not (has_structural_auto_fix and i.get("category") == "schema")
+    ]
 
     remap_warnings = [
         i for i in issues
@@ -3821,6 +4003,7 @@ def main():
     all_issues.extend(check_alpha_state_minimum(data, kind))
     all_issues.extend(check_workproduct_lod_minimum(data, kind))
     all_issues.extend(check_alias_uniqueness(data, kind))
+    all_issues.extend(check_versioning(data, kind))
     all_issues.extend(check_keyword_count(data, kind))
     all_issues.extend(check_narrative_name_uniqueness(data, kind))
     all_issues.extend(check_pattern_alpha_coverage(data, kind))
@@ -3924,6 +4107,7 @@ def main():
     if baseline_data:
         merged_bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
     all_issues.extend(check_alpha_relationships(data, kind, baseline_alpha_names=merged_bl_alpha_names))
+    all_issues.extend(check_contributesto_concentration(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     all_issues.extend(check_mapsto_naming(data, kind, baseline_data))
     all_issues.extend(check_partof_mapsto_candidates(data, kind, baseline_data))
     all_issues.extend(check_missing_partof_candidates(data, kind, baseline_data))
@@ -3932,6 +4116,7 @@ def main():
     all_issues.extend(check_alias_isolation(data, kind))
 
     all_issues.extend(check_internal_crossrefs(data, kind, baseline_data))
+    all_issues.extend(check_persona_group_acyclicity(data, kind, baseline_data))
 
     if baseline_data and kind != "practiceBaseline":
         all_issues.extend(check_competency_levels(data, baseline_data, kind))
