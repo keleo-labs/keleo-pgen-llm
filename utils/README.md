@@ -28,11 +28,17 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `inspect-keleo.py` | Inspect `.keleo` package contents: manifest, documents, versions, dependencies | `python3 utils/inspect-keleo.py <bundle>.keleo [--json] [--list]` |
 | `query-schema.py` | Query Practice Language schema `$defs` type definitions; auto-discovers `deps/language.schema.json` | `python3 utils/query-schema.py <TypeName> [--properties] [--json] [--list]` |
 
+## Remote Management
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `studio-client.py` | keleo-studio-gas API client: fetch remote index, compare versions, download/upload bundles, configure credentials | `python3 utils/studio-client.py --status \| --index [--max-age N] \| --check [name] \| --pull "Name" \| --push <file>.keleo \| --configure [--json]` |
+
 ## Resolution & Merging
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `discover-dependencies.py` | Auto-discover and resolve dependencies by scanning project directories | `python3 utils/discover-dependencies.py --resolve "Name" \| --resolve-from <file>.json [--transitive] \| --dependents "Name" \| --tiers <method>.json \| --consumers "Name" \| --list` |
+| `discover-dependencies.py` | Auto-discover and resolve dependencies by scanning project directories; `--remote` checks cached remote index, `--auto-pull` downloads missing bundles | `python3 utils/discover-dependencies.py --resolve "Name" [--remote] [--auto-pull] \| --resolve-from <file>.json [--transitive] [--remote] \| --dependents "Name" \| --tiers <method>.json \| --consumers "Name" \| --list` |
 | `sync-practices.py` | Sync shared practices across method directories (match by name, preserve filenames) | `python3 utils/sync-practices.py <source-dir>/ [--fix] [--rebuild-bundles] [--json]` |
 | `resolve-context.py` | Unified context resolver: baselines + practices + .keleo → effective context | `python3 utils/resolve-context.py <baseline>.json [<practice>.json] [<bundle>.keleo] --transitive -o <output>.json` |
 | `resolve-practice-dependencies.py` | Determine practiceDependencyNames by comparing parent and baseline alphas | `python3 utils/resolve-practice-dependencies.py --parent <parent>.json --baseline <baseline>.json --practice <practice>.json [--per-alpha]` |
@@ -99,7 +105,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Module | Purpose |
 |--------|---------|
-| `_shared.py` | Shared utilities: `load_json`, `load_json_pair`, `merge_by_name` (with optional `_contributingPracticeName` provenance), `detect_kind`, `load_json_from_keleo`, `load_all_from_keleo`, `get_schema_version`, `increment_version`, `build_dependency_versions`, `MERGEABLE_ARRAYS`. Not a CLI tool. |
+| `_shared.py` | Shared utilities: `load_json`, `load_json_pair`, `merge_by_name` (with optional `_contributingPracticeName` provenance), `detect_kind`, `load_json_from_keleo`, `load_all_from_keleo`, `get_project_root`, `load_user_config`, `save_user_config`, `get_schema_version`, `increment_version`, `build_dependency_versions`, `MERGEABLE_ARRAYS`. Not a CLI tool. |
 
 ## Typical Workflow
 

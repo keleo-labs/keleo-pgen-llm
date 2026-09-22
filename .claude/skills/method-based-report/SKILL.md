@@ -115,6 +115,12 @@ python3 utils/resolve-context.py --describe-output
 
 **Name resolution:** `--by-name` uses the dependency index to find documents by their `name` field (not directory name). This eliminates trial-and-error path lookups — e.g., the user may type "CRM-Foundations" but the directory is `crm-foundations/` and the document name is "CRM Foundations".
 
+**If a document is not found locally:** Download it from the remote bundle library:
+```bash
+python3 utils/studio-client.py --pull "<Document Name>"
+```
+Then re-run the `resolve-context.py` command. If `studio-client.py` reports an auth error, guide the user to run `python3 utils/studio-client.py --configure` to set or refresh their keleo-studio-gas credentials.
+
 **Multi-practice reports:** When the report draws on multiple practices, pass all of them in one call. The merged effective context gives you all personas, alphas, activities, and patterns from all sources with provenance annotations (`_contributingPracticeName`) so you know which practice each element came from.
 
 Read the output effective context JSON to extract:

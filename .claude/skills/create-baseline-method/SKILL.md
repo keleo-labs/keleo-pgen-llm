@@ -82,15 +82,19 @@ This skill orchestrates a 4-phase pipeline:
      python3 utils/discover-dependencies.py --resolve "Parent Baseline Name"
      ```
      - `found` → use the resolved path
-     - `not_found` → ask user for the file path
+     - `not_found` → attempt remote download:
+       ```bash
+       python3 utils/studio-client.py --pull "Parent Baseline Name"
+       ```
+       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
      - `ambiguous` → present candidates to user
 
 2. **Resolve transitive dependencies in a single step:**
    For each resolved parent baseline, check for transitive dependencies:
    ```bash
-   python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive
+   python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive --remote
    ```
-   This scans `baselines/`, `practices/`, and `deps/` directories and recursively resolves all `baselinePracticeNames` in the chain. Ask user only for any `not_found` dependencies.
+   This scans `baselines/`, `practices/`, `deps/`, and `bundles/` directories plus the cached remote index, recursively resolving all `baselinePracticeNames` in the chain. For any `not_found` dependencies, attempt `python3 utils/studio-client.py --pull "<name>"` before asking the user.
 
 3. **Confirm all resolved dependencies with user:**
    Present ALL parent baselines and their transitive deps in a single summary:

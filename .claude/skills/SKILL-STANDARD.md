@@ -242,3 +242,44 @@ Identify Bash commands that triggered permission prompts but could be auto-allow
 ### 11.3 Skill Improvements (Propose to User)
 
 Identify patterns that indicate skill instruction gaps (repeated manual corrections, ambiguous guidance that led to wrong output). Propose specific SKILL.md edits — do not apply unilaterally since skill changes affect all future runs.
+
+## 12. Remote Bundle Resolution
+
+When a skill cannot resolve a dependency locally (via `discover-dependencies.py`), use the `studio-client.py` utility to download from the keleo-studio-gas remote library.
+
+### 12.1 Download a Missing Bundle
+
+```bash
+python3 utils/studio-client.py --pull "<Document Name>"
+```
+
+This handles authentication, download URL resolution, and bundle verification. The downloaded `.keleo` is saved to `bundles/` and will be found by subsequent `discover-dependencies.py` calls.
+
+### 12.2 Check for Newer Versions
+
+```bash
+python3 utils/studio-client.py --check "<Document Name>"
+```
+
+Compares local vs remote versions. When remote is newer, offer the user a choice: keep local, pull remote, or diff.
+
+### 12.3 Authentication
+
+Credentials (`keleoStudioGasUrl`, `keleoStudioGasToken`) are stored in `.claude/user-config.json`. If not configured or if the token has expired:
+
+```bash
+python3 utils/studio-client.py --configure
+```
+
+Tokens are Google OAuth bearer tokens that expire after ~1 hour. On 401 errors, `studio-client.py` reports the expiry and guides the user to refresh.
+
+### 12.4 Integrated Resolution
+
+`discover-dependencies.py` supports a `--remote` flag that checks the cached remote index when local resolution fails:
+
+```bash
+python3 utils/discover-dependencies.py --resolve "<Name>" --remote
+python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive --remote --auto-pull
+```
+
+With `--auto-pull`, remote-only dependencies are downloaded automatically before re-resolving.

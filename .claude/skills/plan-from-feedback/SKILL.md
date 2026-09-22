@@ -66,23 +66,13 @@ The issue register URL is stored per-user in `.claude/user-config.json` (git-ign
 
 The keleo-studio-gas connection is configured **only when needed** — when a bundle referenced in an issue cannot be found locally (see Bundle Resolution below). Do not prompt for these on first use.
 
-When remote bundle access is needed and the config is missing, ask the user for:
+When remote bundle access is needed and the config is missing, run:
 
-1. **Deployment URL** — the base URL of their keleo-studio-gas instance (a Google Apps Script web app URL, e.g., `https://script.google.com/a/macros/.../exec`)
-2. **API token** — a Google OAuth bearer token obtained from the GAS app's help page (Settings → API Token). Tokens expire after ~1 hour.
-
-Save to `.claude/user-config.json`:
-
-```json
-{
-  "issueRegisterUrl": "...",
-  "issueRegisterSpreadsheetId": "...",
-  "keleoStudioGasUrl": "<deployment URL>",
-  "keleoStudioGasToken": "<OAuth bearer token>"
-}
+```bash
+python3 utils/studio-client.py --configure
 ```
 
-**Token expiry:** If an API call returns a 401 or auth error, inform the user that their token has expired and ask them to provide a fresh one from the GAS app. Update the stored token.
+This prompts for the deployment URL and API token, saves them to `.claude/user-config.json`, and tests the connection. Token expiry is handled automatically — `studio-client.py` detects 401 errors and guides the user to refresh their token.
 
 ### Detect Table Structure
 
@@ -219,12 +209,15 @@ This searches `practices/`, `baselines/`, `deps/`, and `bundles/*.keleo` automat
 
 **Tier 3 — Remote download from keleo-studio-gas:**
 
-If `discover-dependencies.py` returns `"status": "not_found"`, attempt remote download. This triggers the lazy configuration prompt if `keleoStudioGasUrl` and `keleoStudioGasToken` are not yet in `.claude/user-config.json`.
+If `discover-dependencies.py` returns `"status": "not_found"`, attempt remote download using `studio-client.py`:
 
-1. Search: `curl -s -H "Authorization: Bearer <TOKEN>" '<GAS_URL>?api=packages'` → match on document name
-2. Get download URL: `curl -s -H "Authorization: Bearer <TOKEN>" '<GAS_URL>?api=download&name=<DOCUMENT_NAME>'` → returns `{ downloadUrl }`
-3. Download: extract Drive file ID from URL, use `gws drive files get --params '{"fileId": "<FILE_ID>", "alt": "media"}' --output bundles/<slug>.keleo`
-4. Extract: `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/` and read `manifest.json` for document layout
+```bash
+python3 utils/studio-client.py --pull "<Document Name>"
+```
+
+This handles authentication, download URL resolution, and bundle verification automatically. Config (`keleoStudioGasUrl`, `keleoStudioGasToken`) is read from `.claude/user-config.json`. If not configured, run `python3 utils/studio-client.py --configure` first. If the token has expired, the utility reports this and guides the user to refresh it.
+
+After a successful pull, re-run `discover-dependencies.py --resolve` — the downloaded bundle will now be found locally. Extract with `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/` for direct file access.
 
 **If remote download also fails:** Inform the user and set the issue status to **Planned** with a note explaining the document could not be located.
 
@@ -410,25 +403,31 @@ cat /tmp/keleo-extract/manifest.json | jq '.documents'
 cp /tmp/keleo-extract/documents/<doc>.json practices/<name>/<doc>.json
 ```
 
-After making L1 changes to a document that came from a remote bundle, rebundle and optionally re-upload. The skill does NOT auto-upload — inform the user that the updated bundle needs to be uploaded to keleo-studio-gas manually if desired.
+After making L1 changes to a document that came from a remote bundle, rebundle and optionally re-upload:
+
+```bash
+python3 utils/studio-client.py --push bundles/<updated>.keleo
+```
+
+The skill does NOT auto-upload — inform the user and let them decide whether to push.
 
 ### Querying Document Details Remotely
 
-If you need to inspect a specific document without downloading the full bundle, use the document API:
+If you need to inspect a specific document without downloading the full bundle, download and inspect locally:
 
 ```bash
-curl -s -H "Authorization: Bearer <TOKEN>" \
-  '<GAS_URL>?api=document&bundle=<SLUG>&path=documents/<filename>.json'
+python3 utils/studio-client.py --pull "<Document Name>"
+python3 utils/inspect-keleo.py bundles/<slug>.keleo
 ```
 
-This returns the full document JSON directly, useful for read-only inspection during triage.
+For detailed document inspection after download, use `extract-reference-names.py` or `practice-summary.py` on the extracted JSON.
 
 ---
 
 ## Error Handling
 
-- **Document not found locally**: Attempt remote download from keleo-studio-gas (triggers lazy config if needed). If remote also fails, set Status to "Planned" with Resolution Summary explaining the document could not be located.
-- **keleo-studio-gas token expired (401/auth error)**: Inform the user their token has expired. Ask for a fresh token from the GAS app (Settings → API Token). Update `.claude/user-config.json` with the new token and retry.
+- **Document not found locally**: Attempt `python3 utils/studio-client.py --pull "<name>"`. If remote also fails, set Status to "Planned" with Resolution Summary explaining the document could not be located.
+- **keleo-studio-gas token expired (401/auth error)**: `studio-client.py` detects this automatically. Guide the user to run `python3 utils/studio-client.py --configure` to refresh the token.
 - **keleo-studio-gas unreachable**: Fall back to setting Status to "Planned". Note the connection issue in the Resolution Summary.
 - **Validation fails after change**: Revert the change, investigate the validation error, and fix properly. Do not suppress validation errors.
 - **Google Sheet write fails**: Report the intended status update to the user in the conversation so they can update manually.

@@ -135,7 +135,11 @@ In plan mode:
      ```
      - `found` → use the resolved path
      - `ambiguous` → present candidates to user, let them choose (filesystem entries preferred over bundle copies)
-     - `not_found` → ask user for the file path
+     - `not_found` → attempt remote download:
+       ```bash
+       python3 utils/studio-client.py --pull "Name Provided By User"
+       ```
+       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
    - **`.keleo` bundles:** Accepted directly — all documents inside are extracted and classified
    - **Classify all inputs:**
      ```bash

@@ -155,11 +155,28 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
 
 1. **Auto-discover and resolve all dependencies:**
    ```bash
-   python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive
+   python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive --remote
    ```
-   This scans `baselines/`, `practices/`, and `deps/` directories, extracts `baselinePracticeName` and `practiceDependencyNames` from the existing JSON, and recursively resolves all baseline dependencies.
-   - If any dependencies are `not_found`: ask user for the file paths
+   This scans `baselines/`, `practices/`, `deps/`, and `bundles/` directories, plus the cached remote index. Extracts `baselinePracticeName` and `practiceDependencyNames` from the existing JSON, and recursively resolves all baseline dependencies.
+   - If any dependencies are `not_found`: attempt remote download:
+     ```bash
+     python3 utils/studio-client.py --pull "<dependency-name>"
+     ```
+     If pull succeeds, re-resolve. If pull fails, ask user for the file paths.
    - If any are `ambiguous`: present candidates to user
+
+1b. **Check for newer remote versions:**
+   ```bash
+   python3 utils/studio-client.py --check "<practice-name>"
+   ```
+   If remote has a newer version than local:
+   - Show version comparison to user
+   - Offer: (a) use local version, (b) pull remote and use that, (c) pull remote and diff:
+     ```bash
+     python3 utils/studio-client.py --pull "<name>"
+     python3 utils/diff-practice-json.py <local.json> <remote.json> --changes-only
+     ```
+   - User decides which version to work from
 
 2. **Confirm resolved dependencies with user:**
    Present all resolved dependencies before proceeding:

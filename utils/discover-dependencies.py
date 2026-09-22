@@ -32,13 +32,60 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import load_json_pair, detect_kind, load_json_from_keleo
+from _shared import load_json_pair, detect_kind, load_json_from_keleo, get_project_root
 
 DEFAULT_SEARCH_DIRS = ["baselines", "practices", "deps", "bundles"]
+REMOTE_INDEX_PATH = "bundles/.remote-index.json"
 
 
-def build_index(search_dirs):
+def _load_remote_index():
+    """Load cached remote index from bundles/.remote-index.json."""
+    index_path = get_project_root() / REMOTE_INDEX_PATH
+    if not index_path.exists():
+        return None
+    try:
+        with open(index_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def _refresh_remote_index_if_stale(max_age=3600):
+    """Refresh remote index via studio-client if stale. Returns cached index or None."""
+    cached = _load_remote_index()
+    if cached:
+        fetched = cached.get("_fetchedAt", "")
+        if fetched:
+            try:
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(fetched.replace("Z", "+00:00"))
+                age = (datetime.now(timezone.utc) - dt).total_seconds()
+                if age < max_age:
+                    return cached
+            except (ValueError, TypeError):
+                pass
+
+    studio_client = Path(__file__).resolve().parent / "studio-client.py"
+    if studio_client.exists():
+        import subprocess
+        try:
+            subprocess.run(
+                [sys.executable, str(studio_client), "--index", "--max-age", str(max_age)],
+                capture_output=True, timeout=30,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        return _load_remote_index()
+
+    return cached
+
+
+def build_index(search_dirs, include_remote=False):
     """Scan directories for JSON files and .keleo bundles, building a name-to-entries index.
+
+    Args:
+        search_dirs: List of directory paths to scan.
+        include_remote: If True, also include entries from the cached remote index.
 
     Returns:
         (index, skipped) where index is {name: [{path, kind, name, ...}]} and
@@ -114,6 +161,23 @@ def build_index(search_dirs):
                 "kind": kind,
             })
 
+    if include_remote:
+        remote = _load_remote_index()
+        if remote:
+            for bundle in remote.get("bundles", []):
+                bname = bundle.get("name", "")
+                if not bname:
+                    continue
+                if bname in index:
+                    continue
+                index[bname].append({
+                    "name": bname,
+                    "kind": "",
+                    "version": bundle.get("version", ""),
+                    "slug": bundle.get("slug", ""),
+                    "remote": True,
+                })
+
     return dict(index), skipped
 
 
@@ -132,20 +196,30 @@ def resolve_name(name, index, prefer_filesystem=False):
 
     If prefer_filesystem is True and multiple candidates exist, prefer
     non-keleo (filesystem) entries over keleo-sourced entries.
+    Remote-only entries return status "remote" instead of "found".
     """
     entries = index.get(name, [])
-    if len(entries) == 1:
-        return {"name": name, "status": "found", **entries[0]}
-    elif len(entries) > 1:
+    if not entries:
+        return {"name": name, "status": "not_found"}
+
+    local_entries = [e for e in entries if not e.get("remote")]
+    remote_entries = [e for e in entries if e.get("remote")]
+
+    if local_entries:
+        if len(local_entries) == 1:
+            return {"name": name, "status": "found", **local_entries[0]}
         if prefer_filesystem:
-            fs_entries = [e for e in entries if "keleo_path" not in e]
+            fs_entries = [e for e in local_entries if "keleo_path" not in e]
             if len(fs_entries) == 1:
                 return {"name": name, "status": "found", **fs_entries[0]}
             if fs_entries:
                 return {"name": name, "status": "ambiguous", "candidates": fs_entries}
-        return {"name": name, "status": "ambiguous", "candidates": entries}
-    else:
-        return {"name": name, "status": "not_found"}
+        return {"name": name, "status": "ambiguous", "candidates": local_entries}
+
+    if remote_entries:
+        return {"name": name, "status": "remote", **remote_entries[0]}
+
+    return {"name": name, "status": "not_found"}
 
 
 def extract_dependency_names(data, kind):
@@ -584,9 +658,22 @@ def main():
         "--include-bundles", action="store_true",
         help="When ambiguous, include bundle-embedded candidates instead of preferring filesystem paths"
     )
+    parser.add_argument(
+        "--remote", action="store_true",
+        help="Check cached remote index when local resolution fails"
+    )
+    parser.add_argument(
+        "--auto-pull", action="store_true",
+        help="With --remote: automatically download remote bundles that aren't found locally"
+    )
     args = parser.parse_args()
 
     prefer_fs = not getattr(args, 'include_bundles', False)
+    use_remote = getattr(args, 'remote', False)
+    auto_pull = getattr(args, 'auto_pull', False)
+
+    if use_remote:
+        _refresh_remote_index_if_stale()
 
     if args.tiers:
         if not Path(args.tiers).is_file():
@@ -602,7 +689,7 @@ def main():
         print(json.dumps(result, indent=2) if args.json else fmt_consumers(result))
         sys.exit(0)
 
-    index, skipped = build_index(args.search_dirs)
+    index, skipped = build_index(args.search_dirs, include_remote=use_remote)
 
     if args.list:
         result = cmd_list(index, skipped)
@@ -617,7 +704,58 @@ def main():
         result = cmd_resolve_from(args.resolve_from, index, transitive=args.transitive,
                                   prefer_filesystem=prefer_fs)
 
+    if auto_pull and use_remote:
+        result = _auto_pull_remote(result, index, args.search_dirs, prefer_fs)
+
     print(json.dumps(result, indent=2))
+
+
+def _auto_pull_remote(result, index, search_dirs, prefer_fs):
+    """Download remote-only entries and re-resolve them locally."""
+    import subprocess
+
+    studio_client = Path(__file__).resolve().parent / "studio-client.py"
+    if not studio_client.exists():
+        return result
+
+    pulled = False
+
+    def _pull_and_flag(items):
+        nonlocal pulled
+        for item in items:
+            if item.get("status") == "remote":
+                name = item.get("name", "")
+                try:
+                    proc = subprocess.run(
+                        [sys.executable, str(studio_client), "--pull", name, "--json"],
+                        capture_output=True, text=True, timeout=60,
+                    )
+                    if proc.returncode == 0:
+                        pulled = True
+                        print(f"Auto-pulled: {name}", file=sys.stderr)
+                except (subprocess.TimeoutExpired, OSError):
+                    pass
+            for dep in item.get("transitiveDependencies", []):
+                _pull_and_flag([dep])
+
+    if "results" in result:
+        _pull_and_flag(result["results"])
+    if "dependencies" in result:
+        _pull_and_flag(result["dependencies"])
+
+    if pulled:
+        new_index, _ = build_index(search_dirs, include_remote=True)
+        if "results" in result:
+            names = [r["name"] for r in result["results"]]
+            result = cmd_resolve(names, new_index, prefer_filesystem=prefer_fs)
+        elif "dependencies" in result and "inputFile" in result:
+            result = cmd_resolve_from(
+                result["inputFile"], new_index,
+                transitive="transitiveDependencies" in json.dumps(result),
+                prefer_filesystem=prefer_fs,
+            )
+
+    return result
 
 
 if __name__ == "__main__":

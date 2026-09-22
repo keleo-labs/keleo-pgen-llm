@@ -244,6 +244,36 @@ def detect_kind(data):
     return "practiceBaseline"
 
 
+def get_project_root():
+    """Find the project root directory (containing .claude/ or CLAUDE.md)."""
+    current = Path(__file__).resolve().parent.parent
+    for ancestor in [current] + list(current.parents):
+        if (ancestor / ".claude").is_dir() or (ancestor / "CLAUDE.md").is_file():
+            return ancestor
+    return current
+
+
+def load_user_config():
+    """Load user config from .claude/user-config.json. Returns dict (empty if missing)."""
+    config_path = get_project_root() / ".claude" / "user-config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_user_config(config):
+    """Save user config to .claude/user-config.json."""
+    config_path = get_project_root() / ".claude" / "user-config.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+
+
 def get_schema_version(schema_path=None):
     """Extract schemaVersion from the schema's $comment field.
 
