@@ -11,6 +11,64 @@ This is a **Practice Language Code Generation System** that uses LLMs to convert
 
 Extension practices analyze source methodologies (e.g., AWS Well-Architected, SAFe, TOGAF, Team Topologies) and map them to baseline frameworks like Platform Adoption Essentials.
 
+## Prerequisites & External Dependencies
+
+### Required
+
+- **Python 3.9+** — All utility scripts, validation, and the code generation pipeline are Python-based. No third-party pip packages are needed — the project uses only the Python standard library.
+- **`keleo-language` repo** — The Practice Language specification provides the JSON Schema definition, validation scripts, and semantic reference documentation. Six symlinks in `deps/`, `references/`, and `utils/` point into this repo. Must be cloned at `../../keleo-language/` relative to this project root.
+
+### Optional — Content Sourcing
+
+These tools support the research and content extraction phases of the pipeline, where skills need to access external methodology documentation, presentations, spreadsheets, or web content.
+
+- **`gws` CLI** — Google Workspace command-line interface for reading Google Sheets (issue registers), extracting Google Slides content (methodology presentations), and downloading files from Google Drive. Path: `/opt/homebrew/bin/gws`. Without it, content must be provided as local files.
+- **Playwright MCP server** — Browser automation for extracting content from JavaScript-heavy web pages. When `WebFetch` fails (auth walls, client-side rendering), Playwright loads the page in a real browser. Configured at user level, not project level.
+
+### Optional — Remote Bundle Repository
+
+A remote bundle repository provides centralised storage for `.keleo` packages, enabling skills to automatically discover, download, and upload practice bundles. The `studio-client.py` utility works with any service that implements the bundle repository REST API:
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `?api=packages` | GET | List all available bundles (name, version, slug) |
+| `?api=package&name=X` | GET | Get a specific package manifest |
+| `?api=download&name=X` | GET | Get a download URL for a .keleo file |
+| `?api=index&kind=Y` | GET | List documents, optionally filtered by kind |
+| `?api=document&bundle=X&path=Y` | GET | Get a single document's JSON |
+| `?api=upload` | POST | Upload a .keleo package (base64-encoded body) |
+
+Authentication is via bearer token (`Authorization: Bearer <token>`). Credentials are stored in `.claude/user-config.json`. Setup: `python3 utils/studio-client.py --configure`
+
+### Optional — Extended Validation
+
+- **Node.js 18+** — Enables `validate-json-schema.js` (JSON Schema validation via ajv-cli) as an alternative to the Python validators.
+
+### Optional — Convenience Tools
+
+- **`jq`** — Command-line JSON processor for ad hoc inspection.
+- **`unzip`** — Manual `.keleo` extraction (utilities handle this via Python's `zipfile` module).
+
+## First-Time Setup
+
+```bash
+# 1. Clone keleo-language alongside this repo
+git clone <repo-url> ../../keleo-language
+
+# 2. Verify symlinks resolve
+ls -la deps/ references/
+
+# 3. Verify Python
+python3 --version   # 3.9+
+
+# 4. (Optional) Configure remote bundle repository access
+python3 utils/studio-client.py --configure
+
+# 5. Test the toolchain
+python3 utils/validate-practice-json.py --help
+python3 utils/assess-practice.py --help
+```
+
 ## Directory Structure
 
 ```
@@ -27,7 +85,7 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       └── improve-tooling/             # Utils and skill improvement skill
 │           └── SKILL.md
-├── deps/                                   # Symlinks to keleo-studio
+├── deps/                                   # Symlinks to keleo-language
 │   ├── language.schema.json               # JSON Schema definition
 │   ├── platform-adoption-kernel.json      # Baseline framework (Platform Adoption)
 │   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
@@ -191,7 +249,7 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 - `references/semantics.md` - Hub document indexing semantic guidance sub-documents in `references/semantics/`
 - `references/workproduct-assessment-rubric.csv` - 5-level maturity rubric (Level 0: Non-Existent → Level 4: Comprehensive/Automated)
 
-### Dependencies (Symlinks to keleo-studio)
+### Dependencies (Symlinks to keleo-language)
 - `deps/language.schema.json` - JSON Schema definition for Practice Language
 - `deps/platform-adoption-kernel.json` - Platform Adoption Essentials baseline framework
 - `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
@@ -415,7 +473,27 @@ See `references/semantics/project-tracking.md` §12 and `references/semantics/ch
 
 ## Dependencies
 
-This project requires the **keleo-language** repository to be present at `../../keleo-language/`. The schema, validation scripts, and semantic reference files are accessed via symlinks in the `deps/`, `references/`, and `utils/` directories.
+See [Prerequisites & External Dependencies](#prerequisites--external-dependencies) for full setup instructions. The `keleo-language` repository must be present at `../../keleo-language/`. The following symlinks depend on it:
+
+| Symlink | Target in keleo-language |
+|---------|------------------------|
+| `deps/language.schema.json` | `language.schema.json` |
+| `references/domain-framework.md` | `references/domain-framework.md` |
+| `references/semantics.md` | `references/semantics.md` |
+| `references/semantics/` | `references/semantics/` (directory) |
+| `utils/validate-baseline-json.py` | `validate/validate-baseline.py` |
+| `utils/validate-practice-json.py` | `validate/validate-practice.py` |
+
+### User Configuration (`.claude/user-config.json`)
+
+Gitignored per-user config file. Created automatically by skills on first use.
+
+| Key | Purpose | Set by |
+|-----|---------|--------|
+| `issueRegisterUrl` | Google Sheets URL for feedback register | `/plan-from-feedback` first run |
+| `issueRegisterSpreadsheetId` | Extracted spreadsheet ID | `/plan-from-feedback` first run |
+| `keleoStudioGasUrl` | Remote bundle repository deployment URL | `studio-client.py --configure` |
+| `keleoStudioGasToken` | Bearer token for bundle repository API | `studio-client.py --configure` |
 
 ## Development Workflow
 

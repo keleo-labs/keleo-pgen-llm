@@ -36,6 +36,19 @@ Read an issue register (Google Sheet with structured table), triage each item, a
 
 ---
 
+## External Dependencies
+
+| Dependency | Required? | Role |
+|---|---|---|
+| `gws` CLI | Yes | Reads and writes the Google Sheets issue register; downloads bundles from Google Drive |
+| `.claude/user-config.json` | Yes | Stores spreadsheet ID and optional remote bundle repository credentials (git-ignored, per-user) |
+| Remote bundle repository | Optional | Downloads `.keleo` bundles when referenced documents aren't available locally |
+| Playwright MCP | Optional | Falls back to browser-based content extraction when `WebFetch` fails on source URLs |
+
+The `gws` CLI is essential because the issue register lives in Google Sheets — without it, this skill cannot read or update issues. Remote bundle access is only needed when an issue references a document not found in `practices/`, `baselines/`, `deps/`, or `bundles/`.
+
+---
+
 ## Step 0: Configuration
 
 ### Issue Register URL

@@ -35,6 +35,18 @@ Generate a well-structured markdown report on a user-specified subject, using th
 
 ---
 
+## External Dependencies
+
+| Dependency | Required? | Role |
+|---|---|---|
+| `gws` CLI | Optional | Google Drive export for PDF output; Google Slides content extraction for source material |
+| Playwright MCP | Optional | Content sourcing from web pages when researching the report subject |
+| Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice/method isn't available locally |
+
+Both `gws` and Playwright are content sourcing tools — they help gather subject-matter material during the research phase. The core report generation works without either, as long as the practice context is available locally.
+
+---
+
 ## Critical Process: ALWAYS Use EnterPlanMode
 
 **MANDATORY FIRST STEP:** Before generating any report, you MUST use EnterPlanMode to:

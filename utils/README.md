@@ -2,6 +2,18 @@
 
 Scripts for validating, inspecting, fixing, and assembling Practice Language JSON files.
 
+## Prerequisites
+
+**Required:** Python 3.9+ (standard library only — no pip packages), `keleo-language` repo at `../../keleo-language/` (provides schema, validators, and semantic references via symlinks)
+
+**Optional tools by feature:**
+
+| Tool | Scripts that use it | Role |
+|------|-------------------|------|
+| `gws` CLI | `extract-gws-slides.py`, `studio-client.py` | Content sourcing from Google Workspace (Slides, Drive) |
+| Node.js 18+ | `validate-json-schema.js` | Alternative schema validation via ajv-cli |
+| Remote bundle repository | `studio-client.py`, `discover-dependencies.py --remote` | Centralised `.keleo` package storage and version management |
+
 ## Assessment & Validation
 
 | Script | Purpose | Usage |
@@ -32,7 +44,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `studio-client.py` | keleo-studio-gas API client: fetch remote index, compare versions, download/upload bundles, configure credentials | `python3 utils/studio-client.py --status \| --index [--max-age N] \| --check [name] \| --pull "Name" \| --push <file>.keleo \| --configure [--json]` |
+| `studio-client.py` | Remote bundle repository client: fetch remote index, compare versions, download/upload `.keleo` bundles, configure credentials | `python3 utils/studio-client.py --status \| --index [--max-age N] \| --check [name] \| --pull "Name" \| --push <file>.keleo \| --configure [--json]` |
 
 ## Resolution & Merging
 

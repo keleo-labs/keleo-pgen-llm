@@ -24,6 +24,17 @@
 
 ---
 
+## External Dependencies
+
+| Dependency | Required? | Role |
+|---|---|---|
+| Playwright MCP | Optional | Content sourcing from web-based methodology documentation when `WebFetch` fails |
+| Remote bundle repository | Optional | Downloads dependency `.keleo` bundles not available locally (via `studio-client.py`) |
+
+Baselines are foundational — they typically have no upstream practice dependencies. Playwright is only needed when source methodology documentation is on JavaScript-heavy web pages that `WebFetch` cannot render.
+
+---
+
 ## Overview
 
 This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).

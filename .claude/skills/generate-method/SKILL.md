@@ -41,6 +41,18 @@ Each phase is delegated to a subagent that reads a **phase skill document** in `
 
 ---
 
+## External Dependencies
+
+| Dependency | Required? | Role |
+|---|---|---|
+| Baseline practice JSON | Yes | Target framework that the generated practice extends (e.g., `deps/platform-adoption-kernel.json`) |
+| Playwright MCP | Optional | Content sourcing from web-based methodology documentation when `WebFetch` fails |
+| Remote bundle repository | Optional | Downloads dependency `.keleo` bundles not available locally (via `studio-client.py`) |
+
+The baseline JSON is the only hard requirement — it defines the alphas, competencies, and activity spaces that the generated practice maps to. Playwright is a content sourcing fallback for JavaScript-heavy methodology sites. Remote bundle access is used during dependency resolution when referenced practices aren't found locally.
+
+---
+
 ## Critical Process: ALWAYS Use EnterPlanMode
 
 **MANDATORY FIRST STEP:** Before starting ANY phase, you MUST use EnterPlanMode to:
