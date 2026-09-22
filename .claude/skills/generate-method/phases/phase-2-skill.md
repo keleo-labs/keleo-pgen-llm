@@ -116,13 +116,15 @@ For EACH concern from Phase 1, apply the decision framework:
 
 1. **Semantic comparison first:** Compare source concern against baseline alpha DESCRIPTIONS (not just names). Read alpha description + all state descriptions to understand full scope.
 
-2. **Decision questions:**
-   - Is this concern generally applicable (universal to all uses of the parent alpha)? YES -> Redeclaration
-   - Does this concern use the same state progression as the parent? YES + IS-A variant -> Variant Mapping (`mapsTo`); YES + universal enrichment -> Redeclaration; NO -> Specialization (`contributesTo`)
+2. **Universality test:** Is this concern generally applicable (universal to all uses of the parent alpha)? YES -> Redeclaration candidate. NO -> Go to step 3.
 
-3. **Combinability test (strongest signal):** If multiple practices each add to this alpha, would combining all additions produce a coherent, non-conflicting result? YES -> Redeclaration. NO (context-specific, conflicting) -> Specialization or Variant Mapping.
+3. **Combinability test (strongest redeclaration signal):** If multiple practices each add to this alpha, would combining all additions produce a coherent, non-conflicting result? YES -> Redeclaration. NO (context-specific, conflicting) -> Go to step 4.
 
-4. **IS-A test (for variant mapping):** Does the concern represent a named variant that IS-A type of the parent? YES with same states -> `mapsTo`. NO or needs different states -> `contributesTo`.
+4. **Semantic relationship test (drives mapsTo vs contributesTo):**
+   - **IS-A (type-of):** Is this concern a *type of* the parent? Does it represent a named variant that is one kind of the parent concept, following the same lifecycle? YES -> **Variant Mapping** (`mapsTo`). The variant MUST use the parent's exact state names and sequence -- if Phase 1 states don't already match, refactor them to align (rename, merge, or restructure states to fit the parent progression, adding domain-specific checklists to express the difference).
+   - **Subset-of:** Is this concern a *facet, component, or sub-dimension* of the parent? Does it have its own distinct lifecycle progression that advances the parent? YES -> **Specialization** (`contributesTo`). Define new states reflecting the concern's own progression.
+
+**State alignment is a consequence of the semantic decision, not an input to it.** When `mapsTo` is the correct semantic relationship, invest the effort to make states match. When states genuinely cannot be reconciled (the concern has a fundamentally different lifecycle, not just different naming), that is evidence the relationship is `contributesTo`, not `mapsTo`.
 
 ### Alpha Mapping Templates
 
@@ -164,23 +166,35 @@ For each state (all three types), include:
   - Optional `test` (Given/When/Then) and `examples` (array of concrete scenario Tests) on each checklist item
   - **Priority** (optional): read `references/semantics/practice-elements.md` §5.2.2 for MoSCoW-derived priority scheme. Default is `"must"` (omit field). Mark `"should"` for important-but-deferrable items, `"could"` for supplementary items. Assess each item: is it essential for the state/LOD to be achieved, or could a team reasonably defer it?
 
-### State Alignment Validation (Required for New Alphas)
+### contributesTo Target Selection (Required for New Alphas)
 
-For each new alpha, validate the relationship choice:
+**Anti-pattern — defaulting to the parent practice's primary alpha:** When extending a parent practice, it is tempting to assign every new alpha `contributesTo` the parent's primary alpha. This produces semantically wrong relationships. A VM workload is a Platform Asset, not Platform Infrastructure; a migration pipeline onboards assets, it doesn't build infrastructure.
 
-1. List candidate parent alphas (baseline, practice-local, external)
-2. For each candidate: compare state names, count semantic matches, calculate alignment score
-3. Apply decision rule: >=90% -> strong `mapsTo` signal; >=70% -> strong `contributesTo`; 50-69% -> moderate; <50% -> reconsider
-4. Document validation in mapping guide:
+**For each new alpha, systematically evaluate ALL available parent alphas:**
+
+1. **Enumerate candidates:** List every alpha from the effective context (baseline + parent practice). Group by focus.
+2. **Semantic fit test:** For each candidate, ask: "Does advancing the new alpha's states advance THIS parent alpha's states?" Pick the parent whose lifecycle the new alpha most directly advances.
+3. **State alignment score:** Compare new alpha state names against each candidate's state names. Calculate semantic match percentage.
+4. **IS-A test:** If the new alpha IS-A type of a parent (named variant following the same lifecycle), use `mapsTo` and refactor states to match the parent. Otherwise use `contributesTo`.
+5. **Concentration check:** If >2 new alphas target the same parent, verify each independently. Defaulting is a smell — each alpha should have its own justification.
+
+**Document the evaluation in the mapping guide:**
 
 ```
-State Alignment Validation:
-- Parent states: [list]
-- New alpha states: [list]
-- Semantic matches: [list with explanation]
-- Alignment score: [X/Y = Z%]
-- Relationship justification: [why contributesTo vs mapsTo]
+contributesTo Target Selection:
+- Candidates evaluated: [list all considered parents with focus]
+- Selected parent: [name]
+- Semantic fit: [1-sentence justification — what parent lifecycle does this advance?]
+- State alignment: [X/Y = Z%]
+- Alternatives rejected: [name — why not]
 ```
+
+### State Alignment Validation
+
+After selecting the target and relationship type, use state alignment to validate the semantic decision:
+
+- **`mapsTo` chosen:** High alignment (>=90%) confirms the IS-A relationship. Lower alignment means states need refactoring to match the parent -- rename, merge, or restructure Phase 1 states to fit the parent progression. If states genuinely cannot be reconciled (fundamentally different lifecycle), reconsider -- the relationship may actually be `contributesTo`.
+- **`contributesTo` chosen:** Low-to-moderate alignment (<=70%) is expected -- the concern has its own lifecycle. High alignment (>=90%) is a signal to reconsider -- the concern may actually be a variant (`mapsTo`), not a specialization.
 
 ### relatesTo (New Alphas Only)
 
@@ -201,8 +215,8 @@ If alpha A `relatesTo` alpha B, do NOT duplicate B's criteria on A's states. Sha
 
 For each work product from Phase 1, determine relationship:
 1. Baseline/dependency defines similar WP? -> **Redeclare** with additional LODs/checklists
-2. Logically contained within a larger WP? -> New WP with **`partOf`** (containment)
-3. Named variant with SAME LOD progression? -> New WP with **`mapsTo`** (variant)
+2. IS-A (type-of): Is this WP a *type of* another WP -- a named variant following the same fidelity progression? -> New WP with **`mapsTo`** (variant). LODs MUST match parent exactly -- if Phase 1 LODs don't already match, refactor them to align (rename, merge, or restructure to fit the parent LOD progression, adding domain-specific checklists to express the difference).
+3. HAS-A (containment): Is this WP a distinct, independently trackable *component within* a larger WP? -> New WP with **`partOf`** (containment)
 4. None of above -> New standalone practice work product
 
 ### LOD Naming -- The Rubric Principle
@@ -248,21 +262,31 @@ Narrative: [if Phase 1 provided additional context]
 
 ### mapsTo (Variant)
 
-- Use when WP IS-A type of parent with same LOD progression
-- LODs MUST match parent exactly (same names, same sequence)
+- Use when WP IS-A type of parent -- the semantic relationship drives the decision
+- LODs MUST match parent exactly (same names, same sequence) -- if Phase 1 LODs don't match, refactor them to align. Only fall back to standalone or `partOf` when the WP genuinely has a fundamentally different fidelity progression (not just different naming)
 - Variant names MUST NOT repeat parent type name (IS-A makes it redundant)
 - Apply combinability test: would combining checklists with parent produce coherent single document? NO -> `mapsTo`
 
 ## Step 4: Map Personas and Persona Groups
 
-### Competency Mapping
+### Step 4a: Competency Mapping
 
 Match Phase 1 competencies to baseline competency names (EXACT, case-sensitive). Map Phase 1 descriptions to baseline names using semantic understanding from Step 1.
 
-### Persona Structure
+### Step 4b: Consolidate Personas Against Effective Context
+
+Before mapping, review the effective context for existing personas and persona groups already in scope. For each Phase 1 persona, compare against context personas by name:
+
+- **Redeclaration** (name match): Persona exists — document what this practice adds (competencies, narratives, tags). Must not narrow scope.
+- **Redeclaration with alias** (role match, different name): Use existing name, add `practiceElementAlias` for methodology's term.
+- **New** (no match): Justify why genuinely distinct from all context personas.
+
+Aim for 3–6 total personas.
 
 ```
-Persona Name: [from Phase 1]
+Persona Name: [from Phase 1 or existing context name]
+Mapping Type: Redeclaration | Redeclaration with Alias | New
+Justification: [what this practice adds or why existing personas don't cover this role]
 Description: [single sentence]
 Competencies: [{competencyName, competencyLevelName} -- EXACT baseline names]
 Tags: {domainTags, lifecycleTags, organizationalTags}
@@ -270,12 +294,22 @@ Narrative: [ONLY when Phase 1 provides substantive role detail -- omit if brief 
 Asset Icon: [font-character icon, e.g., fa-user-gear]
 ```
 
-### Persona Group Structure
+### Step 4c: Consolidate Persona Groups
+
+Compare Phase 1 groups against context groups. Prefer composing via `personaGroupNames` (hierarchical inclusion) over flat groups that duplicate membership.
+
+- **Redeclare** existing groups to add members or sub-groups
+- **Create new** focused sub-groups (3–5 members) for genuinely novel team structures
+- **Compose** cross-functional groups by referencing sub-groups via `personaGroupNames`
+
+Aim for 1–3 total groups.
 
 ```
-Persona Group Name: [team name]
+Persona Group Name: [team name or existing context name]
+Mapping Type: Redeclaration | New | Composition
 Description: [single sentence]
-Persona Names: [array of member persona names]
+Persona Names: [array of direct member persona names]
+Persona Group Names: [array of existing group names to include as sub-groups]
 Tags: {organizationalTags}
 Narrative: [ONLY when Phase 1 provides substantive team detail -- omit if name/member list only]
 Asset Icon: [font-character icon, e.g., fa-people-group]

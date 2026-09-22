@@ -185,11 +185,9 @@ Map each activity to:
 
 ### Step 9: Identify Personas
 
-**What roles combine competencies?**
+**What roles are explicitly named in the source?**
 
-From the source, identify:
-- Explicit roles mentioned (Platform Engineer, Security Architect)
-- Implied roles (based on competency combinations)
+Aim for 3–6 core personas — roles the source methodology explicitly names or defines. Do not invent "implied roles" from competency combinations; Phase 2 will consolidate these against existing personas from dependencies.
 
 For each persona:
 - **Name** (role title)
@@ -201,10 +199,7 @@ For each persona:
 
 **How do personas work together?**
 
-Describe team structures:
-- Platform teams, product teams, enabling teams
-- Cross-functional groups
-- Communities of practice
+Identify 1–3 natural team structures from the source. Focus on teams explicitly described in the methodology. Larger organizational groups will be composed via hierarchical grouping in Phase 2.
 
 For each group:
 - **Name** (team name)

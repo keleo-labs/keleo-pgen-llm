@@ -233,9 +233,12 @@ Translate each alpha from the mapping guide.
 - Property is `competencies` (NOT `requiredCompetencies`)
 - Format: `{competencyName, competencyLevelName}` (NOT `{competencyName, level}`)
 - Use EXACT baseline competency names and level names
+- For redeclared personas (same name as context persona): output the full enriched definition — merge algorithm union-merges arrays
 
 **Persona Groups:**
-- `personaNames`: array of persona name strings
+- `personaNames`: array of persona name strings (direct members)
+- `personaGroupNames`: optional array of PersonaGroup name strings (sub-groups for hierarchical composition)
+- The `personaGroupNames` graph must be acyclic — no group can transitively include itself
 - Include asset icons for both personas and groups
 
 ### 4.9 Activities
@@ -418,6 +421,22 @@ python3 utils/validate-practice-json.py <practice>.json <leafBaseline>.json deps
 
 The validator auto-discovers `_effective-context.json` in the practice directory for cross-practice element resolution.
 
+### 5.2.5 Harmonize Personas (when practiceDependencyNames is non-empty)
+
+```bash
+python3 utils/harmonize-personas.py <practice>.json --deps <dep1>.json [dep2.json ...] --fix
+```
+
+Ensures redeclared personas preserve all competencies from dependencies and flags personaGroup composition opportunities. Only run when `practiceDependencyNames` is non-empty — the dependency JSON paths are the same files resolved during effective context generation.
+
+### 5.2.6 Fix Pattern Progression
+
+```bash
+python3 utils/fix-pattern-progression.py <practice>.json --fix
+```
+
+Removes non-progressing alphas (stuck at the same state across all views), degenerate single-alpha patterns, and reorders reversed state progressions (e.g., advanced states in early views, initial states in later views). Always run after Phase 3 generation.
+
 ### 5.3 Targeted Alpha Fixes
 
 ```bash
@@ -451,6 +470,7 @@ python3 utils/assess-practice.py <practice>.json --baseline <leafBaseline>.json 
 | **Schema** | Wrong property names, type errors, missing required fields, unevaluated properties | Edit JSON directly; often auto-fixed by `fix-common-issues.py` |
 | **Baseline** | Invalid competency names, invalid state names, floating alphas | Use exact baseline names from Step 2 extraction; add `contributesTo`/`mapsTo` |
 | **Integrity** | Broken WP/activity/alpha cross-references | Fix symbolic references to match defined element names |
+| **Concentration** | Multiple new alphas target same `contributesTo` parent | Verify each alpha's parent independently — defaulting all to one parent is a mapping smell. Review Phase 2 target selection rationale. |
 
 ## Step 6: Package
 
@@ -571,6 +591,33 @@ These are experience-based gotchas — the most frequent errors observed in Phas
 - Do NOT combine commands using variable assignments (`TARGET="..." && grep ...`) or shell loops
 - NEVER use inline `python3 -c` scripts — use utility scripts only
 - Make separate tool calls instead of compound commands
+
+### Inspection Tools (use instead of inline scripts)
+
+When you need to inspect practice JSON structure, use these existing utilities:
+
+```bash
+# Document shape and metadata (kind, name, version, schemaVersion, baseline)
+python3 utils/extract-reference-names.py <file>.json --metadata
+
+# Top-level key overview (type and count for each key)
+python3 utils/extract-reference-names.py <file>.json --structure
+
+# Specific sections (alphas, activities, patterns, personas, etc.)
+python3 utils/extract-reference-names.py <file>.json --sections alphas activities patterns
+
+# Alpha details (states, checklists per state)
+python3 utils/extract-reference-names.py <file>.json --sections alphas --alpha-details
+
+# Filter assessment to specific issue categories
+python3 utils/assess-practice.py <file>.json --category integrity checklist-polarity
+
+# Schema type definitions
+python3 utils/query-schema.py <TypeName>
+
+# .keleo package contents
+python3 utils/inspect-keleo.py <bundle>.keleo
+```
 
 ## Success Criteria
 

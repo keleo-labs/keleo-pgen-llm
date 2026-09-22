@@ -617,6 +617,8 @@ Add personas array:
 - Use exact baseline competency names (case-sensitive)
 - Use {competencyName, competencyLevelName} format
 
+**Redeclaration:** For personas marked as "Redeclaration" in the mapping guide (same name as a context persona), output the full enriched definition. The merge algorithm union-merges arrays (competencies, narratives, tags), so include all practice-specific additions alongside existing properties.
+
 #### 3.9 Persona Groups
 
 Add personaGroups array:
@@ -626,6 +628,7 @@ Add personaGroups array:
     "name": "Team Name",
     "description": "Single sentence",
     "personaNames": ["Persona 1", "Persona 2"],
+    "personaGroupNames": ["Sub-Group 1"],
     "tags": { ... },
     "narratives": [ ... ],
     "assetNames": [
@@ -637,6 +640,8 @@ Add personaGroups array:
   }
 ]
 ```
+
+**`personaGroupNames`:** Optional array of PersonaGroup names to include as sub-groups (hierarchical composition). Use when the mapping guide specifies "Composition" mapping type — include existing groups by reference rather than re-listing their members in `personaNames`. The resulting membership graph must be acyclic (no group can transitively include itself).
 
 **Narratives:** Include when the mapping guide provides a persona group narrative (sourced from Phase 1 team detail — charter, formation model, interaction patterns). Do NOT invent team narratives absent from the mapping guide.
 

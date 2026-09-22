@@ -6,7 +6,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--online]` |
+| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs; `--category` filters to specific issue categories | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--category CAT [CAT ...]] [--online]` |
 | `audit-method-references.py` | Cross-practice reference auditing within a method (alpha refs, duplicates, persona consistency) | `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json [--json]` |
 | `validate-practice-json.py` | Schema validation for practices/methods | `python3 utils/validate-practice-json.py <file>.json` |
 | `validate-baseline-json.py` | Schema validation for baselines | `python3 utils/validate-baseline-json.py <file>.json` |
@@ -25,6 +25,8 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `extract-practice-content.py` | Extract practice content from methods or resolve dependencies; `--summary` prints a human-readable text overview | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--summary] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
 | `diff-practice-json.py` | Diff two practice JSON files by element type; `--gate` mode checks for element arrays that dropped to 0 (post-Phase-3 completeness gate, exit 1 on critical) | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only] [--gate]` |
+| `inspect-keleo.py` | Inspect `.keleo` package contents: manifest, documents, versions, dependencies | `python3 utils/inspect-keleo.py <bundle>.keleo [--json] [--list]` |
+| `query-schema.py` | Query Practice Language schema `$defs` type definitions; auto-discovers `deps/language.schema.json` | `python3 utils/query-schema.py <TypeName> [--properties] [--json] [--list]` |
 
 ## Resolution & Merging
 
@@ -49,7 +51,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `transform-workproducts.py` | Batch work product transformations: rename, convert relationship types (mapsTo/partOf), align LODs | `python3 utils/transform-workproducts.py <file>.json --spec <spec>.json [--fix]` |
 | `apply-versioning.py` | Add schemaVersion, normalize version, populate dependencyVersions, bump/set version, ahead-of-copies | `python3 utils/apply-versioning.py [--all] [--bump patch\|minor\|major] [--set-version X.Y.Z] [--show] [--ahead-of-copies] [--fix]` |
 | `align-baseline-states.py` | Align child baseline redeclared alpha states with parent canonical names | `python3 utils/align-baseline-states.py <child>.json <parent>.json [--check] [--mapping JSON]` |
-| `fix-pattern-progression.py` | Remove non-progressing alphas from pattern views and remove degenerate single-alpha patterns | `python3 utils/fix-pattern-progression.py <file>.json [--fix] [--bump minor] [--json]` |
+| `fix-pattern-progression.py` | Fix pattern progression: remove non-progressing alphas, remove degenerate single-alpha patterns, and reorder reversed alpha state sequences | `python3 utils/fix-pattern-progression.py <file>.json [--fix] [--bump minor] [--json]` |
 | `manage-pattern-groups.py` | Manage patternGroups: init canonical groups in baselines (`--groups`), or adopt baseline groups in extensions (`--assignments`). Auto-detects mode from target's `kind` | `python3 utils/manage-pattern-groups.py <target>.json [<baseline>.json] [--groups <groups>.json] [--assignments <map>.json] [--fix] [--dry-run]` |
 | `modernize-checklists.py` | Transform checklist item names from past-participle to imperative verb phrases; supports batch mode | `python3 utils/modernize-checklists.py <file>.json [--fix] [--dir <dir>]` |
 | `harmonize-personas.py` | Ensure redeclared personas preserve competencies from dependencies; detect personaGroup composition opportunities | `python3 utils/harmonize-personas.py <practice>.json --deps <dep1>.json [<dep2>.json ...] [--fix] [--json]` |

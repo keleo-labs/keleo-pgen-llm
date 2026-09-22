@@ -187,9 +187,9 @@ Map each activity to required competencies with recommended levels.
 
 ### Step 9: Identify Personas
 
-**Question: What roles combine competencies?**
+**Question: What roles are explicitly named in the source?**
 
-From the source, identify explicit roles and implied roles based on competency combinations.
+Aim for 3–6 core personas — roles the source methodology explicitly names or defines. Do not invent "implied roles" from competency combinations; Phase 2 will consolidate these against existing personas from dependencies.
 
 Per persona:
 
@@ -202,7 +202,7 @@ Per persona:
 
 **Question: How do personas work together?**
 
-Describe team structures: platform teams, product teams, enabling teams, cross-functional groups, communities of practice.
+Identify 1–3 natural team structures from the source. Focus on teams explicitly described in the methodology. Larger organizational groups will be composed via hierarchical grouping in Phase 2.
 
 Per group:
 

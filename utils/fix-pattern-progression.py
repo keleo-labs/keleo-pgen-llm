@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Remove non-progressing alphas from pattern views and remove degenerate patterns.
+"""Fix pattern progression issues: non-progressing alphas and reversed state ordering.
 
 A non-progressing alpha is one that stays at the same state across all views
 of a pattern — it's background context, not a lifecycle participant. Removing
@@ -8,6 +8,16 @@ it makes the pattern cleaner and more meaningful.
 After removing non-progressing alphas, patterns with fewer than 2 remaining
 alphas are removed entirely (single-alpha patterns are themselves an anti-pattern
 since the state progression is already visible on the alpha itself).
+
+A reversed alpha is one whose state indices decrease across views — e.g., an
+alpha at an advanced state in an early view and a beginning state in a later view.
+With --fix, reversed alphas have their states reordered to follow the canonical
+progression from the alpha's state array.
+
+Usage:
+    python3 utils/fix-pattern-progression.py practice.json
+    python3 utils/fix-pattern-progression.py practice.json --fix
+    python3 utils/fix-pattern-progression.py practice.json --fix --bump minor
 """
 
 import argparse
@@ -41,9 +51,54 @@ def find_non_progressing(pattern):
     return non_progressing
 
 
+def build_state_index(data):
+    """Build a mapping of alpha name -> state name -> index from the practice's alphas."""
+    index = {}
+    sources = [data]
+    if data.get("kind") == "method":
+        sources = data.get("practices", [])
+    for source in sources:
+        for alpha in source.get("alphas", []):
+            name = alpha.get("name", "")
+            states = alpha.get("states", [])
+            index[name] = {s.get("name", ""): i for i, s in enumerate(states)}
+    return index
+
+
+def find_reversed_ordering(pattern, state_index):
+    """Find alphas whose states go backwards across pattern views."""
+    views = pattern.get("patternViews", [])
+    if len(views) < 2:
+        return {}
+
+    alpha_state_sequence = {}
+    for view in views:
+        for alpha_state in view.get("alphaStates", []):
+            name = alpha_state.get("alphaName", "")
+            state = alpha_state.get("stateName", "")
+            alpha_state_sequence.setdefault(name, []).append(state)
+
+    reversed_alphas = {}
+    for alpha_name, states in alpha_state_sequence.items():
+        if alpha_name not in state_index:
+            continue
+        indices = [state_index[alpha_name].get(s, -1) for s in states]
+        valid = [i for i in indices if i >= 0]
+        if len(valid) < 2:
+            continue
+        if any(valid[i] > valid[i + 1] for i in range(len(valid) - 1)):
+            reversed_alphas[alpha_name] = {
+                "states": states,
+                "indices": indices,
+                "sorted_states": [s for _, s in sorted(zip(indices, states))],
+            }
+    return reversed_alphas
+
+
 def fix_pattern_progression(data, dry_run=True):
-    """Remove non-progressing alphas from patterns. Returns list of fix descriptions."""
+    """Remove non-progressing alphas and fix reversed ordering. Returns list of fix descriptions."""
     fixes = []
+    state_index = build_state_index(data)
     sources = [data]
     if data.get("kind") == "method":
         sources = data.get("practices", [])
@@ -109,12 +164,40 @@ def fix_pattern_progression(data, dry_run=True):
                         if a.get("alphaName", "") not in non_prog
                     ]
 
+            reversed_alphas = find_reversed_ordering(pattern, state_index)
+            for alpha_name, info in reversed_alphas.items():
+                if alpha_name in non_prog:
+                    continue
+                fixes.append({
+                    "action": "reorder-states",
+                    "pattern": pat_name,
+                    "practice": source_name,
+                    "alpha": alpha_name,
+                    "current_order": info["states"],
+                    "corrected_order": info["sorted_states"],
+                })
+
+            if not dry_run and reversed_alphas:
+                alpha_view_states = {}
+                for alpha_name, info in reversed_alphas.items():
+                    if alpha_name in non_prog:
+                        continue
+                    for state in info["sorted_states"]:
+                        alpha_view_states.setdefault(alpha_name, []).append(state)
+
+                for alpha_name, sorted_states in alpha_view_states.items():
+                    state_iter = iter(sorted_states)
+                    for view in views:
+                        for alpha_state in view.get("alphaStates", []):
+                            if alpha_state.get("alphaName") == alpha_name:
+                                alpha_state["stateName"] = next(state_iter)
+
     return fixes
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Remove non-progressing alphas from pattern views"
+        description="Fix pattern progression: remove non-progressing alphas and reorder reversed states"
     )
     parser.add_argument("file", help="Practice or method JSON file")
     parser.add_argument("--fix", action="store_true",
@@ -136,12 +219,17 @@ def main():
         print(json.dumps(fixes, indent=2))
     else:
         if not fixes:
-            print("No non-progressing alphas found.")
+            print("No pattern progression issues found.")
         else:
             for f in fixes:
                 if f["action"] == "remove-pattern":
                     print(f"REMOVE PATTERN: '{f['pattern']}' in {f['practice']} "
                           f"({f['reason']})")
+                elif f["action"] == "reorder-states":
+                    print(f"REORDER STATES: '{f['alpha']}' in pattern "
+                          f"'{f['pattern']}' ({f['practice']})\n"
+                          f"  current:   {' → '.join(f['current_order'])}\n"
+                          f"  corrected: {' → '.join(f['corrected_order'])}")
                 else:
                     print(f"REMOVE ALPHA: '{f['alpha']}' (stuck at '{f['stuck_state']}' "
                           f"across {f['views_affected']} views) from pattern "

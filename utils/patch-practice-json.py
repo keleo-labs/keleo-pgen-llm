@@ -45,6 +45,16 @@ Usage:
     # Provide inline JSON instead of a patch file or stdin
     python3 utils/patch-practice-json.py target.json \
       --set-key narratives --value '[{"name":"Citation Standard","narrativeTypeName":"Citation Standard"}]'
+
+    # Batch mode: apply multiple element patches from a spec file
+    python3 utils/patch-practice-json.py target.json --batch-file enrichments.json
+    python3 utils/patch-practice-json.py target.json --batch-file enrichments.json --dry-run
+
+    # Batch spec format (array of {path, merge} operations):
+    # [
+    #   {"path": "activities[Gather Intelligence]", "merge": {"ledBy": "Analyst"}},
+    #   {"path": "alphas[Plan].states[Approved]", "merge": {"background": {"workProductLevels": [...]}}}
+    # ]
 """
 import argparse
 import json
@@ -160,6 +170,8 @@ def main():
                         help="Rename an element in a collection and update all references")
     parser.add_argument("--rename-focus", nargs=2, metavar=("OLD", "NEW"),
                         help="Rename a focus and update all focusName references (targeted, no deep replace)")
+    parser.add_argument("--batch-file", "-b", metavar="FILE",
+                        help="JSON file with array of {path, merge} operations to apply in sequence")
     parser.add_argument("--value", metavar="JSON_STRING",
                         help="Inline JSON value to use as patch (alternative to --patch-file or stdin)")
     parser.add_argument("--create", action="store_true",
@@ -170,7 +182,7 @@ def main():
                         help="Write to a different file instead of patching in place")
     args = parser.parse_args()
 
-    needs_patch = not (args.delete_key or args.replace or args.replace_file or args.rename_in or args.rename_focus)
+    needs_patch = not (args.delete_key or args.replace or args.replace_file or args.rename_in or args.rename_focus or args.batch_file)
 
     if needs_patch:
         if args.value:
@@ -263,6 +275,45 @@ def main():
         changes.append(
             f"  rename-focus: \"{old_focus}\" -> \"{new_focus}\" ({ref_count} references updated)"
         )
+
+    if args.batch_file:
+        batch_ops = load_json(args.batch_file)
+        if not isinstance(batch_ops, list):
+            print("Error: --batch-file must contain a JSON array of operations",
+                  file=sys.stderr)
+            sys.exit(1)
+        applied = 0
+        errors = 0
+        for i, op in enumerate(batch_ops):
+            if not isinstance(op, dict) or "path" not in op or "merge" not in op:
+                print(f"Error: batch operation [{i}] must have 'path' and 'merge' keys",
+                      file=sys.stderr)
+                sys.exit(1)
+            op_path = op["path"]
+            op_merge = op["merge"]
+            try:
+                parent, final_key = resolve_element_path(data, op_path)
+                target_obj = _navigate(parent, final_key)
+                if isinstance(op_merge, dict) and isinstance(target_obj, dict):
+                    for k, v in op_merge.items():
+                        target_obj[k] = v
+                        changes.append(summarize_changes(f"{op_path}.{k}", v))
+                else:
+                    if isinstance(parent, list) and isinstance(final_key, int):
+                        parent[final_key] = op_merge
+                    elif isinstance(parent, dict):
+                        parent[final_key] = op_merge
+                    else:
+                        for idx, item in enumerate(parent):
+                            if isinstance(item, dict) and item.get("name") == final_key:
+                                parent[idx] = op_merge
+                                break
+                    changes.append(summarize_changes(op_path, op_merge))
+                applied += 1
+            except (KeyError, IndexError, TypeError) as exc:
+                changes.append(f"  SKIP {op_path}: {exc}")
+                errors += 1
+        changes.append(f"  batch: {applied} applied, {errors} skipped")
 
     if needs_patch:
         if args.element_path:

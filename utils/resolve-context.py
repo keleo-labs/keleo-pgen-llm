@@ -619,14 +619,17 @@ def main():
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    backup_path = None
     if output_path.exists() and not args.force:
         backup_path = output_path.with_suffix(".json.bak")
         import shutil
         shutil.copy2(output_path, backup_path)
-        report["backup"] = str(backup_path)
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(effective, f, indent=2, ensure_ascii=False)
+
+    if backup_path and backup_path.exists():
+        backup_path.unlink()
 
     report["outputPath"] = str(output_path)
     print(json.dumps(report, indent=2))

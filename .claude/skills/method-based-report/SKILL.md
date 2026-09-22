@@ -121,7 +121,29 @@ Read the output effective context JSON to extract:
 - **Baseline**: The foundational framework (narrative types, focuses, alphas, competencies)
 - **Practice/Method**: The specialized domain knowledge (alphas, states, activities, patterns, narratives, work products)
 
-**Do not fork subagents to extract data from the effective context.** The JSON is already structured — use targeted `python3 -c` reads or the `--extract` flag to pull specific element types directly.
+**Do not fork subagents to extract data from the effective context.** The JSON is already structured — use inspection utilities to extract specific element types:
+
+```bash
+# Document shape and metadata
+python3 utils/extract-reference-names.py /tmp/report-context.json --metadata --structure
+
+# Specific sections (alphas, activities, patterns, personas, citations, etc.)
+python3 utils/extract-reference-names.py /tmp/report-context.json --sections alphas patterns personas
+
+# Alpha details (states, checklists)
+python3 utils/extract-reference-names.py /tmp/report-context.json --sections alphas --alpha-details
+
+# Narrative types and placement
+python3 utils/extract-reference-names.py /tmp/report-context.json --sections narrativeTypes --narrative-details
+
+# Citation details (full metadata with URLs)
+python3 utils/extract-reference-names.py /tmp/report-context.json --sections citations --citation-details
+
+# Human-readable practice summary
+python3 utils/practice-summary.py /tmp/report-context.json
+```
+
+**NEVER use inline `python3 -c` scripts** — the utilities above cover all inspection needs and produce structured, readable output.
 
 ---
 

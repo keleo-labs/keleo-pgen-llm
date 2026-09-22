@@ -18,6 +18,9 @@ Usage:
     # Full assessment with explicit deps
     python3 utils/assess-practice.py <file.json> --baseline <baseline.json> --schema <schema.json>
 
+    # Filter to specific issue categories
+    python3 utils/assess-practice.py <file.json> --category integrity checklist-polarity
+
 For extension practices (kind != practiceBaseline), the tool auto-resolves
 baselinePracticeName and practiceDependencyNames from the JSON, searching
 deps/, baselines/, practices/, and bundles/ directories. Explicit --baseline
@@ -4032,6 +4035,10 @@ def main():
         "--errors-only", action="store_true",
         help="Filter issues to only include severity='error' items"
     )
+    parser.add_argument(
+        "--category", nargs="+", metavar="CAT",
+        help="Filter issues to only include specific categories (e.g., integrity baseline-alpha checklist-polarity)"
+    )
     args = parser.parse_args()
 
     file_path = Path(args.file)
@@ -4247,6 +4254,10 @@ def main():
 
     if args.errors_only:
         all_issues = [i for i in all_issues if i["severity"] == "error"]
+
+    if args.category:
+        cats = set(args.category)
+        all_issues = [i for i in all_issues if i["category"] in cats]
 
     dependencies = detect_dependencies(data)
 
