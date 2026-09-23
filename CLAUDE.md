@@ -79,7 +79,19 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── create-baseline-method/       # Baseline practice creation skill
 │       │   └── SKILL.md
-│       ├── method-based-report/          # Plain English report generation skill
+│       ├── reporting-foundation/         # Shared reporting infrastructure (NOT a skill)
+│       │   ├── REPORT-FOUNDATION.md      # Common workflow, voice/tone, citations, output
+│       │   ├── narrative-guide.md        # Narrative type palette + purpose mapping
+│       │   └── extension-template.md     # How to add a new report type
+│       ├── method-based-report/          # General-purpose report generation skill
+│       │   └── SKILL.md
+│       ├── reference-architecture/       # Reference architecture documents
+│       │   └── SKILL.md
+│       ├── project-plan/                 # Project plans + SOW generation
+│       │   └── SKILL.md
+│       ├── decision-analysis/            # Trade-off analysis + decision support
+│       │   └── SKILL.md
+│       ├── document-review/              # Document review + improvement guidance
 │       │   └── SKILL.md
 │       ├── plan-from-feedback/          # Issue register triage and resolution skill
 │       │   └── SKILL.md
@@ -580,24 +592,28 @@ The skill is defined in `.claude/skills/generate-method/SKILL.md` and uses the p
 
 ### Generating Reports
 
-Use the `/method-based-report` skill to create plain English reports structured by practice/method narrative frameworks:
+The reporting system is modular — a shared foundation (`.claude/skills/reporting-foundation/`) provides common workflow, citation handling, and narrative structure guidance. Five specialised skills build on it:
 
-```
-/method-based-report
-```
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| General-purpose report | `/method-based-report` | Any report type not covered by a specialised skill |
+| Reference architecture | `/reference-architecture` | Topology, component selection, evaluation frameworks, sizing |
+| Project plan | `/project-plan` | Project plans, PoC outlines, SOW generation (T&M) |
+| Decision analysis | `/decision-analysis` | Trade-off analysis, weighing options, contextual verdicts |
+| Document review | `/document-review` | Review a document and recommend improvements |
 
-The user provides a practice/method/baseline and a subject to report on. The skill:
+All reporting skills follow the same workflow:
 
-1. **Plans** — Identifies practice context, subject, audience, and narrative strategy
+1. **Plans** — Identifies practice context, subject, audience, and type-specific inputs
 2. **Loads Context** — Resolves the practice via `utils/resolve-context.py --transitive`
-3. **Analyzes & Selects** — Extracts domain knowledge (alphas, activities, patterns, narratives) and selects baseline narrative structures that fit the report purpose
+3. **Analyzes & Selects** — Extracts domain knowledge and selects narrative structures
 4. **Generates Report** — Writes a standalone markdown report to `reports/<report-name>.md`
 
-The report uses narrative types from the baseline (Report Narrative, Essay Narrative, STAR, etc.) to organize content, and practice domain knowledge to inform the analysis — but presents everything in plain English with no Keleo terminology.
+Reports use narrative types from the baseline (Report Narrative, Essay Narrative, STAR, SDLC, etc.) to organise content, and practice domain knowledge to inform the analysis — but present everything in plain English with no Keleo terminology.
 
 **Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
 
-The skill is defined in `.claude/skills/method-based-report/SKILL.md`.
+**Extending**: To add a new report type, see `.claude/skills/reporting-foundation/extension-template.md` for the step-by-step guide and SKILL.md template.
 
 ### Processing Feedback
 

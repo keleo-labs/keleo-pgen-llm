@@ -28,7 +28,14 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
 - `generate-method`: 001–199
 - `create-baseline-method`: 200–399
 - `update-method`: 400–599
-- `method-based-report`: 600–799
+- `method-based-report` family: 600–799 (sub-allocated in 20-number blocks):
+  - Shared foundation (`reporting-foundation/REPORT-FOUNDATION.md`): 600–619
+  - `reference-architecture`: 620–639
+  - `project-plan`: 640–659
+  - `decision-analysis`: 660–679
+  - `document-review`: 680–699
+  - `method-based-report` (type-specific): 700–719
+  - Reserved for future report types: 720–799
 - `improve-tooling`: 800–999
 
 ### 1.2 Feature Grouping
