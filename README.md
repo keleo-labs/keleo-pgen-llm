@@ -1,126 +1,167 @@
-# Practice Language Code Generation System
+# Keleo Practice Generation System
 
-A Claude-powered system that converts enterprise methodology documentation into standardized, schema-compliant JSON using a three-phase LLM pipeline.
+An AI-powered system for converting enterprise methodology documentation into standardized, schema-compliant Practice Language JSON — and for generating domain-informed reports, project plans, reference architectures, and decision analyses from the resulting knowledge base.
 
-## Purpose
+## What It Does
 
-This system analyzes source methodologies (AWS Well-Architected, SAFe, TOGAF, Team Topologies, etc.) and maps them to the **Platform Adoption Essentials** baseline framework, generating machine-readable Practice Language JSON. The output enables:
+The system operates across two capability areas:
 
-- Consistent methodology representation across diverse frameworks
-- Automated tooling for practice adoption and assessment
-- Cross-methodology comparison and integration
-- Evidence-based maturity tracking
+**Practice Engineering** — Analyze source methodologies (AWS Well-Architected, SAFe, TOGAF, Team Topologies, MEDDPICC, and many others) and transform them into structured, machine-readable Practice Language JSON. Supports both foundational baseline frameworks and extension practices that specialize them.
 
-## Quick Overview
+**Knowledge-Driven Reporting** — Use the domain knowledge encoded in practices and baselines to generate professional reports, reference architectures, project plans, decision analyses, and document reviews — all in plain English with no framework jargon.
 
-The system uses a three-phase pipeline:
-
-```
-Source Docs → Phase 1: Analysis → Phase 2: Mapping → Phase 3: JSON
-              (~30-50K words)      (~40-60K words)    (schema-valid)
-```
-
-Each phase generates structured output that feeds into the next, with final validation producing schema-compliant Practice Language JSON.
-
-**For detailed architecture, framework concepts, and technical documentation**, see **[CLAUDE.md](CLAUDE.md)**
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-1. **Claude Code**: [Claude Code](https://claude.ai/code) (CLI, desktop app, or web)
-2. **keleo-studio Repository**: Must be at `../keleo-studio/` (one directory up from project root)
-3. **Python 3.x**: For validation (optional)
+- **Claude Code** — [CLI, desktop app, or web](https://claude.ai/code)
+- **Python 3.9+** — Validation and utility scripts (standard library only, no pip packages)
+- **keleo-language repo** — Cloned at `../../keleo-language/` relative to this project root
 
-### Verify Setup
-
-```bash
-# Check keleo-studio symlinks
-ls -l deps/
-
-# In Claude Code, verify skill is loaded
-/help
-# Should list "generate-method"
-```
-
-## Using the Translation Skill
-
-### Basic Usage
-
-The primary workflow uses the `/generate-method` skill in Claude Code:
-
-```
-/generate-method [source files or URLs]
-```
-
-**Examples:**
+### Setup
 
 ```bash
-# Single methodology document
-/generate-method practice-resources/team-topologies/team-topologies-book.pdf
+# 1. Clone keleo-language alongside this repo
+git clone <repo-url> ../../keleo-language
 
-# Multiple source files
-/generate-method practice-resources/partner-demand-generation/*.md
+# 2. Verify symlinks resolve
+ls -la deps/ references/
 
-# URLs (Claude will fetch)
-/generate-method https://example.com/methodology-guide.pdf
+# 3. (Optional) Configure remote bundle repository
+python3 utils/studio-client.py --configure
 ```
 
-### What the Skill Does
-
-The skill automates the complete three-phase pipeline:
-
-**1. Planning Phase (Automatic)**
-- Analyzes source materials
-- Determines if content is a single Practice or multi-practice Method
-- Creates execution roadmap
-
-**2. Phase 1 - Analysis**
-- Reads source materials
-- Applies four-perspective analysis (Business, Technology, People, Process)
-- Generates `01-analysis-report.md` (~30-50K words)
-
-**3. Phase 2 - Mapping**
-- Maps analyzed content to baseline practice
-- Uses semantic guidance from `references/semantics.md`
-- Performs alpha-state-activity gap analysis
-- Generates `02-mapping-guide.md` (~40-60K words)
-
-**4. Phase 3 - JSON Generation**
-- Generates schema-compliant JSON
-- Validates against `deps/language.schema.json`
-- Outputs `<practice-name>.json` or `<method-name>.json`
-
-### Output Location
-
-All generated files for a practice are co-located in `practices/<practice-name>/`:
-
-```
-practices/<practice-name>/
-├── 01-analysis-report.md          # Phase 1 output
-├── 02-mapping-guide.md            # Phase 2 output
-└── <practice-name>.json           # Phase 3 output (validated)
-```
-
-### Validation
-
-The skill automatically validates output. Manual validation:
+### Verify
 
 ```bash
-python3 utils/validate-practice-json.py practices/<practice-name>/<practice-name>.json
+python3 utils/validate-practice-json.py --help
+python3 utils/assess-practice.py --help
+```
+
+## Skills
+
+All skills are invoked as slash commands in Claude Code. Each skill plans its work, asks for approval, then executes autonomously.
+
+### Practice Engineering
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| **Create Baseline** | `/create-baseline-method` | Create foundational framework baselines (focuses, root alphas, competencies, activity spaces, narrative types) |
+| **Generate Method** | `/generate-method` | Create extension practices/methods that specialize a baseline with concrete alphas, activities, work products, and patterns |
+| **Update Method** | `/update-method` | Update existing practice/method JSON to align with latest guidance and baseline changes |
+
+**When to use which:**
+
+- `/create-baseline-method` — Source methodology defines a **universal ontology** for a domain (e.g., Platform Adoption Essentials, Partner Ecosystem Essentials)
+- `/generate-method` — Source methodology **implements or specializes** an existing baseline (e.g., AWS Well-Architected extends Platform Adoption)
+
+### Reporting
+
+All reporting skills resolve practice context, extract domain knowledge, and generate standalone markdown reports. The audience sees domain insight, not Keleo internals.
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| **General Report** | `/method-based-report` | Any report type — flexible narrative structure, catch-all |
+| **Reference Architecture** | `/reference-architecture` | Topology, component selection, evaluation frameworks, sizing |
+| **Project Plan** | `/project-plan` | Project plans, PoC outlines, Statements of Work (T&M) |
+| **Decision Analysis** | `/decision-analysis` | Trade-off analysis, option weighting, contextual verdicts |
+| **Document Review** | `/document-review` | Review an existing document and recommend improvements |
+
+### System Improvement
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| **Plan from Feedback** | `/plan-from-feedback` | Triage issues from a feedback register, plan and execute fixes across practice, skill, and schema layers |
+| **Improve Tooling** | `/improve-tooling` | Create, extend, or consolidate utility scripts; improve skill instructions |
+
+## Pipeline Architecture
+
+### Extension Practices (3-phase)
+
+```
+Source Docs → Phase 1: Analysis → Phase 2: Mapping → Phase 3: JSON + Packaging
+               (~30-50K words)     (~40-60K words)    (schema-valid .keleo)
+```
+
+1. **Analysis** — Four-perspective analysis (Business, Technology, People, Process) of methodology structure
+2. **Mapping** — Map to baseline practice using Practice Language semantics; alpha-state-activity gap analysis
+3. **JSON + Packaging** — Generate schema-compliant JSON, validate, bundle into `.keleo` package
+
+A delineation gate between phases 1 and 2 determines whether the methodology maps to a single practice (3–7 alphas) or a multi-practice method (8+ alphas).
+
+### Baseline Practices (4-phase)
+
+```
+Source Docs → Phase 1: Analysis → Phase 1.5: Distillation → Phase 2: Mapping → Phase 3: JSON
+               (~30-50K words)     (~15-25K words)           (~40-60K words)    (schema-valid)
+```
+
+The additional **Distillation** phase identifies focus areas, distills 8–15 foundational alphas, generalizes activity spaces, and defines competencies and narrative types.
+
+### Output Packaging
+
+All skills produce `.keleo` packages — ZIP archives containing a manifest, Practice Language JSON documents, and optional assets. Packages can be uploaded to a remote bundle repository for consumption by Keleo Studio.
+
+## Project Structure
+
+```
+keleo-pgen-llm/
+├── .claude/skills/           # Skill definitions (10 skills + shared reporting foundation)
+├── deps/                     # Symlinks to keleo-language (schema, baseline JSONs)
+├── references/               # Domain framework, semantic guidance, assessment rubrics
+├── prompts/                  # Phase-specific prompt templates
+├── practices/                # Extension practice outputs (per-practice subdirectories)
+├── baselines/                # Baseline practice outputs (per-baseline subdirectories)
+├── bundles/                  # Packaged .keleo output
+├── reports/                  # Generated reports (git-ignored)
+├── utils/                    # 50+ Python utility scripts (validation, packaging, transforms)
+└── CLAUDE.md                 # Full technical documentation
+```
+
+### Key Dependencies (symlinked from keleo-language)
+
+| File | Purpose |
+|------|---------|
+| `deps/language.schema.json` | Practice Language JSON Schema |
+| `deps/platform-adoption-kernel.json` | Platform Adoption Essentials baseline |
+| `deps/partner-ecosystem-baseline.json` | Partner Ecosystem Essentials baseline |
+| `references/semantics.md` | Semantic guidance hub (indexes sub-documents) |
+| `references/domain-framework.md` | Enterprise architecture analysis framework |
+
+## Validation
+
+```bash
+# Validate an extension practice
+python3 utils/validate-practice-json.py practices/<name>/<name>.json
+
+# Validate a baseline
+python3 utils/validate-baseline-json.py baselines/<name>/<name>.json
+
+# Inspect a .keleo package
+python3 utils/inspect-keleo.py bundles/<name>.keleo
+
+# Assess practice quality
+python3 utils/assess-practice.py practices/<name>/<name>.json
+```
+
+## Remote Bundle Repository
+
+Packaged `.keleo` bundles can be uploaded to a remote repository for use in Keleo Studio:
+
+```bash
+# Configure credentials
+python3 utils/studio-client.py --configure
+
+# List remote packages
+python3 utils/studio-client.py --list
+
+# Upload a bundle
+python3 utils/studio-client.py --upload bundles/<name>.keleo
 ```
 
 ## Learn More
 
-- **[CLAUDE.md](CLAUDE.md)** - Complete architecture, framework concepts, schema rules, and technical details
-- **`.claude/skills/generate-method/SKILL.md`** - Skill implementation details
-- **`references/`** - Domain framework, semantics, and assessment rubrics
-- **`prompts/`** - Phase-specific prompt templates
-
-## License
-
-[Add your license information here]
-
-## Contact
-
-[Add contact/support information here]
+- **[CLAUDE.md](CLAUDE.md)** — Full technical documentation: architecture, schema rules, framework concepts, constraints
+- **`.claude/skills/*/SKILL.md`** — Individual skill implementation details
+- **`references/`** — Domain framework, semantic guidance, assessment rubrics
+- **`prompts/`** — Phase-specific prompt templates
