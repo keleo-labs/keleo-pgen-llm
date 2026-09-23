@@ -42,7 +42,7 @@ def _api_get(base_url, token, api, params=None):
             url += f"&{k}={urllib.request.quote(str(v))}"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read()), None
     except urllib.error.HTTPError as e:
         if e.code == 401:
