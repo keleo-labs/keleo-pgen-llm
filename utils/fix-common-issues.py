@@ -26,6 +26,7 @@ Consolidates structural fixes detected by assess-practice.py:
 - Invalid narrative types (replace narrativeTypeName values not in baseline with closest match)
 - Invalid competency refs (fix competency names and levels not in baseline, with deduplication)
 - Nested narrative wrappers (flatten narratives[i].narratives[] into top-level, merge citations)
+- Missing checklist seq (add sequential seq values to items that lack them)
 - Missing version/schemaVersion (add version 1.0.0 and schemaVersion from schema)
 
 Usage:
@@ -1699,6 +1700,50 @@ def fix_nested_narratives(data):
     return fixes
 
 
+def fix_missing_seq(data):
+    """Add sequential seq values to checklist items missing them."""
+    fixes = []
+    containers = [
+        ("alphas", "states"),
+        ("workProducts", "levelsOfDetail"),
+    ]
+    for collection_key, sub_key in containers:
+        for elem in data.get(collection_key, []):
+            for sub in elem.get(sub_key, []):
+                checklist = sub.get("checklist", [])
+                if not checklist:
+                    continue
+                missing = [cl for cl in checklist if "seq" not in cl]
+                if not missing:
+                    continue
+                for i, cl in enumerate(checklist, 1):
+                    if "seq" not in cl:
+                        cl["seq"] = i
+                        fixes.append({
+                            "category": "missing-seq",
+                            "path": f"{collection_key}.{elem['name']}.{sub_key}.{sub['name']}.checklist.{cl['name']}",
+                            "old": None,
+                            "new": i,
+                        })
+    for act in data.get("activities", []):
+        checklist = act.get("checklist", [])
+        if not checklist:
+            continue
+        missing = [cl for cl in checklist if "seq" not in cl]
+        if not missing:
+            continue
+        for i, cl in enumerate(checklist, 1):
+            if "seq" not in cl:
+                cl["seq"] = i
+                fixes.append({
+                    "category": "missing-seq",
+                    "path": f"activities.{act['name']}.checklist.{cl['name']}",
+                    "old": None,
+                    "new": i,
+                })
+    return fixes
+
+
 def fix_versions(data):
     """Add missing version and schemaVersion."""
     fixes = []
@@ -1847,6 +1892,10 @@ def main():
         help="Flatten nested narrative wrappers (narratives[i].narratives[]) into top-level"
     )
     parser.add_argument(
+        "--fix-missing-seq", action="store_true",
+        help="Add sequential seq values to checklist items that are missing them"
+    )
+    parser.add_argument(
         "--fix-versions", action="store_true",
         help="Add missing version (1.0.0) and schemaVersion (from schema)"
     )
@@ -1938,6 +1987,9 @@ def main():
 
     if args.fix_competency_refs or args.all:
         all_fixes.extend(fix_competency_refs(data, baseline, file_path))
+
+    if args.fix_missing_seq or args.all:
+        all_fixes.extend(fix_missing_seq(data))
 
     if args.fix_versions or args.all:
         all_fixes.extend(fix_versions(data))

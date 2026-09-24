@@ -18,10 +18,28 @@ Spec format (JSON array of objects):
         {
             "workProduct": "Current WP Name",         # required: which WP to transform
             "rename": "New WP Name",                   # optional: rename the work product
-            "setMapsTo": "Parent WP",                  # optional: set mapsTo (removes partOf)
-            "setPartOf": "Parent WP",                  # optional: set partOf (removes mapsTo)
+            "setMapsTo": "Parent WP",                  # optional: set mapsTo
+            "setPartOf": "Parent WP",                  # optional: set partOf
+            "removeMapsTo": true,                      # optional: remove mapsTo
+            "removePartOf": true,                      # optional: remove partOf
             "lodMap": {"OldLOD": "NewLOD"},            # optional: rename LODs (1:1)
             "addLods": [{"name":"L","description":"D","seq":N,"checklist":[]}]  # optional: new LODs
+        }
+    ]
+
+    To add a new work product, use "add": true with the full WP definition:
+    [
+        {
+            "add": true,
+            "definition": {
+                "name": "New WP",
+                "description": "...",
+                "mapsTo": "Parent WP",
+                "partOf": "Container WP",
+                "tags": {...},
+                "levelsOfDetail": [...]
+            },
+            "insertAfter": "Existing WP Name"         # optional: position in array
         }
     ]
 
@@ -121,12 +139,64 @@ def _update_wp_lod_refs(practice, wp_name, new_wp_name, lod_map, changes):
     return ref_count
 
 
+def _ensure_checklist_seq(wp):
+    """Add sequential seq values to checklist items missing them."""
+    fixed = 0
+    for lod in wp.get("levelsOfDetail", []):
+        for i, cl in enumerate(lod.get("checklist", []), 1):
+            if "seq" not in cl:
+                cl["seq"] = i
+                fixed += 1
+    return fixed
+
+
+def add_workproduct(practice, spec):
+    """Add a new work product from a definition. Returns (changes, error)."""
+    definition = spec.get("definition")
+    if not definition or not definition.get("name"):
+        return [], "addWorkProduct requires 'definition' with 'name'"
+
+    wp_name = definition["name"]
+    for w in practice.get("workProducts", []):
+        if w["name"] == wp_name:
+            return [], f"Work product '{wp_name}' already exists"
+
+    seq_fixed = _ensure_checklist_seq(definition)
+
+    insert_after = spec.get("insertAfter")
+    wps = practice.setdefault("workProducts", [])
+
+    if insert_after:
+        idx = next((i for i, w in enumerate(wps) if w["name"] == insert_after), None)
+        if idx is not None:
+            wps.insert(idx + 1, definition)
+        else:
+            wps.append(definition)
+    else:
+        wps.append(definition)
+
+    changes = [f"  added: {wp_name}"]
+    lods = definition.get("levelsOfDetail", [])
+    if lods:
+        changes.append(f"  lods: {', '.join(l['name'] for l in lods)}")
+    if definition.get("mapsTo"):
+        changes.append(f"  mapsTo: {definition['mapsTo']}")
+    if definition.get("partOf"):
+        changes.append(f"  partOf: {definition['partOf']}")
+    if seq_fixed:
+        changes.append(f"  auto-seq: {seq_fixed} checklist items")
+
+    return changes, None
+
+
 def transform_workproduct(practice, spec):
     """Apply a single work product transformation. Returns (changes, error)."""
     wp_name = spec["workProduct"]
     new_name = spec.get("rename")
     set_mapsto = spec.get("setMapsTo")
     set_partof = spec.get("setPartOf")
+    remove_mapsto = spec.get("removeMapsTo", False)
+    remove_partof = spec.get("removePartOf", False)
     lod_map = spec.get("lodMap", {})
     add_lods = spec.get("addLods", [])
     changes = []
@@ -147,28 +217,33 @@ def transform_workproduct(practice, spec):
             changes.append(f"  addLod: {new_lod['name']} (seq={new_lod.get('seq', '?')})")
         wp["levelsOfDetail"].sort(key=lambda l: l.get("seq", 0))
 
-    # 1. Change relationship type
+    # 1. Remove relationships (explicit removal before setting)
+    if remove_mapsto:
+        old = wp.pop("mapsTo", None)
+        if old:
+            changes.append(f"  removed: mapsTo:{old}")
+
+    if remove_partof:
+        old = wp.pop("partOf", None)
+        if old:
+            changes.append(f"  removed: partOf:{old}")
+
+    # 2. Set relationships (mapsTo and partOf can coexist)
     if set_mapsto:
-        old_partof = wp.pop("partOf", None)
-        old_mapsto = wp.pop("mapsTo", None)
+        old_mapsto = wp.get("mapsTo")
         wp["mapsTo"] = set_mapsto
-        if old_partof:
-            changes.append(f"  relationship: partOf:{old_partof} → mapsTo:{set_mapsto}")
-        elif old_mapsto and old_mapsto != set_mapsto:
-            changes.append(f"  relationship: mapsTo:{old_mapsto} → mapsTo:{set_mapsto}")
-        else:
-            changes.append(f"  relationship: set mapsTo:{set_mapsto}")
+        if old_mapsto and old_mapsto != set_mapsto:
+            changes.append(f"  mapsTo: {old_mapsto} → {set_mapsto}")
+        elif not old_mapsto:
+            changes.append(f"  set mapsTo: {set_mapsto}")
 
     if set_partof:
-        old_mapsto = wp.pop("mapsTo", None)
-        old_partof = wp.pop("partOf", None)
+        old_partof = wp.get("partOf")
         wp["partOf"] = set_partof
-        if old_mapsto:
-            changes.append(f"  relationship: mapsTo:{old_mapsto} → partOf:{set_partof}")
-        elif old_partof and old_partof != set_partof:
-            changes.append(f"  relationship: partOf:{old_partof} → partOf:{set_partof}")
-        else:
-            changes.append(f"  relationship: set partOf:{set_partof}")
+        if old_partof and old_partof != set_partof:
+            changes.append(f"  partOf: {old_partof} → {set_partof}")
+        elif not old_partof:
+            changes.append(f"  set partOf: {set_partof}")
 
     # 2. Rename LODs within this WP
     if lod_map:
@@ -228,8 +303,12 @@ def main():
     errors = []
 
     for spec in spec_list:
-        wp_name = spec.get("workProduct", "?")
-        spec_changes, err = transform_workproduct(practice, spec)
+        if spec.get("add"):
+            wp_name = spec.get("definition", {}).get("name", "?")
+            spec_changes, err = add_workproduct(practice, spec)
+        else:
+            wp_name = spec.get("workProduct", "?")
+            spec_changes, err = transform_workproduct(practice, spec)
         if err:
             errors.append(f"{wp_name}: {err}")
         else:
