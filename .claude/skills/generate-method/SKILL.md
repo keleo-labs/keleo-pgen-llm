@@ -300,6 +300,7 @@ Fix any FAIL assertions before proceeding to Step 1.5.
    - Which baseline alphas does the content enrich (redeclarations)?
    - Which need specialization (`contributesTo`) or variant mapping (`mapsTo`)?
    - Count total baseline alpha coverage
+   - **Produce a concern-to-alpha consolidation map** showing how N Phase 1 concerns map to M alphas (concerns often consolidate — e.g., 12 concerns → 7 alphas). This map is passed to Phase 2 agents as part of the delineation context.
 
 3. **Analyze coverage pattern:**
    - **Focused** (3-7 alphas in 1-2 focuses) → Likely single practice

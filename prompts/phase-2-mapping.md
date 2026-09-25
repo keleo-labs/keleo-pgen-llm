@@ -136,6 +136,25 @@ At the TOP of the mapping guide output (after Metadata, before Baseline Practice
 - Source methodology explicitly presents content as a unified framework
 - Subdivision would create practices that lack independent value
 
+**Focus concentration check:** A well-delineated practice concentrates its new alphas in 1-2 focuses. If new alphas spread evenly across all three focuses (Value, Solution, Endeavor), this is a delineation smell — the practice may be trying to cover too much ground. Review whether some alphas would be better served by a separate practice or absorbed as redeclarations.
+
+**Concern-to-Alpha Consolidation Map (REQUIRED):** Phase 1 concerns do not map 1:1 to alphas — related concerns often consolidate into a single alpha. After determining alpha coverage, produce a consolidation map showing how Phase 1 concerns map to practice alphas:
+
+```markdown
+### Concern-to-Alpha Consolidation Map
+
+| Analysis Concern | Consolidated Alpha | Rationale |
+|:-----------------|:-------------------|:----------|
+| Concern A (§2.1) | Alpha X (PRIMARY) | Core lifecycle forms primary alpha nucleus |
+| Concern B (§2.2) | Alpha X (PRIMARY) | Extends primary alpha toward optimization |
+| Concern C (§2.3) | Alpha Y | Standalone — distinct state progression |
+| Concern D (§2.4) | Alpha Z | Merged — shared infrastructure dependency |
+| Concern E (§2.5) | Alpha Z | Merged — extends storage lifecycle |
+| Concern F (§2.6) | (redeclaration of Baseline Alpha) | Universally applicable cross-cutting checklists |
+```
+
+Every Phase 1 concern must appear in this table. The map makes the N-concerns-to-M-alphas consolidation visible and auditable, preventing both alpha proliferation (too many fine-grained alphas) and over-consolidation (too few alphas losing important state progressions).
+
 **Proceed to Step 1 with delineation decision established.**
 
 ### Step 1: Load Resources
@@ -354,6 +373,8 @@ Create "Assets" section listing all identified visual artifacts:
 **Note:** Actual asset files will be created/extracted during practice bundle assembly. Phase 2 mapping identifies and documents what assets should be included.
 
 ### Step 4: Map Concerns to Alphas
+
+**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclaration (enriching baseline alphas with additional checklists) is appropriate only when the content is genuinely universal — applicable to all practices that touch that alpha, not just this one. If you find yourself redeclaring more than 1-2 baseline alphas, verify each redeclaration passes the combinability test.
 
 For EACH concern from Phase 1, apply the **Redeclaration vs Specialization vs Variant Mapping Decision Framework** (semantics/composition.md §4.4):
 
@@ -1079,6 +1100,8 @@ Description: [what this variant represents]
 - Array of {alphaName, stateName} objects
 
 ### Step 6: Map Personas and Persona Groups
+
+**Persona consolidation is expected.** Phase 1 typically identifies more personas than the practice needs — the Phase 1 count is an upper bound, not a target. For each Phase 1 persona, ask: Does this role have distinct competencies, decision authority, AND activities not covered by another persona? Roles that differ only in title but share the same competency profile and activity set should merge. Aspirational target: 3-6 personas per practice.
 
 **Step 6a: Map Competencies**
 

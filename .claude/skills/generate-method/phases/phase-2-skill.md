@@ -87,6 +87,23 @@ Output at the TOP of the mapping guide (after Metadata, before Baseline Practice
 
 **REQUIRED when alpha count >= 8 and all focuses represented:** If concluding SINGLE PRACTICE despite broad coverage, provide explicit justification (e.g., most alphas are redeclarations not specializations; content tightly integrated around one primary alpha; subdivision would create practices lacking independent value).
 
+**Focus concentration check:** A well-delineated practice concentrates its new alphas in 1-2 focuses. If new alphas spread evenly across all three focuses (Value, Solution, Endeavor), this is a delineation smell — the practice may be trying to cover too much ground. Review whether some alphas would be better served by a separate practice or absorbed as redeclarations.
+
+**Concern-to-Alpha Consolidation Map (REQUIRED):** Phase 1 concerns do not map 1:1 to alphas — related concerns often consolidate into a single alpha. After determining alpha coverage, produce a consolidation map showing how Phase 1 concerns map to practice alphas:
+
+```markdown
+### Concern-to-Alpha Consolidation Map
+
+| Analysis Concern | Consolidated Alpha | Rationale |
+|:-----------------|:-------------------|:----------|
+| Concern A (§2.1) | Alpha X (PRIMARY) | Core lifecycle forms primary alpha nucleus |
+| Concern B (§2.2) | Alpha X (PRIMARY) | Extends primary alpha toward optimization |
+| Concern C (§2.3) | Alpha Y | Standalone — distinct state progression |
+| Concern D (§2.4) | (redeclaration of Baseline Alpha) | Universally applicable cross-cutting checklists |
+```
+
+Every Phase 1 concern must appear. The map makes the N-concerns-to-M-alphas consolidation visible and auditable.
+
 ## Step 1: Load Resources
 
 Read these in order:
@@ -109,6 +126,8 @@ Read these in order:
 ## Step 2: Map Concerns to Alphas
 
 **Read** `references/semantics/composition.md` SS4.4 (Redeclaration vs Specialization Decision Framework) and `references/semantics/alphas.md` SS6.1-6.2 before starting.
+
+**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclaration (enriching baseline alphas with additional checklists) is appropriate only when the content is genuinely universal — applicable to all practices that touch that alpha, not just this one. If you find yourself redeclaring more than 1-2 baseline alphas, verify each redeclaration passes the combinability test.
 
 For EACH concern from Phase 1, apply the decision framework:
 
@@ -268,6 +287,8 @@ Narrative: [if Phase 1 provided additional context]
 - Apply combinability test: would combining checklists with parent produce coherent single document? NO -> `mapsTo`
 
 ## Step 4: Map Personas and Persona Groups
+
+**Persona consolidation is expected.** Phase 1 typically identifies more personas than the practice needs — the Phase 1 count is an upper bound, not a target. For each Phase 1 persona, ask: Does this role have distinct competencies, decision authority, AND activities not covered by another persona? Roles that differ only in title but share the same competency profile and activity set should merge. Aspirational target: 3-6 personas per practice.
 
 ### Step 4a: Competency Mapping
 

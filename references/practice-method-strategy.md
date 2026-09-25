@@ -25,6 +25,33 @@ Baseline practice context is required to map Phase 1 concerns to baseline alphas
 
 **Structure:** One analysis report, one mapping guide per practice, one Method JSON with embedded practices.
 
+## Practice-Dependency Chain
+
+**When:** Source methodology has a core capability domain (3-7 alphas) plus a distinct operational use-case that deeply specializes one of those alphas. The use-case has its own personas, tooling focus, and/or lifecycle that is time-bounded or context-specific.
+
+**Structure:** Two separate practices linked by `practiceDependencyNames`. The child practice's alphas all `contributesTo` a single alpha in the parent practice. Each practice can be adopted independently — the child adds depth but the parent is complete without it.
+
+**Signals:**
+- The candidate sub-practice has its own distinct personas not shared with the parent
+- The alpha being deepened has 4+ sub-concerns that could each become their own alpha
+- The sub-practice represents a time-bounded engagement (e.g., migration) or a specialized workflow
+- The sub-practice has its own tooling focus distinct from the parent
+
+**Anti-pattern:** Don't use this pattern when the sub-concerns are tightly coupled to other parent alphas — that's just a larger single practice.
+
+**Example:**
+
+```
+Red Hat OpenShift Virtualization (7 alphas, platform lifecycle)
+  └── Red Hat OpenShift Virtualization Migration (5 alphas)
+      All 5 alphas contributesTo parent's "Workload Migration" alpha
+      Distinct personas: Migration Architect, Migration Program Manager
+      Distinct tooling: Migration Toolkit for Virtualization (MTV)
+      Time-bounded: migration engagement with start/end
+```
+
+**vs Method:** A method bundles peer practices under a shared umbrella (e.g., SAFe → Portfolio + Delivery + Teams). A practice-dependency chain creates a parent-child specialization hierarchy where the child deepens one specific aspect of the parent. Use a method when practices cover different primary alphas across different focuses; use a dependency chain when the child practice drills into one alpha of the parent.
+
 ## Primary Alpha Focus Strategy
 
 **Core Principle:** Each practice should focus around ONE primary alpha, with secondary coverage of that alpha's directly related alphas (via `relatesTo` relationships, 1-level deep). This creates focused, coherent practices with broad coverage of loosely related concerns.
