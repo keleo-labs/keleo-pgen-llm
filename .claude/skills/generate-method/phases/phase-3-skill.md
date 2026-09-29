@@ -452,6 +452,9 @@ python3 utils/fix-alpha-refs.py <practice>.json <leafBaseline>.json --remap "Old
 ```bash
 # Quick error check (add --parent for each practiceDependencyNames entry)
 python3 utils/assess-practice.py <practice>.json --baseline <leafBaseline>.json --errors-only [--parent <dep>.json ...]
+
+# Show only failed eval assertions (use this instead of piping to python3 -c)
+python3 utils/eval-skill-output.py <practice-dir>/ --show-failed
 ```
 
 ### 5.5 Iterate Until Clean
@@ -471,6 +474,7 @@ python3 utils/assess-practice.py <practice>.json --baseline <leafBaseline>.json 
 | **Baseline** | Invalid competency names, invalid state names, floating alphas | Use exact baseline names from Step 2 extraction; add `contributesTo`/`mapsTo` |
 | **Integrity** | Broken WP/activity/alpha cross-references | Fix symbolic references to match defined element names |
 | **Concentration** | Multiple new alphas target same `contributesTo` parent | Verify each alpha's parent independently — defaulting all to one parent is a mapping smell. Review Phase 2 target selection rationale. |
+| **Bypass** | New alpha targets root baseline alpha while intermediate exists | An intermediate practice alpha already specializes the root — consider targeting the intermediate instead. Only target root directly when the new alpha's domain differs from the intermediate's. |
 
 ## Step 6: Package
 

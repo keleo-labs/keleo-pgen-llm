@@ -467,6 +467,86 @@ def check_contributesto_concentration(data, kind, baseline_alpha_names=None):
     return issues
 
 
+def check_contributesto_bypass(data, kind, baseline_data=None):
+    """Warn when a new alpha targets a root/baseline alpha while the practice
+    also targets intermediates that contribute to that same root — indicating
+    the practice works at the intermediate level but bypasses it for some alphas."""
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    baseline_data = baseline_data or {}
+    practice_name = data.get("name", "")
+
+    # Build map of target -> [(intermediate_name, source_practice)] from effective context
+    intermediates_by_target = {}
+    for alpha in baseline_data.get("alphas", []):
+        ct = alpha.get("contributesTo")
+        source = alpha.get("_contributingPracticeName", "")
+        if ct and source and source != practice_name:
+            intermediates_by_target.setdefault(ct, []).append(
+                (alpha.get("name", ""), source)
+            )
+
+    if not intermediates_by_target:
+        return issues
+
+    sources = []
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+    else:
+        sources.append(data)
+
+    for source in sources:
+        pfx = ""
+        if kind == "method":
+            pn = source.get("name", "")
+            pfx = f"practices[{pn}]." if pn else ""
+
+        # Collect all targets used by this practice's alphas
+        practice_targets = set()
+        for alpha in source.get("alphas", []):
+            ct = alpha.get("contributesTo")
+            if ct:
+                practice_targets.add(ct)
+
+        for alpha in source.get("alphas", []):
+            name = alpha.get("name", "")
+            ct = alpha.get("contributesTo")
+            if not ct:
+                continue
+            if ct not in intermediates_by_target:
+                continue
+
+            # Only warn if the practice ALSO targets one of the intermediates,
+            # proving it operates at the intermediate level
+            sibling_intermediates = intermediates_by_target[ct]
+            used_intermediates = [
+                (iname, isrc) for iname, isrc in sibling_intermediates
+                if iname in practice_targets
+            ]
+            if not used_intermediates:
+                continue
+
+            used_names = [iname for iname, _ in used_intermediates]
+            issues.append({
+                "severity": "warning",
+                "category": "contributesto-bypass",
+                "path": f"{pfx}alphas[{name}].contributesTo",
+                "message": (
+                    f"Alpha '{name}' targets '{ct}' directly, but this "
+                    f"practice also targets intermediate(s) "
+                    f"{', '.join(repr(n) for n in used_names)} which "
+                    f"contributesTo '{ct}'. Consider whether one of the "
+                    f"intermediates or a sibling intermediate is a more "
+                    f"appropriate (nearer) parent."
+                ),
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_mapsto_naming(data, kind, baseline_data=None):
     """Check that mapsTo variant names don't repeat the parent type name (work products only).
 
@@ -4210,6 +4290,7 @@ def main():
         merged_bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
     all_issues.extend(check_alpha_relationships(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     all_issues.extend(check_contributesto_concentration(data, kind, baseline_alpha_names=merged_bl_alpha_names))
+    all_issues.extend(check_contributesto_bypass(data, kind, baseline_data))
     all_issues.extend(check_mapsto_naming(data, kind, baseline_data))
     all_issues.extend(check_partof_mapsto_candidates(data, kind, baseline_data))
     all_issues.extend(check_missing_partof_candidates(data, kind, baseline_data))

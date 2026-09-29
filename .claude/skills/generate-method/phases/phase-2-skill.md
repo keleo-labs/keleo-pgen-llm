@@ -192,10 +192,12 @@ For each state (all three types), include:
 **For each new alpha, systematically evaluate ALL available parent alphas:**
 
 1. **Enumerate candidates:** List every alpha from the effective context (baseline + parent practice). Group by focus.
-2. **Semantic fit test:** For each candidate, ask: "Does advancing the new alpha's states advance THIS parent alpha's states?" Pick the parent whose lifecycle the new alpha most directly advances.
-3. **State alignment score:** Compare new alpha state names against each candidate's state names. Calculate semantic match percentage.
-4. **IS-A test:** If the new alpha IS-A type of a parent (named variant following the same lifecycle), use `mapsTo` and refactor states to match the parent. Otherwise use `contributesTo`.
-5. **Concentration check:** If >2 new alphas target the same parent, verify each independently. Defaulting is a smell — each alpha should have its own justification.
+2. **Prefer the nearest ancestor (intermediate alpha rule):** When the effective context contains a practice-level alpha that already `contributesTo` a baseline alpha, new alphas in the same domain should typically target that intermediate practice alpha, not the root baseline alpha. Targeting the root bypasses the specialization hierarchy — the intermediate exists precisely because the domain warrants a more specific parent. Only target the root baseline directly when the new alpha's lifecycle genuinely advances the root independently of the intermediate (e.g., the new alpha is in a different domain than the intermediate).
+3. **Semantic fit test:** For each candidate, ask: "Does advancing the new alpha's states advance THIS parent alpha's states?" Pick the parent whose lifecycle the new alpha most directly advances.
+   **Role test (guards against surface-level text matching):** Identify what each candidate alpha *represents* in the system — its role and responsibility — not just what its description *mentions*. A description that says "ensures assets remain operational" does not mean the alpha IS an asset; it means the alpha is responsible FOR asset protection. Ask: "Is this new alpha a *facet of* the candidate, or does it *serve* the candidate?" If the new alpha serves the candidate (protects it, monitors it, manages it), the candidate is the right target. If the description merely mentions the candidate's domain without the new alpha being a sub-dimension of it, look for a more specific parent.
+4. **State alignment score:** Compare new alpha state names against each candidate's state names. Calculate semantic match percentage.
+5. **IS-A test:** If the new alpha IS-A type of a parent (named variant following the same lifecycle), use `mapsTo` and refactor states to match the parent. Otherwise use `contributesTo`.
+6. **Concentration check:** If >2 new alphas target the same parent, verify each independently. Defaulting is a smell — each alpha should have its own justification.
 
 **Document the evaluation in the mapping guide:**
 
@@ -519,8 +521,10 @@ Description: [1 sentence summary]
 Authors: [array of author names]
 Date: [publication year]
 Source: [publisher/journal]
-URL: [retrieval URL -- REQUIRED where possible; carry forward Phase 1 URLs including internal/intranet links]
+URL: [retrieval URL -- REQUIRED; carry forward Phase 1 URLs including internal/intranet links]
 ```
+
+**Citation URLs are required.** Every citation must include the source URL — the canonical download or access URL. For PDF source materials, use the public download URL (never "provided as file" or similar placeholder text). For web sources, use the original URL. Only omit the URL when genuinely no public URL exists.
 
 ### Visual Assets
 

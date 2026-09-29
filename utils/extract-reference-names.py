@@ -1172,6 +1172,70 @@ def print_narrative_completeness(data, narrative_types=None, as_json=False):
         print()
 
 
+def print_hierarchy(data):
+    """Print alpha contributesTo hierarchy tree with provenance annotations."""
+    alphas = data.get("alphas", [])
+    # Also check method practices
+    if data.get("practices"):
+        for p in data["practices"]:
+            alphas = alphas + p.get("alphas", [])
+
+    # Build parent->children map and alpha metadata
+    children_of = {}  # parent_name -> [(child_name, source, has_own_children)]
+    alpha_info = {}  # name -> {source, contributesTo, mapsTo}
+    all_names = set()
+
+    for a in alphas:
+        name = a.get("name", "")
+        ct = a.get("contributesTo", "")
+        mt = a.get("mapsTo", "")
+        source = a.get("_contributingPracticeName", "")
+        alpha_info[name] = {"source": source, "contributesTo": ct, "mapsTo": mt}
+        all_names.add(name)
+        target = ct or mt
+        if target:
+            children_of.setdefault(target, []).append(name)
+
+    # Find root alphas (no contributesTo/mapsTo, or target not in our set)
+    roots = []
+    for name, info in alpha_info.items():
+        target = info["contributesTo"] or info["mapsTo"]
+        if not target or target not in all_names:
+            roots.append(name)
+
+    roots.sort()
+
+    def format_label(name):
+        info = alpha_info.get(name, {})
+        source = info.get("source", "")
+        parts = [name]
+        if source:
+            parts.append(f"({source})")
+        return " ".join(parts)
+
+    def print_tree(name, prefix="", is_last=True):
+        connector = "└── " if is_last else "├── "
+        if prefix:
+            print(f"{prefix}{connector}{format_label(name)}")
+        else:
+            print(format_label(name))
+
+        kids = sorted(children_of.get(name, []))
+        for i, child in enumerate(kids):
+            child_is_last = (i == len(kids) - 1)
+            if prefix:
+                extension = "    " if is_last else "│   "
+                print_tree(child, prefix + extension, child_is_last)
+            else:
+                print_tree(child, "  ", child_is_last)
+
+    print("=== ALPHA HIERARCHY ===")
+    for i, root in enumerate(roots):
+        print_tree(root)
+        if children_of.get(root) and i < len(roots) - 1:
+            print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract reference names and structure from practice/baseline/method JSON"
@@ -1223,6 +1287,8 @@ def main():
                         help="Check narratives for missing or empty narrative elements")
     parser.add_argument("--baseline", metavar="FILE",
                         help="Baseline JSON for narrative type definitions (with --narrative-completeness)")
+    parser.add_argument("--hierarchy", action="store_true",
+                        help="Show alpha contributesTo hierarchy tree with provenance")
 
     args = parser.parse_args()
     data = load_json(args.json_file)
@@ -1276,6 +1342,10 @@ def main():
     if args.narrative_contexts or args.context_element or args.long_contexts:
         print_narrative_contexts(data, args.context_element, args.long_contexts,
                                  args.full_text)
+        return
+
+    if args.hierarchy:
+        print_hierarchy(data)
         return
 
     if args.metadata:
