@@ -87,6 +87,25 @@ Expected: 11 section headers. If fewer, resume the agent: "The analysis report i
 
 **Validation:** Apply Phase 1 Validation from generate-method skill
 
+#### User Review Gate — Analysis
+
+**Present the Phase 1B output for user review before proceeding.**
+
+1. Inform the user: "Phase 1B (Light Analysis) is complete. The output is at `<dir>/01-analysis-report.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 2."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the analysis report
+   - Re-run validation: `python3 utils/eval-skill-output.py <dir>/ --phase 1 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py <dir>/ --add-decision \
+     --decision-label "Phase 1B Review Gate" \
+     --decision-text "User accepted light analysis output"
+   ```
+5. Proceed to Phase 2.
+
 ## Step 2C: Run Phase 2 - Mapping
 
 Identical to Mode 1's Step 2C. Read `.claude/skills/update-method/modes/mode-1-full-reanalysis.md` Step 2C for detailed instructions, including **Subagent Directives** and **Post-Phase-2 Placeholder Check**.

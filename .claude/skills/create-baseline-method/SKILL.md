@@ -245,6 +245,25 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
 
 Fix any FAIL assertions before proceeding.
 
+#### User Review Gate — Analysis
+
+**Present the Phase 1 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1 (Analysis) is complete. The output is at `baselines/<baseline-name>/01-analysis-report.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 1.5 (Distillation)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the analysis report
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 1 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 1 Review Gate" \
+     --decision-text "User accepted analysis output"
+   ```
+5. Proceed to Phase 1.5.
+
 ## Phase 1.5: Distillation (CRITICAL NEW PHASE)
 
 **Objective:** Distill Phase 1's comprehensive analysis into essential foundational elements
@@ -320,7 +339,26 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
   --decision-text "N focuses, M alphas, K activity spaces, J competencies distilled"
 ```
 
-Fix any FAIL assertions before proceeding to Phase 2.
+Fix any FAIL assertions before proceeding.
+
+#### User Review Gate — Distillation
+
+**Present the Phase 1.5 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1.5 (Distillation) is complete. The output is at `baselines/<baseline-name>/01.5-distilled-essentials.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 2 (Baseline Mapping)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the distilled essentials
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 1.5 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 1.5 Review Gate" \
+     --decision-text "User accepted distillation output"
+   ```
+5. Proceed to Phase 2.
 
 ## Phase 2: Baseline Mapping
 
@@ -408,7 +446,26 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
   --phase-validation "<PASS or FAIL summary>"
 ```
 
-Fix any FAIL assertions before proceeding to Phase 3.
+Fix any FAIL assertions before proceeding.
+
+#### User Review Gate — Mapping
+
+**Present the Phase 2 output for user review before proceeding.**
+
+1. Inform the user: "Phase 2 (Baseline Mapping) is complete. The output is at `baselines/<baseline-name>/02-mapping-guide.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 3 (Baseline JSON Generation)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the mapping guide
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 2 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 2 Review Gate" \
+     --decision-text "User accepted mapping output"
+   ```
+5. Proceed to Phase 3.
 
 ## Phase 3: Baseline JSON Generation
 

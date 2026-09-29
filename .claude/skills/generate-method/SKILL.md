@@ -311,7 +311,26 @@ No conversational context required — only file contents.
      --phase-validation "<PASS or FAIL summary>"
    ```
 
-Fix any FAIL assertions before proceeding to Step 1.5.
+Fix any FAIL assertions before proceeding.
+
+#### User Review Gate — Analysis
+
+**Present the Phase 1 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1 (Analysis) is complete. The output is at `practices/<practice-name>/01-analysis-report.md`. Please review it and let me know if you'd like any changes, or confirm to proceed."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the analysis report
+   - Re-run validation: `python3 utils/eval-skill-output.py practices/<name>/ --phase 1 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
+     --decision-label "Phase 1 Review Gate" \
+     --decision-text "User accepted analysis output"
+   ```
+5. Proceed to Step 1.5.
 
 ### Step 1.5: Practice Delineation Gate (Main Agent Only)
 
@@ -418,7 +437,26 @@ For the full Primary Alpha Focus Strategy with worked examples, read `references
      --phase-validation "<PASS or FAIL summary>"
    ```
 
-Fix any FAIL assertions before proceeding to Phase 3.
+Fix any FAIL assertions before proceeding.
+
+#### User Review Gate — Mapping
+
+**Present the Phase 2 output for user review before proceeding.**
+
+1. Inform the user: "Phase 2 (Mapping) is complete. The output is at `practices/<practice-name>/02-mapping-guide.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 3."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the mapping guide
+   - Re-run validation: `python3 utils/eval-skill-output.py practices/<name>/ --phase 2 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
+     --decision-label "Phase 2 Review Gate" \
+     --decision-text "User accepted mapping output"
+   ```
+5. Proceed to Phase 3.
 
 ### Step 2.5: Secondary Reference Research (Opt-In)
 

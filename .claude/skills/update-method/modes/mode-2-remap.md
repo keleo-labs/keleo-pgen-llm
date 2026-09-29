@@ -89,10 +89,24 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 
 **Validation:** Apply Phase 2 Validation from generate-method skill
 
-**User Feedback:**
-- "Applied latest mapping guidance to existing content"
-- "Updated X competency levels, added Y aliases, completed Z pattern matrices"
-- "Identified primary alpha: <Alpha Name> with N related alphas"
+#### User Review Gate — Mapping
+
+**Present the Phase 2 output for user review before proceeding.**
+
+1. Inform the user: "Phase 2 (Mapping) is complete. The output is at `practices/<name>/02-mapping-guide.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 3."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the mapping guide
+   - Re-run validation: `python3 utils/eval-skill-output.py practices/<name>/ --phase 2 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py practices/<name>/ --add-decision \
+     --decision-label "Phase 2 Review Gate" \
+     --decision-text "User accepted mapping output"
+   ```
+5. Proceed to Phase 3.
 
 ## Step 2C: Run Phase 3 - JSON Generation
 

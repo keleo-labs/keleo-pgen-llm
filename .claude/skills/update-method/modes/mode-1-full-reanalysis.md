@@ -38,6 +38,25 @@
 
 **Validation:** Apply Phase 1 Validation from generate-method skill
 
+#### User Review Gate — Analysis
+
+**Present the Phase 1 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1 (Analysis) is complete. The output is at `<dir>/01-analysis-report.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 2."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the analysis report
+   - Re-run validation: `python3 utils/eval-skill-output.py <dir>/ --phase 1 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py <dir>/ --add-decision \
+     --decision-label "Phase 1 Review Gate" \
+     --decision-text "User accepted analysis output"
+   ```
+5. Proceed to Phase 2.
+
 ## Step 2C: Run Phase 2 - Mapping
 
 **IMPORTANT:** Follow the `generate-method` skill Phase 2 process exactly as documented in `.claude/skills/generate-method/SKILL.md` (Step 2: Phase 2 - Mapping section).
@@ -72,6 +91,25 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 **Output:** `practices/<name>/02-mapping-guide.md` (OVERWRITE existing)
 
 **Validation:** Apply Phase 2 Validation from generate-method skill
+
+#### User Review Gate — Mapping
+
+**Present the Phase 2 output for user review before proceeding.**
+
+1. Inform the user: "Phase 2 (Mapping) is complete. The output is at `<dir>/02-mapping-guide.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 3."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the mapping guide
+   - Re-run validation: `python3 utils/eval-skill-output.py <dir>/ --phase 2 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py <dir>/ --add-decision \
+     --decision-label "Phase 2 Review Gate" \
+     --decision-text "User accepted mapping output"
+   ```
+5. Proceed to Phase 3.
 
 ## Step 2D: Run Phase 3 - JSON Generation
 
