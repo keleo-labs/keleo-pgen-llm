@@ -76,7 +76,8 @@ All generated outputs for a practice go in `practices/<practice-name>/`:
 ```text
 practices/
 └── <practice-name>/
-    ├── 01-analysis-report.md      (Phase 1 output, ~30-50K words)
+    ├── 00-prompt-history.md        (Session provenance: prompt, sources, decisions, phases)
+    ├── 01-analysis-report.md       (Phase 1 output, ~30-50K words)
     ├── 02-mapping-guide.md         (Phase 2 output, scales with alpha count: ~5-6K words/alpha)
     └── <practice-name>.json        (Phase 3 output, schema-compliant JSON)
 
@@ -89,6 +90,7 @@ For methods with multiple practices:
 ```text
 practices/
 └── <method-name>/
+    ├── 00-prompt-history.md        (Session provenance: prompt, sources, decisions, phases)
     ├── 01-analysis-report.md       (Covers all practices)
     ├── 02-mapping-guide.md         (Maps all practices)
     └── <practice-name>.json        (Per-practice standalone JSONs)
@@ -182,6 +184,19 @@ In plan mode:
 
 6. **Exit plan mode** with clear execution roadmap
 
+7. **Initialise prompt history:**
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --init \
+     --type <practice|method> --name "<Practice Name>" \
+     --prompt "<user's original prompt text>"
+   ```
+   Then record each source material identified during planning:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-source \
+     --source-type <file|url|google-doc|google-slides> \
+     --source-path "<path or URL>" --source-desc "<brief description>"
+   ```
+
 ---
 
 ### Step 0.5: Unified Context Resolution
@@ -234,6 +249,14 @@ In plan mode:
 
 **CRITICAL:** If context resolution fails (unresolved dependencies, missing files), STOP and discuss alternatives.
 
+5. **Record dependencies in prompt history:**
+   For each resolved context source (baseline, parent practice, bundle):
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-dependency \
+     --dep-type <baseline|practice|method|bundle> --dep-name "<Name>" \
+     --dep-path "<resolved-path>" --dep-version "<version>"
+   ```
+
 ---
 
 ## Token Budget Management
@@ -266,15 +289,26 @@ No conversational context required — only file contents.
 
 **Dispatch to subagent:**
 
-1. Read `phases/phase-1-skill.md` to understand what the subagent will do
-2. Launch Agent with prompt including:
+1. Record phase start:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --start-phase --phase "Phase 1: Analysis"
+   ```
+2. Read `phases/phase-1-skill.md` to understand what the subagent will do
+3. Launch Agent with prompt including:
    - Practice name and source material file paths
    - Instruction to read `phases/phase-1-skill.md` first
    - Output location: `practices/<practice-name>/01-analysis-report.md`
 
-3. After agent completes, validate:
+4. After agent completes, validate:
    ```bash
    python3 utils/eval-skill-output.py practices/<name>/ --phase 1 --summary
+   ```
+
+5. Record phase completion:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --end-phase \
+     --phase "Phase 1: Analysis" --phase-output "01-analysis-report.md" \
+     --phase-validation "<PASS or FAIL summary>"
    ```
 
 Fix any FAIL assertions before proceeding to Step 1.5.
@@ -324,6 +358,13 @@ Fix any FAIL assertions before proceeding to Step 1.5.
 
 **Pass delineation results to Phase 2 agents:** primary alpha, alpha coverage list, practice boundaries.
 
+7. **Record delineation decision:**
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
+     --decision-label "Delineation Gate" \
+     --decision-text "<Single practice|Method with N practices>: M alphas across K focuses. Primary alpha: <name>"
+   ```
+
 For the full Primary Alpha Focus Strategy with worked examples, read `references/practice-method-strategy.md`.
 
 ### Step 2: Phase 2 — Mapping
@@ -334,8 +375,12 @@ For the full Primary Alpha Focus Strategy with worked examples, read `references
 
 **Dispatch to subagent(s):**
 
-1. Read `phases/phase-2-skill.md` to understand what the subagent will do
-2. Launch Agent(s) with prompt including:
+1. Record phase start:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --start-phase --phase "Phase 2: Mapping"
+   ```
+2. Read `phases/phase-2-skill.md` to understand what the subagent will do
+3. Launch Agent(s) with prompt including:
    - Instruction to read `phases/phase-2-skill.md` first
    - Practice name, description, and file paths:
      - `practices/<name>/01-analysis-report.md` (analysis report)
@@ -346,7 +391,7 @@ For the full Primary Alpha Focus Strategy with worked examples, read `references
 
 **For multi-practice methods:** Launch parallel agents (one per practice) in a single message.
 
-3. **After all agents complete:**
+4. **After all agents complete:**
    - **Check for placeholder sections:**
      ```bash
      grep -n '\[\.\.\..*\]' practices/<method-name>/02-mapping-guide-practice-*.md
@@ -365,6 +410,13 @@ For the full Primary Alpha Focus Strategy with worked examples, read `references
      ```bash
      python3 utils/eval-skill-output.py practices/<name>/ --phase 2 --summary
      ```
+
+5. Record phase completion:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --end-phase \
+     --phase "Phase 2: Mapping" --phase-output "02-mapping-guide.md" \
+     --phase-validation "<PASS or FAIL summary>"
+   ```
 
 Fix any FAIL assertions before proceeding to Phase 3.
 
@@ -393,8 +445,12 @@ Fix any FAIL assertions before proceeding to Phase 3.
 
 **Dispatch to subagent(s):**
 
-1. Read `phases/phase-3-skill.md` to understand what the subagent will do
-2. Launch Agent(s) with prompt including:
+1. Record phase start:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --start-phase --phase "Phase 3: JSON Generation"
+   ```
+2. Read `phases/phase-3-skill.md` to understand what the subagent will do
+3. Launch Agent(s) with prompt including:
    - Instruction to read `phases/phase-3-skill.md` first
    - All required inputs (see phase skill's Inputs table):
      - Practice name and directory path
@@ -423,7 +479,14 @@ Fix any FAIL assertions before proceeding to Phase 3.
 
    Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
 
-5. **ChangeRequest (if updating existing):** If a prior version exists, generate a ChangeRequest:
+5. Record phase completion:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --end-phase \
+     --phase "Phase 3: JSON Generation" --phase-output "<practice-name>.json" \
+     --phase-validation "<PASS or FAIL summary>"
+   ```
+
+6. **ChangeRequest (if updating existing):** If a prior version exists, generate a ChangeRequest:
    ```bash
    python3 utils/generate-change-request.py <old>.json <new>.json --author "<git user>" --status accepted -o practices/<name>/<name>.changerequest.json
    ```
@@ -432,6 +495,13 @@ Fix any FAIL assertions before proceeding to Phase 3.
    python3 utils/discover-dependencies.py --dependents "<Practice Name>"
    ```
    Present a Downstream Impact Report. See `update-method` SKILL.md for the full report format.
+
+7. **Record deliverables and finalise prompt history:**
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-deliverable \
+     --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged practice bundle"
+   python3 utils/prompt-history.py practices/<practice-name>/ --finalize
+   ```
 
 ---
 
@@ -497,10 +567,11 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Final Deliverables
 
-1. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
-2. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
-3. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
-4. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
+1. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, sources, decisions, phases)
+2. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
+3. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
+4. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
+5. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
 
 ### Assets
 

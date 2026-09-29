@@ -106,6 +106,12 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `backup-practice.py` | Create timestamped backup of a practice directory; `--prune N` keeps only the N most recent | `python3 utils/backup-practice.py <directory>/ [--prune N] [--prune-only]` |
 | `assemble-mapping-guide.py` | Assemble Phase 2 mapping guide from cluster fragments | `python3 utils/assemble-mapping-guide.py <cluster1>.md [<cluster2>.md...] -o <output>.md` |
 
+## Session Provenance
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `prompt-history.py` | Manage prompt history files for practice/baseline generation sessions: init, record sources/dependencies/decisions/phases/deliverables, finalise | `python3 utils/prompt-history.py <directory>/ --init --type practice --name "Name" --prompt "..." \| --add-source --source-type file --source-path "..." --source-desc "..." \| --add-dependency --dep-type baseline --dep-name "..." --dep-path "..." [--dep-version "..."] \| --add-decision --decision-label "..." --decision-text "..." \| --start-phase --phase "Phase 1: Analysis" \| --end-phase --phase "Phase 1: Analysis" [--phase-output "..."] [--phase-validation "..."] \| --add-deliverable --deliverable-path "..." --deliverable-desc "..." \| --finalize` |
+
 ## Session Analysis
 
 | Script | Purpose | Usage |

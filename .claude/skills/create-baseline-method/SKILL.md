@@ -75,6 +75,19 @@ This skill orchestrates a 4-phase pipeline:
    - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
 4. **Exit Plan Mode** and present plan to user for approval
 
+5. **Initialise prompt history:**
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
+     --type baseline --name "<Baseline Name>" \
+     --prompt "<user's original prompt text>"
+   ```
+   Then record each source material identified during planning:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-source \
+     --source-type <file|url|google-doc|google-slides> \
+     --source-path "<path or URL>" --source-desc "<brief description>"
+   ```
+
 **Planning ensures:**
 - Appropriate baseline vs extension practice decision
 - Token budget management
@@ -140,6 +153,14 @@ This skill orchestrates a 4-phase pipeline:
    - **Phase 2:** Read effective parent to avoid duplicating elements and to use correct cross-references
    - **Phase 3:** Reference parent elements for cross-reference validation
 
+6. **Record dependencies in prompt history:**
+   For each resolved parent baseline (and transitive deps):
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-dependency \
+     --dep-type baseline --dep-name "<Parent Name>" \
+     --dep-path "<resolved-path>" --dep-version "<version>"
+   ```
+
 **Merging semantics:** `resolve-context.py` uses overlay, name-keyed union (root-first layering). See the utility's `--help` for merge rules. The NEW baseline does NOT need to redeclare all parent elements — it can redeclare (override), add new elements, reference parent elements in `relatesTo`, or define `practiceElementAliases` for its domain.
 
 ### Directory Structure
@@ -147,6 +168,7 @@ This skill orchestrates a 4-phase pipeline:
 ```
 baselines/
 └── <baseline-name>/
+    ├── 00-prompt-history.md         # Session provenance (prompt, sources, decisions, phases)
     ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
     ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
     ├── 02-mapping-guide.md          # Phase 2 output (~40-60K words)
@@ -173,6 +195,11 @@ These documents must be readable for all phases:
 **Objective:** Extract comprehensive methodology structure from source materials
 
 **Prompt:** `prompts/phase-1-baseline-analysis.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 1: Analysis"
+```
 
 **Process:**
 
@@ -208,6 +235,14 @@ These documents must be readable for all phases:
 ```bash
 python3 utils/eval-skill-output.py baselines/<name>/ --phase 1 --summary
 ```
+
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 1: Analysis" --phase-output "01-analysis-report.md" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
 Fix any FAIL assertions before proceeding.
 
 ## Phase 1.5: Distillation (CRITICAL NEW PHASE)
@@ -215,6 +250,11 @@ Fix any FAIL assertions before proceeding.
 **Objective:** Distill Phase 1's comprehensive analysis into essential foundational elements
 
 **Prompt:** `prompts/phase-1.5-baseline-distillation.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 1.5: Distillation"
+```
 
 **Process:**
 
@@ -269,6 +309,17 @@ Fix any FAIL assertions before proceeding.
 ```bash
 python3 utils/eval-skill-output.py baselines/<name>/ --phase 1.5 --summary
 ```
+
+Record phase completion and distillation decision:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 1.5: Distillation" --phase-output "01.5-distilled-essentials.md" \
+  --phase-validation "<PASS or FAIL summary>"
+python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+  --decision-label "Distillation" \
+  --decision-text "N focuses, M alphas, K activity spaces, J competencies distilled"
+```
+
 Fix any FAIL assertions before proceeding to Phase 2.
 
 ## Phase 2: Baseline Mapping
@@ -276,6 +327,11 @@ Fix any FAIL assertions before proceeding to Phase 2.
 **Objective:** Map distilled essentials to baseline practice structures
 
 **Prompt:** `prompts/phase-2-baseline-mapping.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 2: Baseline Mapping"
+```
 
 **Process:**
 
@@ -344,6 +400,14 @@ Fix any FAIL assertions before proceeding to Phase 2.
 ```bash
 python3 utils/eval-skill-output.py baselines/<name>/ --phase 2 --summary
 ```
+
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 2: Baseline Mapping" --phase-output "02-mapping-guide.md" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
 Fix any FAIL assertions before proceeding to Phase 3.
 
 ## Phase 3: Baseline JSON Generation
@@ -351,6 +415,11 @@ Fix any FAIL assertions before proceeding to Phase 3.
 **Objective:** Generate schema-compliant baseline practice JSON
 
 **Prompt:** `prompts/phase-3-baseline-json.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 3: Baseline JSON"
+```
 
 **Process:**
 
@@ -448,6 +517,13 @@ python3 utils/eval-skill-output.py baselines/<name>/ \
 ```
 Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
 
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 3: Baseline JSON" --phase-output "<baseline-name>.json" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
 **Step 5: Package into .keleo**
 
 After validation passes, package the baseline JSON into a `.keleo` archive. If the baseline has `baselinePracticeName` (extends a parent baseline), resolve transitive dependencies and include all parent baselines:
@@ -468,6 +544,13 @@ python3 utils/package-keleo.py \
 Never use `_effective-context.json` as a document — it is a build artifact, not a distributable document.
 
 **Output:** `bundles/<name>.keleo` (packaged baseline with dependencies, verified inline)
+
+Record deliverables and finalise prompt history:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --add-deliverable \
+  --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged baseline bundle"
+python3 utils/prompt-history.py baselines/<baseline-name>/ --finalize
+```
 
 **Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
 

@@ -125,11 +125,13 @@ keleo-pgen-llm/
 │   └── phase-3-baseline-json.md           # Phase 3: Baseline JSON generation
 ├── practices/                              # Extension practices output
 │   └── <practice-name>/
+│       ├── 00-prompt-history.md           # Session provenance
 │       ├── 01-analysis-report.md
 │       ├── 02-mapping-guide.md
 │       └── <practice-name>.json           # Intermediate practice JSON
 ├── baselines/                              # Baseline practices output
 │   └── <baseline-name>/
+│       ├── 00-prompt-history.md           # Session provenance
 │       ├── 01-analysis-report.md
 │       ├── 01.5-distilled-essentials.md   # Distillation phase
 │       ├── 02-mapping-guide.md
@@ -149,6 +151,7 @@ keleo-pgen-llm/
 
 All generated outputs for a practice are in `practices/<practice-name>/`:
 
+- **`00-prompt-history.md`** - Session provenance: user prompt, source materials, decisions, phase execution log
 - **`01-analysis-report.md`** - Phase 1 output: Structured analysis of methodology (~30-50K words)
 - **`02-mapping-guide.md`** - Phase 2 output: Mapping to baseline practice (~40-60K words)
 - **`<practice-name>.json`** - Phase 3 output: Schema-compliant Practice JSON (intermediate)
@@ -158,6 +161,7 @@ All generated outputs for a practice are in `practices/<practice-name>/`:
 
 For multi-practice methods in `practices/<method-name>/`:
 
+- **`00-prompt-history.md`** - Session provenance: user prompt, source materials, decisions, phase execution log
 - **`01-analysis-report.md`** - Phase 1 output covering all practices
 - **`02-mapping-guide.md`** - Phase 2 output mapping all practices
 - **`<practice-name>.json`** - Per-practice standalone JSONs (intermediate)
@@ -374,8 +378,9 @@ Baseline practices are **foundational frameworks** that define the core ontology
 
 All files for a baseline are co-located in `baselines/<baseline-name>/`:
 
+- **`00-prompt-history.md`** - Session provenance: user prompt, source materials, decisions, phase execution log
 - **`01-analysis-report.md`** - Phase 1 output: Comprehensive analysis (~30-50K words)
-- **`01.5-distilled-essentials.md`** - Phase 1.5 output: Essential elements (~15-25K words) **[NEW]**
+- **`01.5-distilled-essentials.md`** - Phase 1.5 output: Essential elements (~15-25K words)
 - **`02-mapping-guide.md`** - Phase 2 output: Baseline mapping (~40-60K words)
 - **`<baseline-name>.json`** - Phase 3 output: Schema-compliant baseline JSON (intermediate)
 - **`bundles/<baseline-name>.keleo`** - Packaged output: Baseline bundled in `.keleo` archive
