@@ -18,7 +18,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs; `--category` filters to specific issue categories | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--category CAT [CAT ...]] [--online]` |
+| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; auto-discovers `_effective-context.json` for transitive baseline resolution; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs; `--category` filters to specific issue categories | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--category CAT [CAT ...]] [--online]` |
 | `audit-method-references.py` | Cross-practice reference auditing within a method (alpha refs, duplicates, persona consistency) | `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json [--json]` |
 | `validate-practice-json.py` | Schema validation for practices/methods | `python3 utils/validate-practice-json.py <file>.json` |
 | `validate-baseline-json.py` | Schema validation for baselines | `python3 utils/validate-baseline-json.py <file>.json` |
@@ -26,6 +26,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `verify-mapping-against-specs.py` | Verify Phase 2 mapping output against Gherkin specs | `python3 utils/verify-mapping-against-specs.py <mapping>.md --baseline <baseline>.json [--parent <parent>.json] [--kind baseline]` |
 | `eval-skill-output.py` | Evaluate skill output quality against assertions | `python3 utils/eval-skill-output.py <practice-dir> [--specs <specs-index.json>] [--one-line]` |
 | `lint-practice.py` | Combined validate-fix-revalidate loop (auto-discovers baseline/schema) | `python3 utils/lint-practice.py <practice>.json [--fix] [--one-line] [--max-iterations N]` |
+| `post-validate-method.py` | Batch fix-validate pipeline across all practice JSONs in a directory; wraps lint-practice.py per file, optional cross-practice audit | `python3 utils/post-validate-method.py <directory>/ [--fix] [--one-line] [--audit] [--baseline <baseline>.json]` |
 
 ## Structural Inspection
 
@@ -37,7 +38,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `extract-practice-content.py` | Extract practice content from methods or resolve dependencies; `--summary` prints a human-readable text overview | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--summary] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
 | `diff-practice-json.py` | Diff two practice JSON files by element type; `--gate` mode checks for element arrays that dropped to 0 (post-Phase-3 completeness gate, exit 1 on critical) | `python3 utils/diff-practice-json.py <old>.json <new>.json [--json] [--changes-only] [--gate]` |
-| `inspect-keleo.py` | Inspect `.keleo` package contents: manifest, documents, versions, dependencies | `python3 utils/inspect-keleo.py <bundle>.keleo [--json] [--list]` |
+| `inspect-keleo.py` | Inspect `.keleo` package contents: manifest, documents, versions, dependencies; extract individual documents by name | `python3 utils/inspect-keleo.py <bundle>.keleo [--json] [--list] [--extract-doc NAME [-o PATH]]` |
 | `query-schema.py` | Query Practice Language schema `$defs` type definitions; auto-discovers `deps/language.schema.json` | `python3 utils/query-schema.py <TypeName> [--properties] [--json] [--list]` |
 
 ## Remote Management

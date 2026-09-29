@@ -5,6 +5,8 @@ Usage:
     python3 utils/inspect-keleo.py bundle.keleo
     python3 utils/inspect-keleo.py bundle.keleo --json
     python3 utils/inspect-keleo.py bundle.keleo --list
+    python3 utils/inspect-keleo.py bundle.keleo --extract-doc "Practice Name"
+    python3 utils/inspect-keleo.py bundle.keleo --extract-doc "Practice Name" -o /tmp/practice.json
 """
 
 import argparse
@@ -60,6 +62,38 @@ def inspect_package(keleo_path):
     }, None
 
 
+def extract_document(keleo_path, doc_name, output_path=None):
+    """Extract a specific document from a .keleo package by its name field."""
+    path = Path(keleo_path)
+    if not path.exists():
+        return None, f"File not found: {path}"
+
+    with zipfile.ZipFile(path, "r") as z:
+        for name in z.namelist():
+            if name.startswith("documents/") and name.endswith(".json"):
+                try:
+                    doc = json.loads(z.read(name))
+                    if doc.get("name") == doc_name:
+                        if output_path:
+                            Path(output_path).write_text(
+                                json.dumps(doc, indent=2, ensure_ascii=False)
+                            )
+                        return doc, None
+                except (json.JSONDecodeError, KeyError):
+                    continue
+
+    available = []
+    with zipfile.ZipFile(path, "r") as z:
+        for name in z.namelist():
+            if name.startswith("documents/") and name.endswith(".json"):
+                try:
+                    doc = json.loads(z.read(name))
+                    available.append(doc.get("name", "<unnamed>"))
+                except (json.JSONDecodeError, KeyError):
+                    pass
+    return None, f"Document '{doc_name}' not found. Available: {', '.join(available)}"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Inspect .keleo package contents"
@@ -69,7 +103,22 @@ def main():
                         help="Output as JSON")
     parser.add_argument("--list", action="store_true",
                         help="List document names only (piping-friendly)")
+    parser.add_argument("--extract-doc", metavar="NAME",
+                        help="Extract a document by name and print its JSON to stdout")
+    parser.add_argument("-o", "--output", metavar="PATH",
+                        help="Write extracted document to file instead of stdout")
     args = parser.parse_args()
+
+    if args.extract_doc:
+        doc, err = extract_document(args.file, args.extract_doc, args.output)
+        if err:
+            print(f"Error: {err}", file=sys.stderr)
+            sys.exit(1)
+        if args.output:
+            print(f"Extracted '{args.extract_doc}' to {args.output}", file=sys.stderr)
+        else:
+            print(json.dumps(doc, indent=2, ensure_ascii=False))
+        return
 
     info, err = inspect_package(args.file)
     if err:

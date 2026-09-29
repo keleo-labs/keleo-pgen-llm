@@ -4113,6 +4113,25 @@ def main():
                 "autoFixable": False,
             })
 
+    # Auto-discover _effective-context.json for transitive baseline resolution
+    if baseline_data and kind != "practiceBaseline":
+        for auto_name in ('_effective-context.json', '_effective-parent.json'):
+            auto_path = file_path.parent / auto_name
+            if auto_path.exists():
+                ectx, ectx_err = load_json_pair(auto_path)
+                if not ectx_err:
+                    # Merge effective context elements into baseline_data
+                    for arr_key in ("narrativeTypes", "competencies", "activitySpaces",
+                                    "focuses", "alphas", "workProducts", "personas",
+                                    "personaGroups", "activities", "citations",
+                                    "patternGroups"):
+                        existing = {e.get("name") for e in baseline_data.get(arr_key, []) if e.get("name")}
+                        for elem in ectx.get(arr_key, []):
+                            if elem.get("name") and elem["name"] not in existing:
+                                baseline_data.setdefault(arr_key, []).append(elem)
+                                existing.add(elem["name"])
+                break
+
     if baseline_data and args.parent:
         bl_alpha_set = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}

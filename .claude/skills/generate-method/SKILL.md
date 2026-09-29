@@ -509,13 +509,21 @@ Fix any FAIL assertions before proceeding.
      python3 utils/audit-method-references.py bundles/<method-name>.keleo --baseline <effective-context.json>
      ```
 
-4. **Validation (all):**
+4. **Validation (trust-but-verify):**
+
+   Phase 3 agents run their own fix-validate chain internally. After they complete, verify rather than re-run:
+
    ```bash
    python3 utils/eval-skill-output.py practices/<name>/ --summary
    ```
    Quick check: `--one-line`. Failed only: `--show-failed`.
 
-   Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
+   - If `error_pass_rate: 1.0` → agents handled it, proceed to step 5.
+   - If `error_pass_rate < 1.0` → run the batch fix pipeline:
+     ```bash
+     python3 utils/post-validate-method.py practices/<name>/ --fix --one-line
+     ```
+     Re-run `eval-skill-output.py` to confirm. Fix remaining issues manually if needed.
 
 5. Record phase completion:
    ```bash

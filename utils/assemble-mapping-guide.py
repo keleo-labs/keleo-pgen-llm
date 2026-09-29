@@ -63,8 +63,8 @@ def extract_practice_metadata(content):
         meta["redecl_count"] = int(total_match.group(2))
         meta["new_count"] = int(total_match.group(3))
     else:
-        redecl_blocks = re.findall(r"\*\*Alpha:\s*.+?\*\*\s*\(Redeclaration", content)
-        new_blocks = re.findall(r"\*\*Alpha:\s*.+?\*\*\s*\((?:Specialization|New)", content)
+        redecl_blocks = re.findall(r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\(Redeclaration", content)
+        new_blocks = re.findall(r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\((?:Specialization|New)", content)
         meta["redecl_count"] = len(redecl_blocks)
         meta["new_count"] = len(new_blocks)
         meta["alpha_count"] = meta["redecl_count"] + meta["new_count"]
@@ -82,12 +82,12 @@ def extract_practice_metadata(content):
         pairs = re.findall(r"([\w\s]+?)\s*→\s*([\w\s]+?)(?:,|$)", new_alpha_match.group(1))
         meta["new_alphas"] = [{"name": n.strip(), "contributesTo": c.strip()} for n, c in pairs]
 
-    activity_headers = re.findall(r"^####\s*Activity\s*\d", content, re.MULTILINE)
+    activity_headers = re.findall(r"^#{3,5}\s*Activity:\s", content, re.MULTILINE)
     if not activity_headers:
         activity_headers = re.findall(r"^\*\*Activity:\s", content, re.MULTILINE)
     meta["activity_count"] = len(activity_headers)
 
-    wp_headers = re.findall(r"^####\s*Work Product\s*\d", content, re.MULTILINE)
+    wp_headers = re.findall(r"^#{3,5}\s*Work Product:\s", content, re.MULTILINE)
     if not wp_headers:
         wp_headers = re.findall(r"^\*\*Work Product:\s", content, re.MULTILINE)
     meta["wp_count"] = len(wp_headers)
