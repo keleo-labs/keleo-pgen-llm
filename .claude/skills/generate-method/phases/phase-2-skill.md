@@ -602,6 +602,24 @@ For each Phase 1 reference candidate:
 4. Named variant with same states (IS-A)? -> **Variant Mapping** (`mapsTo`)
 5. Acronym/abbreviation/synonym? -> **Keywords**
 
+### Scope Rule: Aliases Preserve Element Meaning
+
+An alias introduces a **local term for what the element represents across the entire practice/method context** — it does NOT narrow the element to one practice's perspective or create a specialisation.
+
+**Test:** If the practice/method contains multiple practices (or could compose with sibling practices under a method), would this alias name still make sense for ALL of them? If it only fits one practice's viewpoint, it's too narrow.
+
+**Example (OpenShift method with Platform Operations, Observability, and Security practices):**
+- "Platform" → "OpenShift" ✓ — OpenShift IS the platform across all practices
+- "Platform" → "OpenShift Cluster" ✓ — still names the same thing
+- "Platform" → "Observability Host" ✗ — narrows to the observability practice's viewpoint
+- "Platform" → "Ops Target" ✗ — narrows to the operations practice's viewpoint
+
+**Example (Ansible method):**
+- "Platform" → "Automation Platform" ✓ — AAP IS the platform in this context
+- "Platform" → "Playbook Runtime" ✗ — narrows to one aspect of the platform
+
+**When the term only fits one practice**, it signals a specialisation (`contributesTo`) or a keyword, not an alias.
+
 ### Quality Target
 
 - **3-8 aliases** per practice (ONE alias per PracticeElement)
