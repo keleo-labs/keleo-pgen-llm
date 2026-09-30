@@ -14,7 +14,7 @@ Usage:
     # .keleo bundle (extracts all documents from the archive)
     python3 utils/resolve-context.py bundles/method.keleo -o _effective-context.json
 
-    # Mixed inputs with transitive baseline resolution
+    # Mixed inputs with transitive dependency resolution (practice + baseline)
     python3 utils/resolve-context.py baseline.json parent.keleo --transitive -o _effective-context.json
 
     # Resolve by document name (searches practices/, baselines/, deps/, bundles/)
@@ -144,10 +144,12 @@ def _load_discover_module():
     return mod
 
 
-def resolve_transitive_baselines(baselines, search_dirs):
+def resolve_transitive_baselines(baselines, search_dirs, dd=None, index=None):
     """Discover and add transitive baseline dependencies."""
-    dd = _load_discover_module()
-    index, _ = dd.build_index(search_dirs)
+    if dd is None:
+        dd = _load_discover_module()
+    if index is None:
+        index, _ = dd.build_index(search_dirs)
     existing = {name for name, _ in baselines}
     to_check = list(baselines)
     result = list(baselines)
@@ -168,6 +170,54 @@ def resolve_transitive_baselines(baselines, search_dirs):
                     existing.add(dep_name)
                     result.append((dep_name, dep_data))
                     to_check.append((dep_name, dep_data))
+
+    return result
+
+
+def resolve_transitive_practices(practices, search_dirs, dd=None, index=None):
+    """Discover and add transitive practice dependencies (practiceDependencyNames).
+
+    Skips resolved documents that are baselines — those are collected
+    separately by collect_practice_baselines.
+    """
+    if dd is None:
+        dd = _load_discover_module()
+    if index is None:
+        index, _ = dd.build_index(search_dirs)
+    existing = {name for name, _ in practices}
+    to_check = list(practices)
+    result = list(practices)
+
+    while to_check:
+        name, data = to_check.pop(0)
+        for dep_name in data.get("practiceDependencyNames", []):
+            if dep_name in existing:
+                continue
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True)
+            if match["status"] == "found":
+                dep_data, err = dd.load_resolved_json(match)
+                if dep_data and detect_kind(dep_data) != "practiceBaseline":
+                    existing.add(dep_name)
+                    result.append((dep_name, dep_data))
+                    to_check.append((dep_name, dep_data))
+
+    return result
+
+
+def collect_practice_baselines(practices, baselines, dd, index):
+    """Ensure baselines referenced by practices are in the baselines tier."""
+    existing = {name for name, _ in baselines}
+    result = list(baselines)
+
+    for _, data in practices:
+        bpn = data.get("baselinePracticeName")
+        if bpn and bpn not in existing:
+            match = dd.resolve_name(bpn, index, prefer_filesystem=True)
+            if match["status"] == "found":
+                bl_data, err = dd.load_resolved_json(match)
+                if bl_data:
+                    existing.add(bpn)
+                    result.append((bpn, bl_data))
 
     return result
 
@@ -293,10 +343,24 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
     documents = load_inputs(file_paths)
     tiers = classify_documents(documents)
 
-    if transitive and tiers["baselines"]:
-        tiers["baselines"] = resolve_transitive_baselines(
-            tiers["baselines"], search_dirs
-        )
+    if transitive:
+        dd = _load_discover_module()
+        index, _ = dd.build_index(search_dirs)
+
+        if tiers["practices"]:
+            tiers["practices"] = resolve_transitive_practices(
+                tiers["practices"], search_dirs, dd, index
+            )
+
+        if tiers["practices"]:
+            tiers["baselines"] = collect_practice_baselines(
+                tiers["practices"], tiers["baselines"], dd, index
+            )
+
+        if tiers["baselines"]:
+            tiers["baselines"] = resolve_transitive_baselines(
+                tiers["baselines"], search_dirs, dd, index
+            )
 
     if tiers["baselines"]:
         tiers["baselines"] = topo_sort_baselines(tiers["baselines"])
@@ -546,7 +610,7 @@ def main():
     parser.add_argument(
         "--transitive",
         action="store_true",
-        help="Auto-resolve transitive baseline dependencies from baselines/, practices/, deps/, bundles/",
+        help="Auto-resolve transitive dependencies (practice and baseline) from baselines/, practices/, deps/, bundles/",
     )
     parser.add_argument(
         "--force",

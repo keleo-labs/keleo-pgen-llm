@@ -53,7 +53,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 |--------|---------|-------|
 | `discover-dependencies.py` | Auto-discover and resolve dependencies by scanning project directories; `--remote` checks cached remote index, `--auto-pull` downloads missing bundles | `python3 utils/discover-dependencies.py --resolve "Name" [--remote] [--auto-pull] \| --resolve-from <file>.json [--transitive] [--remote] \| --dependents "Name" \| --tiers <method>.json \| --consumers "Name" \| --list` |
 | `sync-practices.py` | Sync shared practices across method directories (match by name, preserve filenames) | `python3 utils/sync-practices.py <source-dir>/ [--fix] [--rebuild-bundles] [--json]` |
-| `resolve-context.py` | Unified context resolver: baselines + practices + .keleo → effective context | `python3 utils/resolve-context.py <baseline>.json [<practice>.json] [<bundle>.keleo] --transitive -o <output>.json` |
+| `resolve-context.py` | Unified context resolver: baselines + practices + .keleo → effective context; `--transitive` resolves both practice dependencies (practiceDependencyNames) and baseline dependencies | `python3 utils/resolve-context.py <baseline>.json [<practice>.json] [<bundle>.keleo] --transitive -o <output>.json` |
 | `resolve-practice-dependencies.py` | Determine practiceDependencyNames by comparing parent and baseline alphas | `python3 utils/resolve-practice-dependencies.py --parent <parent>.json --baseline <baseline>.json --practice <practice>.json [--per-alpha]` |
 
 ## Auto-Fix Tools

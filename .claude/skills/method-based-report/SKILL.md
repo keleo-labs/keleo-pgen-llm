@@ -72,6 +72,7 @@ Both `gws` and Playwright are content sourcing tools — they help gather subjec
    - The user must specify a practice, method, baseline, or `.keleo` bundle
    - Accept any of: `.keleo` path, `.json` path, practice name (resolved from `practices/`, `baselines/`, `deps/`, `bundles/`)
    - If ambiguous, ask the user to clarify
+   - When multiple practices are specified, check their root baselines (`baselinePracticeName`). If they differ, note in the plan that separate effective-context.json files will be created — one per distinct root baseline. Identify which is the primary context (drives report structure) and which is supplementary (enriches specific sections).
 
 2. **Clarify the subject and purpose**
    - What is the report about? (the domain subject, not the practice itself)
@@ -87,6 +88,19 @@ Both `gws` and Playwright are content sourcing tools — they help gather subjec
    - Confirm the approach with the user before proceeding
 
 **ExitPlanMode** once the user approves the plan.
+
+---
+
+## Multi-Report Generation
+
+When the user requests multiple separate reports from a shared method (e.g., one per product area, one per practice):
+
+1. **Plan the batch in Step 0** — note all N reports, shared method, per-report subjects, any supplementary methods, and confirm the approach with the user.
+2. **Extract per-report domain knowledge** — use `inspect-keleo.py --extract-doc` to pull individual practices from `.keleo` bundles, and `practice-summary.py` to build structured summaries for agent prompts.
+3. **Launch parallel agents** — construct a prompt per report with embedded domain knowledge (alphas, outcomes, patterns, citations from the relevant practices), then launch all agents concurrently in a single message.
+4. **Each agent follows Steps 1–3 independently** — resolving context, selecting narratives, and writing to its own output file.
+
+See `reporting-foundation/REPORT-FOUNDATION.md` → "Parallel Multi-Report Generation" for the full pattern including context resolution, extraction commands, and supplementary method handling.
 
 ---
 

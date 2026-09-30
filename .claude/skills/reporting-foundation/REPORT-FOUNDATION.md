@@ -6,20 +6,34 @@ Common workflow, rules, and conventions shared by all reporting skills. **Load l
 
 ## Context Resolution (Step 1)
 
-Use `resolve-context.py` to load the effective context. **Always pass all inputs in a single call** — the utility merges them with correct tier precedence.
+Use `resolve-context.py` to load the effective context. The `--transitive` flag resolves both practice dependencies (`practiceDependencyNames`) and baseline dependencies automatically.
+
+**Baseline-aware resolution:** When multiple practices are involved, check whether they share the same root baseline before resolving:
+
+- **Same root baseline** → pass all practices in a single `resolve-context.py` call. The merged effective context gives you all elements with provenance annotations (`_contributingPracticeName`).
+- **Different root baselines** → create separate effective-context.json files, one per distinct root baseline group. Merging practices with different baselines conflates incompatible baseline elements (focuses, narrative types, competencies, activity spaces).
 
 ```bash
-# By file path (one or many)
-python3 utils/resolve-context.py practices/crm-foundations/crm-foundations.json practices/meddpicc-qualification/meddpicc-qualification.json --transitive -o /tmp/report-context.json
+# Single practice (resolves its dependencies and baseline transitively)
+python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive -o /tmp/report-context.json
 
-# By document name (preferred — avoids path guessing and directory name mismatches)
-python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" "User Stories" --transitive -o /tmp/report-context.json
+# Multiple practices sharing the same baseline — single call
+python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" --transitive -o /tmp/report-context.json
+
+# Multiple practices with different baselines — separate calls
+python3 utils/resolve-context.py --by-name "Practice A" --transitive -o /tmp/primary-context.json
+python3 utils/resolve-context.py --by-name "Practice B" --transitive -o /tmp/supplementary-context.json
 
 # To see only specific element types (reduces output size for targeted extraction)
 python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive --extract personas alphas patterns -o /tmp/report-context.json
 
 # To understand the output JSON structure
 python3 utils/resolve-context.py --describe-output
+```
+
+**Checking root baselines:** Use `discover-dependencies.py` to inspect a practice's baseline before resolving:
+```bash
+python3 utils/discover-dependencies.py --resolve-from <practice>.json
 ```
 
 **Name resolution:** `--by-name` uses the dependency index to find documents by their `name` field (not directory name). This eliminates trial-and-error path lookups — e.g., the user may type "CRM-Foundations" but the directory is `crm-foundations/` and the document name is "CRM Foundations".
@@ -29,8 +43,6 @@ python3 utils/resolve-context.py --describe-output
 python3 utils/studio-client.py --pull "<Document Name>"
 ```
 Then re-run the `resolve-context.py` command. If `studio-client.py` reports an auth error, guide the user to run `python3 utils/studio-client.py --configure` to set or refresh their keleo-studio-gas credentials.
-
-**Multi-practice reports:** When the report draws on multiple practices, pass all of them in one call. The merged effective context gives you all personas, alphas, activities, and patterns from all sources with provenance annotations (`_contributingPracticeName`) so you know which practice each element came from.
 
 Read the output effective context JSON to extract:
 - **Baseline**: The foundational framework (narrative types, focuses, alphas, competencies)
@@ -244,13 +256,40 @@ Surname, A. A., & Surname, B. B. (2023). *Title of the work*. Publisher Name. ht
 
 When a report draws on multiple practices, methods, or baselines:
 
-1. **Single context call:** Pass all sources to `resolve-context.py` in one invocation (with `--by-name` or file paths). The merged context preserves provenance via `_contributingPracticeName` on each element.
+1. **Group by root baseline:** Check each practice's `baselinePracticeName`. Practices sharing the same root baseline go in a single `resolve-context.py` call; practices with different root baselines get separate calls (see Context Resolution above). Each call produces its own effective-context.json.
 
 2. **Persona cross-referencing:** Different practices may define personas for the same real-world role under different names (e.g., "Sales Representative" in CRM, "Account Executive" in MEDDPICC, "Field Seller" in Sales Play). Cross-reference persona names against the user's target roles during planning — document the mapping in the plan.
 
-3. **No forking for extraction:** The merged effective context JSON contains all elements at the top level (personas, alphas, activities, patterns, etc.). Read the data directly — do not spawn subagents for data that is already structured in the JSON.
+3. **No forking for extraction:** Each effective context JSON contains all elements at the top level (personas, alphas, activities, patterns, etc.). Read the data directly — do not spawn subagents for data that is already structured in the JSON.
 
-4. **External reference documents:** When the user provides Google Docs URLs as supplementary context, use `gws drive files export` to fetch them as plain text (see memory `gws-cli`). Write the export to a file within the current working directory (gws sandboxes output paths). Clean up the file after use.
+4. **External reference documents:** When the user provides Google Workspace URLs as supplementary context:
+   - **Google Docs:** Use `gws drive files export` to fetch as plain text. Write the export to a file within the current working directory (gws sandboxes output paths). Clean up after use.
+   - **Google Slides:** Use `python3 utils/extract-gws-slides.py <presentation-id> -o /tmp/slides-content.md` to extract slide content as structured markdown. The presentation ID is the long alphanumeric string in the URL path.
+
+### Primary + Supplementary Contexts
+
+When a report uses a primary practice/method for structure and supplementary practices for depth:
+
+1. **Primary drives structure** — the primary context's narrative types and alphas shape the report's organisation.
+2. **Supplementary enriches** — supplementary contexts add technical depth, additional activities, and finer-grained state progressions within specific sections.
+3. **Extract per-topic domain knowledge** — use `python3 utils/extract-reference-names.py` or `python3 utils/practice-summary.py` on each resolved context to build topic-specific knowledge that informs the relevant report section.
+
+### Parallel Multi-Report Generation
+
+When the user requests N separate reports from a shared method (e.g., one report per product area):
+
+1. **Plan as a batch in Step 0** — note the full scope (N reports), shared method, per-report subject, and any supplementary methods per report.
+2. **Resolve contexts once** — resolve the shared method context once; resolve each supplementary method context once. Reuse across agents.
+3. **Extract per-report domain knowledge** — for each report, extract the relevant practice(s) from the shared method:
+   ```bash
+   # Extract a specific practice document from a .keleo bundle
+   python3 utils/inspect-keleo.py bundles/<method>.keleo --extract-doc "Practice Name" -o /tmp/practice.json
+   
+   # Build a structured summary for an agent prompt
+   python3 utils/practice-summary.py /tmp/practice.json
+   ```
+4. **Launch parallel agents** — construct a detailed prompt per report embedding: the report subject, audience, narrative strategy, extracted domain knowledge (alphas, outcomes, patterns, citations), and any supplementary method knowledge. Launch all agents in a single message for concurrent execution.
+5. **Each agent writes independently** — each agent generates its report to `reports/<report-name>.md` using the standard Steps 1–3 workflow.
 
 ---
 
@@ -297,6 +336,13 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - When: context resolution fails
 - Then: the skill reports the error clearly
 - And: suggests how the user can provide valid input (path to .json or .keleo file)
+
+#### Scenario: Practices with different baselines resolve separately (@rule:report-609)
+- Given: the user specifies practices with different root baselines
+- When: context resolution runs
+- Then: one effective-context.json is created per distinct root baseline
+- And: the primary context drives narrative structure and report organization
+- And: supplementary contexts provide domain knowledge for specific sections
 
 ### Feature: Citations and References
 
