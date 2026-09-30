@@ -27,6 +27,32 @@ You produce `practices/<practice-name>/02-mapping-guide.md` (~40-60K words, scal
 
 Use **simple single-command** Bash calls matching auto-approved patterns (e.g., `grep`, `wc`, `head`, `python3 utils/...`). Do NOT combine commands with variable assignments or shell loops -- these trigger permission prompts. Make separate tool calls instead.
 
+NEVER use inline `python3 -c` scripts -- use utility scripts only. See the Inspection Tools section below.
+
+### Inspection Tools (use instead of inline scripts)
+
+When you need to inspect the effective context or practice structure, use these existing utilities:
+
+```bash
+# Visualize alpha hierarchy (contributesTo/mapsTo tree with provenance)
+python3 utils/extract-reference-names.py <file>.json --hierarchy
+
+# Alpha details (states, checklists, mapsTo/contributesTo per alpha)
+python3 utils/extract-reference-names.py <file>.json --sections alphas --alpha-details
+
+# Specific sections (alphas, activitySpaces, competencies, narrativeTypes)
+python3 utils/extract-reference-names.py <file>.json --sections competencies narrativeTypes
+
+# Document shape and metadata (kind, name, version, baseline)
+python3 utils/extract-reference-names.py <file>.json --metadata
+
+# Batch practice summary for all JSONs in a directory
+python3 utils/practice-summary.py --dir <dir>/
+
+# Schema type definitions
+python3 utils/query-schema.py <TypeName> [--properties]
+```
+
 ## Reading Plan
 
 Read references **at the step where they are needed**, not upfront. Each step below specifies which references to load.
@@ -137,6 +163,8 @@ For EACH concern from Phase 1, apply the decision framework:
 
 2. **Universality test:** Is this concern generally applicable (universal to all uses of the parent alpha)? YES -> Redeclaration candidate. NO -> Go to step 3.
 
+   **Domain practice constraint:** General-purpose alphas shared across domains (e.g., Platform Asset, Requirements, Platform, Way Of Working, Platform Consumption Interface) should almost never be redeclared by a domain practice. Domain content inherently narrows scope -- use `mapsTo` to create a domain variant instead. Only redeclare if the enrichment is genuinely universal (applies equally to compute, storage, networking, etc.).
+
 3. **Combinability test (strongest redeclaration signal):** If multiple practices each add to this alpha, would combining all additions produce a coherent, non-conflicting result? YES -> Redeclaration. NO (context-specific, conflicting) -> Go to step 4.
 
 4. **Semantic relationship test (drives mapsTo vs contributesTo):**
@@ -209,6 +237,25 @@ contributesTo Target Selection:
 - State alignment: [X/Y = Z%]
 - Alternatives rejected: [name — why not]
 ```
+
+### Method-Internal Alpha Hierarchy (Multi-Practice Methods)
+
+When this practice is part of a method with a shared Foundations practice (or any dependency practice that already created mapsTo variants or specializations of baseline alphas), apply these additional rules:
+
+**Rule 1 — Target the nearest ancestor, not the root:**
+If the effective context contains a practice-level mapsTo variant of a baseline alpha (e.g., Foundations defines "Cisco Platform Asset" as mapsTo "Platform Asset"), domain practices MUST target the Foundations variant, not the root baseline alpha. The Foundations variant exists precisely to provide a domain-scoped intermediate -- bypassing it breaks the inheritance chain.
+
+**Rule 2 — Shared infrastructure → redeclare, not duplicate:**
+When multiple domain practices operate on the SAME instance of a concept (e.g., all domain practices use the same automation platform), they should REDECLARE the Foundations variant rather than creating separate mapsTo variants. The test: "Do these domain practices each have their own distinct instance, or do they share one?" Shared instance → redeclare. Distinct instance → mapsTo.
+
+**Rule 3 — Domain-specific concerns → mapsTo the Foundations variant:**
+When a domain practice needs a domain-specific variant of a concept that Foundations already specialized, the mapsTo target should be the Foundations variant, not the root baseline. Example: "IOS/NX-OS Platform Asset" mapsTo "Cisco Platform Asset" (from Foundations), NOT "Platform Asset" (from baseline).
+
+**Visualize before deciding:**
+```bash
+python3 utils/extract-reference-names.py <effective-context>.json --hierarchy
+```
+Review the alpha tree to identify intermediate practice-level alphas before selecting contributesTo/mapsTo targets.
 
 ### State Alignment Validation
 
