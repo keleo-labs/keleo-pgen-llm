@@ -114,11 +114,17 @@ Aim for **5–15 citations** in a standard report. Fewer is fine for focused top
 | `url` | Appended to the reference entry when present |
 
 **In-text shorthand** (used when writing the report):
-- Single personal author: `(Surname, 2024)`
-- Two personal authors: `(Surname & Surname, 2024)`
-- Three or more personal authors: `(Surname et al., 2024)`
-- Corporate author: `(Organization Name, 2024)`
-- Narrative form: `Surname (2024) found that...` or `According to Organization Name (2024),...`
+
+When the citation has a `url`, wrap the citation text in a markdown hyperlink. When it does not, use plain text.
+
+| Form | With URL | Without URL |
+|---|---|---|
+| Single personal author | `([Surname, 2024](URL))` | `(Surname, 2024)` |
+| Two personal authors | `([Surname & Surname, 2024](URL))` | `(Surname & Surname, 2024)` |
+| Three or more | `([Surname et al., 2024](URL))` | `(Surname et al., 2024)` |
+| Corporate author | `([Organization Name, 2024](URL))` | `(Organization Name, 2024)` |
+| Narrative form | `[Surname (2024)](URL) found that...` | `Surname (2024) found that...` |
+| Multiple sources | `([Red Hat, 2025](URL1); [Dell, 2024](URL2))` | `(Red Hat, 2025; Dell, 2024)` |
 
 **Full reference format** (used in the References section):
 ```
@@ -217,11 +223,12 @@ Tell the user:
 
 ## Citations in Reports (Step 3)
 
-**In-text citations** support the report's credibility by linking claims and recommendations to their source documents. Use APA 7 parenthetical format:
+**In-text citations** support the report's credibility by linking claims and recommendations to their source documents. Use APA 7 parenthetical format, with markdown hyperlinks when the citation has a URL:
 
-- Place the citation at the end of the relevant sentence or paragraph, before the period: `...reducing provisioning time by 80% (Red Hat, 2025).`
-- Use narrative form when the source is the subject: `According to Dell Technologies (2024), the recommended architecture uses...`
-- When multiple citations support the same point: `(Red Hat, 2025; Dell Technologies, 2024)`
+- Place the citation at the end of the relevant sentence or paragraph, before the period: `...reducing provisioning time by 80% ([Red Hat, 2025](https://www.redhat.com/...)).`
+- Use narrative form when the source is the subject: `According to [Dell Technologies (2024)](https://infohub.delltechnologies.com/...), the recommended architecture uses...`
+- When multiple citations support the same point: `([Red Hat, 2025](https://...); [Dell Technologies, 2024](https://...))`
+- Citations without a URL remain plain text: `(Surname, 2024)`
 
 **What to cite:**
 - Specific factual claims, statistics, or benchmarks
@@ -350,6 +357,8 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - Given: the effective context contains citations relevant to the report subject
 - When: the report makes factual claims, technical recommendations, or framework references
 - Then: those claims are supported by APA 7 parenthetical citations (Author, Year)
+- And: citations with a URL are rendered as markdown hyperlinks `([Author, Year](URL))`
+- And: citations without a URL remain plain text `(Author, Year)`
 - And: 5–15 citations appear in a standard report
 - And: citations are placed at the end of the relevant sentence, before the period
 
