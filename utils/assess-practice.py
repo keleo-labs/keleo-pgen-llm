@@ -3791,8 +3791,22 @@ def check_pattern_alpha_coverage(data, kind):
     return issues
 
 
+def _build_alpha_state_index(source):
+    """Build {alphaName: {stateName: 0-based index}} from a practice's alphas."""
+    index = {}
+    for alpha in source.get("alphas", []):
+        aname = alpha.get("name", "")
+        if aname:
+            index[aname] = {}
+            for si, state in enumerate(alpha.get("states", [])):
+                sname = state.get("name", "")
+                if sname:
+                    index[aname][sname] = si
+    return index
+
+
 def check_pattern_alpha_progression(data, kind):
-    """Flag non-progressing alphas and single-alpha patterns."""
+    """Flag non-progressing alphas, single-alpha patterns, and pattern quality issues."""
     issues = []
 
     sources = [data]
@@ -3804,23 +3818,47 @@ def check_pattern_alpha_progression(data, kind):
         if kind == "method" and source is not data:
             pfx = f"practice[{source.get('name', '?')}]."
 
+        state_index = _build_alpha_state_index(source)
+
         for pi, pat in enumerate(source.get("patterns", [])):
             pat_name = pat.get("name", f"<unnamed-{pi}>")
             views_sorted = sorted(
                 pat.get("patternViews", []),
                 key=lambda v: v.get("seq", 0),
             )
-            if len(views_sorted) < 2:
+            num_views = len(views_sorted)
+
+            if num_views < 2:
                 continue
+
+            if num_views < 3:
+                issues.append({
+                    "severity": "warning",
+                    "category": "pattern-few-views",
+                    "path": f"{pfx}patterns[{pat_name}]",
+                    "message": (
+                        f"Pattern '{pat_name}' has only {num_views} views. "
+                        f"Patterns should have 3+ views for meaningful "
+                        f"lifecycle progression."
+                    ),
+                    "autoFixable": False,
+                })
 
             alpha_states = {}
             last_known = {}
-            for view in views_sorted:
+            alpha_explicit_views = {}
+            alpha_first_view = {}
+            alpha_first_state = {}
+            for vi, view in enumerate(views_sorted):
                 for astate in view.get("alphaStates", []):
                     aname = astate.get("alphaName", "")
                     sname = astate.get("stateName", "")
                     if aname:
                         last_known[aname] = sname
+                        alpha_explicit_views.setdefault(aname, set()).add(vi)
+                        if aname not in alpha_first_view:
+                            alpha_first_view[aname] = vi
+                            alpha_first_state[aname] = sname
                 for aname, sname in last_known.items():
                     alpha_states.setdefault(aname, set()).add(sname)
 
@@ -3851,6 +3889,55 @@ def check_pattern_alpha_progression(data, kind):
                             f"{len(views_sorted)} views of pattern "
                             f"'{pat_name}'. Either progress it through "
                             f"meaningful states or remove it from the pattern."
+                        ),
+                        "autoFixable": False,
+                    })
+
+            if num_views >= 3:
+                for aname in sorted(distinct_alphas):
+                    explicit = alpha_explicit_views.get(aname, set())
+                    if len(explicit) == 1:
+                        view_idx = next(iter(explicit))
+                        view_name = views_sorted[view_idx].get("name", f"view {view_idx}")
+                        issues.append({
+                            "severity": "warning",
+                            "category": "pattern-sparse-alpha",
+                            "path": f"{pfx}patterns[{pat_name}]",
+                            "message": (
+                                f"Alpha '{aname}' appears in only 1 of "
+                                f"{num_views} views ('{view_name}') in "
+                                f"pattern '{pat_name}'. Progress it through "
+                                f"more views or remove it."
+                            ),
+                            "autoFixable": False,
+                        })
+
+            for aname in sorted(distinct_alphas):
+                if aname not in state_index or aname not in alpha_first_view:
+                    continue
+                si = state_index[aname]
+                first_state = alpha_first_state[aname]
+                first_view_idx = alpha_first_view[aname]
+                if first_state not in si:
+                    continue
+                state_pos = si[first_state]
+                total_states = len(si)
+                if total_states < 3:
+                    continue
+                state_ratio = state_pos / (total_states - 1) if total_states > 1 else 0
+                view_ratio = first_view_idx / (num_views - 1) if num_views > 1 else 0
+                if state_ratio < 0.3 and view_ratio > 0.6:
+                    view_name = views_sorted[first_view_idx].get("name", f"view {first_view_idx}")
+                    issues.append({
+                        "severity": "warning",
+                        "category": "pattern-misaligned-state",
+                        "path": f"{pfx}patterns[{pat_name}]",
+                        "message": (
+                            f"Alpha '{aname}' first appears in late view "
+                            f"'{view_name}' (view {first_view_idx + 1}/{num_views}) "
+                            f"with early state '{first_state}' "
+                            f"(state {state_pos + 1}/{total_states}). "
+                            f"Early states should appear in early views."
                         ),
                         "autoFixable": False,
                     })
@@ -4368,7 +4455,11 @@ def main():
 
     if args.category:
         cats = set(args.category)
-        all_issues = [i for i in all_issues if i["category"] in cats]
+        all_issues = [
+            i for i in all_issues
+            if i["category"] in cats
+            or any(i["category"].startswith(c + "-") for c in cats)
+        ]
 
     dependencies = detect_dependencies(data)
 
