@@ -151,11 +151,19 @@ def _print_alpha_list(alphas, detail=False, alpha_names=None, indent="  "):
         relates = a.get("relatesTo", [])
         states = a.get("states", [])
 
+        maps_to = a.get("mapsTo", None)
+        source = a.get("_contributingPracticeName", None)
+
         line = f"{indent}{name} (focus: {focus}"
         if contrib:
             line += f", contributesTo: {contrib}"
+        if maps_to:
+            line += f", mapsTo: {maps_to}"
         line += ")"
         print(line)
+
+        if source:
+            print(f"{indent}  contributingPractice: {source}")
 
         if detail and a.get("description"):
             print(f"{indent}  description: {a['description']}")
@@ -745,6 +753,8 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
                         "name": a["name"],
                         "focusName": a.get("focusName"),
                         "contributesTo": a.get("contributesTo"),
+                        "mapsTo": a.get("mapsTo"),
+                        "contributingPractice": a.get("_contributingPracticeName"),
                         "relatesTo": a.get("relatesTo", []),
                         "states": [{"seq": s.get("seq"), "name": s["name"]} for s in a.get("states", [])],
                     }

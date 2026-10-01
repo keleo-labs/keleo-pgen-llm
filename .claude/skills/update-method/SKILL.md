@@ -165,7 +165,16 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
      If pull succeeds, re-resolve. If pull fails, ask user for the file paths.
    - If any are `ambiguous`: present candidates to user
 
-1b. **Check for newer remote versions:**
+1b. **Check for new related practices (since last generation):**
+   ```bash
+   python3 utils/discover-dependencies.py --related <file.json> --json
+   ```
+   Compare against current `practiceDependencyNames`. If new practices exist that weren't
+   dependencies when the practice was originally generated, flag them to the user:
+   "Since this practice was last generated, these related practices are now available: ..."
+   User decides whether to include them in the update (adds to `practiceDependencyNames` and effective context).
+
+1c. **Check for newer remote versions:**
    ```bash
    python3 utils/studio-client.py --check "<practice-name>"
    ```

@@ -126,6 +126,18 @@ Subagents read these instead of the phase prompts. Each is a self-contained orch
 - **phases/phase-2-skill.md** - Mapping phase subagent instructions
 - **phases/phase-3-skill.md** - JSON generation phase subagent instructions
 
+### Utility Quick Reference
+
+Use these utilities instead of ad-hoc `python3 -c` scripts for common inspection tasks:
+
+| Need | Utility | Command |
+|---|---|---|
+| Practice metadata (kind, name, version, deps) | `practice-summary.py` | `<file> [--json]` |
+| Alpha hierarchy with provenance | `extract-reference-names.py` | `--hierarchy` |
+| Alpha flat list with details + provenance | `extract-reference-names.py` | `--sections alphas --alpha-details` |
+| Bundle contents | `inspect-keleo.py` | `<file> [--json]` |
+| Find related/sibling practices | `discover-dependencies.py` | `--related <file> [--json]` |
+
 ---
 
 ## Execution Workflow
@@ -162,7 +174,18 @@ In plan mode:
      Reports tiers (baselines, practices, methods) and document count. Review with user.
    - Report detected context sources and tiers to user
 
-3. **Initial structure assessment (preliminary only):**
+3. **Discover related practices**
+   After identifying the parent method or practice, discover siblings that share dependencies:
+   ```bash
+   python3 utils/discover-dependencies.py --related <parent-method-or-practice.json> --json
+   ```
+   Review the results against the source material content:
+   - For each related practice, assess whether the source material covers that practice's domain
+   - Present relevant matches to the user with rationale (e.g., "Source covers virtualization — Red Hat OpenShift Virtualization may be relevant")
+   - User confirms which (if any) to include in the effective context
+   - Add confirmed practices to the context source list for Step 0.5
+
+4. **Initial structure assessment (preliminary only):**
    - **Note:** Final practice delineation happens in Step 1.5 (Delineation Gate) before Phase 2 delegation
    - Check for obvious separation signals from source:
      - Multiple distinct use-cases? Different stakeholder journeys? Clearly separate capability domains?
@@ -170,21 +193,21 @@ In plan mode:
    - **If unified framework:** Plan for single practice (subject to Phase 2 validation)
    - **Key principle:** Don't determine primary alphas or practice boundaries yet — you need baseline context first
 
-4. **Reference strategy (present to user):**
+5. **Reference strategy (present to user):**
    - Estimate reference yield from source materials
    - **Few candidates** (0-2) → recommend secondary research (Step 2.5)
    - **Moderate** (3-5) → optional, user decides
    - **Many** (6+) → skip secondary research
 
-5. **Plan execution:**
+6. **Plan execution:**
    - Tentative practice/method name (kebab-case)
    - Phase execution sequence
    - Expected complexity and size
    - Whether secondary reference research (Step 2.5) will be performed
 
-6. **Exit plan mode** with clear execution roadmap
+7. **Exit plan mode** with clear execution roadmap
 
-7. **Initialise prompt history:**
+8. **Initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --init \
      --type <practice|method> --name "<Practice Name>" \

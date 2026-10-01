@@ -23,6 +23,9 @@ Usage:
 
     # Find all methods/practices that contain a given practice name
     python3 utils/discover-dependencies.py --consumers "AI Platform TDP"
+
+    # Find practices sharing dependencies with a method or practice
+    python3 utils/discover-dependencies.py --related practices/method-name/method-name.json
 """
 
 import argparse
@@ -630,6 +633,110 @@ def fmt_consumers(result):
     return "\n".join(lines)
 
 
+def cmd_related(file_path, index):
+    """Find practices that share dependencies with a given method or practice.
+
+    For methods: extracts practiceNames and each constituent practice's
+    practiceDependencyNames, then finds other practices depending on those same names.
+    For practices: extracts practiceDependencyNames directly.
+    """
+    data, err = load_json_pair(file_path)
+    if err or data is None:
+        return {"error": f"Failed to load {file_path}: {err}"}
+
+    kind = detect_kind(data)
+    source_name = data.get("name", Path(file_path).stem)
+
+    own_practice_names = set()
+    dependency_names = set()
+
+    if kind == "method":
+        practice_names = data.get("practiceNames", [])
+        own_practice_names.update(practice_names)
+        own_practice_names.add(source_name)
+        for pn in practice_names:
+            dependency_names.add(pn)
+            match = resolve_name(pn, index, prefer_filesystem=True)
+            if match.get("status") != "found":
+                continue
+            p_data, p_err = load_resolved_json(match)
+            if p_err or p_data is None:
+                continue
+            for dep_name in p_data.get("practiceDependencyNames", []):
+                dependency_names.add(dep_name)
+
+    elif kind == "practice":
+        own_practice_names.add(source_name)
+        for dep_name in data.get("practiceDependencyNames", []):
+            dependency_names.add(dep_name)
+
+    else:
+        return {"error": f"--related requires a practice or method file, got kind={kind}"}
+
+    related_by_dep = {}
+    seen_paths = set()
+    for dep_name in sorted(dependency_names):
+        dep_result = cmd_dependents(dep_name, index)
+        for dep_entry in dep_result.get("dependents", []):
+            entry_name = dep_entry["name"]
+            if entry_name in own_practice_names:
+                continue
+            path = dep_entry.get("path", "")
+            if dep_entry.get("source") == "keleo" and path:
+                fs_key = (entry_name, "filesystem")
+                if fs_key in seen_paths:
+                    continue
+            path_key = (entry_name, dep_entry.get("source", ""))
+            if path_key in seen_paths:
+                continue
+            seen_paths.add(path_key)
+            if entry_name not in related_by_dep:
+                related_by_dep[entry_name] = {
+                    "name": entry_name,
+                    "kind": dep_entry["kind"],
+                    "path": path,
+                    "source": dep_entry.get("source", "filesystem"),
+                    "sharedVia": [],
+                }
+            related_by_dep[entry_name]["sharedVia"].append(dep_name)
+            if dep_entry.get("source") == "filesystem":
+                related_by_dep[entry_name]["path"] = path
+                related_by_dep[entry_name]["source"] = "filesystem"
+
+    related = sorted(related_by_dep.values(), key=lambda x: (-len(x["sharedVia"]), x["name"]))
+
+    return {
+        "source": source_name,
+        "sourceKind": kind,
+        "sharedDependencies": sorted(dependency_names),
+        "related": related,
+        "count": len(related),
+    }
+
+
+def fmt_related(result):
+    if "error" in result:
+        return f"Error: {result['error']}"
+
+    lines = [f'Related practices for "{result["source"]}" ({result["sourceKind"]}):']
+    if not result["related"]:
+        lines.append("  (none found)")
+        return "\n".join(lines)
+
+    by_dep = defaultdict(list)
+    for entry in result["related"]:
+        for dep in entry["sharedVia"]:
+            by_dep[dep].append(entry)
+
+    for dep_name in sorted(by_dep.keys()):
+        lines.append(f'\n  Via "{dep_name}":')
+        for entry in sorted(by_dep[dep_name], key=lambda x: x["name"]):
+            lines.append(f"    {entry['name']} ({entry['kind']}) — {entry['path']}")
+
+    lines.append(f"\n{result['count']} related practice(s) found.")
+    return "\n".join(lines)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Discover and resolve Practice Language JSON dependencies"
@@ -654,6 +761,10 @@ def main():
     group.add_argument(
         "--consumers", metavar="NAME",
         help="Find all methods/practices containing or referencing a named practice"
+    )
+    group.add_argument(
+        "--related", metavar="FILE",
+        help="Find practices sharing dependencies with a given method or practice"
     )
     group.add_argument(
         "--list", action="store_true",
@@ -704,6 +815,16 @@ def main():
     if args.consumers:
         result = cmd_consumers(args.consumers, args.search_dirs)
         print(json.dumps(result, indent=2) if args.json else fmt_consumers(result))
+        sys.exit(0)
+
+    if args.related:
+        if not Path(args.related).is_file():
+            print(json.dumps({"error": f"File not found: {args.related}"}) if args.json
+                  else f"Error: File not found: {args.related}")
+            sys.exit(1)
+        index, skipped = build_index(args.search_dirs, include_remote=use_remote)
+        result = cmd_related(args.related, index)
+        print(json.dumps(result, indent=2) if args.json else fmt_related(result))
         sys.exit(0)
 
     index, skipped = build_index(args.search_dirs, include_remote=use_remote)
