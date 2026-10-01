@@ -89,6 +89,10 @@ def get_dependency_names(data, kind):
     if kind == "practiceBaseline":
         for name in data.get("baselinePracticeNames", []):
             add(name)
+    elif kind == "method":
+        add(data.get("baselinePracticeName", ""))
+        for name in data.get("practiceNames", []):
+            add(name)
     else:
         add(data.get("baselinePracticeName", ""))
         for name in data.get("practiceDependencyNames", []):
