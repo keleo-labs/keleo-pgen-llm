@@ -18,13 +18,13 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; auto-discovers `_effective-context.json` for transitive baseline resolution; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs; `--category` filters to specific issue categories | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--errors-only] [--category CAT [CAT ...]] [--online]` |
+| `assess-practice.py` | Unified quality assessment: structure, uniqueness, competency levels, cross-references, baseline references; auto-discovers baseline and parent practices from declared dependencies; `--online` checks asset URLs, citation URLs, reference URIs, and citations missing URLs; `--category` filters to specific issue categories | `python3 utils/assess-practice.py <file>.json [--baseline <baseline>.json] [--schema <schema>.json] [--parent <parent>.json] [--errors-only] [--category CAT [CAT ...]] [--online]` |
 | `audit-method-references.py` | Cross-practice reference auditing within a method (alpha refs, duplicates, persona consistency) | `python3 utils/audit-method-references.py <method>.json --baseline <baseline>.json [--json]` |
 | `validate-practice-json.py` | Schema validation for practices/methods | `python3 utils/validate-practice-json.py <file>.json` |
 | `validate-baseline-json.py` | Schema validation for baselines | `python3 utils/validate-baseline-json.py <file>.json` |
 | `validate-phase-output.py` | Validate Phase 1/1.5/2 markdown output structure | `python3 utils/validate-phase-output.py <file>.md --phase <1|1.5|2>` |
 | `verify-mapping-against-specs.py` | Verify Phase 2 mapping output against Gherkin specs | `python3 utils/verify-mapping-against-specs.py <mapping>.md --baseline <baseline>.json [--parent <parent>.json] [--kind baseline]` |
-| `eval-skill-output.py` | Evaluate skill output quality against assertions | `python3 utils/eval-skill-output.py <practice-dir> [--specs <specs-index.json>] [--one-line]` |
+| `eval-skill-output.py` | Evaluate skill output quality against assertions; auto-discovers baseline, parent practices, and schema; `--errors-only` filters to error-severity (excludes warnings) | `python3 utils/eval-skill-output.py <practice-dir> [--specs <specs-index.json>] [--one-line] [--errors-only]` |
 | `lint-practice.py` | Combined validate-fix-revalidate loop (auto-discovers baseline/schema) | `python3 utils/lint-practice.py <practice>.json [--fix] [--one-line] [--max-iterations N]` |
 | `post-validate-method.py` | Batch fix-validate pipeline across all practice JSONs in a directory; wraps lint-practice.py per file, optional cross-practice audit | `python3 utils/post-validate-method.py <directory>/ [--fix] [--one-line] [--audit] [--baseline <baseline>.json]` |
 
@@ -32,7 +32,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `practice-summary.py` | Structured practice summary for subagent prompt construction (metadata, alphas, patterns, outcomes, feature coverage) | `python3 utils/practice-summary.py <file>.json [--baseline <baseline>.json] [--json] \| --dir <dir>/` |
+| `practice-summary.py` | Structured practice summary for subagent prompt construction (metadata, alphas, patterns, outcomes, feature coverage); `--names-only` lists name/kind/version compactly | `python3 utils/practice-summary.py <file>.json [--baseline <baseline>.json] [--json] [--names-only] \| --dir <dir>/` |
 | `detect-schema-gaps.py` | Schema evolution gap detection (outcomes, patternGroups, priorities, references vs current schema) | `python3 utils/detect-schema-gaps.py <file>.json [--schema <schema>.json] [--json] \| --dir <dir>/` |
 | `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, outcomes, pattern-views, etc.); `--hierarchy` shows alpha contributesTo tree with provenance | `python3 utils/extract-reference-names.py <file>.json [--sections alphas activities outcomes pattern-views ...] [--alpha-details] [--structure] [--metadata] [--hierarchy]` |
 | `library-index.py` | Build a compact index of all discoverable practices and methods with matchable metadata (description, outcomes, keywords, tags); `--compact` produces LLM-readable text | `python3 utils/library-index.py [--kind practice method] [--compact] [-o <output>.json]` |

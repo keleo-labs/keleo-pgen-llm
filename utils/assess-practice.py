@@ -1903,7 +1903,7 @@ def check_keyword_count(data, kind):
     return issues
 
 
-def check_outcomes(data, kind):
+def check_outcomes(data, kind, baseline_data=None):
     """Check that practices have 1-3 outcomes with measureDescription and valid contributions."""
     issues = []
     if kind == "practiceBaseline":
@@ -1914,7 +1914,14 @@ def check_outcomes(data, kind):
         sources = data.get("practices", [data])
 
     all_alpha_names = {a.get("name") for a in data.get("alphas", []) if a.get("name")}
+    if baseline_data:
+        all_alpha_names |= {a.get("name") for a in baseline_data.get("alphas", []) if a.get("name")}
     all_alpha_states = {}
+    if baseline_data:
+        for a in baseline_data.get("alphas", []):
+            aname = a.get("name")
+            if aname:
+                all_alpha_states[aname] = {s.get("name") for s in a.get("states", []) if s.get("name")}
     for a in data.get("alphas", []):
         aname = a.get("name")
         if aname:
@@ -1977,8 +1984,9 @@ def check_outcomes(data, kind):
                 })
 
             if not o.get("metricContributions") and not o.get("objectiveContributions"):
+                is_method_level = kind == "method" and source is data
                 issues.append({
-                    "severity": "error",
+                    "severity": "warning" if is_method_level else "error",
                     "category": "outcome-refs",
                     "path": opath,
                     "message": f"Outcome '{oname}' has neither metricContributions nor objectiveContributions",
@@ -4130,8 +4138,11 @@ def main():
     kind = data.get("kind", "practice")
     name = data.get("name", "<unnamed>")
 
-    if not args.baseline and kind != "practiceBaseline":
-        args.baseline, args.parent = _auto_resolve_deps(data, kind, file_path, args.parent)
+    if kind != "practiceBaseline":
+        resolved_baseline, resolved_parents = _auto_resolve_deps(data, kind, file_path, args.parent)
+        if not args.baseline:
+            args.baseline = resolved_baseline
+        args.parent = resolved_parents
 
     all_issues = []
 
@@ -4311,7 +4322,7 @@ def main():
         all_issues.extend(check_evidence_coverage(data, kind))
 
     all_issues.extend(check_references(data, kind, baseline_data))
-    all_issues.extend(check_outcomes(data, kind))
+    all_issues.extend(check_outcomes(data, kind, baseline_data))
 
     if kind == "practiceBaseline" and args.parent:
         parent_merged = None

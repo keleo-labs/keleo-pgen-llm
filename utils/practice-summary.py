@@ -331,6 +331,8 @@ def main():
     parser.add_argument("--dir", help="Process all practice JSON files in directory")
     parser.add_argument("--baseline", help="Baseline JSON for context")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--names-only", action="store_true",
+                        help="List only name, kind, and version per file (compact)")
     args = parser.parse_args()
 
     if not args.json_file and not args.dir:
@@ -349,6 +351,17 @@ def main():
         )
     else:
         files = [Path(args.json_file)]
+
+    if args.names_only:
+        for f in files:
+            data = load_json(f)
+            kind = detect_kind(data)
+            if kind not in ("practice", "method", "practiceBaseline"):
+                continue
+            name = data.get("name", f.stem)
+            version = data.get("version", "?")
+            print(f"{name} ({kind}) v{version}")
+        return
 
     summaries = []
     for f in files:

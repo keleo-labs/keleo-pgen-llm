@@ -271,6 +271,35 @@ def auto_discover_baseline(json_files):
     return None
 
 
+def auto_discover_parents(json_files):
+    """Resolve parent practice paths from practiceDependencyNames in sibling JSON files."""
+    import re as _re
+    project_root = UTILS_DIR.parent
+    parents = []
+    seen = set()
+    for jf in json_files:
+        try:
+            data = load_json(jf, exit_on_error=False)
+            for dep_name in data.get("practiceDependencyNames", []):
+                if dep_name in seen:
+                    continue
+                seen.add(dep_name)
+                slug = _re.sub(r'[^a-z0-9]+', '-', dep_name.lower()).strip('-')
+                directory = Path(jf).parent
+                candidate = directory / f"{slug}.json"
+                if candidate.exists() and str(candidate) not in json_files:
+                    parents.append(str(candidate))
+                    continue
+                for search_dir in (project_root / "practices", project_root / "baselines"):
+                    candidate = search_dir / slug / f"{slug}.json"
+                    if candidate.exists():
+                        parents.append(str(candidate))
+                        break
+        except Exception:
+            continue
+    return parents if parents else None
+
+
 def auto_discover_schema():
     """Return schema path if deps/language.schema.json exists."""
     candidate = UTILS_DIR.parent / "deps" / "language.schema.json"
@@ -587,9 +616,16 @@ def eval_directory(directory, baseline=None, schema=None, parent=None, phase_fil
         kind = "practiceBaseline" if "baselines" in str(directory) else "practice"
         name = Path(directory).name
 
-    # Auto-discover baseline and schema if not provided
+    # Auto-discover baseline, parents, and schema if not provided
     if not baseline and files["json_files"]:
         baseline = auto_discover_baseline(files["json_files"])
+    parents = [parent] if parent else []
+    if files["json_files"]:
+        discovered = auto_discover_parents(files["json_files"])
+        if discovered:
+            for p in discovered:
+                if p not in parents:
+                    parents.append(p)
     if not schema:
         schema = auto_discover_schema()
 
@@ -619,7 +655,7 @@ def eval_directory(directory, baseline=None, schema=None, parent=None, phase_fil
         assertion_results.extend(eval_phase_2(files["mapping"]))
     if 3 in phases and files["json_files"]:
         for jf in files["json_files"]:
-            assertion_results.extend(eval_phase_3(jf, baseline, schema, [parent] if parent else None))
+            assertion_results.extend(eval_phase_3(jf, baseline, schema, parents or None))
 
     summary = compute_summary(assertion_results)
 
@@ -708,6 +744,8 @@ def main():
     parser.add_argument("--summary", action="store_true", help="Compact pass/fail counts only")
     parser.add_argument("--show-failed", action="store_true",
                         help="Show only failed assertions with details")
+    parser.add_argument("--errors-only", action="store_true",
+                        help="Filter to error-severity assertions only (with --show-failed or --summary)")
     parser.add_argument("--one-line", action="store_true",
                         help="Print single-line summary (e.g. PASS 52/56 (100%% errors))")
     parser.add_argument("--evals", metavar="EVALS_JSON",
@@ -758,6 +796,8 @@ def main():
 
     if args.show_failed and not args.evals:
         failed = [a for a in result.get("assertion_results", []) if not a["passed"]]
+        if args.errors_only:
+            failed = [a for a in failed if a["severity"] == "error"]
         if not failed:
             output = json.dumps({"status": "all_passed", "total": len(result.get("assertion_results", []))}, indent=2)
         else:
@@ -782,6 +822,8 @@ def main():
         summary["kind"] = result.get("kind")
         summary["name"] = result.get("name")
         failed = [a for a in result.get("assertion_results", []) if not a["passed"]]
+        if args.errors_only:
+            failed = [a for a in failed if a["severity"] == "error"]
         if failed:
             summary["failed_assertions"] = [
                 {"id": a["id"], "severity": a["severity"], "evidence": a["evidence"]}
