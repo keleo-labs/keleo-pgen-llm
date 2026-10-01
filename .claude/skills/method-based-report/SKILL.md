@@ -74,13 +74,21 @@ Both `gws` and Playwright are content sourcing tools — they help gather subjec
    - If ambiguous, ask the user to clarify
    - When multiple practices are specified, check their root baselines (`baselinePracticeName`). If they differ, note in the plan that separate effective-context.json files will be created — one per distinct root baseline. Identify which is the primary context (drives report structure) and which is supplementary (enriches specific sections).
 
-2. **Clarify the subject and purpose**
+2. **Recommend practices from the library**
+   - Run `python3 utils/library-index.py --kind practice method --compact` to get a summary of all available practices and methods
+   - Read the index output and identify 1–3 practices or methods whose description, outcomes, or keywords semantically align with the user's reporting objective
+   - Present recommendations to the user with a brief rationale for each (e.g., "CRM Foundations addresses customer lifecycle management, which aligns with your report on account planning")
+   - If the user already specified a practice, still present recommendations as supplementary options that may enrich the report
+   - The user decides: accept one or more recommendations, decline all, or substitute their original selection
+   - Proceed with whatever the user confirms — do not re-recommend after they decide
+
+3. **Clarify the subject and purpose**
    - What is the report about? (the domain subject, not the practice itself)
    - Who is the audience? (default: general business/technical audience)
    - What is the report's purpose? (inform, assess, recommend, persuade)
    - What scope or angle should the report take?
 
-3. **Preview the narrative strategy**
+4. **Preview the narrative strategy**
    - Read `reporting-foundation/narrative-guide.md` to select structures
    - Note which narrative types are available from the baseline
    - Propose a primary narrative structure for the overall report
