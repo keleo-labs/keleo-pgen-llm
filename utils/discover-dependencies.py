@@ -388,26 +388,43 @@ def cmd_resolve_from(file_path, index, transitive=False, prefer_filesystem=True)
 
 
 def cmd_dependents(target_name, index):
-    """Find all practices/methods that depend on the named baseline or practice."""
+    """Find all practices/methods that depend on the named baseline or practice.
+
+    Searches filesystem JSON files, local .keleo bundles, and remote index entries.
+    """
     dependents = []
+    seen = set()
 
     for name, entries in index.items():
         for entry in entries:
             if "keleo_path" in entry:
+                data, err = load_resolved_json(entry)
+            elif entry.get("remote"):
                 continue
-            data, err = load_json_pair(entry["path"])
-            if err:
+            else:
+                data, err = load_json_pair(entry["path"])
+            if err or data is None:
                 continue
             kind = detect_kind(data)
             dep_names = extract_dependency_names(data, kind)
             for dep_name, role in dep_names:
                 if dep_name == target_name:
-                    dependents.append({
+                    dep_key = (name, entry.get("path", entry.get("keleo_path", "")))
+                    if dep_key in seen:
+                        break
+                    seen.add(dep_key)
+                    dep_entry = {
                         "name": name,
-                        "path": entry["path"],
                         "kind": kind,
                         "role": role,
-                    })
+                    }
+                    if "keleo_path" in entry:
+                        dep_entry["path"] = entry["keleo_path"]
+                        dep_entry["source"] = "keleo"
+                    else:
+                        dep_entry["path"] = entry["path"]
+                        dep_entry["source"] = "filesystem"
+                    dependents.append(dep_entry)
                     break
 
     return {

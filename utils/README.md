@@ -84,7 +84,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 |--------|---------|-------|
 | `generate-change-request.py` | Generate a ChangeRequest JSON from the diff between old and new practice/baseline/method JSON files | `python3 utils/generate-change-request.py <old>.json <new>.json [--author NAME] [--status draft\|accepted] [--note "..."] [-o <output>.json]` |
 | `apply-change-request.py` | Apply ChangeRequest nameChanges/removals to downstream JSON | `python3 utils/apply-change-request.py <change-request>.json <target>.json [--fix]` |
-| `check-downstream-impact.py` | Orchestrate downstream impact analysis: generate ChangeRequest from old/new diff, find all dependents, check for broken references, optionally fix and rebuild bundles | `python3 utils/check-downstream-impact.py <old>.json <new>.json [--fix] [--rebuild-bundles] [--element-types TYPE ...] [--json]` |
+| `check-downstream-impact.py` | Orchestrate downstream impact analysis: generate ChangeRequest from old/new diff, find all dependents (filesystem, .keleo bundles, and remote repository), check for broken references, optionally fix and rebuild bundles | `python3 utils/check-downstream-impact.py <old>.json <new>.json [--fix] [--rebuild-bundles] [--remote] [--auto-pull] [--element-types TYPE ...] [--json]` |
 
 ## Enrichment
 
