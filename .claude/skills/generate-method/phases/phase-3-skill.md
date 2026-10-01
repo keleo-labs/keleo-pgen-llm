@@ -437,6 +437,23 @@ python3 utils/fix-pattern-progression.py <practice>.json --fix
 
 Removes non-progressing alphas (stuck at the same state across all views), degenerate single-alpha patterns, and reorders reversed state progressions (e.g., advanced states in early views, initial states in later views). Always run after Phase 3 generation.
 
+### 5.2.7 Resolve Reference URL Anchors (when source is web documentation)
+
+When the practice's source material comes from a web page, resolve section references in the generated JSON to anchored URLs:
+
+```bash
+# Extract heading→anchor map from source page
+python3 utils/extract-html-text.py <source-url> --anchors-file /tmp/<practice>-anchors.json
+
+# Dry-run: see which URLs would be updated
+python3 utils/resolve-doc-anchors.py <practice>.json --anchors /tmp/<practice>-anchors.json
+
+# Apply anchor fragments
+python3 utils/resolve-doc-anchors.py <practice>.json --anchors /tmp/<practice>-anchors.json --fix
+```
+
+This matches reference and citation descriptions containing section numbers (e.g., "Section 5.4.1") against HTML heading anchors and appends `#fragment` to the URL. Skip this step when the source material is not web-based.
+
 ### 5.3 Targeted Alpha Fixes
 
 ```bash

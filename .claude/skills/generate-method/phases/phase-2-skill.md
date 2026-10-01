@@ -70,6 +70,12 @@ Read references **at the step where they are needed**, not upfront. Each step be
 | 7 | `references/pattern-completeness.md` | Four-pass pattern construction algorithm |
 | 8 | `references/semantics/narrative-and-assets.md` SS10-11 | Narrative format, self-containment rules, citations, assets |
 
+## General Redeclaration Principle
+
+All practiceElements can be redeclared. Redeclaration is additive: preserve the original name and description exactly, preserve all existing properties, and add new array items (narratives, personaNames, tags, competencies, etc.). Exceptions: alpha states and work product levels of detail cannot be added via redeclaration — these define the progression and are fixed by the defining practice.
+
+Before creating any new element, check the effective context for an existing element with the same or overlapping purpose. If it exists, redeclare it.
+
 ## Step 0: Delineation Validation
 
 **Read** `references/practice-method-strategy.md` for the full delineation strategy and worked examples.
@@ -368,8 +374,10 @@ Asset Icon: [font-character icon, e.g., fa-user-gear]
 
 Compare Phase 1 groups against context groups. Prefer composing via `personaGroupNames` (hierarchical inclusion) over flat groups that duplicate membership.
 
+**Redeclaration-first rule:** Before creating ANY new persona group, check the effective context for existing groups whose `personaNames` overlap >50% with the proposed group. If overlap exists, REDECLARE the existing group — preserve name and description, add new personaNames additively, add narratives describing the practice-specific team context. This rule applies to all practiceElements (see General Redeclaration Principle above and Step 4b for personas). Creating a new group that duplicates an existing group's membership fractures the ontology.
+
 - **Redeclare** existing groups to add members or sub-groups
-- **Create new** focused sub-groups (3–5 members) for genuinely novel team structures
+- **Create new** focused sub-groups (3–5 members) only when no existing group has >50% member overlap
 - **Compose** cross-functional groups by referencing sub-groups via `personaGroupNames`
 
 Aim for 1–3 total groups.

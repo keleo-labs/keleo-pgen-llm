@@ -125,6 +125,13 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 |--------|---------|-------|
 | `extract-gws-slides.py` | Extract Google Workspace Slides content via gws CLI | `python3 utils/extract-gws-slides.py <presentation-id> [-o <output>.md]` |
 | `extract-gws-text.py` | Extract text from Google Workspace API JSON (auto-detects Slides/Docs format) | `python3 utils/extract-gws-text.py <input>.json [-o <output-dir>] [--format slides\|docs]` |
+| `extract-html-text.py` | Extract text from HTML pages (URL or file), preserving heading structure in markdown; `--anchors` outputs heading→anchor ID JSON map; `--headings-only` for table of contents | `python3 utils/extract-html-text.py <url-or-file> [-o <output>.md] [--anchors] [--anchors-file <map>.json] [--headings-only]` |
+
+## URL & Reference Resolution
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `resolve-doc-anchors.py` | Resolve section references in practice JSON to anchored URLs; matches reference/citation descriptions against heading anchors and appends `#fragment` to URLs | `python3 utils/resolve-doc-anchors.py <file>.json --anchors <map>.json [--fix] [--json]` or `python3 utils/resolve-doc-anchors.py <file>.json --url <page-url> [--fix] [--json]` |
 
 ## Internal Module
 
