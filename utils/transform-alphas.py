@@ -24,6 +24,7 @@ Spec format (JSON array of objects):
             "removeMapsTo": true,                  # optional: remove mapsTo field
             "stateMap": {"OldState": "NewState"},  # optional: rename states (1:1 or many:1 merge)
             "addStates": [{"name":"S","description":"D","seq":N,"checklist":[]}],  # optional: new states
+            "setAlias": "Alias Name",                 # optional: set/update practiceElementAlias (works on inherited alphas too)
             "setRelatesTo": [{"alphaName":"X","relationship":"R","direction":"outgoing"}],  # optional: replace relatesTo array
             "stripContributesToState": true,        # optional: remove contributesToState from all states
             "remove": true                         # optional: remove alpha and all cross-references
@@ -171,11 +172,35 @@ def transform_alpha(practice, spec):
         return remove_alpha(practice, alpha_name)
 
     new_name = spec.get("rename")
+    set_alias = spec.get("setAlias")
     set_mapsto = spec.get("setMapsTo")
     set_contributesto = spec.get("setContributesTo")
     state_map = spec.get("stateMap", {})
     add_states = spec.get("addStates", [])
     changes = []
+
+    # setAlias works on practiceElementAliases directly — does not require
+    # the alpha to exist in the practice's own alphas array (supports
+    # inherited/redeclared baseline alphas)
+    if set_alias:
+        aliases = practice.setdefault("practiceElementAliases", [])
+        existing = None
+        for alias in aliases:
+            if (alias.get("practiceElementType") == "Alpha"
+                    and alias.get("practiceElementName") == alpha_name):
+                existing = alias
+                break
+        if existing:
+            old_alias = existing["aliasName"]
+            existing["aliasName"] = set_alias
+            changes.append(f"  alias: {alpha_name} → {set_alias} (was {old_alias})")
+        else:
+            aliases.append({
+                "practiceElementType": "Alpha",
+                "practiceElementName": alpha_name,
+                "aliasName": set_alias,
+            })
+            changes.append(f"  alias: {alpha_name} → {set_alias} (new)")
 
     alpha = None
     for a in practice.get("alphas", []):
@@ -183,8 +208,16 @@ def transform_alpha(practice, spec):
             alpha = a
             break
 
-    if not alpha:
+    # If only setAlias was requested and no other operations, allow missing alpha
+    alias_only = set_alias and not any([
+        new_name, set_mapsto, set_contributesto, state_map, add_states,
+        spec.get("removeContributesTo"), spec.get("removeMapsTo"),
+        spec.get("setRelatesTo"), spec.get("stripContributesToState"),
+    ])
+    if not alpha and not alias_only:
         return [], f"Alpha '{alpha_name}' not found"
+    if not alpha:
+        return changes, None
 
     # 0. Handle state merging (many:1 in stateMap) and new states
     if state_map:
