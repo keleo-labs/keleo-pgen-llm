@@ -17,6 +17,10 @@ Usage:
 
     # Include baselines
     python3 utils/library-index.py --kind practice method practiceBaseline
+
+    # Check whether a named set of practices shares a root baseline
+    python3 utils/library-index.py --name "Platform Operations" "HPE OpenShift" \
+        --group-by-root
 """
 
 import argparse
@@ -69,8 +73,52 @@ def extract_metadata(data, path_str):
         "keywords": data.get("keywords", []),
         "tags": _flatten_tags(data.get("tags", {})),
         "baselinePracticeName": data.get("baselinePracticeName", ""),
+        "baselinePracticeNames": data.get("baselinePracticeNames", []),
         "path": path_str,
     }
+
+
+def _parents(entry):
+    """Return the names of an entry's direct baseline parents.
+
+    Practices and methods reference a single baseline via baselinePracticeName;
+    baselines may reference one or more parent baselines via baselinePracticeNames.
+    """
+    parents = list(entry.get("baselinePracticeNames", []))
+    direct = entry.get("baselinePracticeName", "")
+    if direct and direct not in parents:
+        parents.insert(0, direct)
+    return parents
+
+
+def resolve_roots(index):
+    """Annotate each entry with the root baseline(s) at the top of its chain.
+
+    Walks baseline parents until reaching documents with no parent of their own.
+    Names that cannot be resolved in the index terminate the walk and are
+    reported as roots, so an unresolvable dependency is visible rather than
+    silently dropped. Cycles are broken by tracking visited names.
+    """
+    for entry in index.values():
+        roots = []
+        seen = set()
+        queue = _parents(entry)
+        if not queue:
+            entry["rootBaselines"] = [entry["name"]]
+            continue
+        while queue:
+            name = queue.pop(0)
+            if name in seen:
+                continue
+            seen.add(name)
+            parent = index.get(name)
+            next_up = _parents(parent) if parent else []
+            if next_up:
+                queue.extend(next_up)
+            elif name not in roots:
+                roots.append(name)
+        entry["rootBaselines"] = roots
+    return index
 
 
 def scan_directories(search_dirs):
@@ -153,6 +201,13 @@ def format_compact(entries):
         parts = [f"[{e['kind']}] {e['name']}"]
         if desc:
             parts.append(f"  {desc}")
+        parents = _parents(e)
+        roots = e.get("rootBaselines", [])
+        if parents:
+            line = f"  Baseline: {', '.join(parents)}"
+            if roots and roots != parents:
+                line += f" (root: {', '.join(roots)})"
+            parts.append(line)
         if outcome_names:
             parts.append(f"  Outcomes: {outcome_names}")
         if e.get("keywords"):
@@ -163,27 +218,62 @@ def format_compact(entries):
     return "\n\n".join(lines)
 
 
+def format_by_root(entries):
+    """Group entries by root baseline.
+
+    Answers the planning question "do these documents share a root baseline?" —
+    more than one group means separate effective contexts are required.
+    """
+    groups = {}
+    for e in entries:
+        key = ", ".join(e.get("rootBaselines", [])) or "(unresolved)"
+        groups.setdefault(key, []).append(e)
+
+    blocks = []
+    for root in sorted(groups):
+        members = "\n".join(f"  [{e['kind']}] {e['name']}"
+                            for e in groups[root])
+        blocks.append(f"Root: {root}\n{members}")
+    summary = (f"{len(groups)} root baseline(s) across {len(entries)} "
+               f"document(s)")
+    return "\n\n".join(blocks) + f"\n\n{summary}"
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Build a compact index of discoverable practices and methods")
     parser.add_argument("--kind", nargs="+",
                         help="Filter by document kind (practice, method, practiceBaseline)")
+    parser.add_argument("--name", nargs="+",
+                        help="Filter to specific document names (case-insensitive)")
     parser.add_argument("--compact", action="store_true",
                         help="Output compact text (one entry per block) instead of JSON")
+    parser.add_argument("--group-by-root", action="store_true",
+                        help="Group output by root baseline (implies compact text output)")
     parser.add_argument("--search-dirs", nargs="+", default=DEFAULT_SEARCH_DIRS,
                         help=f"Override search directories (default: {' '.join(DEFAULT_SEARCH_DIRS)})")
     parser.add_argument("-o", "--output",
                         help="Write output to file instead of stdout")
     args = parser.parse_args()
 
-    index = scan_directories(args.search_dirs)
+    index = resolve_roots(scan_directories(args.search_dirs))
 
     entries = sorted(index.values(), key=lambda e: e["name"])
 
     if args.kind:
         entries = [e for e in entries if e["kind"] in args.kind]
 
-    if args.compact:
+    if args.name:
+        wanted = {n.casefold() for n in args.name}
+        entries = [e for e in entries if e["name"].casefold() in wanted]
+        found = {e["name"].casefold() for e in entries}
+        for missing in sorted(n for n in wanted if n not in found):
+            print(f"Warning: no document named '{missing}' was found",
+                  file=sys.stderr)
+
+    if args.group_by_root:
+        output = format_by_root(entries)
+    elif args.compact:
         output = format_compact(entries)
     else:
         output = json.dumps(entries, indent=2, ensure_ascii=False)
@@ -191,7 +281,7 @@ def main():
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(output)
-            if args.compact:
+            if args.compact or args.group_by_root:
                 f.write("\n")
         print(f"Wrote {len(entries)} entries to {args.output}", file=sys.stderr)
     else:
