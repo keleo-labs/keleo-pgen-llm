@@ -10,7 +10,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Tool | Scripts that use it | Role |
 |------|-------------------|------|
-| `gws` CLI | `extract-gws-slides.py`, `studio-client.py` | Content sourcing from Google Workspace (Slides, Drive) |
+| `gws` CLI | `extract-gws-slides.py`, `studio-client.py`, `issue-register.py` | Content sourcing from Google Workspace (Slides, Drive) and feedback register access (Sheets) |
 | Node.js 18+ | `validate-json-schema.js` | Alternative schema validation via ajv-cli |
 | Remote bundle repository | `studio-client.py`, `discover-dependencies.py --remote` | Centralised `.keleo` package storage and version management |
 
@@ -34,7 +34,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 |--------|---------|-------|
 | `practice-summary.py` | Structured practice summary for subagent prompt construction (metadata, alphas, patterns, outcomes, feature coverage); `--names-only` lists name/kind/version compactly | `python3 utils/practice-summary.py <file>.json [--baseline <baseline>.json] [--json] [--names-only] \| --dir <dir>/` |
 | `detect-schema-gaps.py` | Schema evolution gap detection (outcomes, patternGroups, priorities, references vs current schema) | `python3 utils/detect-schema-gaps.py <file>.json [--schema <schema>.json] [--json] \| --dir <dir>/` |
-| `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, outcomes, pattern-views, etc.); `--hierarchy` shows alpha contributesTo tree with provenance; `--alpha-details` includes contributesTo, mapsTo, and contributingPractice | `python3 utils/extract-reference-names.py <file>.json [--sections alphas activities outcomes pattern-views ...] [--alpha-details] [--structure] [--metadata] [--hierarchy]` |
+| `extract-reference-names.py` | Extract symbolic names from JSON (alphas, states, activities, outcomes, pattern-views, etc.); `--hierarchy` shows alpha contributesTo tree with provenance; `--alpha-details` includes contributesTo, mapsTo, and contributingPractice; `--locate` finds where a named element is *defined* and reports its element type (with close-match suggestions), complementing `--find-refs` which finds where it is *used* | `python3 utils/extract-reference-names.py <file>.json [--sections alphas activities outcomes pattern-views ...] [--alpha-details] [--structure] [--metadata] [--hierarchy] [--locate "Name" [--exact]] [--find-refs "Name"]` |
 | `library-index.py` | Build a compact index of all discoverable practices and methods with matchable metadata (description, outcomes, keywords, tags); `--compact` produces LLM-readable text | `python3 utils/library-index.py [--kind practice method] [--compact] [-o <output>.json]` |
 | `extract-practice-content.py` | Extract practice content from methods or resolve dependencies; `--summary` prints a human-readable text overview | `python3 utils/extract-practice-content.py <file>.json [--output <report>.md] [--summary] [--extract-narratives <out>.json]` |
 | `extract-specs.py` | Parse Gherkin scenarios from SKILL.md into specs-index.json | `python3 utils/extract-specs.py <SKILL.md> [-o <specs-index.json>]` |
@@ -47,6 +47,12 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | Script | Purpose | Usage |
 |--------|---------|-------|
 | `studio-client.py` | Remote bundle repository client: fetch remote index, compare versions, download/upload `.keleo` bundles, configure credentials | `python3 utils/studio-client.py --status \| --index [--max-age N] \| --check [name] \| --pull "Name" \| --push <file>.keleo \| --configure [--json]` |
+
+## Feedback Register
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `issue-register.py` | Google Sheets feedback register client: inspect table schema, list issues by status, validate and duplicate-check draft issues, append new rows (Status always written as `New`, resolution columns Q–T left untouched). Used by `/report-issue` to file issues and `/plan-from-feedback` to read them | `python3 utils/issue-register.py --schema \| --list [--status New] [--limit N] \| --validate <drafts>.json \| --check-duplicates <drafts>.json [--threshold 0.72] \| --append <drafts>.json [--dry-run] [--no-duplicate-check] [--email ADDR] [--spreadsheet URL_OR_ID] [--json]` |
 
 ## Resolution & Merging
 

@@ -13,6 +13,8 @@ triggerPatterns:
 
 Read an issue register (Google Sheet with structured table), triage each item, and plan/execute fixes at up to three levels: direct practice/method fixes, skill/utility improvements (keleo-pgen-llm), and schema/semantics improvements (keleo-language). Write resolution status and change details back to the register.
 
+The reciprocal skill is `/report-issue`, which files new rows into the same register (input columns A–P, Status New). This skill owns the resolution columns (Q–T).
+
 ## Workflow Overview
 
 **Step 0: Configuration** → Load or prompt for issue register URL; detect table structure
@@ -104,11 +106,13 @@ Store the table metadata (name, ID, column count, row count) in memory for use i
 
 ### Fetch the Register
 
-Read the full table range using the gws CLI:
+Read the register through `utils/issue-register.py`, which wraps the gws CLI and returns rows keyed by column with their 1-based sheet row numbers:
 
 ```bash
-gws sheets +read --spreadsheet "<SPREADSHEET_ID>" --range "Sheet1"
+python3 utils/issue-register.py --list --status New --json
 ```
+
+Drop `--status New` to see every row, or use `--schema` to inspect the table structure (columns, dropdown values, row count). The same utility is used by `/report-issue` to append new rows.
 
 ### Register Table Schema
 
@@ -157,7 +161,7 @@ Both can be combined into a single `batchUpdate` with two `updateTable` requests
 
 ### Identify Actionable Items
 
-Filter for rows where Status (column P, index 15) is **"New"**. These are the items to triage. Skip rows with any other status — they have already been processed or are in progress.
+Rows with Status **"New"** are the items to triage (`--list --status New`). Skip rows with any other status — they have already been processed or are in progress. Rows filed by `/report-issue` arrive with Status New and empty resolution columns, exactly like form submissions.
 
 Present the actionable items to the user as a summary table before planning.
 

@@ -93,8 +93,12 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── document-review/              # Document review + improvement guidance
 │       │   └── SKILL.md
+│       ├── report-issue/                # Issue register capture skill (files issues)
+│       │   ├── SKILL.md
+│       │   └── contract.feature
 │       ├── plan-from-feedback/          # Issue register triage and resolution skill
-│       │   └── SKILL.md
+│       │   ├── SKILL.md
+│       │   └── contract.feature
 │       └── improve-tooling/             # Utils and skill improvement skill
 │           └── SKILL.md
 ├── deps/                                   # Symlinks to keleo-language
@@ -507,8 +511,9 @@ Gitignored per-user config file. Created automatically by skills on first use.
 
 | Key | Purpose | Set by |
 |-----|---------|--------|
-| `issueRegisterUrl` | Google Sheets URL for feedback register | `/plan-from-feedback` first run |
-| `issueRegisterSpreadsheetId` | Extracted spreadsheet ID | `/plan-from-feedback` first run |
+| `issueRegisterUrl` | Google Sheets URL for feedback register | `/plan-from-feedback` or `/report-issue` first run |
+| `issueRegisterSpreadsheetId` | Extracted spreadsheet ID | `/plan-from-feedback` or `/report-issue` first run |
+| `issueReporterEmail` | Email recorded against issues you file | `/report-issue` first run |
 | `keleoStudioGasUrl` | Remote bundle repository deployment URL | `studio-client.py --configure` |
 | `keleoStudioGasToken` | Bearer token for bundle repository API | `studio-client.py --configure` |
 
@@ -619,6 +624,23 @@ Reports use narrative types from the baseline (Report Narrative, Essay Narrative
 **Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
 
 **Extending**: To add a new report type, see `.claude/skills/reporting-foundation/extension-template.md` for the step-by-step guide and SKILL.md template.
+
+### Reporting Issues
+
+Use the `/report-issue` skill to record issues, enhancements, or questions in the feedback register:
+
+```
+/report-issue [description of one or more issues]
+```
+
+The skill is the reciprocal of `/plan-from-feedback` — it fills the register's input columns (A–P), which that skill then triages and resolves (columns Q–T). For each issue it:
+
+1. **Captures** — Type (Issue/Enhancement/Question), summary, and description; several issues can be filed in one invocation
+2. **Enriches** — Resolves the reported document (name, version, kind) and element (exact name, element type) so triage can act on the row
+3. **Checks** — Validates the drafts and flags near-duplicates of existing register rows
+4. **Appends** — Writes the rows with Status "New" after user confirmation
+
+Register access is wrapped by `utils/issue-register.py` (gws CLI). The skill is defined in `.claude/skills/report-issue/SKILL.md`, with its behavioural contract in `contract.feature`.
 
 ### Processing Feedback
 

@@ -27,6 +27,9 @@ Usage:
     # Find all references to a named element
     python3 utils/extract-reference-names.py practice.json --find-refs "Platform"
 
+    # Find where an element is defined and what type it is
+    python3 utils/extract-reference-names.py practice.json --locate "Workload Placement Strategy"
+
     # List narrative contexts by element name
     python3 utils/extract-reference-names.py practice.json --narrative-contexts
 
@@ -64,6 +67,7 @@ Usage:
     python3 utils/extract-reference-names.py method.json --sections practices
 """
 import argparse
+import difflib
 import json
 import sys
 from pathlib import Path
@@ -648,6 +652,111 @@ def print_practices(data):
         print(f"    counts: {counts}")
         if deps:
             print(f"    dependencies: {deps}")
+
+
+# Collection key -> element type name as used by Keleo Studio and the issue register
+ELEMENT_TYPE_BY_COLLECTION = {
+    "alphas": "alpha",
+    "states": "state",
+    "checklist": "checklistItem",
+    "activities": "activity",
+    "activitySpaces": "activitySpace",
+    "workProducts": "workProduct",
+    "levelsOfDetail": "levelOfDetail",
+    "personas": "persona",
+    "personaGroups": "personaGroup",
+    "patterns": "pattern",
+    "patternGroups": "patternGroup",
+    "patternViews": "patternView",
+    "narratives": "narrative",
+    "narrativeTypes": "narrativeType",
+    "narrativeElements": "narrativeElement",
+    "citations": "citation",
+    "outcomes": "outcome",
+    "focuses": "focus",
+    "competencies": "competency",
+    "levels": "competencyLevel",
+    "assets": "asset",
+    "references": "reference",
+    "practiceElementAliases": "alias",
+    "practices": "practice",
+    "acknowledgements": "acknowledgement",
+    "metricContributions": "metricContribution",
+    "objectiveContributions": "objectiveContribution",
+}
+
+
+def locate_element(data, target_name, exact=False):
+    """Find where a named element is DEFINED (not referenced) in a document.
+
+    Walks every named object and reports its element type, the collection it
+    lives in, and its parent chain. Complements --find-refs, which reports
+    where a name is used rather than where it is declared.
+
+    Returns (matches, suggestions). Matches are exact or case-insensitive hits;
+    suggestions are close names offered when nothing matched.
+    """
+    matches = []
+    all_names = []
+    target_lower = target_name.lower()
+
+    def walk(node, collection, parents):
+        if isinstance(node, dict):
+            name = node.get("name")
+            next_parents = parents
+            if isinstance(name, str) and name:
+                element_type = ELEMENT_TYPE_BY_COLLECTION.get(collection, collection or "document")
+                all_names.append((name, element_type))
+                if name == target_name or (not exact and name.lower() == target_lower):
+                    matches.append({
+                        "name": name,
+                        "elementType": element_type,
+                        "collection": collection,
+                        "parent": parents[-1] if parents else None,
+                        "path": " > ".join(parents + [name]),
+                        "exact": name == target_name,
+                        "description": (node.get("description") or "")[:200],
+                    })
+                next_parents = parents + [name]
+            for key, value in node.items():
+                if isinstance(value, (dict, list)):
+                    walk(value, key, next_parents)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item, collection, parents)
+
+    walk(data, "", [])
+
+    suggestions = []
+    if not matches:
+        unique = {}
+        for name, element_type in all_names:
+            unique.setdefault(name, element_type)
+        for name in difflib.get_close_matches(target_name, list(unique), n=5, cutoff=0.6):
+            suggestions.append({"name": name, "elementType": unique[name]})
+    return matches, suggestions
+
+
+def print_locate(data, target_name, exact=False, as_json=False):
+    """Print locate results for a named element."""
+    matches, suggestions = locate_element(data, target_name, exact)
+    if as_json:
+        print(json.dumps({"query": target_name, "matches": matches,
+                          "suggestions": suggestions}, indent=2))
+        return
+    if matches:
+        print(f"=== '{target_name}' DEFINED AS ({len(matches)}) ===")
+        for match in matches:
+            qualifier = "" if match["exact"] else "  (case-insensitive match)"
+            print(f"  {match['elementType']}: {match['path']}{qualifier}")
+            if match["description"]:
+                print(f"    {match['description']}")
+    else:
+        print(f"No element named '{target_name}' is defined in this document.")
+        if suggestions:
+            print("  Did you mean:")
+            for suggestion in suggestions:
+                print(f"    {suggestion['name']} ({suggestion['elementType']})")
 
 
 def find_references(data, target_name):
@@ -1277,6 +1386,10 @@ def main():
                         help="Dump raw JSON of the first element from SECTION (e.g., activities, alphas)")
     parser.add_argument("--find-refs", metavar="NAME",
                         help="Find all references to a named element across the entire JSON")
+    parser.add_argument("--locate", metavar="NAME",
+                        help="Find where a named element is DEFINED and report its element type")
+    parser.add_argument("--exact", action="store_true",
+                        help="With --locate: require an exact case-sensitive name match")
     parser.add_argument("--narrative-contexts", action="store_true",
                         help="List all narrative contexts with element name counts")
     parser.add_argument("--context-element", metavar="ELEMENT",
@@ -1320,6 +1433,10 @@ def main():
             baseline_data = load_json(args.baseline)
             nt_defs = baseline_data.get("narrativeTypes", [])
         print_narrative_completeness(data, narrative_types=nt_defs, as_json=args.json)
+        return
+
+    if args.locate:
+        print_locate(data, args.locate, exact=args.exact, as_json=args.json)
         return
 
     if args.find_refs:
