@@ -44,6 +44,14 @@ Authentication is via bearer token (`Authorization: Bearer <token>`). Credential
 
 - **Node.js 18+** — Enables `validate-json-schema.js` (JSON Schema validation via ajv-cli) as an alternative to the Python validators.
 
+### Optional — Presentations
+
+Required only by the deck skills (`/slide-deck`, `/pitch-deck`, `/exec-readout`).
+
+- **Node.js 18+** — Slidev is installed per deck project by `new-deck.py` (`npx slidev`). No global install needed.
+- **Playwright chromium** — Required by Slidev's `pptx-editable` export. `new-deck.py` installs it into the deck project.
+- **`gws` CLI** — Uploads the .pptx to Drive for conversion to Google Slides, and renders the published deck for review. Without it, decks can still be exported locally to PDF and PNG.
+
 ### Optional — Convenience Tools
 
 - **`jq`** — Command-line JSON processor for ad hoc inspection.
@@ -99,8 +107,24 @@ keleo-pgen-llm/
 │       ├── plan-from-feedback/          # Issue register triage and resolution skill
 │       │   ├── SKILL.md
 │       │   └── contract.feature
-│       └── improve-tooling/             # Utils and skill improvement skill
-│           └── SKILL.md
+│       ├── improve-tooling/             # Utils and skill improvement skill
+│       │   └── SKILL.md
+│       ├── deck-foundation/             # Shared deck infrastructure (NOT a skill)
+│       │   ├── DECK-FOUNDATION.md       # Pipeline, layouts, conversion safety, citations/notes
+│       │   ├── slide-grammar.md         # How to write an individual slide
+│       │   ├── narrative-guide.md       # Deck-level narrative shapes
+│       │   ├── extension-template.md    # How to add a new deck type
+│       │   ├── scripts/                 # new-deck, publish-deck, review-deck, inspect-template
+│       │   └── theme-redhat/            # Slidev theme (layouts, components, brand tokens)
+│       ├── slide-deck/                  # General-purpose deck skill
+│       │   ├── SKILL.md
+│       │   └── contract.feature
+│       ├── pitch-deck/                  # Persuasive deck skill (pitches, business cases)
+│       │   ├── SKILL.md
+│       │   └── contract.feature
+│       └── exec-readout/                # Readout deck skill (status, findings)
+│           ├── SKILL.md
+│           └── contract.feature
 ├── deps/                                   # Symlinks to keleo-language
 │   ├── language.schema.json               # JSON Schema definition
 │   ├── platform-adoption-kernel.json      # Baseline framework (Platform Adoption)
@@ -624,6 +648,38 @@ Reports use narrative types from the baseline (Report Narrative, Essay Narrative
 **Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
 
 **Extending**: To add a new report type, see `.claude/skills/reporting-foundation/extension-template.md` for the step-by-step guide and SKILL.md template.
+
+### Generating Presentations
+
+The deck system mirrors the reporting system's shape — a shared foundation (`.claude/skills/deck-foundation/`, **not a skill**) plus thin per-type skills:
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| General-purpose deck | `/slide-deck` | Talks, training, overviews, workshops — anything not covered below |
+| Pitch deck | `/pitch-deck` | Value propositions, partner/GSI pitches, solution proposals, business cases |
+| Executive readout | `/exec-readout` | Status reports, findings, review outcomes, programme updates |
+
+Decks are authored as **Slidev** markdown against the `theme-redhat` theme and published through a fixed chain — there is no direct Slidev → Google Slides export, so the PowerPoint hop is mandatory:
+
+```
+slides.md ──slidev export──▶ .pptx ──Drive upload──▶ Google Slides ──▶ PDF
+          (pptx-editable)          (convert on import)
+```
+
+All three skills follow the same workflow:
+
+1. **Plan** — Subject, audience, the decision being asked for, length
+2. **Scaffold** — `python3 .claude/skills/deck-foundation/scripts/new-deck.py <dir> --title "…"` copies the theme and installs Slidev + Playwright
+3. **Structure** — **If there is a source document, the deck follows its structure** (DECK-FOUNDATION §2.1). Narrative shapes from `narrative-guide.md` apply only when there is no source document, or when the user accepts a proposed reshape
+4. **Write** — Slide titles as assertions first; every content slide carries a `sources` citation band and speaker notes derived from the source's prose (§5)
+5. **Publish** — `python3 .claude/skills/deck-foundation/scripts/publish-deck.py slides.md --name "…" --pdf --review`
+6. **Review** — Read the rendered PNGs of the **published** deck. Google Slides sets text slightly wider than Chromium, so overflow defects are invisible in the local render
+
+**Output Location**: wherever the deck project was scaffolded (conventionally outside the repo — decks are deliverables, not practice artifacts). `bundles/` and `reports/` are not used.
+
+**Extending**: To add a new deck type, see `.claude/skills/deck-foundation/extension-template.md`.
+
+**Upstream**: This tree is a vendored copy of the user-level skills at `~/.claude/skills/`, carried here so the project distributes with deck capability. Fix defects upstream and re-copy; the only intended difference is repo-relative paths.
 
 ### Reporting Issues
 

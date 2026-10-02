@@ -1,0 +1,31 @@
+{
+  "name": "slidev-theme-redhat",
+  "version": "1.2.0",
+  "description": "Red Hat brand theme for Slidev, built for clean export to Google Slides",
+  "keywords": [
+    "slidev-theme",
+    "slidev",
+    "redhat"
+  ],
+  "engines": {
+    "slidev": ">=0.48.0"
+  },
+  "slidev": {
+    "colorSchema": "light",
+    "defaults": {
+      "transition": "none",
+      "aspectRatio": "16/9",
+      "fonts": {
+        "sans": "Red Hat Text",
+        "serif": "Red Hat Display",
+        "mono": "Red Hat Mono",
+        "provider": "google"
+      }
+    }
+  },
+  "dependencies": {},
+  "comments": {
+    "transition": "Transitions are dropped by the pptx export, so the theme does not pay the dev-server cost of animating them.",
+    "fonts": "Pulled from Google Fonts at build time. A .pptx names fonts rather than embedding them, so recipients still need Red Hat Display/Text installed or they will see a fallback."
+  }
+}

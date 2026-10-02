@@ -67,6 +67,18 @@ All reporting skills resolve practice context, extract domain knowledge, and gen
 | **Decision Analysis** | `/decision-analysis` | Trade-off analysis, option weighting, contextual verdicts |
 | **Document Review** | `/document-review` | Review an existing document and recommend improvements |
 
+### Presentations
+
+Deck skills author **Slidev** markdown and publish to Google Slides and PDF. They share `.claude/skills/deck-foundation/` (pipeline, layouts, conversion constraints, the Red Hat theme and the publishing scripts). By default a deck follows the structure of its source document rather than re-arguing the material.
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| **Slide Deck** | `/slide-deck` | Any deck not covered below — talks, training, overviews, workshops |
+| **Pitch Deck** | `/pitch-deck` | Value propositions, partner/GSI pitches, solution proposals, business cases |
+| **Exec Readout** | `/exec-readout` | Status reports, findings, review outcomes, programme updates |
+
+Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` CLI (Drive upload). See `.claude/skills/deck-foundation/DECK-FOUNDATION.md`.
+
 ### System Improvement
 
 | Skill | Command | Purpose |
@@ -109,7 +121,7 @@ All skills produce `.keleo` packages — ZIP archives containing a manifest, Pra
 
 ```
 keleo-pgen-llm/
-├── .claude/skills/           # Skill definitions (11 skills + shared reporting foundation)
+├── .claude/skills/           # Skill definitions (14 skills + reporting and deck foundations)
 ├── deps/                     # Symlinks to keleo-language (schema, baseline JSONs)
 ├── references/               # Domain framework, semantic guidance, assessment rubrics
 ├── prompts/                  # Phase-specific prompt templates

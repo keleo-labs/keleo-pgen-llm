@@ -19,6 +19,13 @@ __pycache__/
 deps/*-cr.json
 .tmp/*
 
+# Deck projects scaffolded in-tree (decks are deliverables, not repo artifacts).
+# The deck-foundation skill and its theme are tracked; built output is not.
+node_modules/
+decks/
+**/build/
+*.pptx
+
 # Keep the practices directory structure
 !practices/.gitkeep
 !baselines/.gitkeep
