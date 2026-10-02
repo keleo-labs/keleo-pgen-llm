@@ -71,8 +71,11 @@ All reporting skills resolve practice context, extract domain knowledge, and gen
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
+| **Report Issue** | `/report-issue` | Record issues, enhancements, or questions in the feedback register for later triage |
 | **Plan from Feedback** | `/plan-from-feedback` | Triage issues from a feedback register, plan and execute fixes across practice, skill, and schema layers |
 | **Improve Tooling** | `/improve-tooling` | Create, extend, or consolidate utility scripts; improve skill instructions |
+
+`/report-issue` and `/plan-from-feedback` are two ends of the same register: the first files rows (input columns, Status `New`), the second triages them and writes back the resolution. Both share the register configured in `.claude/user-config.json`.
 
 ## Pipeline Architecture
 
@@ -106,7 +109,7 @@ All skills produce `.keleo` packages — ZIP archives containing a manifest, Pra
 
 ```
 keleo-pgen-llm/
-├── .claude/skills/           # Skill definitions (10 skills + shared reporting foundation)
+├── .claude/skills/           # Skill definitions (11 skills + shared reporting foundation)
 ├── deps/                     # Symlinks to keleo-language (schema, baseline JSONs)
 ├── references/               # Domain framework, semantic guidance, assessment rubrics
 ├── prompts/                  # Phase-specific prompt templates
