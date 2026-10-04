@@ -33,7 +33,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Document | Load at | What it provides |
 |---|---|---|
-| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, shared rules |
+| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection (this skill uses fixed structures — guide is for reference only) |
 
 ---

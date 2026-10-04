@@ -34,7 +34,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Document | Load at | What it provides |
 |---|---|---|
-| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, shared Gherkin rules (@rule:report-600 through 608) |
+| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared Gherkin rules (@rule:report-600 through 610) |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 and Step 2 | Narrative type selection, purpose-to-narrative mapping, element-to-heading mappings |
 
 ---
@@ -118,7 +118,7 @@ Follow the common reporting workflow in `reporting-foundation/REPORT-FOUNDATION.
 
 1. **Load Context** — Context Resolution section
 2. **Analyze & Select** — Domain Knowledge Extraction + Citation Pool sections. For narrative selection, use the purpose-to-narrative mapping in `reporting-foundation/narrative-guide.md`.
-3. **Generate Report** — Voice and Tone, Content Sourcing, Report Structure, Length and Depth, Output, Citations in Reports sections
+3. **Generate Report** — Voice and Tone, Content Sourcing, Report Structure, Framework Attribution, Length and Depth, Output, Citations in Reports sections
 
 For multi-practice reports, also follow the Multi-Source Reports section.
 

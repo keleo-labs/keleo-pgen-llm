@@ -7,7 +7,10 @@ and authentication configuration for keleo-studio-gas instances.
 Usage:
     python3 utils/studio-client.py --status
     python3 utils/studio-client.py --index [--max-age 3600]
+    python3 utils/studio-client.py --docs [--kind practice]
     python3 utils/studio-client.py --check [name]
+    python3 utils/studio-client.py --link "Practice Name" ["Other Name" ...] [--markdown]
+    python3 utils/studio-client.py --link "Practice A" "Practice B" --attribution
     python3 utils/studio-client.py --pull "Practice Name"
     python3 utils/studio-client.py --push bundles/practice.keleo
     python3 utils/studio-client.py --configure
@@ -22,6 +25,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -31,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _shared import load_user_config, save_user_config, get_project_root
 
 REMOTE_INDEX_PATH = "bundles/.remote-index.json"
+REMOTE_DOCS_PATH = "bundles/.remote-documents.json"
 DEFAULT_MAX_AGE = 3600
 
 
@@ -90,18 +95,23 @@ def _get_credentials():
     return url, token
 
 
+AUTH_EXPIRED_HINT = (
+    "Get a fresh token from your keleo-studio-gas instance "
+    "(Settings → API Token) and run:\n"
+    "  python3 utils/studio-client.py --configure --token <token>"
+)
+
+
 def _handle_auth_error():
     """Print auth expiry message and exit."""
     print("Error: Authentication token has expired.", file=sys.stderr)
-    print("Get a fresh token from your keleo-studio-gas instance", file=sys.stderr)
-    print("(Settings → API Token) and run:", file=sys.stderr)
-    print("  python3 utils/studio-client.py --configure", file=sys.stderr)
+    print(AUTH_EXPIRED_HINT, file=sys.stderr)
     sys.exit(1)
 
 
-def _load_cached_index():
-    """Load the cached remote index if it exists."""
-    index_path = get_project_root() / REMOTE_INDEX_PATH
+def _load_cached_index(path=REMOTE_INDEX_PATH):
+    """Load a cached remote index if it exists."""
+    index_path = get_project_root() / path
     if not index_path.exists():
         return None
     try:
@@ -111,9 +121,9 @@ def _load_cached_index():
         return None
 
 
-def _save_index(data):
-    """Save remote index to cache file."""
-    index_path = get_project_root() / REMOTE_INDEX_PATH
+def _save_index(data, path=REMOTE_INDEX_PATH):
+    """Save a remote index to its cache file."""
+    index_path = get_project_root() / path
     index_path.parent.mkdir(parents=True, exist_ok=True)
     with open(index_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -155,30 +165,45 @@ def _parse_semver(version_str):
     return tuple(result)
 
 
-def cmd_configure():
-    """Interactive configuration of keleo-studio-gas credentials."""
+def cmd_configure(url=None, token=None):
+    """Configure keleo-studio-gas credentials.
+
+    Prompts for whatever is not supplied as an argument, so redeploying can be
+    recorded with `--configure --url <new URL>` without retyping the token.
+    """
     config = load_user_config()
     current_url = config.get("keleoStudioGasUrl", "")
+    current_token = config.get("keleoStudioGasToken", "")
+    interactive = not (url or token)
 
-    print("Configure keleo-studio-gas connection")
-    print("=" * 40)
+    if interactive:
+        print("Configure keleo-studio-gas connection")
+        print("=" * 40)
+        url = input(f"Deployment URL [{current_url}]: ").strip()
+        token = input("API token (from Settings → API Token): ").strip()
 
-    url = input(f"Deployment URL [{current_url}]: ").strip()
-    if not url:
-        url = current_url
+    url = url or current_url
+    token = token or current_token
     if not url:
         print("Error: URL is required.", file=sys.stderr)
         sys.exit(1)
-
-    token = input("API token (from Settings → API Token): ").strip()
     if not token:
         print("Error: Token is required.", file=sys.stderr)
         sys.exit(1)
 
+    url_changed = url != current_url
     config["keleoStudioGasUrl"] = url
     config["keleoStudioGasToken"] = token
     save_user_config(config)
-    print(f"\nSaved to .claude/user-config.json")
+    print(f"Saved to .claude/user-config.json")
+
+    # A new deployment serves a different library; the caches no longer apply.
+    if url_changed:
+        for path in (REMOTE_INDEX_PATH, REMOTE_DOCS_PATH):
+            cache = get_project_root() / path
+            if cache.exists():
+                cache.unlink()
+                print(f"Cleared stale cache: {path}")
 
     data, err = _api_get(url, token, "packages")
     if err == "auth_expired":
@@ -268,6 +293,157 @@ def cmd_index(max_age=DEFAULT_MAX_AGE, as_json=False):
         print(f"Fetched remote index: {count} packages")
 
     return index_data
+
+
+def _fetch_documents(max_age=DEFAULT_MAX_AGE):
+    """Return (documents, error) for the remote document listing.
+
+    Falls back to the cached listing when the remote is unreachable, so callers
+    that only need name resolution can degrade instead of failing. Auth expiry
+    is returned rather than raised, for the same reason — the caller decides
+    whether an unverified answer is still useful.
+    """
+    cached = _load_cached_index(REMOTE_DOCS_PATH)
+    if _index_age_seconds(cached) < max_age and cached:
+        return cached.get("documents", []), None
+
+    url, token = _get_credentials()
+    data, err = _api_get(url, token, "index")
+    if err:
+        if cached:
+            return cached.get("documents", []), f"{err} (using cached listing)"
+        return None, err
+
+    docs_data = {
+        "_fetchedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "_sourceUrl": url,
+        "documents": data.get("documents", []),
+    }
+    _save_index(docs_data, REMOTE_DOCS_PATH)
+    return docs_data["documents"], None
+
+
+def cmd_docs(kind=None, max_age=DEFAULT_MAX_AGE, as_json=False):
+    """Fetch the remote document listing (every document in every bundle)."""
+    documents, err = _fetch_documents(max_age)
+    if err == "auth_expired":
+        _handle_auth_error()
+    if documents is None:
+        print(f"Error fetching document index: {err}", file=sys.stderr)
+        sys.exit(1)
+    if err:
+        print(f"Warning: {err}", file=sys.stderr)
+
+    if kind:
+        documents = [d for d in documents if d.get("kind") == kind]
+
+    if as_json:
+        print(json.dumps({"documents": documents}, indent=2))
+    else:
+        for d in sorted(documents, key=lambda d: d.get("name", "")):
+            version = d.get("version") or "—"
+            print(f"  {d.get('name', ''):45s} {d.get('kind', ''):18s} v{version}")
+        print(f"{len(documents)} documents")
+
+    return documents
+
+
+def _deep_link(base_url, doc_name, element=None):
+    """Build a keleo-studio-gas deep link for a document (and optional element)."""
+    url = f"{base_url}?doc={urllib.parse.quote(doc_name, safe='')}"
+    if element:
+        url += f"&element={urllib.parse.quote(element, safe='')}"
+    return url
+
+
+def _attribution_line(links):
+    """Render the closing framework attribution line for a report."""
+    parts = [f"[{l['name']}]({l['url']})" for l in links]
+    if len(parts) == 1:
+        joined, noun = parts[0], "framework"
+    else:
+        joined = f"{', '.join(parts[:-1])}{',' if len(parts) > 2 else ''} and {parts[-1]}"
+        noun = "frameworks"
+    return f"*Structured using the {joined} {noun}.*"
+
+
+def cmd_link(names, element=None, markdown=False, attribution=False,
+             as_json=False, max_age=DEFAULT_MAX_AGE, strict=False):
+    """Build deep links into keleo-studio-gas for named practices/methods.
+
+    Names are matched against the remote document index so that a link is only
+    emitted for a document that is actually published. Matching is exact first,
+    then case-insensitive; the resolved name is used in the URL.
+
+    When the index cannot be reached, links are still built from the names as
+    given and marked unverified — a report should not be blocked by a transient
+    remote failure.
+    """
+    config = load_user_config()
+    base_url = config.get("keleoStudioGasUrl")
+    if not base_url:
+        print("Error: keleo-studio-gas URL not configured.", file=sys.stderr)
+        print("Run: python3 utils/studio-client.py --configure", file=sys.stderr)
+        sys.exit(1)
+
+    if element and len(names) > 1:
+        print("Error: --element applies to a single document only.", file=sys.stderr)
+        sys.exit(1)
+
+    documents, err = _fetch_documents(max_age)
+    by_exact, by_fold = {}, {}
+    for d in documents or []:
+        by_exact.setdefault(d.get("name", ""), d)
+        by_fold.setdefault(d.get("name", "").casefold(), d)
+
+    links = []
+    for name in names:
+        doc = by_exact.get(name) or by_fold.get(name.casefold())
+        resolved = doc.get("name", name) if doc else name
+        links.append({
+            "requested": name,
+            "name": resolved,
+            "url": _deep_link(base_url, resolved, element),
+            # None when the index was unavailable: the link is unverified.
+            "found": None if documents is None else bool(doc),
+            "kind": doc.get("kind") if doc else None,
+            "version": doc.get("version") if doc else None,
+            "bundleSlug": doc.get("bundleSlug") if doc else None,
+        })
+
+    missing = [l["requested"] for l in links if l["found"] is False]
+
+    if as_json:
+        print(json.dumps({
+            "baseUrl": base_url,
+            "links": links,
+            "attribution": _attribution_line(links),
+        }, indent=2))
+    elif attribution:
+        print(_attribution_line(links))
+    elif markdown:
+        for link in links:
+            print(f"[{link['name']}]({link['url']})")
+    else:
+        for link in links:
+            mark = {True: "", False: "  (NOT PUBLISHED)", None: "  (unverified)"}
+            print(f"  {link['name']:45s} {link['url']}{mark[link['found']]}")
+
+    if documents is None:
+        reason = ("the API token has expired" if err == "auth_expired" else err)
+        print(f"Warning: document index unavailable ({reason}) — links are "
+              f"unverified", file=sys.stderr)
+        if err == "auth_expired":
+            print(AUTH_EXPIRED_HINT, file=sys.stderr)
+    elif err:
+        print(f"Warning: {err}", file=sys.stderr)
+    if missing:
+        print(f"Warning: not in the remote library: {', '.join(missing)}",
+              file=sys.stderr)
+    if strict and (missing or documents is None):
+        sys.exit(1)
+
+    return links
 
 
 def _build_local_versions():
@@ -525,8 +701,13 @@ def main():
                        help="Show connection status and index freshness")
     group.add_argument("--index", action="store_true",
                        help="Fetch and cache remote package listing")
+    group.add_argument("--docs", action="store_true",
+                       help="Fetch and cache the remote document listing")
     group.add_argument("--check", nargs="?", const="", metavar="NAME",
                        help="Compare local vs remote versions (all or specific name)")
+    group.add_argument("--link", nargs="+", metavar="NAME",
+                       help="Build deep links into keleo-studio-gas for the "
+                            "named practices/methods")
     group.add_argument("--pull", metavar="NAME",
                        help="Download a .keleo bundle from remote")
     group.add_argument("--push", metavar="FILE",
@@ -534,17 +715,41 @@ def main():
 
     parser.add_argument("--max-age", type=int, default=DEFAULT_MAX_AGE,
                         help=f"Max age in seconds for cached index (default: {DEFAULT_MAX_AGE})")
+    parser.add_argument("--url", metavar="URL",
+                        help="With --configure: set the deployment URL without "
+                             "prompting (keeps the stored token)")
+    parser.add_argument("--token", metavar="TOKEN",
+                        help="With --configure: set the API token without "
+                             "prompting (keeps the stored URL)")
+    parser.add_argument("--kind", metavar="KIND",
+                        help="With --docs: filter by kind (practice, method, "
+                             "baselinePractice)")
+    parser.add_argument("--element", metavar="NAME",
+                        help="With --link: also select an element in the document")
+    parser.add_argument("--markdown", action="store_true",
+                        help="With --link: emit markdown links, one per line")
+    parser.add_argument("--attribution", action="store_true",
+                        help="With --link: emit the closing report attribution "
+                             "line with every framework hyperlinked")
+    parser.add_argument("--strict", action="store_true",
+                        help="With --link: exit 1 if any name is unpublished")
     parser.add_argument("--json", action="store_true",
                         help="Output as JSON")
 
     args = parser.parse_args()
 
     if args.configure:
-        cmd_configure()
+        cmd_configure(url=args.url, token=args.token)
     elif args.status:
         cmd_status(as_json=args.json)
     elif args.index:
         cmd_index(max_age=args.max_age, as_json=args.json)
+    elif args.docs:
+        cmd_docs(kind=args.kind, max_age=args.max_age, as_json=args.json)
+    elif args.link:
+        cmd_link(args.link, element=args.element, markdown=args.markdown,
+                 attribution=args.attribution, as_json=args.json,
+                 max_age=args.max_age, strict=args.strict)
     elif args.check is not None:
         cmd_check(name=args.check or None, as_json=args.json)
     elif args.pull:

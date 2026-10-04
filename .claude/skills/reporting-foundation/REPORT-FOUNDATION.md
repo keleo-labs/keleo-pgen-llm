@@ -185,7 +185,7 @@ The practice/method provides the **analytical framework** — the structured way
 
 ---
 
-*<Optional: brief note on the analytical framework used, e.g., "This report was structured using the [Practice Name] framework.")*
+*Structured using the [<Practice Name>](<studio deep link>) framework.*
 ```
 
 Rules:
@@ -195,6 +195,31 @@ Rules:
 - Use subsections (###) where depth is needed
 - Include concrete examples, criteria, or recommendations where the practice provides them
 - End with actionable content (recommendations, next steps, or conclusions) appropriate to the narrative structure
+
+---
+
+## Framework Attribution (Step 3)
+
+The report closes with a single italic line naming every practice, method, or baseline that shaped it. **Each name is a hyperlink into keleo-studio-gas** so a reader can open the framework itself — a bare name is a dead end for anyone who wants to look it up.
+
+Generate the line rather than writing it by hand. Pass the document names in the order they should read — primary context first, supplementary contexts after:
+
+```bash
+python3 utils/studio-client.py --link "Platform Operations" "HPE OpenShift" --attribution
+```
+
+This emits the finished line, ready to paste as the last line of the report:
+
+```markdown
+*Structured using the [Platform Operations](<deep link>) and [HPE OpenShift](<deep link>) frameworks.*
+```
+
+Notes:
+- Use the **document `name`** (the `name` field of the practice/method/baseline JSON), not the directory or bundle slug. Deep links resolve on exact document name.
+- Names are checked against the remote document index. A name reported as `NOT PUBLISHED` has no page to link to — either push the bundle (`--push`) or drop that name from the attribution.
+- If the remote is unreachable or the API token has expired, the links are still generated and marked `unverified`; that is fine for the report, but the warning is worth repeating to the user. A refreshed token goes in with `python3 utils/studio-client.py --configure --token <token>`.
+- If keleo-studio-gas is not configured, fall back to plain names and tell the user that `python3 utils/studio-client.py --configure` would make the attribution clickable.
+- Verify with `python3 utils/lint-report.py <report>.md --checks attribution`, which fails on any framework name left unlinked.
 
 ---
 
@@ -329,6 +354,14 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - When: the report is finalized
 - Then: at most one brief line at the end attributes the analytical framework
 - And: no structural diagrams, schema references, or methodology deep-dives are included
+
+#### Scenario: Framework attribution links to keleo-studio-gas (@rule:report-610)
+- Given: a report closes with a framework attribution line
+- And: keleo-studio-gas is configured in `.claude/user-config.json`
+- When: the attribution line is written
+- Then: every practice, method, or baseline named in it is a markdown hyperlink
+- And: each link is a `?doc=<document name>` deep link on the configured deployment
+- And: the line is generated with `studio-client.py --link ... --attribution`, not hand-written
 
 ### Feature: Context Resolution
 
