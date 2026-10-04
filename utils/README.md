@@ -10,7 +10,7 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Tool | Scripts that use it | Role |
 |------|-------------------|------|
-| `gws` CLI | `extract-gws-slides.py`, `studio-client.py`, `issue-register.py` | Content sourcing from Google Workspace (Slides, Drive) and feedback register access (Sheets) |
+| `gws` CLI | `extract-gws-slides.py`, `edit-gws-slides.py`, `check-gws-slides-fit.py`, `render-gws-slides.py`, `studio-client.py`, `issue-register.py` | Content sourcing from Google Workspace (Slides, Drive), published deck editing, and feedback register access (Sheets) |
 | Node.js 18+ | `validate-json-schema.js` | Alternative schema validation via ajv-cli |
 | Remote bundle repository | `studio-client.py`, `discover-dependencies.py --remote` | Centralised `.keleo` package storage and version management |
 
@@ -137,6 +137,16 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 | `extract-gws-slides.py` | Extract Google Workspace Slides content via gws CLI | `python3 utils/extract-gws-slides.py <presentation-id> [-o <output>.md]` |
 | `extract-gws-text.py` | Extract text from Google Workspace API JSON (auto-detects Slides/Docs format) | `python3 utils/extract-gws-text.py <input>.json [-o <output-dir>] [--format slides\|docs]` |
 | `extract-html-text.py` | Extract text from HTML pages (URL or file), preserving heading structure in markdown; `--anchors` outputs heading→anchor ID JSON map; `--headings-only` for table of contents | `python3 utils/extract-html-text.py <url-or-file> [-o <output>.md] [--anchors] [--anchors-file <map>.json] [--headings-only]` |
+
+## Published Deck Editing
+
+For decks that live only in Google Slides — no local Slidev source, or a source that has diverged — these edit and verify the published deck in place, preserving its layout and theme. Edits are reversible through Google Slides version history.
+
+| Script | Purpose | Usage |
+|--------|---------|-------|
+| `edit-gws-slides.py` | Apply find/replace edits to a published deck. Three edit forms: `find`/`replace` across body copy (case-sensitive, notes deliberately out of scope), `notesForSlide`/`replace` to rewrite a slide's whole speaker-note body (fragment matching is unreliable — pptx import leaves vertical-tab soft breaks mid-sentence), and `objectId` with `fontSize` and/or `widthInches` to reshape an element whose box was exported around the old wording. Pre-flight counts every match and fails on a no-op edit; post-flight re-fetches and reports anything that did not take | `python3 utils/edit-gws-slides.py <presentation-id> --edits <edits>.json [--dry-run] [--allow-missing] [--rename TITLE]` |
+| `check-gws-slides-fit.py` | Flag text that probably collides with the element below it or runs off the slide, by estimating rendered height from font size and box width. Triage for which slides to render — it does not catch text that wraps into whitespace, and deliberately does not test box fit (pptx export sizes boxes tighter than one line of their own text) | `python3 utils/check-gws-slides-fit.py <presentation-id> [--all] [--advance 0.52] [--line-height 1.2] [--tolerance 0.1]` |
+| `render-gws-slides.py` | Download slides as PNG for visual review. Google Slides sets text wider than a local Chromium render, so overflow defects only show up on the published deck | `python3 utils/render-gws-slides.py <presentation-id> (--slides 1,4-6,30- \| --all) [-o <dir>] [--prefix NAME] [--size small\|medium\|large]` |
 
 ## URL & Reference Resolution
 
