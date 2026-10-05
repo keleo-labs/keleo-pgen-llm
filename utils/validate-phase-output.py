@@ -671,6 +671,11 @@ def main():
         action="store_true",
         help="Print word/line/size statistics for each input file",
     )
+    parser.add_argument(
+        "--one-line",
+        action="store_true",
+        help="Print a single-line verdict instead of the full JSON check list",
+    )
     args = parser.parse_args()
 
     if args.stats:
@@ -706,7 +711,10 @@ def main():
         if "pass" in c:
             c["severity"] = "critical" if _is_critical(c["check"]) else "advisory"
 
-    passed = sum(1 for c in checks if c.get("pass", True))
+    # Only checks that actually carry a "pass" key are scored. Informational
+    # entries (e.g. competency_level_names) have no verdict and must be excluded
+    # from both numerator and denominator, or passed can exceed total.
+    passed = sum(1 for c in checks if "pass" in c and c["pass"])
     total = sum(1 for c in checks if "pass" in c)
     all_pass = passed == total
 
@@ -732,6 +740,13 @@ def main():
         }
         print(json.dumps(result, indent=2))
         sys.exit(0 if gate_result != "fail" else 1)
+
+    if args.one_line:
+        verdict = "PASS" if all_pass else "FAIL"
+        names = ", ".join(c["check"] for c in failures)
+        detail = f" | failed: {names}" if names else ""
+        print(f"{verdict} {passed}/{total} {target}{detail}")
+        sys.exit(0 if all_pass else 1)
 
     result = {
         "file": target,

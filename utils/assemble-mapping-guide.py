@@ -63,8 +63,17 @@ def extract_practice_metadata(content):
         meta["redecl_count"] = int(total_match.group(2))
         meta["new_count"] = int(total_match.group(3))
     else:
-        redecl_blocks = re.findall(r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\(Redeclaration", content)
-        new_blocks = re.findall(r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\((?:Specialization|New)", content)
+        # Accept both -ization and -isation: subagents vary in spelling, and a
+        # spelling-sensitive counter silently reports zero alphas for a guide
+        # that is otherwise complete. "Variant" covers mapsTo alphas.
+        redecl_blocks = re.findall(
+            r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\(Redeclar", content, re.IGNORECASE
+        )
+        new_blocks = re.findall(
+            r"(?:\*\*Alpha:\s*.+?\*\*|#{3,5}\s*Alpha:\s*.+?)\s*\((?:Speciali|New|Variant)",
+            content,
+            re.IGNORECASE,
+        )
         meta["redecl_count"] = len(redecl_blocks)
         meta["new_count"] = len(new_blocks)
         meta["alpha_count"] = meta["redecl_count"] + meta["new_count"]

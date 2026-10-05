@@ -47,13 +47,20 @@ def inspect_package(keleo_path):
 
         assets = [n for n in sorted(names) if n.startswith("assets/")]
 
+    # Package identity lives under manifest.package (PackageManifest schema);
+    # fall back to the root for hand-written or legacy manifests.
+    package = manifest.get("package") or {}
+
+    def identity(key):
+        return package.get(key, "") or manifest.get(key, "")
+
     return {
         "file": str(path),
         "manifest": {
-            "name": manifest.get("name", ""),
-            "version": manifest.get("version", ""),
+            "name": identity("name"),
+            "version": identity("version"),
             "schemaVersion": manifest.get("schemaVersion", ""),
-            "description": manifest.get("description", ""),
+            "description": identity("description"),
             "dependencies": manifest.get("dependencies", []),
         },
         "documents": documents,

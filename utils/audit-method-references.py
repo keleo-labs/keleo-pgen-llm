@@ -7,12 +7,14 @@ personaNames) resolve across practices, dependencies, and baseline.
 Usage:
     python3 utils/audit-method-references.py <method.json> --baseline <baseline.json>
     python3 utils/audit-method-references.py <practice-dir/> --baseline <baseline.json>
+    python3 utils/audit-method-references.py <bundle.keleo> --baseline <baseline.json>
     python3 utils/audit-method-references.py <method.json> --baseline <baseline.json> --json
 """
 
 import argparse
 import json
 import sys
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -25,6 +27,25 @@ def load_practices(path):
     Returns (list_of_practice_dicts, source_description).
     """
     p = Path(path)
+
+    # A .keleo is a ZIP, so json.load on the path dies with a UnicodeDecodeError.
+    # Read the practice documents straight out of the archive instead.
+    if p.is_file() and p.suffix == ".keleo":
+        practices = []
+        with zipfile.ZipFile(p) as zf:
+            for name in sorted(zf.namelist()):
+                if not name.startswith("documents/") or not name.endswith(".json"):
+                    continue
+                data = json.loads(zf.read(name).decode("utf-8"))
+                kind = detect_kind(data)
+                if kind == "method":
+                    # Externalised methods carry practiceNames, not embedded
+                    # objects; their practices arrive as sibling documents.
+                    practices.extend(data.get("practices", []))
+                elif kind == "practice":
+                    practices.append(data)
+        return practices, f"keleo:{p.name}"
+
     if p.is_file():
         data = load_json(p)
         kind = detect_kind(data)
