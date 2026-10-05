@@ -76,7 +76,7 @@ All generated outputs for a practice go in `practices/<practice-name>/`:
 ```text
 practices/
 └── <practice-name>/
-    ├── 00-prompt-history.md        (Session provenance: prompt, sources, decisions, phases)
+    ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Phase 1 output, ~30-50K words)
     ├── 02-mapping-guide.md         (Phase 2 output, scales with alpha count: ~5-6K words/alpha)
     └── <practice-name>.json        (Phase 3 output, schema-compliant JSON)
@@ -90,7 +90,7 @@ For methods with multiple practices:
 ```text
 practices/
 └── <method-name>/
-    ├── 00-prompt-history.md        (Session provenance: prompt, sources, decisions, phases)
+    ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Covers all practices)
     ├── 02-mapping-guide.md         (Maps all practices)
     └── <practice-name>.json        (Per-practice standalone JSONs)
@@ -220,6 +220,20 @@ In plan mode:
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
 
+   **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
+   user turn and every `AskUserQuestion` exchange in this session is appended to the
+   Interaction Log automatically — you do not need to record those. You DO need to record,
+   manually, any question you put to the user in plain prose (outside `AskUserQuestion`),
+   because the hook captures only the answer:
+   ```bash
+   python3 utils/prompt-history.py practices/<practice-name>/ --add-interaction \
+     --interaction-label "<context, e.g. 'Baseline selection'>" \
+     --interaction-question "<the question you asked>" \
+     --interaction-answer "<the user's reply, verbatim>"
+   ```
+   If you are resuming a practice in a new session, re-arm the hooks first:
+   `python3 utils/prompt-history.py practices/<practice-name>/ --activate`
+
 ---
 
 ### Step 0.5: Unified Context Resolution
@@ -347,11 +361,12 @@ Fix any FAIL assertions before proceeding.
    - Re-run validation: `python3 utils/eval-skill-output.py practices/<name>/ --phase 1 --summary`
    - Present the updated output and ask again
    - Repeat until the user confirms
-4. Record acceptance:
+4. Record the outcome — what the user asked for, not just that they accepted. Their words are
+   already in the Interaction Log via the hook; this records what you did about them:
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
      --decision-label "Phase 1 Review Gate" \
-     --decision-text "User accepted analysis output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Step 1.5.
 
@@ -473,11 +488,11 @@ Fix any FAIL assertions before proceeding.
    - Re-run validation: `python3 utils/eval-skill-output.py practices/<name>/ --phase 2 --summary`
    - Present the updated output and ask again
    - Repeat until the user confirms
-4. Record acceptance:
+4. Record the outcome — what the user asked for, not just that they accepted:
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
      --decision-label "Phase 2 Review Gate" \
-     --decision-text "User accepted mapping output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 3.
 
@@ -571,6 +586,8 @@ Fix any FAIL assertions before proceeding.
      --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged practice bundle"
    python3 utils/prompt-history.py practices/<practice-name>/ --finalize
    ```
+   `--finalize` stands the hooks down — later turns in this session are no longer appended to
+   the Interaction Log. If the user reopens the work, run `--activate` before continuing.
 
 ---
 
@@ -636,7 +653,7 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Final Deliverables
 
-1. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, sources, decisions, phases)
+1. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, interactions, sources, decisions, phases)
 2. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
 3. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
 4. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)

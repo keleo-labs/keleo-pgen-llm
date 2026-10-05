@@ -102,7 +102,7 @@ Expected: 11 section headers. If fewer, resume the agent: "The analysis report i
    ```bash
    python3 utils/prompt-history.py <dir>/ --add-decision \
      --decision-label "Phase 1B Review Gate" \
-     --decision-text "User accepted light analysis output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 2.
 

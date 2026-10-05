@@ -122,7 +122,29 @@ Scripts for validating, inspecting, fixing, and assembling Practice Language JSO
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `prompt-history.py` | Manage prompt history files for practice/baseline generation sessions: init, record sources/dependencies/decisions/phases/deliverables, finalise | `python3 utils/prompt-history.py <directory>/ --init --type practice --name "Name" --prompt "..." \| --add-source --source-type file --source-path "..." --source-desc "..." \| --add-dependency --dep-type baseline --dep-name "..." --dep-path "..." [--dep-version "..."] \| --add-decision --decision-label "..." --decision-text "..." \| --start-phase --phase "Phase 1: Analysis" \| --end-phase --phase "Phase 1: Analysis" [--phase-output "..."] [--phase-validation "..."] \| --add-deliverable --deliverable-path "..." --deliverable-desc "..." \| --finalize` |
+| `prompt-history.py` | Manage prompt history files for practice/baseline generation sessions: init, record sources/dependencies/decisions/interactions/phases/deliverables, finalise | `python3 utils/prompt-history.py <directory>/ --init --type practice --name "Name" --prompt "..." \| --add-source --source-type file --source-path "..." --source-desc "..." \| --add-dependency --dep-type baseline --dep-name "..." --dep-path "..." [--dep-version "..."] \| --add-decision --decision-label "..." --decision-text "..." \| --add-interaction [--interaction-label "..."] [--interaction-question "..."] --interaction-answer "..." \| --start-phase --phase "Phase 1: Analysis" \| --end-phase --phase "Phase 1: Analysis" [--phase-output "..."] [--phase-validation "..."] \| --add-deliverable --deliverable-path "..." --deliverable-desc "..." \| --activate \| --finalize \| --batch <ops>.json` |
+
+### Automatic interaction capture
+
+`prompt-history.py --init` writes `.tmp/active-prompt-history.json`, which points two hooks in
+`.claude/settings.json` at the live history:
+
+| Hook | Records |
+|------|---------|
+| `UserPromptSubmit` → `--hook user-prompt` | Every user turn, verbatim, under `## Interaction Log` |
+| `PostToolUse` matching `AskUserQuestion` → `--hook tool` | The question(s) put to the user and the option(s) they chose |
+
+The pointer binds to the first session that fires, so a concurrent session in this project
+cannot leak its prompts into the history. `--finalize` clears the pointer; `--activate`
+re-arms it when resuming an existing practice in a new session. Hook mode never writes to
+stdout and always exits 0 — a recording failure must not break the session.
+
+The hooks capture what the user *said*. A question asked in plain prose, outside
+`AskUserQuestion`, still needs `--add-interaction` so the question is recorded alongside the
+answer.
+
+**`.claude/settings.json` is git-ignored**, so a fresh clone has no hooks. Re-add the two
+entries above to enable automatic capture.
 
 ## Session Analysis
 

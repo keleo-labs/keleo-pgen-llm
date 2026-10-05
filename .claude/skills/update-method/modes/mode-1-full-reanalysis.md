@@ -53,7 +53,7 @@
    ```bash
    python3 utils/prompt-history.py <dir>/ --add-decision \
      --decision-label "Phase 1 Review Gate" \
-     --decision-text "User accepted analysis output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 2.
 
@@ -107,7 +107,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
    ```bash
    python3 utils/prompt-history.py <dir>/ --add-decision \
      --decision-label "Phase 2 Review Gate" \
-     --decision-text "User accepted mapping output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 3.
 

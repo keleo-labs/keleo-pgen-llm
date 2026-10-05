@@ -88,6 +88,20 @@ This skill orchestrates a 4-phase pipeline:
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
 
+   **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
+   user turn and every `AskUserQuestion` exchange in this session is appended to the
+   Interaction Log automatically — you do not need to record those. You DO need to record,
+   manually, any question you put to the user in plain prose (outside `AskUserQuestion`),
+   because the hook captures only the answer:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-interaction \
+     --interaction-label "<context, e.g. 'Focus selection'>" \
+     --interaction-question "<the question you asked>" \
+     --interaction-answer "<the user's reply, verbatim>"
+   ```
+   If you are resuming a baseline in a new session, re-arm the hooks first:
+   `python3 utils/prompt-history.py baselines/<baseline-name>/ --activate`
+
 **Planning ensures:**
 - Appropriate baseline vs extension practice decision
 - Token budget management
@@ -168,7 +182,7 @@ This skill orchestrates a 4-phase pipeline:
 ```
 baselines/
 └── <baseline-name>/
-    ├── 00-prompt-history.md         # Session provenance (prompt, sources, decisions, phases)
+    ├── 00-prompt-history.md         # Session provenance (prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
     ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
     ├── 02-mapping-guide.md          # Phase 2 output (~40-60K words)
@@ -260,7 +274,7 @@ Fix any FAIL assertions before proceeding.
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
      --decision-label "Phase 1 Review Gate" \
-     --decision-text "User accepted analysis output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 1.5.
 
@@ -356,7 +370,7 @@ Fix any FAIL assertions before proceeding.
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
      --decision-label "Phase 1.5 Review Gate" \
-     --decision-text "User accepted distillation output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 2.
 
@@ -463,7 +477,7 @@ Fix any FAIL assertions before proceeding.
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
      --decision-label "Phase 2 Review Gate" \
-     --decision-text "User accepted mapping output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 3.
 
@@ -608,6 +622,8 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --add-deliverable \
   --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged baseline bundle"
 python3 utils/prompt-history.py baselines/<baseline-name>/ --finalize
 ```
+`--finalize` stands the hooks down — later turns in this session are no longer appended to the
+Interaction Log. If the user reopens the work, run `--activate` before continuing.
 
 **Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
 

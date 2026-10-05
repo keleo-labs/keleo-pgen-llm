@@ -80,7 +80,19 @@ This skill updates existing Practice or Method JSON files to align with the late
 
 ### Step 0: Assess and Detect Gaps
 
-Run the consolidated assessment utility — this replaces ALL manual inspection steps:
+**First, arm the prompt-history hooks** so this update session's user turns and
+`AskUserQuestion` exchanges are appended to the existing Interaction Log:
+
+```bash
+python3 utils/prompt-history.py <dir>/ --activate
+```
+
+If the directory has no `00-prompt-history.md` (an older practice), `--init` one instead, using
+the user's update request as the prompt. Stand the hooks down with `--finalize` when the update
+is complete. Questions you put to the user in plain prose — outside `AskUserQuestion` — must be
+recorded manually with `--add-interaction`; the hook captures only the answer.
+
+Then run the consolidated assessment utility — this replaces ALL manual inspection steps:
 
 ```bash
 python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json

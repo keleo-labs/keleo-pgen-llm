@@ -104,7 +104,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
    ```bash
    python3 utils/prompt-history.py practices/<name>/ --add-decision \
      --decision-label "Phase 2 Review Gate" \
-     --decision-text "User accepted mapping output"
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
    ```
 5. Proceed to Phase 3.
 
