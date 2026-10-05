@@ -6,6 +6,7 @@ Internal module — not a CLI tool. Import from individual scripts:
 
 import copy
 import json
+import os
 import sys
 import zipfile
 from collections import OrderedDict
@@ -47,6 +48,28 @@ def load_json_pair(file_path):
         return None, f"File not found: {file_path}"
     except json.JSONDecodeError as e:
         return None, f"Invalid JSON in {file_path}: {e}"
+
+
+def resolve_reference_context(practice_path, baseline_data):
+    """Return the vocabulary source for name-validation checks.
+
+    Narrative types and competencies are inherited down the whole baseline
+    chain, so a leaf baseline sees only its own. Validating against the leaf
+    makes every inherited value look invalid, and "fixing" it rewrites valid
+    names to bad fuzzy matches.
+
+    `_effective-context.json` already holds the merged vocabulary from every
+    baseline and dependency practice, so prefer it whenever it sits beside the
+    practice being fixed. Falls back to the supplied baseline when absent.
+    """
+    if practice_path:
+        candidate = os.path.join(os.path.dirname(os.path.abspath(practice_path)),
+                                 "_effective-context.json")
+        if os.path.exists(candidate):
+            data, err = load_json_pair(candidate)
+            if data and not err:
+                return data, candidate
+    return baseline_data, None
 
 
 MERGEABLE_ARRAYS = [

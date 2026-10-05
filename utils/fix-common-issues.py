@@ -97,13 +97,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json_pair, get_schema_version
+from utils._shared import load_json_pair, get_schema_version, resolve_reference_context
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
 
 RELATIONSHIP_NORMALIZATIONS = {
-    "governs": "governed by",
     "supports": "produces",
     "enables": "produces",
     "enables delivery of": "produces",
@@ -112,8 +111,12 @@ RELATIONSHIP_NORMALIZATIONS = {
     "strengthens": "produces",
     "strengthened by": "uses",
     "drives": "produces",
-    "constrains": "governed by",
-    "protects": "governed by",
+    # NOTE: active governance verbs ("governs", "constrains", "protects") are
+    # deliberately NOT normalised. Per references/semantics/alphas.md the verb
+    # reads from the declaring alpha, so rewriting "A governs B" to "A governed
+    # by B" inverts the meaning, and flipping direction to match only makes the
+    # inversion internally consistent. The canonical set has no active
+    # governance verb, so these are left as authored.
     "protected by": "governed by",
     "managed by": "governed by",
     "constrained by": "governed by",
@@ -1979,14 +1982,19 @@ def main():
     if args.fix_nested_narratives or args.all:
         all_fixes.extend(fix_nested_narratives(data))
 
+    # Narrative types and competencies are inherited down the whole baseline
+    # chain, so validate them against the merged vocabulary rather than
+    # whichever baseline happened to be passed on the command line.
+    vocabulary, vocab_source = resolve_reference_context(file_path, baseline)
+
     if args.fix_narrative_types or args.all:
-        nt_fixes = fix_narrative_types(data, baseline)
+        nt_fixes = fix_narrative_types(data, vocabulary)
         all_fixes.extend(nt_fixes)
         if nt_fixes:
-            all_fixes.extend(fix_narrative_element_names(data, baseline))
+            all_fixes.extend(fix_narrative_element_names(data, vocabulary))
 
     if args.fix_competency_refs or args.all:
-        all_fixes.extend(fix_competency_refs(data, baseline, file_path))
+        all_fixes.extend(fix_competency_refs(data, vocabulary, file_path))
 
     if args.fix_missing_seq or args.all:
         all_fixes.extend(fix_missing_seq(data))

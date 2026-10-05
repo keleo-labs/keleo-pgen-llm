@@ -57,11 +57,13 @@ Understand the mapping guide structure:
    - `schemaVersion`: from schema `$comment` field (e.g., `"schemaVersion:2.13.0"` -> `"2.13.0"`)
    - Baseline `version`: for `dependencyVersions` caret range
 
-3. Extract valid baseline names for competencies and narrative types:
+3. Extract the valid competency and narrative type vocabulary:
    ```bash
    python3 utils/extract-reference-names.py <effectiveContextPath> --sections competencies narrativeTypes
    ```
    Keep these lists visible — every competency and narrative type reference in the output MUST match these exactly.
+
+   **Always use the effective context for vocabulary, never a single baseline file.** Competencies and narrative types are inherited down the whole baseline chain and merged into `_effective-context.json`. Any one baseline document holds only the subset it declares, so checking a name against it reports inherited-but-valid values as invalid. The fixers resolve this automatically (they prefer `_effective-context.json` when it sits beside the practice), but the same rule applies to your own judgement.
 
 ### Step 3: Read Semantic Guidance (selective)
 
@@ -589,8 +591,8 @@ These are experience-based gotchas — the most frequent errors observed in Phas
 | 4 | `views` / `alphas` / `workProducts` on patterns | `patternViews` / `alphaStates` / `workProductLevels` |
 | 5 | Missing `contributesTo` on LevelOfDetail | Required on every LOD |
 | 6 | Pattern final view missing alphas from earlier views | Final view = complete end-state snapshot of ALL alphas |
-| 7 | Inventing competency names not in baseline | Extract from baseline with `extract-reference-names.py --sections competencies` |
-| 8 | Inventing narrative types not in baseline | Extract from baseline with `extract-reference-names.py --sections narrativeTypes` |
+| 7 | Inventing competency names not in the merged vocabulary | Extract from the effective context with `extract-reference-names.py --sections competencies` |
+| 8 | Inventing narrative types not in the merged vocabulary | Extract from the effective context with `extract-reference-names.py --sections narrativeTypes` |
 | 9 | Tags as flat array | Nested object `{domainTags, lifecycleTags, organizationalTags}` |
 | 10 | `involves` as object array | `string[]` of persona group names |
 | 11 | Negative/absence framing in checklists | Must be positive/additive achievements |

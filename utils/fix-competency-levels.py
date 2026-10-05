@@ -23,7 +23,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json
+from utils._shared import load_json, resolve_reference_context
 
 COMMON_LEVEL_MAPPINGS = {
     "Advanced": "Masters",
@@ -266,6 +266,11 @@ def main():
 
     data = load_json(args.file)
     baseline_data = load_json(args.baseline)
+
+    # Competencies are inherited down the whole baseline chain. Validating
+    # against a leaf baseline reports every inherited competency as invalid,
+    # so prefer the merged vocabulary in _effective-context.json when present.
+    baseline_data, vocab_source = resolve_reference_context(args.file, baseline_data)
 
     explicit_level_maps = {}
     for m in args.map:
