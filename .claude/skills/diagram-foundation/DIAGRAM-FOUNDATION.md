@@ -1,5 +1,12 @@
 # Diagram Foundation
 
+> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
+> capability works from a clone without a user-level install. It tracks the
+> global skill at `~/.claude/skills/diagram-foundation/` version by version; the only
+> intended difference is that paths are repo-relative rather than
+> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
+> upstream. Re-copy with `python3 utils/vendor-skills.py`.
+
 Version: 1.0.0
 
 Shared diagram engine. A declarative JSON spec goes in; an SVG for a markdown

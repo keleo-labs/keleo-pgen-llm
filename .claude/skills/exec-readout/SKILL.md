@@ -2,7 +2,7 @@
 name: exec-readout
 description: Create an executive readout deck — status report, findings, review outcome, programme update — and publish it to Google Slides and PDF.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Exec Readout
@@ -14,7 +14,7 @@ metadata:
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.0.0
+Version: 2.1.0
 
 Decks that **report to a decision-maker**: status updates, findings, review
 outcomes, programme reviews, incident summaries.

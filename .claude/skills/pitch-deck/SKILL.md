@@ -2,7 +2,7 @@
 name: pitch-deck
 description: Create a persuasive pitch deck — value proposition, partner or GSI pitch, solution proposal, business case — and publish it to Google Slides and PDF.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Pitch Deck
@@ -14,7 +14,7 @@ metadata:
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.0.0
+Version: 2.1.0
 
 Decks whose job is to **win a decision**: value propositions, partner and GSI
 pitches, solution proposals, business cases.
