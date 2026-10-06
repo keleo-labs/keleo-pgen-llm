@@ -72,6 +72,11 @@ RE_CITE_LINKED = re.compile(r"\[([^()\[\]]+?),\s*(\d{4}[a-z]?)\]\([^()\s]*\)")
 RE_CITE_NARRATIVE = re.compile(
     r"(?<![(\[])\b([A-Z][\w.&'-]*(?:\s+(?:&|and|et|al\.|[A-Z][\w.&'-]*))*)\s+"
     r"\((\d{4}[a-z]?)\)")
+# [Author (2024a)](url) — hyperlinked narrative form. The author sits inside
+# the link text, so RE_CITE_NARRATIVE's lookbehind rejects it.
+RE_CITE_NARRATIVE_LINKED = re.compile(
+    r"\[([A-Z][\w.&'-]*(?:\s+(?:&|and|et|al\.|[A-Z][\w.&'-]*))*)\s+"
+    r"\((\d{4}[a-z]?)\)\]\([^()\s]*\)")
 # Reference entry: "Author, A., & Other, B. (2024a). *Title*. ..."
 RE_REF_ENTRY = re.compile(r"^(.+?)\.?\s*\((\d{4}[a-z]?)\)\.\s")
 
@@ -124,7 +129,8 @@ def find_in_text_citations(body_lines):
     """Return {(surnames, year): [line numbers]} for in-text citations."""
     cites = {}
     for n, line in enumerate(body_lines, 1):
-        for pattern in (RE_CITE_PAREN, RE_CITE_LINKED, RE_CITE_NARRATIVE):
+        for pattern in (RE_CITE_PAREN, RE_CITE_LINKED, RE_CITE_NARRATIVE,
+                        RE_CITE_NARRATIVE_LINKED):
             for match in pattern.finditer(line):
                 author, year = match.group(1), match.group(2)
                 key = (surnames(author), year)
