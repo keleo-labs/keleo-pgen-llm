@@ -16,6 +16,10 @@ Usage:
 
     # Show word/line stats for one or more files
     python3 utils/validate-phase-output.py --stats file1.md file2.md file3.md
+
+    # Check every source document is drawn on (all files searched, not just the first)
+    python3 utils/validate-phase-output.py _phase1-cluster-*.md --phase 1 \\
+        --source-manifest /tmp/corpus/_manifest.json
 """
 
 import argparse
@@ -74,6 +78,68 @@ def _is_critical(check_name):
     if check_name in CRITICAL_CHECKS:
         return True
     return any(check_name.startswith(p) for p in CRITICAL_PREFIXES)
+
+
+def validate_source_coverage(contents, manifest_path):
+    """Check every source document is actually drawn on by the phase output.
+
+    When a large corpus is split across parallel cluster analysts, guides can
+    fall between cluster boundaries because each analyst only claims what its
+    own prompt listed. This compares the extraction manifest produced by
+    ``extract-html-text.py`` (or a plain newline-delimited list of sources)
+    against the combined phase output, matching on each source's stem.
+
+    Args:
+        contents: Combined text of all phase output files to search.
+        manifest_path: Path to an extract-html-text.py JSON manifest, or a
+            newline-delimited list of source URLs/paths.
+
+    Returns:
+        list[dict]: One summary check plus one entry naming any uncited stems.
+    """
+    path = Path(manifest_path)
+    if not path.exists():
+        return [{"check": "source_coverage", "pass": False,
+                 "detail": f"Manifest not found: {manifest_path}"}]
+
+    raw = path.read_text(encoding="utf-8")
+    stems = []
+    if raw.lstrip().startswith("{"):
+        manifest = json.loads(raw)
+        stems = [e["stem"] for e in manifest.get("entries", []) if "stem" in e]
+    else:
+        for line in raw.splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                stems.append(_source_stem(line))
+
+    if not stems:
+        return [{"check": "source_coverage", "pass": False,
+                 "detail": f"No sources found in {manifest_path}"}]
+
+    haystack = contents.lower()
+    uncited = [s for s in stems if s.lower() not in haystack]
+    checks = [{
+        "check": "source_coverage",
+        "pass": not uncited,
+        "detail": f"{len(stems) - len(uncited)}/{len(stems)} source documents cited",
+    }]
+    if uncited:
+        checks.append({
+            "check": "source_coverage_gaps",
+            "detail": "Sources never referenced in the phase output: " + ", ".join(uncited),
+        })
+    return checks
+
+
+def _source_stem(source):
+    """Derive the identifying stem from a URL or path (mirrors extract-html-text.py)."""
+    generic = {"", "index", "index.html", "index.htm"}
+    segments = [s for s in re.split(r"[/\\]", source.split("?")[0].split("#")[0]) if s]
+    for seg in reversed(segments):
+        if seg.lower() not in generic:
+            return re.sub(r"\.(x?html?|htm)$", "", seg, flags=re.IGNORECASE)
+    return source
 
 
 def validate_phase_1(content, lines):
@@ -676,6 +742,15 @@ def main():
         action="store_true",
         help="Print a single-line verdict instead of the full JSON check list",
     )
+    parser.add_argument(
+        "--source-manifest",
+        metavar="FILE",
+        help=(
+            "Check every source document is drawn on by the output. Takes an "
+            "extract-html-text.py JSON manifest or a newline-delimited source list. "
+            "Searches all given files, not just the first."
+        ),
+    )
     args = parser.parse_args()
 
     if args.stats:
@@ -706,6 +781,13 @@ def main():
 
     if args.validate_patterns and args.phase == 2:
         checks.extend(validate_pattern_views(content))
+
+    if args.source_manifest:
+        combined = "\n".join(
+            Path(f).read_text(encoding="utf-8", errors="replace")
+            for f in args.file if Path(f).exists()
+        )
+        checks.extend(validate_source_coverage(combined, args.source_manifest))
 
     for c in checks:
         if "pass" in c:

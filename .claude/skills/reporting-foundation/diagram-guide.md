@@ -76,6 +76,11 @@ diagram.
 
 ## Writing a good spec
 
+**The title is not drawn.** `title` and `description` become the SVG's `<title>` and
+`<desc>`/`aria-label` — metadata for screen readers, never artwork. The heading above the diagram
+in the report already names it, so a rendered title would print the same line twice. Set both
+fields anyway; they cost nothing and they are what a non-sighted reader gets.
+
 **Labels are noun phrases, not sentences.** "Automation controller", not "The automation controller
 runs scheduled scans". Detail belongs in `sublabel` or in the prose around the diagram.
 

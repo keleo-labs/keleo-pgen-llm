@@ -221,6 +221,57 @@ def parse_html(html_content):
     return parser.tokens
 
 
+#: A line that is an ATX markdown heading, e.g. "### Some heading".
+MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$")
+#: A line that is a markdown list item, bulleted or numbered.
+MD_LIST_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(.*)$")
+#: Any HTML-ish tag, used to decide which parser a source needs.
+HTML_TAG_RE = re.compile(r"<\s*(?:!doctype|html|head|body|div|p|h[1-6]|span|a|ul|ol|li|table)\b",
+                         re.IGNORECASE)
+
+
+def parse_markdown(text):
+    """Parse markdown into the same token shape as parse_html.
+
+    This utility renders markdown, so it must also be able to read it back:
+    pointing it at its own output (or any markdown file) to pull a heading
+    outline is a natural thing to do, and silently returning nothing for that
+    is worse than not supporting it.
+    """
+    tokens = []
+    for line in text.splitlines():
+        heading = MD_HEADING_RE.match(line)
+        if heading:
+            tokens.append({
+                "type": "heading",
+                "level": len(heading.group(1)),
+                "text": heading.group(2).strip(),
+                "anchor": None,
+            })
+            continue
+        item = MD_LIST_RE.match(line)
+        if item:
+            tokens.append({"type": "list_item", "text": item.group(1).strip()})
+            continue
+        stripped = line.strip()
+        if stripped:
+            tokens.append({"type": "text", "text": stripped})
+        else:
+            tokens.append({"type": "break"})
+    return tokens
+
+
+def parse_source(content):
+    """Parse content as HTML or markdown, whichever it actually is.
+
+    Sniffs for HTML tags rather than trusting the file extension, so a .txt
+    holding HTML and a .html holding markdown both do the right thing.
+    """
+    if HTML_TAG_RE.search(content):
+        return parse_html(content)
+    return parse_markdown(content)
+
+
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
@@ -349,7 +400,7 @@ def extract_batch(sources, output_dir, want_anchors=False, headings_only=False):
 
         entry = {"source": source, "stem": stem}
         try:
-            tokens = parse_html(load_html_or_raise(source))
+            tokens = parse_source(load_html_or_raise(source))
         except Exception as exc:  # noqa: BLE001 - report and continue the batch
             entry["error"] = str(exc)
             entries.append(entry)
@@ -505,7 +556,7 @@ def main(argv=None):
 
     # Single-source mode
     html_content = load_html(sources[0])
-    tokens = parse_html(html_content)
+    tokens = parse_source(html_content)
 
     # Determine what to output to stdout
     # Priority: if --anchors without -o or --anchors-file, JSON goes to stdout.

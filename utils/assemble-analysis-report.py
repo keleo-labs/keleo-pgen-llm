@@ -232,6 +232,74 @@ def render(name, buckets, unmatched, partial_paths, sources, structure, analyst)
     return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n", written
 
 
+#: Sub-blocks within a concern that carry cross-cluster wiring. Matched
+#: case-insensitively against `#### ` headings inside Section 2.
+RELATIONSHIP_HEADINGS = ("concern relationship", "relationship")
+
+
+def render_digest(partial_paths):
+    """Render a compact cross-cluster digest from the partials.
+
+    Parallel Phase 2 agents each need to know what the *other* clusters found
+    without reading the whole assembled report, which for a large corpus can run
+    to tens of thousands of words. This pulls just the concern names, their
+    one-line descriptions, and the relationship blocks each analyst wrote.
+    """
+    out = [
+        "# Cross-Cluster Digest",
+        "",
+        "Concern inventory and relationship map across all clusters, extracted from the "
+        "Phase 1 partials. Read this for cross-practice awareness; read your own cluster's "
+        "partial for depth.",
+        "",
+    ]
+
+    for path_str in partial_paths:
+        path = Path(path_str)
+        content = path.read_text(encoding="utf-8")
+        _, sections = split_sections(content)
+        concerns = next((s for s in sections if classify_heading(s["title"]) == 2), None)
+        if not concerns:
+            continue
+
+        out.append(f"## {path.stem}")
+        out.append("")
+        _, subs = split_subsections(concerns["body"])
+        for sub in subs:
+            out.append(f"**{sub['title']}** — {_first_description(sub['body'])}")
+            out.append("")
+            for heading, block in _nested_blocks(sub["body"]):
+                if any(k in heading.lower() for k in RELATIONSHIP_HEADINGS):
+                    out.append(block.strip())
+                    out.append("")
+
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
+
+
+def _first_description(body):
+    """Pull the first Description field, or the first non-empty line."""
+    match = re.search(r"\*\*Description:?\*\*:?\s*(.+)", body)
+    if match:
+        return match.group(1).strip()
+    for line in body.splitlines():
+        if line.strip() and not line.startswith("#"):
+            return line.strip()
+    return "(no description)"
+
+
+#: HEADING_RE deliberately caps at `###` so section splitting ignores deeper
+#: levels; nested-block extraction needs its own pattern for `#### `.
+SUBHEADING_RE = re.compile(r"^(#{4})\s+(.*?)\s*$", re.MULTILINE)
+
+
+def _nested_blocks(body):
+    """Yield (heading, block) pairs for ``#### `` headings inside a subsection."""
+    matches = list(SUBHEADING_RE.finditer(body))
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+        yield m.group(2), body[m.end():end]
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Assemble partial Phase 1 analysis reports into one report",
@@ -249,6 +317,13 @@ def build_parser():
                         help="Text for the Analyst metadata line")
     parser.add_argument("--stats", action="store_true",
                         help="Print per-partial word/line/section statistics")
+    parser.add_argument("--digest", metavar="FILE",
+                        help=(
+                            "Also write a compact cross-cluster digest to FILE: each "
+                            "cluster's concern names, descriptions and relationship blocks. "
+                            "For parallel Phase 2 agents that need cross-practice awareness "
+                            "without the full report."
+                        ))
     return parser
 
 
@@ -269,6 +344,13 @@ def main(argv=None):
             print(f"{s['file']:<70} {s['words']:>8} {s['lines']:>7} "
                   f"{s['sections']:>6} {s['matched']:>8}")
         print()
+
+    if args.digest:
+        digest = render_digest(args.partials)
+        digest_path = Path(args.digest)
+        digest_path.parent.mkdir(parents=True, exist_ok=True)
+        digest_path.write_text(digest, encoding="utf-8")
+        print(f"Wrote {digest_path} ({len(digest.split())} words, digest)")
 
     print(f"Wrote {out_path} ({len(report.split())} words)")
     for num, title, _ in CANONICAL_SECTIONS:

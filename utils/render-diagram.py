@@ -61,7 +61,6 @@ THEME = {
     "radius_node": 4,
     "radius_group": 6,
     "font": "'Red Hat Text', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif",
-    "size_title": 13,
     "size_label": 11,
     "size_sub": 9,
     "size_edge": 10,
@@ -584,20 +583,11 @@ def render(spec):
     """Return the SVG document for a validated spec."""
     body, width, height = LAYOUT_FUNCS[spec["layout"]](spec)
 
+    # The title is metadata, not artwork. A diagram in a report always sits
+    # under a heading that already names it, so drawing it inside the image
+    # repeats the line — visibly, in the published Doc. It stays in <title>
+    # and aria-label, where it serves screen readers without duplicating.
     title = spec.get("title", "")
-    if title:
-        lines = wrap_text(title, THEME["size_title"], width - THEME["pad"] * 2, max_lines=2)
-        title_h = len(lines) * THEME["size_title"] * THEME["line_height"] + 10
-        shifted = [f'  <g transform="translate(0, {_fmt(title_h)})">'] + body + ["  </g>"]
-        header = []
-        cursor = THEME["pad"] + THEME["size_title"]
-        for line in lines:
-            header.append(svg_text(width / 2, cursor, line, THEME["size_title"],
-                                   THEME["text"], "700"))
-            cursor += THEME["size_title"] * THEME["line_height"]
-        body = header + shifted
-        height += title_h
-
     desc = spec.get("description", title)
     out = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {_fmt(width)} {_fmt(height)}" '
@@ -628,8 +618,12 @@ Diagram spec reference
 ======================
 
 Every spec is a JSON object with a "layout" plus optional "title" and
-"description". The description becomes the SVG aria-label; it falls back to the
-title when omitted.
+"description".
+
+Neither is drawn. The title becomes the SVG's <title>, the description its
+<desc> and aria-label, falling back to the title when omitted. A diagram in a
+report sits under a heading that already names it, so rendering the title
+inside the image would print the same line twice.
 
 Shared node fields (flow nodes, stack tiers, timeline phases, hub centre and
 satellites all accept these):
