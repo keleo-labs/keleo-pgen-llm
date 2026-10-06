@@ -91,6 +91,9 @@ RE_ITALIC_LINE = re.compile(r"^\*(?![\s*])(.+?)\*$")
 RE_ATTRIBUTION_HINT = re.compile(r"\b(?:structured using|frameworks?)\b", re.I)
 RE_MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
 RE_IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
+# Figure caption under a diagram: "*Figure 2 — End-to-end remediation path*".
+# An em dash, en dash, colon or hyphen separates the number from the title.
+RE_CAPTION = re.compile(r"^\*Figure\s+\d+\s*[—–:-]\s*\S.*\*$")
 RE_BOX_DRAWING = re.compile(r"[─-╿▀-▟▲▶▼◀]")
 RE_ASCII_BOX = re.compile(r"\+[-=]{3,}\+")
 # Two or more consecutive capitalised words — a framework name left unlinked.
@@ -248,7 +251,32 @@ def check_diagrams(lines, report_path):
                     "check": "diagrams", "severity": "error", "line": n,
                     "message": f"image '{target}' has no alt text",
                 })
+            if target.lower().endswith(".svg"):
+                findings.extend(check_caption(lines, n, target))
     return findings
+
+
+def check_caption(lines, image_line, target):
+    """A rendered diagram carries no drawn title, so the page must name it.
+
+    The caption is the italic line under the figure (@rule:report-615). Only
+    SVG embeds are checked: a screenshot or photo is not a figure the reader
+    needs to reference by number.
+    """
+    # Walk past blank lines to the first line of content under the image.
+    index = image_line  # lines is 0-indexed, so this is already the next line
+    while index < len(lines) and not lines[index].strip():
+        index += 1
+    following = lines[index].strip() if index < len(lines) else ""
+
+    if not RE_CAPTION.match(following):
+        return [{
+            "check": "diagrams", "severity": "error", "line": image_line,
+            "message": (f"diagram '{target}' has no caption — follow it with an "
+                        f"italic '*Figure N — <title>*' line naming the figure, "
+                        f"since the SVG does not draw its own title"),
+        }]
+    return []
 
 
 def check_citations(cites, refs, min_count, max_count):

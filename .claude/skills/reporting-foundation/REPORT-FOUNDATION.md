@@ -237,10 +237,14 @@ python3 utils/render-diagram.py --dir reports/<report-slug>/assets/
 python3 utils/render-diagram.py --spec-help    # full spec field reference
 ```
 
-Embed with a relative path and alt text that carries the diagram's claim:
+Embed with a relative path, alt text that carries the diagram's claim, and a numbered caption
+giving the spec's `title` — the SVG does not draw its own title, so without the caption the figure
+reaches the reader unnamed:
 
 ```markdown
 ![Option A: controller-centric scheduled remediation topology](assets/option-a-topology.svg)
+
+*Figure 1 — Option A: controller-centric scheduled remediation*
 ```
 
 Read `reporting-foundation/diagram-guide.md` for layout selection, when a table beats a diagram, and
@@ -487,6 +491,12 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - When: the markdown image is written
 - Then: the target path resolves relative to the report
 - And: the alt text states the diagram's claim rather than listing its boxes
+
+#### Scenario: Embedded diagrams are captioned (@rule:report-615)
+- Given: a report embeds a diagram, which does not draw its own title
+- When: the markdown image is written
+- Then: an italic caption follows it, numbered sequentially through the report
+- And: the caption names the figure, where the alt text states its claim
 
 ### Feature: Context Resolution
 

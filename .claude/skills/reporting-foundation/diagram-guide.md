@@ -71,20 +71,37 @@ python3 utils/render-diagram.py --dir reports/<report-slug>/assets/
 Batch mode writes each `<name>.svg` beside its `<name>.json`. One call per report, not one per
 diagram.
 
-**3. Embed with a relative path and real alt text:**
+**3. Embed with a relative path, real alt text, and a numbered caption:**
 
 ```markdown
 ![Option A: controller-centric scheduled remediation topology](assets/option-a-topology.svg)
+
+*Figure 1 — Option A: controller-centric scheduled remediation*
 ```
+
+The caption carries the spec's `title`, which is otherwise invisible to a sighted reader — the SVG
+does not draw it. Where a heading immediately above already names the figure, do not echo it; name
+what the figure *shows* instead, so the line earns its place.
+
+Number figures sequentially through the report so prose can refer to "Figure 2" instead of "the
+diagram above", which breaks as soon as a page or slide boundary moves.
+
+The caption and the alt text do different jobs and should not be the same sentence. The caption
+**names** the figure; the alt text states its **claim**, for a reader who cannot see it.
+
+Because the report now carries its own captions, do **not** publish it to Google Docs with
+`publish-doc.py --captions` — that renders the alt text as a second caption under the same figure.
+Alt text reaches the Doc as the image description either way.
 
 ---
 
 ## Writing a good spec
 
 **The title is not drawn.** `title` and `description` become the SVG's `<title>` and
-`<desc>`/`aria-label` — metadata for screen readers, never artwork. The heading above the diagram
-in the report already names it, so a rendered title would print the same line twice. Set both
-fields anyway; they cost nothing and they are what a non-sighted reader gets.
+`<desc>`/`aria-label` — metadata for screen readers, never artwork. The markdown caption beneath
+the figure names it, so a rendered title would print the same line twice — once in the picture and
+again in the page, which is how it reaches a Google Doc doubled. Set both fields anyway: `title` is
+the caption text, and both are what a non-sighted reader gets.
 
 **Labels are noun phrases, not sentences.** "Automation controller", not "The automation controller
 runs scheduled scans". Detail belongs in `sublabel` or in the prose around the diagram.
