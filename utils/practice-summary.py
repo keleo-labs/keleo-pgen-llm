@@ -96,6 +96,20 @@ def summarize_pattern(pattern):
         "name": pattern.get("name"),
         "viewNames": [v.get("name") for v in sorted_views],
         "viewCount": len(views),
+        # Per-view alpha states are what you need to judge whether a pattern
+        # reads as a progression or repeats one snapshot; viewNames alone
+        # cannot show that.
+        "views": [
+            {
+                "seq": v.get("seq"),
+                "name": v.get("name"),
+                "alphaStates": [
+                    {"alphaName": a.get("alphaName"), "stateName": a.get("stateName")}
+                    for a in v.get("alphaStates", [])
+                ],
+            }
+            for v in sorted_views
+        ],
     }
 
 
@@ -268,8 +282,10 @@ def print_human_readable(summary):
         print(f"Patterns ({len(s['patterns'])}):")
         for p in s["patterns"]:
             print(f"  {p['name']} ({p['viewCount']} views)")
-            for v in p["viewNames"]:
-                print(f"    - {v}")
+            for v in p.get("views", []):
+                print(f"    - {v['name']}")
+                for a in v["alphaStates"]:
+                    print(f"        {a['alphaName']} -> {a['stateName']}")
         print()
 
     if s["patternGroups"]:

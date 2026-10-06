@@ -26,7 +26,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-GWS_PATH = "/opt/homebrew/bin/gws"
+from _shared import GWS as GWS_PATH
 
 
 def fetch_presentation(presentation_id):

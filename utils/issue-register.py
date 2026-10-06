@@ -26,6 +26,24 @@ Usage:
     # Append the issues (Status is always written as "New")
     python3 utils/issue-register.py --append drafts/issues.json
 
+    # Write resolution columns P-T back onto existing rows
+    python3 utils/issue-register.py --resolve drafts/resolutions.json --dry-run
+    python3 utils/issue-register.py --resolve drafts/resolutions.json
+
+Resolution file format — a single object or an array of objects. Only `row`
+and `status` are required; omitted change columns are written as "N/A":
+
+    [
+      {
+        "row": 38,
+        "status": "Resolved",
+        "resolutionSummary": "Reworked the pattern so each view advances.",
+        "practiceMethodChanges": "practices/red-hat-ai/train-prepare-ai-models.json: ...",
+        "pgenChanges": "N/A",
+        "languageChanges": "N/A"
+      }
+    ]
+
 Draft issue file format — a single object or an array of objects:
 
     [
@@ -52,14 +70,11 @@ import argparse
 import difflib
 import json
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
 
-from _shared import load_user_config
-
-GWS = shutil.which("gws") or "/opt/homebrew/bin/gws"
+from _shared import GWS, load_user_config
 
 # Column order of the register's input zone (A-P). Resolution columns Q-T are
 # written by /plan-from-feedback, never on append.
@@ -92,6 +107,10 @@ RESOLUTION_COLUMNS = [
 ALL_COLUMNS = INPUT_COLUMNS + RESOLUTION_COLUMNS
 
 VALID_TYPES = ["Issue", "Enhancement", "Question"]
+
+# Status column dropdown. Writing anything else trips the sheet's own
+# validation, so --resolve checks against this list before calling out.
+VALID_STATUSES = ["New", "Planned", "In Progress", "Resolved", "Closed", "Declined"]
 VALID_KINDS = ["practice", "practiceBaseline", "method"]
 
 # Element types as named by the Practice Language schema. Used to warn on
@@ -333,6 +352,77 @@ def column_letter(index):
     return letters
 
 
+def validate_resolutions(resolutions, table):
+    """Check resolution entries before any write. Returns a list of errors."""
+    errors = []
+    table_range = table.get("range", {})
+    # endRowIndex is exclusive and 0-based; the header occupies the first row.
+    first_data_row = table_range.get("startRowIndex", 0) + 2
+    last_data_row = table_range.get("endRowIndex", 0)
+
+    seen = set()
+    for i, entry in enumerate(resolutions):
+        label = f"resolution[{i}]"
+        row = entry.get("row")
+        if not isinstance(row, int):
+            errors.append(f"{label}: 'row' must be an integer sheet row number")
+        else:
+            if row in seen:
+                errors.append(f"{label}: row {row} appears more than once")
+            seen.add(row)
+            if not first_data_row <= row <= last_data_row:
+                errors.append(
+                    f"{label}: row {row} is outside the table's data rows "
+                    f"({first_data_row}-{last_data_row})")
+
+        status = entry.get("status")
+        if not status:
+            errors.append(f"{label}: 'status' is required")
+        elif status not in VALID_STATUSES:
+            errors.append(
+                f"{label}: status '{status}' is not one of {', '.join(VALID_STATUSES)}")
+
+        if not entry.get("resolutionSummary"):
+            errors.append(f"{label}: 'resolutionSummary' is required")
+
+        unknown = set(entry) - {"row", "status"} - {k for k, _ in RESOLUTION_COLUMNS}
+        if unknown:
+            errors.append(f"{label}: unknown field(s): {', '.join(sorted(unknown))}")
+
+    return errors
+
+
+def write_resolutions(spreadsheet_id, sheet_title, resolutions):
+    """Write Status plus the resolution columns (P-T) for each row.
+
+    Rows are written individually rather than as one range: they are rarely
+    contiguous, and a per-row write keeps a failure from stranding the batch
+    half-applied.
+    """
+    first_column = column_letter(len(INPUT_COLUMNS) - 1)   # P — Status
+    last_column = column_letter(len(ALL_COLUMNS) - 1)      # T — language changes
+
+    written = []
+    for entry in resolutions:
+        row = entry["row"]
+        values = [entry["status"]] + [
+            entry.get(key) or "N/A" for key, _label in RESOLUTION_COLUMNS
+        ]
+        run_gws(
+            ["sheets", "spreadsheets", "values", "update",
+             "--params", json.dumps({
+                 "spreadsheetId": spreadsheet_id,
+                 "range": f"{sheet_title}!{first_column}{row}:{last_column}{row}",
+                 "valueInputOption": "USER_ENTERED",
+             }),
+             "--json", json.dumps({"values": [values]})],
+            f"Writing resolution for row {row}",
+        )
+        written.append({"row": row, "status": entry["status"]})
+
+    return written
+
+
 def append_rows(spreadsheet_id, sheet_title, sheet_id, table, rows):
     """Write rows below the table and extend the table range to cover them."""
     table_range = table.get("range", {})
@@ -515,6 +605,36 @@ def cmd_append(spreadsheet_id, drafts, default_email, dry_run, as_json, skip_dup
             print(f"  Row {row_number}: [{row[2]}] {row[3]}")
 
 
+def cmd_resolve(spreadsheet_id, resolutions, dry_run, as_json):
+    sheet_title, _sheet_id, table = get_table(spreadsheet_id)
+
+    errors = validate_resolutions(resolutions, table)
+    if errors:
+        for message in errors:
+            print(f"ERROR: {message}", file=sys.stderr)
+        sys.exit(1)
+
+    if dry_run:
+        if as_json:
+            print(json.dumps({"dryRun": True, "resolutions": resolutions}, indent=2))
+        else:
+            print(f"=== DRY RUN — {len(resolutions)} ROW(S) ===")
+            for entry in resolutions:
+                print(f"  Row {entry['row']}: [{entry['status']}] "
+                      f"{entry['resolutionSummary'][:80]}")
+        return resolutions
+
+    written = write_resolutions(spreadsheet_id, sheet_title, resolutions)
+
+    if as_json:
+        print(json.dumps({"written": written}, indent=2))
+    else:
+        print(f"=== UPDATED {len(written)} ROW(S) ===")
+        for entry in written:
+            print(f"  Row {entry['row']}: {entry['status']}")
+    return written
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Read from and append to the Google Sheets feedback/issue register"
@@ -530,6 +650,9 @@ def main():
                       help="Compare draft issues against existing register rows")
     mode.add_argument("--append", metavar="FILE",
                       help="Append draft issues to the register (Status is written as 'New')")
+    mode.add_argument("--resolve", metavar="FILE",
+                      help="Write Status and resolution columns (P-T) onto "
+                           "existing rows from a resolution file")
 
     parser.add_argument("--spreadsheet", metavar="URL_OR_ID",
                         help="Override the register from .claude/user-config.json")
@@ -543,7 +666,7 @@ def main():
     parser.add_argument("--no-duplicate-check", action="store_true",
                         help="Skip the duplicate warning pass during --append")
     parser.add_argument("--dry-run", action="store_true",
-                        help="With --append: preview the rows without writing")
+                        help="With --append or --resolve: preview without writing")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     args = parser.parse_args()
@@ -565,6 +688,8 @@ def main():
     elif args.append:
         cmd_append(spreadsheet_id, load_drafts(args.append), default_email,
                    args.dry_run, args.json, args.no_duplicate_check)
+    elif args.resolve:
+        cmd_resolve(spreadsheet_id, load_drafts(args.resolve), args.dry_run, args.json)
 
 
 if __name__ == "__main__":

@@ -1024,11 +1024,46 @@ _NEGATIVE_POLARITY_PATTERNS = [
 ]
 
 
+def _starts_with_imperative(name):
+    """Heuristic: does the item name open with a base-form verb?
+
+    Base-form verbs ("Declare", "Record", "Confirm") read as instructions to
+    act. Past participles ("Defined", "Missing") and gerunds read as states
+    observed. This only inspects the first token, which is where the framing of
+    an imperative phrase is carried.
+    """
+    first = name.strip().split(" ", 1)[0].strip(":,.;").lower()
+    if not first.isalpha() or len(first) < 3:
+        return False
+    # "Exceed", "Proceed", "Feed" and similar are base forms despite the
+    # ending, so exempt the short -eed set before rejecting -ed.
+    if first.endswith("eed"):
+        return True
+    return not (first.endswith("ed") or first.endswith("ing"))
+
+
 def _is_negative_polarity(name, desc):
-    """Check if a checklist item uses negative/absence framing."""
+    """Check if a checklist item uses negative/absence framing.
+
+    Polarity is a property of how the item is *framed*, which the name carries.
+    A description legitimately explains why the action matters, and doing so
+    often requires naming the deficiency being prevented — "a ConfigMap the
+    deployment does not reconcile over" describes the hazard, not an absence to
+    observe. Matching the description unconditionally produced false positives
+    on every practice in a seven-practice method, every one of them an item
+    whose name was already a positive imperative. A whole warning category that
+    is usually wrong trains its readers to ignore it.
+    """
     for pattern in _NEGATIVE_POLARITY_PATTERNS:
         if pattern.search(name):
             return True
+
+    # The name is clean. Only fall through to the description when the name has
+    # not already established a positive imperative.
+    if _starts_with_imperative(name):
+        return False
+
+    for pattern in _NEGATIVE_POLARITY_PATTERNS:
         if pattern.search(desc):
             return True
     return False
@@ -4293,7 +4328,8 @@ def main():
 
     # Auto-discover _effective-context.json for transitive baseline resolution
     if baseline_data and kind != "practiceBaseline":
-        for auto_name in ('_effective-context.json', '_effective-parent.json'):
+        for auto_name in ('_effective-context.json', '_effective-parent.json',
+                          '_effective-baseline.json'):
             auto_path = file_path.parent / auto_name
             if auto_path.exists():
                 ectx, ectx_err = load_json_pair(auto_path)

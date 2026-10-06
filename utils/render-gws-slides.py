@@ -28,7 +28,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-GWS_PATH = "/opt/homebrew/bin/gws"
+from _shared import GWS as GWS_PATH
 TIMEOUT = 120
 SIZES = {"small": "SMALL", "medium": "MEDIUM", "large": "LARGE"}
 

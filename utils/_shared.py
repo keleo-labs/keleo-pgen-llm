@@ -7,10 +7,15 @@ Internal module — not a CLI tool. Import from individual scripts:
 import copy
 import json
 import os
+import shutil
 import sys
 import zipfile
 from collections import OrderedDict
 from pathlib import Path
+
+# Google Workspace CLI. Resolved from PATH so non-Homebrew installs (npm, for
+# example) work; the Homebrew location is only a last-resort fallback.
+GWS = shutil.which("gws") or "/opt/homebrew/bin/gws"
 
 
 def load_json(file_path, exit_on_error=True):
@@ -81,32 +86,52 @@ MERGEABLE_ARRAYS = [
 ]
 
 
+def _stamp_contributor(entry, source):
+    """Record `source` as a contributor of `entry`, preserving earlier contributors.
+
+    Sets `_contributingPracticeName` to the most recent contributor (last writer
+    wins) and appends to the ordered `_contributingPracticeNames` list. When the
+    same element name is declared by several documents, the scalar alone loses
+    every contributor but the last — consumers deciding practiceDependencyNames
+    must read the list.
+    """
+    if source is None:
+        return
+    entry["_contributingPracticeName"] = source
+    contributors = entry.get("_contributingPracticeNames") or []
+    if source not in contributors:
+        contributors = contributors + [source]
+    entry["_contributingPracticeNames"] = contributors
+
+
 def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None):
     """Merge two lists of objects by 'name' key. Overlay overrides base.
 
-    When source names are provided, stamps _contributingPracticeName on each
-    element for provenance tracking.
+    When source names are provided, stamps _contributingPracticeName (last
+    writer) and _contributingPracticeNames (all contributors, in merge order)
+    on each element for provenance tracking.
     """
     merged = OrderedDict()
     for item in (base_list or []):
         if "name" in item:
             entry = copy.deepcopy(item)
             if base_source is not None and "_contributingPracticeName" not in entry:
-                entry["_contributingPracticeName"] = base_source
+                _stamp_contributor(entry, base_source)
             merged[item["name"]] = entry
     for item in (overlay_list or []):
         if "name" in item:
             if item["name"] in merged:
                 existing = merged[item["name"]]
                 combined = copy.deepcopy(existing)
+                prior = existing.get("_contributingPracticeNames") or []
                 combined.update(copy.deepcopy(item))
-                if overlay_source is not None:
-                    combined["_contributingPracticeName"] = overlay_source
+                if prior:
+                    combined["_contributingPracticeNames"] = list(prior)
+                _stamp_contributor(combined, overlay_source)
                 merged[item["name"]] = combined
             else:
                 entry = copy.deepcopy(item)
-                if overlay_source is not None:
-                    entry["_contributingPracticeName"] = overlay_source
+                _stamp_contributor(entry, overlay_source)
                 merged[item["name"]] = entry
     return list(merged.values())
 

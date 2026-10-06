@@ -8,7 +8,7 @@ Usage:
     python3 utils/studio-client.py --status
     python3 utils/studio-client.py --index [--max-age 3600]
     python3 utils/studio-client.py --docs [--kind practice]
-    python3 utils/studio-client.py --check [name]
+    python3 utils/studio-client.py --check [name] [--deep]
     python3 utils/studio-client.py --link "Practice Name" ["Other Name" ...] [--markdown]
     python3 utils/studio-client.py --link "Practice A" "Practice B" --attribution
     python3 utils/studio-client.py --pull "Practice Name"
@@ -18,11 +18,13 @@ Usage:
 
 import argparse
 import base64
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -32,7 +34,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import load_user_config, save_user_config, get_project_root
+from _shared import GWS, load_user_config, save_user_config, get_project_root
 
 REMOTE_INDEX_PATH = "bundles/.remote-index.json"
 REMOTE_DOCS_PATH = "bundles/.remote-documents.json"
@@ -476,8 +478,8 @@ def _build_local_versions():
     return versions
 
 
-def cmd_check(name=None, as_json=False):
-    """Compare local vs remote versions."""
+def cmd_check(name=None, as_json=False, deep=False):
+    """Compare local vs remote versions, and with deep=True their content too."""
     cached = _load_cached_index()
     if not cached or _index_age_seconds(cached) > DEFAULT_MAX_AGE:
         cached = cmd_index(max_age=DEFAULT_MAX_AGE, as_json=False)
@@ -523,14 +525,29 @@ def cmd_check(name=None, as_json=False):
         else:
             status = "unknown"
 
-        results.append({
+        entry = {
             "name": doc_name,
             "localVersion": local_ver,
             "remoteVersion": remote_ver,
             "status": status,
             "localPath": local["path"] if local else None,
             "remoteSlug": remote.get("slug") if remote else None,
-        })
+        }
+
+        # Version equality says nothing about content: a bundle republished
+        # without a version bump still reads as up to date. Only --deep can
+        # tell the difference, and only where both sides exist.
+        if deep and status == "up-to-date":
+            comparison = _compare_bundle_content(doc_name, local["path"])
+            if comparison["error"]:
+                entry["contentCheckError"] = comparison["error"]
+            elif not comparison["match"]:
+                entry["status"] = "same-version-content-differs"
+                entry["differingDocuments"] = comparison["differingDocuments"]
+            else:
+                entry["contentVerified"] = True
+
+        results.append(entry)
 
     if as_json:
         print(json.dumps({"results": results}, indent=2))
@@ -540,79 +557,141 @@ def cmd_check(name=None, as_json=False):
         lv = r["localVersion"] or "—"
         rv = r["remoteVersion"] or "—"
         indicator = {
-            "up-to-date": "  ✓ up to date",
+            "up-to-date": "  ✓ up to date" + (" (content verified)" if r.get("contentVerified") else ""),
+            "same-version-content-differs": "  ! SAME VERSION, CONTENT DIFFERS",
             "remote-newer": "  ← REMOTE NEWER",
             "local-newer": "  → LOCAL NEWER",
             "local-only": "  → LOCAL ONLY",
             "remote-only": "  ← REMOTE ONLY",
         }.get(r["status"], "")
         print(f"  {r['name']:40s} local: {lv:8s} remote: {rv:8s}{indicator}")
+        for doc in r.get("differingDocuments", []):
+            print(f"      differs: {doc}")
+        if r.get("contentCheckError"):
+            print(f"      content check failed: {r['contentCheckError']}")
 
     return results
 
 
-def cmd_pull(name, as_json=False):
-    """Download a .keleo bundle from remote into bundles/."""
+def _fetch_bundle(name, output_path, quiet=False):
+    """Download a remote .keleo bundle to output_path.
+
+    Returns (path, None) on success or (None, reason) on failure. Unlike
+    cmd_pull this never exits, so callers that treat a download failure as
+    non-fatal (--deep) can carry on with the remaining bundles.
+    """
     url, token = _get_credentials()
 
     data, err = _api_get(url, token, "download", {"name": name})
     if err == "auth_expired":
         _handle_auth_error()
     if err:
-        print(f"Error: {err}", file=sys.stderr)
-        sys.exit(1)
+        return None, err
 
     download_url = data.get("downloadUrl")
     if not download_url:
-        print(f"Error: No download URL returned for '{name}'.", file=sys.stderr)
-        print("The document may not exist on the remote.", file=sys.stderr)
-        sys.exit(1)
+        return None, "no download URL returned (document may not exist remotely)"
 
     file_id_match = re.search(r"/d/([^/]+)/", download_url)
     if not file_id_match:
         file_id_match = re.search(r"id=([^&]+)", download_url)
     if not file_id_match:
-        print(f"Error: Cannot extract file ID from download URL.", file=sys.stderr)
-        sys.exit(1)
+        return None, "cannot extract file ID from download URL"
 
-    file_id = file_id_match.group(1)
-    slug = _slugify(name)
-    bundles_dir = get_project_root() / "bundles"
-    bundles_dir.mkdir(parents=True, exist_ok=True)
-    output_path = bundles_dir / f"{slug}.keleo"
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     gws_cmd = [
-        "/opt/homebrew/bin/gws", "drive", "files", "get",
-        "--params", json.dumps({"fileId": file_id, "alt": "media"}),
+        GWS, "drive", "files", "get",
+        "--params", json.dumps({"fileId": file_id_match.group(1), "alt": "media"}),
         "--output", str(output_path),
     ]
 
     try:
         result = subprocess.run(gws_cmd, capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
-            print(f"Error downloading bundle: {result.stderr.strip()}", file=sys.stderr)
-            sys.exit(1)
+            return None, f"download failed: {result.stderr.strip()}"
     except FileNotFoundError:
-        print("Error: gws CLI not found at /opt/homebrew/bin/gws", file=sys.stderr)
-        print("Install it or download manually from:", file=sys.stderr)
-        print(f"  {download_url}", file=sys.stderr)
-        sys.exit(1)
+        return None, f"gws CLI not found at {GWS} (download manually: {download_url})"
+    except subprocess.TimeoutExpired:
+        return None, "download timed out after 60s"
 
     if not output_path.exists() or output_path.stat().st_size == 0:
-        print(f"Error: Download produced empty file.", file=sys.stderr)
-        sys.exit(1)
+        return None, "download produced an empty file"
 
     if not zipfile.is_zipfile(output_path):
-        print(f"Error: Downloaded file is not a valid ZIP archive.", file=sys.stderr)
         output_path.unlink()
+        return None, "downloaded file is not a valid ZIP archive"
+
+    with zipfile.ZipFile(output_path, "r") as zf:
+        if "manifest.json" not in zf.namelist():
+            output_path.unlink()
+            return None, "downloaded archive has no manifest.json"
+
+    return output_path, None
+
+
+def _document_hashes(keleo_path):
+    """Map document filename → SHA-256 of its canonicalised JSON.
+
+    Canonicalising (sorted keys, fixed separators) means formatting-only
+    differences — indentation, key order, trailing newline — do not register
+    as content changes.
+    """
+    hashes = {}
+    with zipfile.ZipFile(keleo_path, "r") as zf:
+        for entry in sorted(zf.namelist()):
+            if not entry.startswith("documents/") or not entry.endswith(".json"):
+                continue
+            try:
+                doc = json.loads(zf.read(entry))
+            except json.JSONDecodeError:
+                hashes[entry] = "unparseable"
+                continue
+            canonical = json.dumps(doc, sort_keys=True, separators=(",", ":"))
+            hashes[entry] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return hashes
+
+
+def _compare_bundle_content(name, local_path):
+    """Compare local and remote bundle document content.
+
+    Returns a dict with 'match' (bool or None if undetermined), the differing
+    document names, and any error encountered.
+    """
+    # The gws CLI refuses an --output path outside its working directory, so
+    # the scratch dir has to live under cwd rather than the system temp dir.
+    with tempfile.TemporaryDirectory(dir=Path.cwd(), prefix=".keleo-deep-") as tmpdir:
+        remote_path, err = _fetch_bundle(name, Path(tmpdir) / "remote.keleo")
+        if err:
+            return {"match": None, "error": err}
+
+        try:
+            local_hashes = _document_hashes(local_path)
+            remote_hashes = _document_hashes(remote_path)
+        except (zipfile.BadZipFile, KeyError) as e:
+            return {"match": None, "error": f"could not read documents: {e}"}
+
+    differing = sorted(
+        set(local_hashes) ^ set(remote_hashes)
+        | {k for k in set(local_hashes) & set(remote_hashes)
+           if local_hashes[k] != remote_hashes[k]}
+    )
+    return {"match": not differing, "differingDocuments": differing, "error": None}
+
+
+def cmd_pull(name, as_json=False):
+    """Download a .keleo bundle from remote into bundles/."""
+    slug = _slugify(name)
+    output_path = get_project_root() / "bundles" / f"{slug}.keleo"
+
+    output_path, err = _fetch_bundle(name, output_path)
+    if err:
+        print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
 
     try:
         with zipfile.ZipFile(output_path, "r") as zf:
-            if "manifest.json" not in zf.namelist():
-                print(f"Error: Downloaded archive has no manifest.json.", file=sys.stderr)
-                output_path.unlink()
-                sys.exit(1)
             manifest = json.loads(zf.read("manifest.json"))
             pkg = manifest.get("package", {})
             version = manifest.get("version") or pkg.get("version", "?")
@@ -728,6 +807,12 @@ def main():
                         help="With --link: also select an element in the document")
     parser.add_argument("--markdown", action="store_true",
                         help="With --link: emit markdown links, one per line")
+    parser.add_argument("--deep", action="store_true",
+                        help="With --check: also compare document content for "
+                             "bundles whose versions match, reporting "
+                             "same-version-content-differs where they diverge. "
+                             "Downloads each matching bundle, so scope it with "
+                             "a NAME rather than running it over the library")
     parser.add_argument("--attribution", action="store_true",
                         help="With --link: emit the closing report attribution "
                              "line with every framework hyperlinked")
@@ -751,7 +836,7 @@ def main():
                  attribution=args.attribution, as_json=args.json,
                  max_age=args.max_age, strict=args.strict)
     elif args.check is not None:
-        cmd_check(name=args.check or None, as_json=args.json)
+        cmd_check(name=args.check or None, as_json=args.json, deep=args.deep)
     elif args.pull:
         cmd_pull(args.pull, as_json=args.json)
     elif args.push:

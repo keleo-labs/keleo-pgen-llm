@@ -36,7 +36,7 @@ import json
 import subprocess
 import sys
 
-GWS_PATH = "/opt/homebrew/bin/gws"
+from _shared import GWS as GWS_PATH
 TIMEOUT = 120
 EMU_PER_INCH = 914400
 POINTS_PER_INCH = 72
