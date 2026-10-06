@@ -1,6 +1,6 @@
 # Deck Foundation
 
-Version: 2.1.0
+Version: 2.2.0
 
 > **2.0.0 changes the default.** A deck built from a source document now
 > follows that document's structure instead of being re-argued into a
@@ -48,6 +48,20 @@ Slides export; the pptx hop is required, which is why §4's constraints exist.
 
 Step 6 is not optional. Layout problems are invisible in markdown and obvious
 in a thumbnail.
+
+Steps 5 and 6 cycle: publishing is how you find the layout defects, so expect
+several rounds. Drive cannot replace a deck in place, so each round uploads a
+new file — `publish-deck.py` records the ID it created in
+`<workdir>/.published.json` and trashes it on the next run, which is what
+stops the cycle filling Drive with near-identical decks. Two consequences
+worth knowing:
+
+- **The URL changes every publish.** Give the user the link from the final
+  run, not an earlier one.
+- **Deleting the build directory loses the thread.** The next publish then
+  has nothing to supersede and leaves the previous deck behind. `--prune`
+  cleans that up by matching on deck name; `--keep-previous` opts out of
+  replacement entirely when you want the versions kept.
 
 ### 2.1 Working from a source document
 
@@ -283,7 +297,7 @@ they work from any working directory.
 | Script | Purpose |
 |--------|---------|
 | `new-deck.py` | Scaffold a deck project against a brand theme |
-| `publish-deck.py` | Export → upload → convert → PDF |
+| `publish-deck.py` | Export → upload → convert → PDF, trashing the version it replaces |
 | `review-deck.py` | Render a published deck to local PNGs |
 | `inspect-template.py` | Assess a .pptx as a branding donor |
 | `slides-template.py` | Map a Google Slides template's layouts to semantic roles |

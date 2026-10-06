@@ -164,6 +164,36 @@ def upload_as_slides(path: str, name: str, parent: str | None = None) -> dict:
     )
 
 
+def list_files(
+    query: str,
+    fields: str = "files(id,name,createdTime)",
+    order_by: str | None = None,
+) -> list[dict]:
+    """List Drive files matching a search query, returning the `files` array."""
+    params = {"q": query, "fields": fields}
+    if order_by:
+        params["orderBy"] = order_by
+    result = run(["drive", "files", "list", *_params(params)])
+    return result.get("files", [])
+
+
+def find_presentations(name: str) -> list[dict]:
+    """Return live Slides decks with this exact name, newest first.
+
+    Used to find the trail a repeated publish leaves behind. Matching is on
+    name alone, so a deck a human created under the same name looks identical
+    to one this tooling produced — callers must treat the result as a
+    candidate list, not a confirmed set.
+    """
+    escaped = name.replace("\\", "\\\\").replace("'", "\\'")
+    query = (
+        f"name = '{escaped}' "
+        "and mimeType = 'application/vnd.google-apps.presentation' "
+        "and trashed = false"
+    )
+    return list_files(query, order_by="createdTime desc")
+
+
 def trash_file(file_id: str) -> dict:
     """Move a file to the Drive trash (recoverable, unlike a hard delete)."""
     return run(
