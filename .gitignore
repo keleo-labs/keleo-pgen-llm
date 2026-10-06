@@ -6,6 +6,13 @@
 practices/*
 baselines/*
 bundles/*
+
+# Exception: Platform Adoption Essentials is the definitive baseline the
+# library resolves against, not regenerable output, so it is tracked. Only
+# the document itself — its phase reports and backups stay ignored.
+!baselines/platform-adoption-essentials/
+baselines/platform-adoption-essentials/*
+!baselines/platform-adoption-essentials/platform-adoption-essentials.json
 reviews/*
 practice-resources/*
 archive

@@ -30,6 +30,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -194,6 +195,32 @@ def load_resolved_json(entry):
     return load_json_pair(entry["path"])
 
 
+def _dedupe_same_file(entries):
+    """Collapse entries whose paths resolve to the same file on disk.
+
+    A baseline can be reachable by more than one path — deps/ commonly
+    symlinks to the document's real home — and two paths to one file is not
+    a genuine ambiguity for the caller to resolve. Keeps the first path seen,
+    which preserves the index's own ordering preference.
+    """
+    seen = set()
+    deduped = []
+    for entry in entries:
+        path = entry.get("path")
+        if not path or entry.get("remote") or "keleo_path" in entry:
+            deduped.append(entry)
+            continue
+        try:
+            key = os.path.realpath(path)
+        except OSError:
+            key = path
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(entry)
+    return deduped
+
+
 def resolve_name(name, index, prefer_filesystem=False):
     """Resolve a single name against the index.
 
@@ -205,6 +232,7 @@ def resolve_name(name, index, prefer_filesystem=False):
     if not entries:
         return {"name": name, "status": "not_found"}
 
+    entries = _dedupe_same_file(entries)
     local_entries = [e for e in entries if not e.get("remote")]
     remote_entries = [e for e in entries if e.get("remote")]
 

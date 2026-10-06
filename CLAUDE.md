@@ -130,7 +130,7 @@ keleo-pgen-llm/
 │           └── contract.feature
 ├── deps/                                   # Consumed dependencies (tracked)
 │   ├── language.schema.json               # JSON Schema definition (symlink to keleo-language)
-│   ├── platform-adoption-kernel.json      # Baseline framework (Platform Adoption)
+│   ├── platform-adoption-kernel.json      # Symlink to baselines/platform-adoption-essentials/
 │   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
 ├── references/                             # Analysis framework documentation
 │   ├── domain-framework.md
@@ -298,13 +298,23 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 
 ### Dependencies (`deps/`)
 
-Inputs the library resolves against. All are tracked in git — unlike
-`baselines/`, which holds regenerable `/create-baseline-method` output and is
-ignored. A baseline that practices depend on belongs here, as a real file.
+Inputs the library resolves against.
 
-- `deps/language.schema.json` - JSON Schema definition for Practice Language (symlink to keleo-language)
-- `deps/platform-adoption-kernel.json` - Platform Adoption Essentials baseline framework
+- `deps/language.schema.json` - JSON Schema definition (symlink to keleo-language)
+- `deps/platform-adoption-kernel.json` - Platform Adoption Essentials (symlink to `baselines/platform-adoption-essentials/`)
 - `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
+
+**Where the definitive Platform Adoption Essentials lives.** The document
+itself is `baselines/platform-adoption-essentials/platform-adoption-essentials.json`;
+`deps/platform-adoption-kernel.json` is a symlink to it, kept so existing
+references to the `deps/` path continue to resolve. `baselines/*` is otherwise
+git-ignored as regenerable `/create-baseline-method` output, so `.gitignore`
+carries an explicit exception for this one document — its phase reports and
+backups stay ignored.
+
+Other copies of this baseline exist outside the project (keleo-studio serves
+one from `web/public/examples/` for its practice-author page). Those are
+allowed to drift; this one is definitive for code generation.
 
 ## Baseline Practices (Foundational Frameworks)
 
