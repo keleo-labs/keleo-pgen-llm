@@ -1,17 +1,12 @@
 # Diagram Foundation
 
-> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
-> capability works from a clone without a user-level install. It tracks the
-> global skill at `~/.claude/skills/diagram-foundation/` version by version; the only
-> intended difference is that paths are repo-relative rather than
-> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
-> upstream. Re-copy with `python3 utils/vendor-skills.py`.
+Version: 1.0.0
 
 Shared diagram engine. A declarative JSON spec goes in; an SVG for a markdown
 report or native Google Slides shapes for a deck comes out. Not a skill — a
 foundation, like `deck-foundation` and `reporting-foundation`.
 
-Consumers: the reporting skills (via `reports/assets/<report>/*.json`), the deck
+Consumers: the reporting skills (via `reports/<report-slug>/assets/*.json`), the deck
 skills (via a `diagram:` slide), and `keleo-pgen-llm`, which vendors a copy.
 
 ## Why a spec and not an SVG
@@ -42,9 +37,30 @@ decks and the studio UI read as one system. They live in the `THEME` dict at
 the top of `scripts/diagram.py`. Restyle there, never per diagram: a spec
 carries content and structure only.
 
-The accent colour, body text and muted grey match the deck theme's
-`--rh-link`, `--rh-black` and `--rh-grey-text`, so a diagram does not fight
-the slide it sits on.
+Body text and muted grey match the deck theme's `--rh-black` and
+`--rh-grey-text`, so a diagram does not fight the surface it sits on.
+
+### Palettes
+
+Only the colour family varies; geometry, type scale and spacing are fixed, and
+the spec never carries colour. `PALETTES` in `scripts/diagram.py` holds the
+two, and `use_palette(name)` switches between them:
+
+| Palette | Accent | Used by |
+|---|---|---|
+| `navigator` (default) | `#0066cc` | Reports, the studio UI |
+| `redhat` | `#ee0000` | Decks — `build-diagrams.py` applies it |
+
+A diagram in a report belongs to the document and reads in the navigator
+family. The same spec rendered onto a branded slide belongs to the deck, so
+the deck build swaps the palette before laying anything out. Pass
+`--palette navigator` to opt a deck out.
+
+`use_palette` mutates `THEME` and `EMPHASIS` **in place**. The backends bind
+them at import (`from diagram import THEME`), so rebinding would leave them
+pointing at the old dict. Any new consumer must call it before `build_scene`,
+not after — and `build-diagrams.py` and `upgrade-diagrams.py` must agree, or
+the native Slides shapes will not match the picture they replace.
 
 ## Writing a good spec
 

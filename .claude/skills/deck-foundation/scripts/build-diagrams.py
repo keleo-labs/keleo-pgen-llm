@@ -12,9 +12,15 @@ for a report page is reconsidered for a landscape frame. Where no orientation
 fits, the diagram is left alone and the reason is reported — a diagram that
 will not fit a slide is usually one carrying more than one idea.
 
+Diagrams render in the deck's brand palette rather than the engine default,
+so a figure on a slide reads as part of the deck instead of as something
+pasted in from a report. Only the colour family changes; geometry and type
+are identical, and the spec is untouched.
+
 Usage:
     build-diagrams.py slides.md
     build-diagrams.py slides.md --width 1600      # raster width in px
+    build-diagrams.py slides.md --palette navigator   # engine default colours
     build-diagrams.py slides.md --check           # report, write nothing
 
 Exit codes: 0 ok, 1 a diagram failed to build, 2 bad arguments.
@@ -34,7 +40,7 @@ sys.path.insert(0, str(DIAGRAM_SCRIPTS))
 
 try:
     import svg_backend
-    from diagram import build_scene, fit_to_aspect, validate
+    from diagram import build_scene, fit_to_aspect, use_palette, validate
 except ImportError as exc:  # pragma: no cover - surfaced to the user
     print(f"Error: diagram-foundation not found at {DIAGRAM_SCRIPTS} ({exc})",
           file=sys.stderr)
@@ -67,8 +73,10 @@ def rasterise(svg_path: Path, png_path: Path, width: int) -> None:
         produced.replace(png_path)
 
 
-def build(source: Path, width: int, check: bool) -> tuple[list[dict], list[str]]:
+def build(source: Path, width: int, check: bool,
+          palette: str = "redhat") -> tuple[list[dict], list[str]]:
     """Render each referenced diagram. Returns (manifest, notes)."""
+    use_palette(palette)
     manifest, notes = [], []
     for order, ref in enumerate(find_references(source)):
         spec_path = (source.parent / ref).resolve()
@@ -115,6 +123,8 @@ def main() -> int:
                         help="build directory (default: <source dir>/build)")
     parser.add_argument("--check", action="store_true",
                         help="report what would be built, write nothing")
+    parser.add_argument("--palette", default="redhat",
+                        help="colour family: redhat (default) or navigator")
     args = parser.parse_args()
 
     if not args.source.exists():
@@ -124,7 +134,7 @@ def main() -> int:
     workdir = args.workdir or args.source.parent / "build"
 
     try:
-        manifest, notes = build(args.source, args.width, args.check)
+        manifest, notes = build(args.source, args.width, args.check, args.palette)
     except (OSError, RuntimeError, ValueError, json.JSONDecodeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

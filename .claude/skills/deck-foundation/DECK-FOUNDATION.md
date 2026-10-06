@@ -1,13 +1,6 @@
 # Deck Foundation
 
-> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
-> capability works from a clone without a user-level install. It tracks the
-> global skill at `~/.claude/skills/deck-foundation/` version by version; the only
-> intended difference is that paths are repo-relative rather than
-> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
-> upstream. Re-copy with `python3 utils/vendor-skills.py`.
-
-Version: 2.2.0
+Version: 2.3.0
 
 > **2.0.0 changes the default.** A deck built from a source document now
 > follows that document's structure instead of being re-argued into a
@@ -294,6 +287,14 @@ and move.
 
 The upgrade is additive. If it cannot find the slide, or the batch fails, the
 deck keeps the picture and stays usable; the publish reports what it skipped.
+
+**Colour.** Diagrams render in the Red Hat palette on a slide rather than the
+engine's default navigator blue, so a figure reads as part of the deck. Only
+the colour family changes — the spec is untouched and the same spec still
+renders in navigator colours for a report. `build-diagrams.py --palette
+navigator` opts out; whatever is chosen, `upgrade-diagrams.py` must be given
+the same one or the native shapes will not match the picture they replace.
+See `diagram-foundation/DIAGRAM-FOUNDATION.md` → Palettes.
 
 **Any other image** — a screenshot, a photo, an SVG with no spec — uses
 `image:` on the same layout, or any layout that takes one. It is embedded as a

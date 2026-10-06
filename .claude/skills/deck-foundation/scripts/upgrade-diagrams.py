@@ -32,7 +32,7 @@ DIAGRAM_SCRIPTS = HERE.parent.parent / "diagram-foundation" / "scripts"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DIAGRAM_SCRIPTS))
 
-from diagram import build_scene  # noqa: E402
+from diagram import build_scene, use_palette  # noqa: E402
 from gwsclient import GwsError, run  # noqa: E402
 from slides_backend import scene_requests  # noqa: E402
 
@@ -118,6 +118,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("presentation_id")
+    parser.add_argument("--palette", default="redhat",
+                        help="colour family; must match the one build-diagrams.py "
+                             "used, or the native shapes will not match the PNG "
+                             "they replace")
     parser.add_argument("--manifest", type=Path, required=True,
                         help="build/diagrams.json written by build-diagrams.py")
     args = parser.parse_args()
@@ -133,7 +137,11 @@ def main() -> int:
         return 1
 
     try:
+        use_palette(args.palette)
         upgraded, skipped = upgrade(args.presentation_id, manifest)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     except GwsError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

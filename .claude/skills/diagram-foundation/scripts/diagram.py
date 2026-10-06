@@ -78,6 +78,63 @@ EMPHASIS = {
     "selected": (THEME["node_fill_selected"], THEME["border_accent"], THEME["stroke_accent"]),
 }
 
+
+# --------------------------------------------------------------------------
+# Palettes
+#
+# Geometry, type scale and spacing are fixed — only the colour family varies.
+# A diagram embedded in a report or the studio UI reads as part of that
+# surface; the same spec rendered onto a branded slide should read as part of
+# the deck. The deck build swaps the palette before laying anything out, so
+# the PNG and the native Slides shapes it is upgraded to agree.
+# --------------------------------------------------------------------------
+
+PALETTES = {
+    # keleo-studio-gas navigator. The default: reports and the studio UI.
+    "navigator": {
+        "accent": "#0066cc",
+        "border_accent": "#0066cc",
+        "node_fill_accent": "#f0f0ff",
+        "node_fill_selected": "#edf1ff",
+        "node_fill_muted": "#f5f5f5",
+        "group_fill": "#f5f5f5",
+    },
+    # Red Hat brand, matching deck-foundation/theme-redhat/styles/base.css.
+    "redhat": {
+        "accent": "#ee0000",
+        "border_accent": "#ee0000",
+        "node_fill_accent": "#fdeaea",
+        "node_fill_selected": "#fdf4f4",
+        "node_fill_muted": "#f2f2f2",
+        "group_fill": "#f2f2f2",
+    },
+}
+
+
+def use_palette(name):
+    """Switch the colour family in place. Returns the palette applied.
+
+    THEME and EMPHASIS are mutated rather than rebound because the backends
+    bind them at import (`from diagram import THEME`); rebinding here would
+    leave them pointing at the old dict.
+    """
+    try:
+        palette = PALETTES[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown palette {name!r} (use one of {', '.join(PALETTES)})") from None
+
+    THEME.update(palette)
+    EMPHASIS.update({
+        "default": (THEME["node_fill"], THEME["border"], THEME["stroke_default"]),
+        "muted": (THEME["node_fill_muted"], THEME["border"], THEME["stroke_default"]),
+        "accent": (THEME["node_fill_accent"], THEME["border_accent"],
+                   THEME["stroke_accent"]),
+        "selected": (THEME["node_fill_selected"], THEME["border_accent"],
+                     THEME["stroke_accent"]),
+    })
+    return palette
+
 LAYOUTS = ("flow", "stack", "timeline", "hub")
 
 
