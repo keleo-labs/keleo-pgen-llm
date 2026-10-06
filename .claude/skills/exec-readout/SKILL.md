@@ -1,9 +1,18 @@
 ---
 name: exec-readout
 description: Create an executive readout deck — status report, findings, review outcome, programme update — and publish it to Google Slides and PDF.
+metadata:
+  version: "1.0.0"
 ---
 
 # Exec Readout
+
+> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
+> capability works from a clone without a user-level install. It tracks the
+> global skill at `~/.claude/skills/exec-readout/` version by version; the only
+> intended difference is that paths are repo-relative rather than
+> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
+> upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
 Version: 2.0.0
 
@@ -90,6 +99,12 @@ Both required (DECK-FOUNDATION §5).
   readout these carry the detail behind a RAG status, the threshold that
   produced it, and the answer to the obvious follow-up question — the
   material that would otherwise force a hedge onto the slide itself.
+
+## Diagrams
+
+A diagram with a spec goes on a `diagram` slide and is upgraded to native,
+editable Slides shapes after publishing; any other image is embedded as a
+picture (DECK-FOUNDATION §6).
 
 ## Output
 

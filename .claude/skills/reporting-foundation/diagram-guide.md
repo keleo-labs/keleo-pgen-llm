@@ -29,6 +29,11 @@ Two or three diagrams in a report is normal. Six is a sign that tables are being
 
 ---
 
+The engine is shared. `.claude/skills/diagram-foundation/DIAGRAM-FOUNDATION.md` carries the spec
+reference, the design tokens and the rationale; this guide covers only what a report author needs.
+The deck skills use the same engine, which is why a diagram's spec — not its SVG — is the artifact
+worth keeping.
+
 ## Layout selection
 
 | Layout | Shape | Reach for it when |

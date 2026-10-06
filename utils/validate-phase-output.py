@@ -396,8 +396,8 @@ def validate_phase_2(content, lines, kind="practice"):
             "pass": len(pattern_lines) >= 1,
         })
 
-    alpha_lines = [l for l in lines
-                   if re.match(r"^\*\*Alpha:\s", l) or re.match(r"^#{3,5} Alpha[:\s]", l)]
+    # Matches `**Alpha: X**`, `#### Alpha: X` and `##### **Alpha: X**`.
+    alpha_lines = [l for l in lines if re.match(r"^(?:#{0,6}\s*)?\*{0,2}Alpha:\s", l)]
     checks.append({
         "check": "alpha_count",
         "description": "Mapped alphas",
@@ -523,18 +523,60 @@ def validate_phase_2(content, lines, kind="practice"):
     return checks
 
 
+#: An alpha block opener, in either the bold form (`**Alpha: Name**`) or the
+#: heading form the phase skill prescribes (`#### Alpha: Name`). Guides written
+#: to the phase skill use headings, so matching only the bold form silently
+#: finds zero alphas and turns pattern validation into a no-op that still
+#: reports a pass.
+#: Three conventions are in use across guides written to the same phase skill:
+#: `#### Alpha: Name`, `**Alpha: Name**`, and `##### **Alpha: Name** (qualifier)`.
+#: Optional leading hashes are allowed before the bold form.
+ALPHA_ANCHOR_RE = re.compile(
+    r"^(?:#{0,6}\s*\*\*Alpha:\s*(?P<b>.+?)\*\*.*|#{3,6}\s*Alpha:\s*(?P<h>.+?)\s*)$",
+    re.MULTILINE,
+)
+
+#: A state within an alpha block: `**State: Name**`, `**State 3: Name**` or
+#: `**State 3 — Name**`, optionally followed by `(seq 3, type: Progression)`.
+#: Guides use colons and dashes interchangeably as the separator.
+STATE_RE = re.compile(r"\*\*State(?:\s+\d+)?\s*[:—–-]\s*(.+?)\*\*")
+
+#: Words that mark a trailing parenthetical on an alpha heading as a mapping
+#: qualifier rather than part of the name, e.g.
+#: "#### Alpha: Git Provider Integration (Specialization - contributesTo X)".
+#: Alpha names may legitimately contain brackets ("Platform Engineering (CNCF)"),
+#: so only qualifier-looking parentheses are stripped.
+ALPHA_QUALIFIER_WORDS = (
+    "contributesto", "mapsto", "specialization", "specialisation",
+    "redeclaration", "redeclared", "variant", "new alpha", "inherited",
+)
+
+
+def _clean_alpha_name(name):
+    """Strip a trailing mapping qualifier from an alpha heading."""
+    match = re.search(r"\s*\(([^()]*)\)\s*$", name)
+    if match and any(w in match.group(1).lower() for w in ALPHA_QUALIFIER_WORDS):
+        return name[: match.start()].strip().strip("`").strip()
+    return name.strip().strip("`").strip()
+
+
 def extract_alphas_and_states(content):
-    """Extract alpha names and their states from the ## Alphas / ### Alpha Mappings section."""
+    """Extract alpha names and their states from a Phase 2 mapping guide.
+
+    Tolerates both the bold (`**Alpha: Name**`) and heading (`#### Alpha: Name`)
+    conventions, and both unnumbered and numbered state labels, because guides
+    in the wild use all four combinations.
+    """
+    anchors = list(ALPHA_ANCHOR_RE.finditer(content))
     alphas = {}
-    blocks = re.split(r"\*\*Alpha:\s*", content)
-    for block in blocks[1:]:
-        name_match = re.match(r"(.+?)\*\*", block)
-        if not name_match:
+    for i, match in enumerate(anchors):
+        name = _clean_alpha_name(match.group("h") or match.group("b") or "")
+        if not name:
             continue
-        alpha_name = name_match.group(1).strip()
-        states = re.findall(r"\*\*State:\s*(.+?)\*\*", block)
+        end = anchors[i + 1].start() if i + 1 < len(anchors) else len(content)
+        states = STATE_RE.findall(content[match.end():end])
         if states:
-            alphas[alpha_name] = [s.strip() for s in states]
+            alphas[name] = [s.strip() for s in states]
     return alphas
 
 
@@ -545,20 +587,72 @@ def extract_pattern_views(content):
       - **View N: Name** (numbered)
       - **View: Name** (seq: N) (named with seq)
     """
-    pattern_start = content.find("### Pattern Mappings")
-    if pattern_start < 0:
-        pattern_start = content.find("#### Pattern Views")
-    if pattern_start < 0:
+    # Locate the pattern section without assuming a heading depth: guides write
+    # "## Pattern Mappings", "### Pattern Mappings" or "#### Pattern Views"
+    # depending on how the practice nests its sections. Matching one fixed depth
+    # silently returns no views, which reads as a structural failure in the guide
+    # rather than a parser miss.
+    header = re.search(r"^(#{2,5})\s*Pattern (?:Mappings|Views)\b.*$", content, re.MULTILINE)
+    if header:
+        pattern_start = header.start()
+        depth = len(header.group(1))
+        # End at the next heading of the same or shallower depth that is not
+        # itself a pattern heading.
+        tail = content[header.end():]
+        boundary = re.search(
+            rf"^#{{1,{depth}}}\s+(?!Pattern\b).*$", tail, re.MULTILINE
+        )
+        pattern_section = tail[:boundary.start()] if boundary else tail
+    else:
         pattern_start = content.find("- **Pattern Views:**")
-    if pattern_start < 0:
-        return []
-
-    pattern_section = content[pattern_start:]
-    next_section = re.search(r"\n### (?!Pattern)", pattern_section[10:])
-    if next_section:
-        pattern_section = pattern_section[:next_section.start() + 10]
+        if pattern_start < 0:
+            return []
+        pattern_section = content[pattern_start:]
 
     views = []
+
+    def _pairs(block):
+        """Extract (alpha, state) pairs from a view body.
+
+        Two conventions are in use. The verbose one lists each pair on its own
+        pair of lines; the compact one puts them on a single semicolon-separated
+        "Alpha States:" line using an arrow. Supporting only the verbose form
+        yields zero pairs for compact guides, which then report every view as
+        missing every alpha.
+        """
+        found = [
+            (a.strip(), s.strip())
+            for a, s in re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
+        ]
+        if found:
+            return found
+
+        # Keyed-brace form, one entry per line under an "Alpha States:" label:
+        #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
+        keyed = re.findall(
+            r"\{\s*alphaName:\s*([^,{}]+?)\s*,\s*stateName:\s*([^{}]+?)\s*\}",
+            block, re.IGNORECASE,
+        )
+        if keyed:
+            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
+
+        # The label may carry a qualifier, e.g. "Alpha States (changed only):".
+        line = re.search(r"Alpha States?\s*(?:\([^)]*\))?\s*:\s*(.+)", block)
+        if not line:
+            return []
+        raw = line.group(1)
+
+        # Brace-tuple form: [{Alpha Name, State Name}, {Alpha Name, State Name}]
+        braced = re.findall(r"\{\s*([^,{}]+?)\s*,\s*([^{}]+?)\s*\}", raw)
+        if braced:
+            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in braced]
+
+        # Arrow form: Alpha → State; Alpha → State
+        for entry in raw.split(";"):
+            parts = re.split(r"\s*(?:→|->|=>)\s*", entry.strip(), maxsplit=1)
+            if len(parts) == 2 and parts[0] and parts[1]:
+                found.append((parts[0].strip().strip("`"), parts[1].strip().strip("`")))
+        return found
 
     # Format 1: **View: Name** (seq: N)
     view_splits = re.split(r"\*\*View:\s*", pattern_section)
@@ -573,30 +667,65 @@ def extract_pattern_views(content):
                 view_name = name_only.group(1).strip() if name_only else "?"
                 view_num = len(views)
 
-            pairs = re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
-            alpha_states = [(a.strip(), s.strip()) for a, s in pairs]
-            views.append({"seq": view_num, "name": view_name, "alpha_states": alpha_states})
+            views.append({"seq": view_num, "name": view_name, "alpha_states": _pairs(block)})
         return views
 
-    # Format 2: **View N: Name**
-    view_splits = re.split(r"\*\*View (\d+):", pattern_section)
+    # Format 2: **View N: Name**, or **View N — Name** / **View N - Name**.
+    # Guides separate the number from the title with a colon or a dash; matching
+    # only the colon drops every view in a dash-style guide.
+    view_splits = re.split(r"\*\*View (\d+)\s*[:—–-]", pattern_section)
+    if len(view_splits) == 1:
+        # Format 3: a plain `View N:` line with the name on an indented
+        # `Name:` line beneath it.
+        view_splits = re.split(r"^View (\d+):\s*$", pattern_section, flags=re.MULTILINE)
+        for i in range(1, len(view_splits), 2):
+            view_num = int(view_splits[i])
+            view_text = view_splits[i + 1] if i + 1 < len(view_splits) else ""
+            name_match = re.search(r"^\s*Name:\s*(.+)$", view_text, re.MULTILINE)
+            views.append({
+                "seq": view_num,
+                "name": name_match.group(1).strip() if name_match else f"View {view_num}",
+                "alpha_states": _pairs(view_text),
+            })
+        if views:
+            return views
+        view_splits = []
     for i in range(1, len(view_splits), 2):
         view_num = int(view_splits[i])
         view_text = view_splits[i + 1] if i + 1 < len(view_splits) else ""
         view_name_match = re.match(r"\s*(.+?)\*\*", view_text)
         view_name = view_name_match.group(1).strip() if view_name_match else f"View {view_num}"
 
-        pairs = re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", view_text)
-        alpha_states = [(a.strip(), s.strip()) for a, s in pairs]
-        views.append({"seq": view_num, "name": view_name, "alpha_states": alpha_states})
+        views.append({"seq": view_num, "name": view_name, "alpha_states": _pairs(view_text)})
 
     return views
 
 
-def validate_pattern_views(content):
-    """Validate pattern view completeness: alpha presence and state validity."""
-    checks = []
+#: An assembled method guide concatenates per-practice guides, each keeping its
+#: own `# Phase 2 Mapping Guide: ...` H1 under the method's.
+_PRACTICE_SEGMENT_RE = re.compile(r"^#\s+Phase 2 Mapping Guide:", re.MULTILINE)
 
+
+def validate_pattern_views(content):
+    """Validate pattern view completeness: alpha presence and state validity.
+
+    An assembled method guide holds several practices. Validating it as one
+    document pools every practice's alphas and views, so the highest-numbered
+    view is judged against all 30 alphas in the method and fails for alphas
+    that belong to a different practice. Segment first, then validate each
+    practice on its own terms.
+    """
+    segments = [m.start() for m in _PRACTICE_SEGMENT_RE.finditer(content)]
+    if len(segments) > 2:  # method header + 2 or more practice guides
+        checks = []
+        for i, start in enumerate(segments[1:], start=1):
+            end = segments[i + 1] if i + 1 < len(segments) else len(content)
+            for check in validate_pattern_views(content[start:end]):
+                check["check"] = f"p{i}_{check['check']}"
+                checks.append(check)
+        return checks
+
+    checks = []
     alphas = extract_alphas_and_states(content)
     if not alphas:
         checks.append({
@@ -622,32 +751,62 @@ def validate_pattern_views(content):
     })
 
     expected_alphas = set(alphas.keys())
+    # phase-2-skill.md "State Compression Rule": non-final views carry ONLY the
+    # alpha states that change from the previous view; unchanged states are
+    # implicit carry-forward. Only the final view must be a complete snapshot.
+    # Requiring every alpha in every view contradicts that rule and fails
+    # correctly-compressed guides.
+    final_seq = max(v["seq"] for v in views)
 
     for view in views:
         view_alphas = {a for a, _ in view["alpha_states"]}
+        is_final = view["seq"] == final_seq
         missing = expected_alphas - view_alphas
         extra = view_alphas - expected_alphas
 
-        checks.append({
-            "check": f"view_{view['seq']}_alpha_count",
-            "description": f"View {view['seq']} ({view['name']}): {len(view_alphas)} alphas",
-            "expected": len(expected_alphas),
-            "actual": len(view_alphas),
-            "pass": not missing,
-        })
-        if missing:
+        if is_final:
             checks.append({
-                "check": f"view_{view['seq']}_missing_alphas",
-                "description": f"View {view['seq']} missing alphas",
-                "missing": sorted(missing),
-                "pass": False,
+                "check": f"view_{view['seq']}_alpha_count",
+                "description": (
+                    f"Final view {view['seq']} ({view['name']}) is a complete "
+                    f"snapshot: {len(view_alphas)} alphas"
+                ),
+                "expected": len(expected_alphas),
+                "actual": len(view_alphas),
+                "pass": not missing,
+            })
+            if missing:
+                checks.append({
+                    "check": f"view_{view['seq']}_missing_alphas",
+                    "description": f"Final view {view['seq']} missing alphas",
+                    "missing": sorted(missing),
+                    "pass": False,
+                })
+        else:
+            # A compressed view may legitimately carry a subset, but an empty
+            # one should have been eliminated and its activities merged.
+            checks.append({
+                "check": f"view_{view['seq']}_alpha_count",
+                "description": (
+                    f"View {view['seq']} ({view['name']}): {len(view_alphas)} "
+                    f"changed alphas (compressed)"
+                ),
+                "expected": ">=1",
+                "actual": len(view_alphas),
+                "pass": len(view_alphas) >= 1,
             })
         if extra:
+            # Informational, not scored. A pattern view may legitimately place
+            # an *inherited* alpha (redeclared, or merely related) alongside the
+            # practice's own. This parser reads only the markdown, so it cannot
+            # see the effective context and must not call that a defect.
             checks.append({
-                "check": f"view_{view['seq']}_extra_alphas",
-                "description": f"View {view['seq']} has alphas not in mapping guide",
-                "extra": sorted(extra),
-                "pass": False,
+                "check": f"view_{view['seq']}_alphas_not_declared_here",
+                "description": (
+                    f"View {view['seq']} names alphas not declared in this guide "
+                    f"(expected if they are inherited)"
+                ),
+                "names": sorted(extra),
             })
 
         for alpha_name, state_name in view["alpha_states"]:

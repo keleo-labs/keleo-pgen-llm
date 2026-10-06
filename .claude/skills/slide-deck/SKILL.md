@@ -1,9 +1,18 @@
 ---
 name: slide-deck
 description: Create a presentation deck and publish it to Google Slides and PDF. Use for any deck request not covered by pitch-deck or exec-readout — talks, training, overviews, workshops, conference sessions.
+metadata:
+  version: "1.0.0"
 ---
 
 # Slide Deck
+
+> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
+> capability works from a clone without a user-level install. It tracks the
+> global skill at `~/.claude/skills/slide-deck/` version by version; the only
+> intended difference is that paths are repo-relative rather than
+> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
+> upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
 Version: 2.0.0
 
@@ -48,6 +57,10 @@ it reads as an argument.
 **Write.** Apply `slide-grammar.md` throughout — assertion titles,
 assertion–evidence bodies, one idea per slide. Carry each slide's citations
 in `sources` and write its speaker notes as you go (DECK-FOUNDATION §5).
+
+**Diagrams.** A diagram with a spec goes on a `diagram` slide and is
+upgraded to native, editable Slides shapes after publishing; any other
+image is embedded as a picture (DECK-FOUNDATION §6).
 
 **Publish and review.** Render the published deck and read every slide. Fix
 what reads badly before reporting completion.

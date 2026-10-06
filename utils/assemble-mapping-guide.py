@@ -45,7 +45,10 @@ def extract_practice_metadata(content):
         "new_alphas": [],
     }
 
-    name_match = re.search(r"\*\*Name:\*\*\s*(.+)", content)
+    # Agents write metadata labels with the colon either inside or outside the
+    # bold run (`**Name:** X` vs `**Name**: X`). Both read identically to a
+    # human, so accept either rather than silently dropping a guide's metadata.
+    name_match = re.search(r"\*\*Name:?\*\*:?\s*(.+)", content)
     if name_match:
         meta["name"] = name_match.group(1).strip()
     else:
@@ -53,11 +56,15 @@ def extract_practice_metadata(content):
         if h1_match:
             meta["name"] = h1_match.group(1).strip()
 
-    primary_match = re.search(r"\*\*Primary Alpha\*\*:\s*(.+?)(?:\s*[—–-]|$)", content)
+    primary_match = re.search(r"\*\*Primary Alpha:?\*\*:?\s*(.+?)(?:\s*[—–-]|$)", content)
     if primary_match:
         meta["primary_alpha"] = primary_match.group(1).strip()
 
-    total_match = re.search(r"\*\*Total Alphas\*\*:\s*(\d+)\s*\((\d+)\s*redecl[a-z]*\s*\+\s*(\d+)\s*(?:new|special)", content)
+    # Matches both `**Total Alphas**: 5 (...)` and `**Total Alphas: 5 (...)**`.
+    total_match = re.search(
+        r"\*\*Total Alphas(?:\*\*)?:\s*(\d+)\s*\((\d+)\s*redecl[a-z]*\s*\+\s*(\d+)\s*(?:new|special)",
+        content,
+    )
     if total_match:
         meta["alpha_count"] = int(total_match.group(1))
         meta["redecl_count"] = int(total_match.group(2))
@@ -112,19 +119,44 @@ def extract_practice_metadata(content):
     return meta
 
 
+#: An alpha block opener in any of the conventions guides actually use:
+#: `**Alpha: Name** (Specialization ...)`, `#### Alpha: Name (...)`, and
+#: `##### **Alpha: Name** (...)`. Matching only the bold form returns nothing
+#: for heading-style guides, which silently empties the assembled header's
+#: alpha summary table.
+_ALPHA_OPENER_RE = re.compile(
+    r"^(?:#{0,6}\s*\*\*Alpha:\s*(?P<b>.+?)\*\*|#{3,6}\s*Alpha:\s*(?P<h>[^(\n]+?))"
+    r"\s*\((?:Speciali[sz]ation|New|Variant)",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+#: A state marker: `**State: X**`, `**State 3: X**` or `**State 3 — X**`.
+_STATE_MARKER_RE = re.compile(r"\*\*State(?:\s+\d+)?\s*[:—–-]")
+
+
 def extract_new_alpha_states(content):
     """Extract state counts for new/specialized alphas."""
     results = []
-    blocks = re.split(r"\*\*Alpha:\s*", content)
-    for block in blocks[1:]:
-        name_match = re.match(r"(.+?)\*\*\s*\((?:Specialization|New)", block)
-        if not name_match:
+    openers = list(_ALPHA_OPENER_RE.finditer(content))
+    for i, match in enumerate(openers):
+        name = (match.group("b") or match.group("h") or "").strip().strip("`")
+        if not name:
             continue
-        name = name_match.group(1).strip()
-        contributes_match = re.search(r"\*\*contributesTo:\*\*\s*(.+)", block)
-        contributes_to = contributes_match.group(1).strip() if contributes_match else "?"
-        state_count = len(re.findall(r"\*\*State:\s", block))
-        results.append({"name": name, "contributesTo": contributes_to, "states": state_count})
+        end = openers[i + 1].start() if i + 1 < len(openers) else len(content)
+        block = content[match.end():end]
+        contributes_match = re.search(r"\*\*contributesTo:?\*\*:?\s*(.+)", block)
+        if not contributes_match:
+            # Heading-style guides often put the target in the opener itself,
+            # e.g. "#### Alpha: X (Specialization — contributesTo `Y`)".
+            contributes_match = re.search(
+                r"contributesTo\s*`?([^`)\n]+)`?", content[match.start():match.end() + 200]
+            )
+        contributes_to = contributes_match.group(1).strip().strip("`") if contributes_match else "?"
+        results.append({
+            "name": name,
+            "contributesTo": contributes_to,
+            "states": len(_STATE_MARKER_RE.findall(block)),
+        })
     return results
 
 

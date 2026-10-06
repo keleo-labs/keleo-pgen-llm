@@ -1,9 +1,18 @@
 ---
 name: pitch-deck
 description: Create a persuasive pitch deck — value proposition, partner or GSI pitch, solution proposal, business case — and publish it to Google Slides and PDF.
+metadata:
+  version: "1.0.0"
 ---
 
 # Pitch Deck
+
+> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
+> capability works from a clone without a user-level install. It tracks the
+> global skill at `~/.claude/skills/pitch-deck/` version by version; the only
+> intended difference is that paths are repo-relative rather than
+> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
+> upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
 Version: 2.0.0
 
@@ -95,6 +104,12 @@ Both are required, not optional. See DECK-FOUNDATION §5.
 Red Hat and partner positioning is **complementary to hyperscalers, not
 competitive**. Avoid anti-cloud or migration-away framing. Do not cite
 competitors as sources; use analysts, independent experts and integrators.
+
+## Diagrams
+
+A diagram with a spec goes on a `diagram` slide and is upgraded to native,
+editable Slides shapes after publishing; any other image is embedded as a
+picture (DECK-FOUNDATION §6).
 
 ## Output
 

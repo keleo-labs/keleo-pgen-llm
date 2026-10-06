@@ -1,5 +1,12 @@
 # Deck Foundation
 
+> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so the
+> capability works from a clone without a user-level install. It tracks the
+> global skill at `~/.claude/skills/deck-foundation/` version by version; the only
+> intended difference is that paths are repo-relative rather than
+> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
+> upstream. Re-copy with `python3 utils/vendor-skills.py`.
+
 Version: 2.2.0
 
 > **2.0.0 changes the default.** A deck built from a source document now
@@ -10,13 +17,6 @@ Version: 2.2.0
 Shared workflow for every deck-producing skill. Not a skill itself — the
 `slide-deck`, `pitch-deck` and `exec-readout` skills each read this, then add
 their own narrative shape and content rules on top.
-
-> **Vendored copy.** This tree is distributed with `keleo-pgen-llm` so decks
-> can be produced from a clone without a user-level install. It tracks the
-> global skill at `~/.claude/skills/deck-foundation/` version by version; the
-> only intended difference is that paths are repo-relative rather than
-> `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
-> upstream.
 
 Decks are authored as **Slidev markdown** and published to **Google Slides**
 and **PDF**. Slidev is the design layer: it gives typographic control a
@@ -40,11 +40,11 @@ Slides export; the pptx hop is required, which is why §4's constraints exist.
 | Step | Action |
 |------|--------|
 | 1. Plan | Establish subject, audience, decision being asked for, length. Agree the spine before writing slides. |
-| 2. Scaffold | `python3 .claude/skills/deck-foundation/scripts/new-deck.py <dir> --title "…"` — creates the project, copies the theme, installs Slidev + Playwright. |
+| 2. Scaffold | `new-deck.py <dir> --title "…"` — creates the project, copies the theme, installs Slidev + Playwright. |
 | 3. Structure | **If there is a source document, derive the spine from it (§2.1).** Otherwise choose a narrative shape from `narrative-guide.md`. Either way, write the slide titles *first*, as a sequence of assertions, and check they read as an argument on their own. |
 | 4. Write | Fill slides using the layouts in §3 and the rules in `slide-grammar.md`. Carry each slide's citations in `sources` and write its speaker notes as you go (§5). |
 | 5. Publish | `publish-deck.py slides.md --name "…" --pdf --review` |
-| 6. Review | Render and **look at every slide** (§6). Fix what reads badly. Never report a deck as done without this. |
+| 6. Review | Render and **look at every slide** (§7). Fix what reads badly. Never report a deck as done without this. |
 
 Step 6 is not optional. Layout problems are invisible in markdown and obvious
 in a thumbnail.
@@ -168,7 +168,7 @@ inferred.
 | Markdown inside raw HTML blocks | Markdown at the top level of the slide |
 | `display: contents` | Explicit markup for the special case |
 | Pseudo-element `content` | A real character in the template |
-| Gradients, shadows, border-radius, SVG | Flat fills and rules |
+| Gradients, shadows, border-radius, inline SVG | Flat fills and rules. For a *diagram*, use the `diagram` layout — the build rasterises it and the publish upgrades it to native shapes (§6) |
 | `::marker` colour | Nothing — markers take the paragraph colour in PowerPoint. The marker survives, its colour does not, so do not rely on a red bullet as a brand device |
 | Brand colour on link text | Nothing — Google Slides rewrites every link run to its own HYPERLINK blue and forces an underline. Keep links out of body copy and confine them to the `sources` band, where blue-underlined text reads as a citation |
 
@@ -205,14 +205,14 @@ only the converted deck shows the collision.
 
 Allow roughly `1.75rem` between a body and the caption or source line under
 it, and about `1.1rem` between a heading and its body. Spacing that looks
-merely adequate on screen is not enough. This is why §6 checks the
+merely adequate on screen is not enough. This is why §7 checks the
 **published** deck and not the local render.
 
 Font *embedding* does not survive: recipients without Red Hat fonts installed
 see a substitute. The PDF export is unaffected, so send PDF when typography
 must be guaranteed.
 
-Adding a layout means re-verifying it through §6 — the table above is the
+Adding a layout means re-verifying it through §7 — the table above is the
 record of what has been tested, not a guarantee about untested constructs.
 
 ## 5. Citations and speaker notes
@@ -269,12 +269,49 @@ would have crowded the slide.
 - Where the source made a point the slide had to compress, the notes are
   where the full version belongs.
 
-## 6. Visual review
+## 6. Diagrams and images
+
+A deck can carry both. The difference is whether a **spec** exists.
+
+**Spec-backed diagram.** Reference a spec in the format
+`diagram-foundation/scripts/render-diagram.py` reads:
+
+```yaml
+---
+layout: diagram
+diagram: ./assets/option-b-topology.json
+eyebrow: Event-driven
+---
+# Remediation starts within minutes
+```
+
+Publishing then does three things on its own. `build-diagrams.py` fits the
+spec to the slide's aspect and renders a PNG beside it, so the local preview
+and a `--pptx-only` export are already right. Slidev carries that PNG into the
+deck. Finally `upgrade-diagrams.py` replaces the picture with **native Google
+Slides shapes** — rounded rectangles and arrowed connectors someone can select
+and move.
+
+The upgrade is additive. If it cannot find the slide, or the batch fails, the
+deck keeps the picture and stays usable; the publish reports what it skipped.
+
+**Any other image** — a screenshot, a photo, an SVG with no spec — uses
+`image:` on the same layout, or any layout that takes one. It is embedded as a
+picture and no shape pass is attempted. Rasterise SVG yourself first; Slidev
+will not carry it.
+
+**Aspect.** A flow authored top-to-bottom for a report page is reconsidered
+for 16:9 at build time. Where no orientation fits, the build says so rather
+than mangling the diagram — a diagram that will not fit a slide is usually one
+carrying more than one idea, and the fix is to split it. See
+`diagram-foundation/DIAGRAM-FOUNDATION.md` for why wrapping was tried and
+rejected.
+
+## 7. Visual review
 
 ```bash
-DECK=.claude/skills/deck-foundation/scripts
-python3 $DECK/publish-deck.py slides.md --name "…" --pdf --review
-python3 $DECK/review-deck.py <presentationId> --out /tmp/deck-review
+python3 scripts/publish-deck.py slides.md --name "…" --pdf --review
+python3 scripts/review-deck.py <presentationId> --out /tmp/deck-review
 ```
 
 Then **Read the PNGs**. Check each slide for:
@@ -288,16 +325,14 @@ Then **Read the PNGs**. Check each slide for:
 To iterate on design only, skip the upload: `npx slidev export slides.md
 --format png --output png` is faster and renders the same layout engine.
 
-## 7. Scripts
-
-All live in `.claude/skills/deck-foundation/scripts/` and are run from the
-repository root. They resolve the theme relative to their own location, so
-they work from any working directory.
+## 8. Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `new-deck.py` | Scaffold a deck project against a brand theme |
-| `publish-deck.py` | Export → upload → convert → PDF, trashing the version it replaces |
+| `publish-deck.py` | Build diagrams → export → upload → convert → upgrade diagrams → PDF, trashing the version it replaces |
+| `build-diagrams.py` | Fit each referenced diagram spec to the slide and render it to PNG; writes `build/diagrams.json` |
+| `upgrade-diagrams.py` | Replace published diagram pictures with native Slides shapes. Runs from `publish-deck.py`; skips rather than fails |
 | `review-deck.py` | Render a published deck to local PNGs |
 | `inspect-template.py` | Assess a .pptx as a branding donor |
 | `slides-template.py` | Map a Google Slides template's layouts to semantic roles |
@@ -307,7 +342,7 @@ they work from any working directory.
 Needing a mechanical helper that does not exist means writing or extending one
 here — not doing the work inline.
 
-## 8. Adding a brand theme
+## 9. Adding a brand theme
 
 Themes live at `theme-<name>/` and are selected with `new-deck.py --theme
 <name>`. To derive one from an existing deck:
@@ -317,9 +352,9 @@ Themes live at `theme-<name>/` and are selected with `new-deck.py --theme
 2. Build `theme-<name>/` with `package.json` (name must start
    `slidev-theme-`), `styles/base.css` holding brand tokens, and `layouts/`
    covering the roles in §3.
-3. Verify every layout through §6 before using it for real work.
+3. Verify every layout through §7 before using it for real work.
 
-## 9. Related documents
+## 10. Related documents
 
 - `slide-grammar.md` — how an individual slide should be written
 - `narrative-guide.md` — deck-level narrative shapes

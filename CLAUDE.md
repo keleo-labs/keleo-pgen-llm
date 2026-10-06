@@ -109,6 +109,9 @@ keleo-pgen-llm/
 │       │   └── contract.feature
 │       ├── improve-tooling/             # Utils and skill improvement skill
 │       │   └── SKILL.md
+│       ├── diagram-foundation/          # Shared diagram engine (NOT a skill)
+│       │   ├── DIAGRAM-FOUNDATION.md    # Spec reference, design language, layout choice
+│       │   └── scripts/                 # diagram, svg_backend, slides_backend, render-diagram
 │       ├── deck-foundation/             # Shared deck infrastructure (NOT a skill)
 │       │   ├── DECK-FOUNDATION.md       # Pipeline, layouts, conversion safety, citations/notes
 │       │   ├── slide-grammar.md         # How to write an individual slide

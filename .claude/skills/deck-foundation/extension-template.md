@@ -34,7 +34,7 @@ worse than one skill with good inputs.
    how the two drift apart.
 4. **Check the layouts cover it.** If the type needs a slide form that
    `theme-redhat/layouts/` lacks, add the layout, then verify it through
-   `DECK-FOUNDATION.md` §6 before shipping. Adding a layout is a MINOR bump
+   `DECK-FOUNDATION.md` §7 before shipping. Adding a layout is a MINOR bump
    to the theme. A content layout must also accept `sources` and render
    `<SourceNote>` (§5).
 5. **Test it** on a real request end to end, including visual review.

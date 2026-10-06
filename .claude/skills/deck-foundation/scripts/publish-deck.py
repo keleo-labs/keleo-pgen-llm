@@ -88,6 +88,43 @@ def export_pptx(source: Path, output: Path, timeout: int = 600) -> Path:
     return output
 
 
+def _run_helper(args: list[str], label: str) -> str | None:
+    """Run a sibling script, returning its stdout, or None if it failed.
+
+    Both diagram steps are enhancements over a deck that already works, so a
+    failure is reported and stepped over rather than aborting the publish.
+    """
+    proc = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve().parent / args[0]), *args[1:]],
+        capture_output=True, text=True, timeout=900,
+    )
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip()
+        print(f"warning: {label} failed, continuing — {detail[:300]}",
+              file=sys.stderr)
+        return None
+    return proc.stdout.strip()
+
+
+def build_diagrams(source: Path, workdir: Path) -> str | None:
+    out = _run_helper(
+        ["build-diagrams.py", str(source), "--workdir", str(workdir)],
+        "diagram build",
+    )
+    return out if out and "no diagrams referenced" not in out else None
+
+
+def upgrade_diagrams(presentation_id: str, workdir: Path) -> str | None:
+    manifest = workdir / "diagrams.json"
+    if not manifest.exists():
+        return None
+    out = _run_helper(
+        ["upgrade-diagrams.py", presentation_id, "--manifest", str(manifest)],
+        "diagram shape upgrade",
+    )
+    return out or None
+
+
 def read_state(workdir: Path) -> dict:
     """Return the record of the last publish from this build directory."""
     path = workdir / STATE_FILE
@@ -160,6 +197,7 @@ def publish(
     replace: bool = True,
     prune: bool = False,
 ) -> dict:
+    diagram_notes = build_diagrams(source, workdir)
     pptx = export_pptx(source, workdir / f"{source.stem}.pptx")
     previous = read_state(workdir) if replace else {}
 
@@ -173,6 +211,14 @@ def publish(
         "url": file_link(presentation_id),
         "pptx": str(pptx),
     }
+    if diagram_notes:
+        result["diagrams"] = diagram_notes
+
+    # Upgrade pictures to native shapes before the PDF is drawn, so the PDF
+    # shows what the deck shows. A failure here leaves the picture in place.
+    upgraded = upgrade_diagrams(presentation_id, workdir)
+    if upgraded:
+        result["diagramsUpgraded"] = upgraded
 
     if want_pdf:
         pdf_path = workdir / f"{source.stem}.pdf"

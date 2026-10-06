@@ -306,7 +306,10 @@ The update-method skill will assess, determine auto-fix vs remap, and execute th
 ### L3: Schema/Semantics Changes (keleo-language)
 
 - Identify the specific schema, semantics, or specification file to improve
-- Make the change in `/Users/eseymour/code/keleo/keleo-language/`
+- Make the change in the `keleo-language` checkout, which CLAUDE.md expects at
+  `../../keleo-language/` relative to this repo. The `deps/` and `references/`
+  symlinks resolve there, so `readlink deps/language.schema.json` gives the
+  real path if the checkout lives somewhere else.
 - If schema changes: validate existing practices still pass
 - Record what changed
 
