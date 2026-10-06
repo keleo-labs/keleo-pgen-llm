@@ -12,6 +12,9 @@ report is handed over:
                every in-text citation needs an entry (@rule:report-607/608).
                Author-year keys are matched on surnames, so "Naikwadi &
                Kulari, 2023" matches "Naikwadi, S., & Kulari, V. B. (2023)".
+  diagrams     Diagrams must be rendered SVG, not ASCII art (@rule:report-611),
+               and every embedded image needs alt text and a target that
+               resolves relative to the report (@rule:report-612).
   attribution  The closing framework attribution line must name each practice
                or method as a keleo-studio-gas deep link (@rule:report-610).
   length       Body word count (excluding References and the attribution line)
@@ -87,6 +90,9 @@ RE_HEADING = re.compile(r"^(#{1,3})\s+(.*)$")
 RE_ITALIC_LINE = re.compile(r"^\*(?![\s*])(.+?)\*$")
 RE_ATTRIBUTION_HINT = re.compile(r"\b(?:structured using|frameworks?)\b", re.I)
 RE_MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+RE_IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)\s]+)\)")
+RE_BOX_DRAWING = re.compile(r"[─-╿▀-▟▲▶▼◀]")
+RE_ASCII_BOX = re.compile(r"\+[-=]{3,}\+")
 # Two or more consecutive capitalised words — a framework name left unlinked.
 RE_PROPER_NAME = re.compile(r"\b[A-Z][\w.&-]*(?:\s+[A-Z][\w.&-]*)+")
 # How far back from the end of the body the attribution line may sit.
@@ -181,6 +187,66 @@ def check_terminology(lines, strict):
                 findings.append({
                     "check": "terminology", "severity": severity, "line": n,
                     "message": f"Keleo vocabulary '{term}' appears in report text",
+                })
+    return findings
+
+
+def check_diagrams(lines, report_path):
+    """Flag ASCII-art diagrams and image links that do not resolve.
+
+    Reports embed diagrams as rendered SVG (see reporting-foundation's
+    diagram-guide.md). Box-drawing characters essentially never appear in a
+    pasted code sample, so they are a reliable signal of hand-drawn art; a
+    bare '-->' is not, and is deliberately left alone.
+    """
+    findings = []
+    in_code, block_start, box_lines, ascii_lines = False, 0, 0, 0
+
+    def close_block():
+        if box_lines:
+            findings.append({
+                "check": "diagrams", "severity": "error", "line": block_start,
+                "message": ("code block contains box-drawing characters — render "
+                            "the diagram with utils/render-diagram.py and embed "
+                            "the SVG instead"),
+            })
+        elif ascii_lines >= 2:
+            findings.append({
+                "check": "diagrams", "severity": "error", "line": block_start,
+                "message": ("code block looks like ASCII box art — render the "
+                            "diagram with utils/render-diagram.py and embed the "
+                            "SVG instead"),
+            })
+
+    for n, line in enumerate(lines, 1):
+        if line.lstrip().startswith("```"):
+            if in_code:
+                close_block()
+            in_code = not in_code
+            block_start, box_lines, ascii_lines = n, 0, 0
+            continue
+        if in_code:
+            if RE_BOX_DRAWING.search(line):
+                box_lines += 1
+            if RE_ASCII_BOX.search(line):
+                ascii_lines += 1
+    if in_code:
+        close_block()
+
+    base = Path(report_path).parent
+    for n, line in enumerate(lines, 1):
+        for alt, target in RE_IMAGE.findall(line):
+            if target.startswith(("http://", "https://", "data:")):
+                continue
+            if not (base / target).exists():
+                findings.append({
+                    "check": "diagrams", "severity": "error", "line": n,
+                    "message": f"image target '{target}' does not resolve",
+                })
+            if not alt.strip():
+                findings.append({
+                    "check": "diagrams", "severity": "error", "line": n,
+                    "message": f"image '{target}' has no alt text",
                 })
     return findings
 
@@ -348,10 +414,10 @@ def main():
                         help="Fixed names (play, TDP, tactic, product) that "
                              "must appear in every report given")
     parser.add_argument("--checks", nargs="+",
-                        choices=["terminology", "citations", "attribution",
-                                 "length", "structure"],
-                        default=["terminology", "citations", "attribution",
-                                 "length", "structure"],
+                        choices=["terminology", "citations", "diagrams",
+                                 "attribution", "length", "structure"],
+                        default=["terminology", "citations", "diagrams",
+                                 "attribution", "length", "structure"],
                         help="Which checks to run (default: all)")
     parser.add_argument("--studio-url", metavar="URL",
                         help="keleo-studio-gas deployment URL attribution links "
@@ -395,6 +461,8 @@ def main():
         if "citations" in args.checks:
             findings += check_citations(cites, refs,
                                         args.min_citations, args.max_citations)
+        if "diagrams" in args.checks:
+            findings += check_diagrams(lines, path)
         if "attribution" in args.checks:
             findings += check_attribution(body_lines, studio_url)
         if "length" in args.checks:

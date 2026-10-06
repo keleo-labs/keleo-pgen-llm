@@ -36,6 +36,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 |---|---|---|
 | `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared Gherkin rules (@rule:report-600 through 610) |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 and Step 2 | Narrative type selection, purpose-to-narrative mapping, element-to-heading mappings |
+| `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3, if the report needs a visual | Diagram layouts, when a table beats a diagram, spec authoring, embedding convention |
 
 ---
 

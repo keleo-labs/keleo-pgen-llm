@@ -25,6 +25,10 @@ Usage examples:
 
     # Table of contents only
     python3 utils/extract-html-text.py /tmp/page.html --headings-only
+
+    # Batch: many sources into a directory, one .txt per source, plus a manifest
+    python3 utils/extract-html-text.py --sources-file /tmp/urls.txt \\
+        --output-dir /tmp/docs --anchors --manifest /tmp/docs/_manifest.json
 """
 
 import argparse
@@ -300,6 +304,90 @@ def load_html(source):
         return path.read_text(encoding="utf-8")
 
 
+def read_sources_file(path):
+    """Read a newline-delimited list of sources, ignoring blanks and # comments."""
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return [ln.strip() for ln in lines if ln.strip() and not ln.strip().startswith("#")]
+
+
+def source_stem(source):
+    """Derive a filesystem-safe stem from a URL or path.
+
+    Picks the last meaningful path segment, skipping generic trailing segments
+    ("index", "index.html") that carry no identifying information. Documentation
+    URLs such as .../html-single/configuring_the_thing/index/index.html reduce to
+    "configuring_the_thing".
+    """
+    generic = {"", "index", "index.html", "index.htm"}
+    segments = [seg for seg in re.split(r"[/\\]", source.split("?")[0].split("#")[0]) if seg]
+    for seg in reversed(segments):
+        if seg.lower() not in generic:
+            stem = re.sub(r"\.(x?html?|htm)$", "", seg, flags=re.IGNORECASE)
+            return re.sub(r"[^A-Za-z0-9._-]+", "-", stem).strip("-") or "page"
+    return "page"
+
+
+def extract_batch(sources, output_dir, want_anchors=False, headings_only=False):
+    """Extract many sources into one directory, one text file per source.
+
+    Returns:
+        list[dict]: One manifest entry per source, with its stem, output paths,
+        character count and heading count. Failed sources carry an ``error`` key
+        instead of output paths so one bad URL does not abort the batch.
+    """
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    entries = []
+    seen = {}
+    for source in sources:
+        stem = source_stem(source)
+        # Disambiguate collisions rather than silently overwriting.
+        seen[stem] = seen.get(stem, 0) + 1
+        if seen[stem] > 1:
+            stem = f"{stem}-{seen[stem]}"
+
+        entry = {"source": source, "stem": stem}
+        try:
+            tokens = parse_html(load_html_or_raise(source))
+        except Exception as exc:  # noqa: BLE001 - report and continue the batch
+            entry["error"] = str(exc)
+            entries.append(entry)
+            print(f"WARN  {stem}: {exc}", file=sys.stderr)
+            continue
+
+        text = render_headings_only(tokens) if headings_only else render_markdown(tokens)
+        text_path = out_dir / f"{stem}.txt"
+        text_path.write_text(text, encoding="utf-8")
+        entry["textPath"] = str(text_path)
+        entry["chars"] = len(text)
+        entry["headings"] = sum(1 for t in tokens if t["type"] == "heading")
+
+        if want_anchors:
+            anchor_path = out_dir / f"{stem}.anchors.json"
+            anchor_path.write_text(
+                json.dumps(build_anchor_map(tokens), indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            entry["anchorsPath"] = str(anchor_path)
+
+        entries.append(entry)
+    return entries
+
+
+def load_html_or_raise(source):
+    """Like load_html, but raises instead of calling sys.exit (batch-safe)."""
+    if source.startswith("http://") or source.startswith("https://"):
+        req = urllib.request.Request(source, headers={"User-Agent": "extract-html-text/1.0"})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            charset = resp.headers.get_content_charset() or "utf-8"
+            return resp.read().decode(charset, errors="replace")
+    path = Path(source)
+    if not path.exists():
+        raise FileNotFoundError(f"File not found: {source}")
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -320,11 +408,32 @@ def build_parser():
             "  %(prog)s http://localhost:8080/docs/.../index/ "
             "-o /tmp/content.txt --anchors-file /tmp/anchors.json\n"
             "  %(prog)s /tmp/page.html --headings-only\n"
+            "  %(prog)s --sources-file /tmp/urls.txt --output-dir /tmp/docs "
+            "--anchors --manifest /tmp/docs/_manifest.json\n"
         ),
     )
     parser.add_argument(
-        "source",
-        help="URL (http/https) or local file path to extract from",
+        "sources",
+        nargs="*",
+        help="One or more URLs (http/https) or local file paths to extract from",
+    )
+    parser.add_argument(
+        "--sources-file",
+        metavar="FILE",
+        help="Read sources from FILE, one per line (blank lines and # comments ignored)",
+    )
+    parser.add_argument(
+        "-d", "--output-dir",
+        metavar="DIR",
+        help=(
+            "Batch mode: write one <stem>.txt per source into DIR. Required when "
+            "more than one source is given."
+        ),
+    )
+    parser.add_argument(
+        "--manifest",
+        metavar="FILE",
+        help="In batch mode, write a JSON manifest of extracted sources to FILE",
     )
     parser.add_argument(
         "-o", "--output",
@@ -363,8 +472,39 @@ def main(argv=None):
     if args.anchors_file:
         args.anchors = True
 
-    # Load and parse
-    html_content = load_html(args.source)
+    sources = list(args.sources)
+    if args.sources_file:
+        sources.extend(read_sources_file(args.sources_file))
+    if not sources:
+        parser.error("no sources given (pass positional sources or --sources-file)")
+
+    # Batch mode: many sources, or an explicit output directory.
+    if args.output_dir or len(sources) > 1:
+        if not args.output_dir:
+            parser.error("--output-dir is required when more than one source is given")
+        entries = extract_batch(
+            sources,
+            args.output_dir,
+            want_anchors=args.anchors,
+            headings_only=args.headings_only,
+        )
+        summary = {
+            "outputDir": args.output_dir,
+            "requested": len(sources),
+            "extracted": sum(1 for e in entries if "textPath" in e),
+            "failed": sum(1 for e in entries if "error" in e),
+            "totalChars": sum(e.get("chars", 0) for e in entries),
+            "entries": entries,
+        }
+        if args.manifest:
+            Path(args.manifest).write_text(
+                json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            )
+        print(json.dumps({k: v for k, v in summary.items() if k != "entries"}, indent=2))
+        return
+
+    # Single-source mode
+    html_content = load_html(sources[0])
     tokens = parse_html(html_content)
 
     # Determine what to output to stdout
