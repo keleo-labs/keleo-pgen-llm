@@ -128,8 +128,8 @@ keleo-pgen-llm/
 │       └── exec-readout/                # Readout deck skill (status, findings)
 │           ├── SKILL.md
 │           └── contract.feature
-├── deps/                                   # Symlinks to keleo-language
-│   ├── language.schema.json               # JSON Schema definition
+├── deps/                                   # Consumed dependencies (tracked)
+│   ├── language.schema.json               # JSON Schema definition (symlink to keleo-language)
 │   ├── platform-adoption-kernel.json      # Baseline framework (Platform Adoption)
 │   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
 ├── references/                             # Analysis framework documentation
@@ -296,8 +296,13 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 - `references/semantics.md` - Hub document indexing semantic guidance sub-documents in `references/semantics/`
 - `references/workproduct-assessment-rubric.csv` - 5-level maturity rubric (Level 0: Non-Existent → Level 4: Comprehensive/Automated)
 
-### Dependencies (Symlinks to keleo-language)
-- `deps/language.schema.json` - JSON Schema definition for Practice Language
+### Dependencies (`deps/`)
+
+Inputs the library resolves against. All are tracked in git — unlike
+`baselines/`, which holds regenerable `/create-baseline-method` output and is
+ignored. A baseline that practices depend on belongs here, as a real file.
+
+- `deps/language.schema.json` - JSON Schema definition for Practice Language (symlink to keleo-language)
 - `deps/platform-adoption-kernel.json` - Platform Adoption Essentials baseline framework
 - `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
 
