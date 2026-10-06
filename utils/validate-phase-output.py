@@ -627,17 +627,22 @@ def extract_pattern_views(content):
         if found:
             return found
 
-        # Keyed-brace form, one entry per line under an "Alpha States:" label:
+        # Keyed-brace form, bare or JSON-quoted keys, on one line or many:
         #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
+        #   - alphaStates: [{"alphaName": "Platform", "stateName": "Ready"}]
         keyed = re.findall(
-            r"\{\s*alphaName:\s*([^,{}]+?)\s*,\s*stateName:\s*([^{}]+?)\s*\}",
+            r"\{\s*\"?alphaName\"?\s*:\s*\"?([^,{}\"]+?)\"?\s*,"
+            r"\s*\"?stateName\"?\s*:\s*\"?([^{}\"]+?)\"?\s*\}",
             block, re.IGNORECASE,
         )
         if keyed:
             return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
 
-        # The label may carry a qualifier, e.g. "Alpha States (changed only):".
-        line = re.search(r"Alpha States?\s*(?:\([^)]*\))?\s*:\s*(.+)", block)
+        # The label may carry a qualifier ("Alpha States (changed only):") and
+        # may be written as prose or as the schema's camelCase property name.
+        line = re.search(
+            r"(?:Alpha States?|alphaStates)\s*(?:\([^)]*\))?\s*:\s*(.+)", block
+        )
         if not line:
             return []
         raw = line.group(1)

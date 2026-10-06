@@ -160,6 +160,12 @@ def main():
                         help="Append patch array items to an existing array at KEY")
     parser.add_argument("--element-path", "-e", metavar="PATH",
                         help="Merge patch into element at PATH (e.g., 'alphas[Platform]')")
+    parser.add_argument("--append-to", metavar="PATH",
+                        help=(
+                            "Append patch array items to an array nested at PATH "
+                            "(e.g., 'alphas[Platform].relatesTo'). Unlike --append-key, "
+                            "which only reaches top-level arrays."
+                        ))
     parser.add_argument("--delete-key", "-d", nargs="+", metavar="KEY",
                         help="Delete one or more top-level keys (no patch input needed)")
     parser.add_argument("--replace", nargs=2, metavar=("OLD", "NEW"),
@@ -316,7 +322,28 @@ def main():
         changes.append(f"  batch: {applied} applied, {errors} skipped")
 
     if needs_patch:
-        if args.element_path:
+        if args.append_to:
+            # Append into an array nested inside a named element, e.g.
+            # 'alphas[Software Catalog Inventory].relatesTo'. --element-path
+            # merges or replaces, and --append-key only reaches top-level
+            # arrays, so adding one entry to one alpha's relatesTo otherwise
+            # means rewriting the whole array by hand.
+            parent, final_key = resolve_element_path(data, args.append_to)
+            target = _navigate(parent, final_key)
+            if not isinstance(target, list):
+                print(
+                    f"Error: {args.append_to} is {type(target).__name__}, not an array",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            items = patch if isinstance(patch, list) else [patch]
+            target.extend(items)
+            changes.append(
+                f"  {args.append_to}: appended {len(items)} item(s) "
+                f"({len(target) - len(items)} -> {len(target)})"
+            )
+
+        elif args.element_path:
             parent, final_key = resolve_element_path(data, args.element_path)
             target_obj = _navigate(parent, final_key) if not isinstance(final_key, int) or isinstance(parent, list) else parent[final_key]
             if isinstance(patch, dict) and isinstance(target_obj, dict):

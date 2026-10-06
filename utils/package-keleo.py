@@ -120,6 +120,10 @@ def build_externalized_method(args, documents):
     method["description"] = args.method_description or (
         f"Comprehensive methodology combining {len(practice_names)} practices."
     )
+    method["version"] = args.method_version or args.version
+    schema_version = get_schema_version()
+    if schema_version:
+        method["schemaVersion"] = schema_version
     method["baselinePracticeName"] = baseline_name
     method["practiceNames"] = practice_names
 
@@ -467,6 +471,9 @@ def main():
                         help="Generate an externalized method document with this name")
     parser.add_argument("--method-description",
                         help="Description for the generated method document")
+    parser.add_argument("--method-version",
+                        help="Version for the generated method document (semver). "
+                             "Defaults to the package --version.")
     parser.add_argument("--method-narrative-file",
                         help="JSON file with method-level narrative definitions")
 

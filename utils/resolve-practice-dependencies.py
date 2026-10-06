@@ -65,17 +65,52 @@ def collect_alpha_names(data):
 
 
 def map_alphas_to_practices(method_data):
+    """Map each parent alpha to the practice that defines it.
+
+    Two parent shapes exist. A legacy method embeds its practices as objects
+    under ``practices``. A resolved effective context produced by
+    ``resolve-context.py`` is flat: one merged ``alphas`` array where every
+    element carries ``_contributingPracticeName`` provenance. Reading only the
+    embedded shape leaves the map empty for an effective context, so every
+    parent-only target resolves to no owning practice and the tool reports an
+    empty ``practiceDependencyNames`` while simultaneously listing the alpha
+    under ``referencedParentOnlyAlphas`` — a silent under-report.
+    """
     alpha_to_practice = {}
+
+    # Legacy embedded-practice method shape.
     for p in method_data.get("practices", []):
         practice_name = p.get("name", "unknown")
         for alpha in p.get("alphas", []):
             name = alpha.get("name")
             if name:
-                alpha_to_practice[name] = practice_name
+                alpha_to_practice[name] = [practice_name]
+
+    # Resolved effective context: provenance lives on each element. Only the
+    # practice tier creates a practiceDependencyNames entry — a baseline
+    # contributor creates none, and a method contributor is coordination-level
+    # rather than a practice dependency.
+    # An alpha declared identically by two practices keeps only the last writer
+    # in `_contributingPracticeName`. Prefer the full `_contributingPracticeNames`
+    # list so a shared alpha reports every practice that declares it — reading
+    # the scalar alone silently drops dependencies the practice genuinely needs.
+    tiers = (method_data.get("_provenance") or {}).get("tiers") or {}
+    practice_tier = set(tiers.get("practices") or [])
     for alpha in method_data.get("alphas", []):
         name = alpha.get("name")
-        if name and name not in alpha_to_practice:
-            alpha_to_practice[name] = method_data.get("name", "root")
+        if not name or name in alpha_to_practice:
+            continue
+        contributors = alpha.get("_contributingPracticeNames") or []
+        if not contributors:
+            scalar = alpha.get("_contributingPracticeName")
+            contributors = [scalar] if scalar else []
+        owners = [
+            c for c in contributors
+            if c and (not practice_tier or c in practice_tier)
+        ]
+        if owners:
+            alpha_to_practice[name] = owners
+
     return alpha_to_practice
 
 
@@ -118,8 +153,10 @@ def build_per_alpha_detail(practice_data, baseline_alphas, parent_only_set,
                 row["targetOrigin"] = "baseline"
             elif ct in parent_only_set:
                 row["targetOrigin"] = "parent-only"
-                if ct in alpha_to_practice:
-                    row["targetOwningPractice"] = alpha_to_practice[ct]
+                owners = alpha_to_practice.get(ct, [])
+                if owners:
+                    row["targetOwningPractice"] = owners[-1]
+                    row["targetOwningPractices"] = owners
             else:
                 row["targetOrigin"] = "unresolved"
         rows.append(row)
@@ -137,10 +174,23 @@ def analyze_practice_with_detail(practice_data, practice_name, baseline_alphas,
         external_targets - parent_only_set - baseline_alphas
     )
 
-    owning_practices = set()
+    # An alpha with exactly one owner forces that dependency. An alpha declared
+    # by several practices is satisfied by ANY one of them, so unioning the
+    # owners would inflate the dependency graph; report those separately and let
+    # the caller pick on semantic grounds (which owner the content really
+    # belongs to), rather than guessing here.
+    required = set()
+    shared = {}
     for alpha_name in referenced_parent_only:
-        if alpha_name in alpha_to_practice:
-            owning_practices.add(alpha_to_practice[alpha_name])
+        owners = alpha_to_practice.get(alpha_name, [])
+        if len(owners) == 1:
+            required.add(owners[0])
+        elif len(owners) > 1:
+            shared[alpha_name] = owners
+
+    unresolved_shared = {
+        a: o for a, o in shared.items() if not (set(o) & required)
+    }
 
     result = {
         "practice": practice_name,
@@ -148,12 +198,23 @@ def analyze_practice_with_detail(practice_data, practice_name, baseline_alphas,
         "referencedBaselineAlphas": referenced_baseline,
         "referencedParentOnlyAlphas": referenced_parent_only,
         "unresolvedTargets": unresolved,
-        "practiceDependencyNames": sorted(owning_practices),
+        "practiceDependencyNames": sorted(required),
         "alphas": build_per_alpha_detail(
             practice_data, baseline_alphas, parent_only_set,
             alpha_to_practice,
         ),
     }
+    if shared:
+        result["sharedAlphaOwners"] = shared
+    if unresolved_shared:
+        result["requiresDependencyChoice"] = {
+            "note": (
+                "These alphas are declared by more than one practice and none of "
+                "their owners is already required. Add one owner per alpha to "
+                "practiceDependencyNames, choosing on semantic grounds."
+            ),
+            "alphas": unresolved_shared,
+        }
     return result
 
 
@@ -190,16 +251,24 @@ def main():
     baseline_alphas = collect_alpha_names(baseline_data)
     parent_only = sorted(parent_alphas - baseline_alphas)
 
-    alpha_to_practice = {}
+    # Ownership comes from an explicit --parent-method when one is given.
+    # Otherwise derive it from the parent document itself: a resolved effective
+    # context already carries `_contributingPracticeName` on every element.
+    # Without this fallback the map stays empty on the documented invocation
+    # (--parent/--baseline/--practice), so practiceDependencyNames is always
+    # reported as [] no matter what the practice actually references.
     if args.parent_method:
-        method_data = load_json(args.parent_method)
-        alpha_to_practice = map_alphas_to_practices(method_data)
+        alpha_to_practice = map_alphas_to_practices(load_json(args.parent_method))
+    else:
+        alpha_to_practice = map_alphas_to_practices(parent_data)
 
     parent_only_with_practice = []
     for alpha_name in parent_only:
         entry = {"alphaName": alpha_name}
-        if alpha_name in alpha_to_practice:
-            entry["owningPractice"] = alpha_to_practice[alpha_name]
+        owners = alpha_to_practice.get(alpha_name, [])
+        if owners:
+            entry["owningPractice"] = owners[-1]
+            entry["owningPractices"] = owners
         parent_only_with_practice.append(entry)
 
     output = {

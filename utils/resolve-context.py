@@ -309,17 +309,24 @@ def apply_alias_context(effective, aliases):
 def build_provenance(effective, merge_order, tiers):
     """Build _provenance manifest from the effective context."""
     element_sources = {}
+    multi_source_elements = {}
     for key in MERGEABLE_ARRAYS:
         items = effective.get(key, [])
         if items:
             sources = {}
+            shared = {}
             for item in items:
                 name = item.get("name", "")
                 source = item.get("_contributingPracticeName", "")
                 if name:
                     sources[name] = source
+                    contributors = item.get("_contributingPracticeNames") or []
+                    if len(contributors) > 1:
+                        shared[name] = contributors
             if sources:
                 element_sources[key] = sources
+            if shared:
+                multi_source_elements[key] = shared
 
     return {
         "mergeOrder": merge_order,
@@ -329,6 +336,7 @@ def build_provenance(effective, merge_order, tiers):
             "methods": [name for name, _ in tiers["methods"]],
         },
         "elementSources": element_sources,
+        "multiSourceElements": multi_source_elements,
     }
 
 
@@ -477,7 +485,10 @@ OUTPUT_SCHEMA = {
         "keywords": "array — deduplicated merged keywords",
     },
     "elementAnnotations": {
-        "_contributingPracticeName": "string on each merged element — source practice/baseline name",
+        "_contributingPracticeName": "string on each merged element — most recent source practice/baseline name",
+        "_contributingPracticeNames": "array on each merged element — ALL sources that declared it, in merge order. "
+                                      "Read this, not the scalar, when deciding practiceDependencyNames: an element "
+                                      "declared by two practices keeps only the last in the scalar.",
         "_domainAlias": "string on elements with aliases — the domain-specific name",
     },
 }
