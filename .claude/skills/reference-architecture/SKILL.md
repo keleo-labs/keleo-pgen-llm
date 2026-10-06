@@ -30,7 +30,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Document | Load at | What it provides |
 |---|---|---|
-| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
+| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection reference |
 | `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3 | Diagram layouts, spec authoring, embedding convention — every option needs a topology diagram |
 
@@ -95,6 +95,8 @@ In plan mode:
 
 **ExitPlanMode** once the user approves the plan.
 
+**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+
 ---
 
 ## Step 3: Output Structure
@@ -134,7 +136,7 @@ In plan mode:
 
 ### Option A: <Name>
 
-![<Option name> topology](assets/<report-slug>/<option-slug>-topology.svg)
+![<Option name> topology](assets/<option-slug>-topology.svg)
 
 <Rendered with `utils/render-diagram.py` from a `flow` spec — see
 `reporting-foundation/diagram-guide.md`. Never ASCII art.>
@@ -222,4 +224,6 @@ In plan mode:
 
 ## Post-Completion
 
-After generating the architecture document, perform the Post-Completion Review per SKILL-STANDARD.md §11.
+Record the architecture document — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).
+
+Then perform the Post-Completion Review per SKILL-STANDARD.md §11.

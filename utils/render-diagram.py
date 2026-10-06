@@ -12,7 +12,7 @@ structure rather than its rendered SVG.
 
 Usage is unchanged:
     python3 utils/render-diagram.py <spec>.json [-o <out>.svg] [--stdout]
-    python3 utils/render-diagram.py --dir reports/assets/<report-slug>/
+    python3 utils/render-diagram.py --dir reports/<report-slug>/assets/
     python3 utils/render-diagram.py --spec-help
 
 Run `--spec-help` for the spec reference, or read

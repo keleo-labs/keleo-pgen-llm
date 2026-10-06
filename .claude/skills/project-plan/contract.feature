@@ -9,7 +9,7 @@ Feature: Project Plan Generation
 
   Scenario: Standard project plan
     When the skill completes all steps
-    Then a plan document is written to reports/
+    Then a plan document is written to reports/<report-slug>/<report-slug>.md
     And the plan includes explicit scope boundaries (in and out)
     And activities map to deliverables
     And success criteria are measurable
@@ -24,8 +24,16 @@ Feature: Project Plan Generation
   Scenario: Standalone SOW
     Given the user requests only a SOW
     When the skill generates the output
-    Then a standalone SOW document is written to reports/
+    Then a standalone SOW document is written to reports/<report-slug>/<report-slug>-sow.md
     And the SOW derives scope from practice activities
+
+  Scenario: Report workspace and provenance
+    When the skill completes all steps
+    Then the report directory contains 00-prompt-history.md alongside the plan
+    And the history records the user's prompt and each practice resolved as a dependency
+    And the history records the narrative strategy decision and the plan as a deliverable
+    And a SOW, where one was produced, is recorded as a separate deliverable in the same directory
+    And the session is finalized
 
   Scenario: PoC plan
     Given the engagement type is a proof of concept

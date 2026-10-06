@@ -9,7 +9,7 @@ Feature: Document Review
 
   Scenario: Standard document review
     When the skill completes all steps
-    Then a review report is written to reports/
+    Then a review report is written to reports/<report-slug>/<report-slug>.md
     And the report identifies both strengths and weaknesses
     And gap analysis dimensions derive from the practice's domain concerns
     And recommendations are specific and actionable
@@ -19,6 +19,13 @@ Feature: Document Review
     When the skill ingests the document
     Then content is extracted via gws CLI
     And slide-level references appear in the review findings
+
+  Scenario: Report workspace and provenance
+    When the skill completes all steps
+    Then the report directory contains 00-prompt-history.md alongside the review report
+    And the history records the user's prompt and the reviewed document as a source
+    And the history records each practice resolved as a dependency and the report as a deliverable
+    And the session is finalized
 
   Scenario: Focused review on specific aspects
     Given the user requests a focused review on specific dimensions

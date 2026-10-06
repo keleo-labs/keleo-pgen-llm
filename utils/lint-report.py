@@ -25,12 +25,12 @@ report is handed over:
                given together with --consistent-terms.
 
 Usage:
-    python3 utils/lint-report.py reports/my-report.md
-    python3 utils/lint-report.py reports/my-report.md --min-words 3000 --max-words 6000
-    python3 utils/lint-report.py reports/my-report.md --checks citations --json
-    python3 utils/lint-report.py reports/my-report.md --checks attribution
-    python3 utils/lint-report.py reports/my-report.md --strict
-    python3 utils/lint-report.py reports/a.md reports/b.md \
+    python3 utils/lint-report.py reports/my-report/my-report.md
+    python3 utils/lint-report.py reports/my-report/my-report.md --min-words 3000 --max-words 6000
+    python3 utils/lint-report.py reports/my-report/my-report.md --checks citations --json
+    python3 utils/lint-report.py reports/my-report/my-report.md --checks attribution
+    python3 utils/lint-report.py reports/my-report/my-report.md --strict
+    python3 utils/lint-report.py reports/a/a.md reports/b/b.md \
         --consistent-terms "Run Commercial Applications" "COTS Application Hosting TDP"
 
 Exit status is 1 if any error-severity finding is reported, else 0.

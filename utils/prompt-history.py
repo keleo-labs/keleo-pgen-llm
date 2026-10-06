@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""Manage prompt history files for practice/baseline generation sessions.
+"""Manage prompt history files for generation sessions.
 
 Records the user prompt, source materials, resolved dependencies, phase
 execution, key decisions, and final deliverables as a structured markdown
-document inside the practice/baseline output folder.
+document inside the practice, baseline, or report output folder.
 
 Usage:
     # Initialise a new prompt history
     python3 utils/prompt-history.py practices/my-practice/ --init \
         --type practice --name "My Practice" --prompt "Generate a practice for ..."
+
+    # ... or for a report workspace (reports/<slug>/)
+    python3 utils/prompt-history.py reports/my-report/ --init \
+        --type report --name "My Report" --prompt "Write a report on ..."
 
     # Record source materials (one per call, or multiple)
     python3 utils/prompt-history.py practices/my-practice/ --add-source \
@@ -547,13 +551,14 @@ def cmd_hook(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage prompt history files for practice/baseline generation sessions"
+        description="Manage prompt history files for practice, baseline, and report sessions"
     )
     parser.add_argument(
         "directory",
         nargs="?",
-        help="Practice or baseline output directory (e.g., practices/my-practice/). "
-        "Omitted in --hook mode, where the directory comes from the active-session pointer.",
+        help="Practice, baseline, or report output directory (e.g., practices/my-practice/, "
+        "reports/my-report/). Omitted in --hook mode, where the directory comes from the "
+        "active-session pointer.",
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -588,8 +593,12 @@ def main():
     )
 
     # --init options
-    parser.add_argument("--type", choices=["practice", "baseline", "method"], help="Generation type")
-    parser.add_argument("--name", help="Practice/baseline/method name")
+    parser.add_argument(
+        "--type",
+        choices=["practice", "baseline", "method", "report"],
+        help="Generation type",
+    )
+    parser.add_argument("--name", help="Practice/baseline/method/report name")
     parser.add_argument("--prompt", help="User's original prompt text")
     parser.add_argument("--force", action="store_true", help="Overwrite existing history")
 

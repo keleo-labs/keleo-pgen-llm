@@ -33,7 +33,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Document | Load at | What it provides |
 |---|---|---|
-| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
+| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection (this skill uses fixed structures — guide is for reference only) |
 | `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3, if the review needs a visual | Diagram layouts, spec authoring, embedding convention |
 
@@ -95,6 +95,8 @@ In plan mode:
    - Confirm the assessment scope with the user
 
 **ExitPlanMode** once the user approves the plan.
+
+**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the reviewed document and any other sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
 
 ---
 
@@ -200,4 +202,6 @@ Build a mental map of the document's structure, coverage, messaging, and gaps re
 
 ## Post-Completion
 
-After generating the review report, perform the Post-Completion Review per SKILL-STANDARD.md §11.
+Record the review report — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).
+
+Then perform the Post-Completion Review per SKILL-STANDARD.md §11.

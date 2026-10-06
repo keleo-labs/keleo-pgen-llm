@@ -53,9 +53,9 @@ output into a subagent prompt — point the agent at the command.
 **1. Write the spec** next to where the SVG will live, using the Write tool:
 
 ```
-reports/
+reports/<report-slug>/
   <report-slug>.md
-  assets/<report-slug>/
+  assets/
     option-a-topology.json
     option-a-topology.svg
 ```
@@ -65,7 +65,7 @@ The spec is kept, not discarded — it is how the diagram gets corrected later w
 **2. Render every spec in one call** once all specs for the report are written:
 
 ```bash
-python3 utils/render-diagram.py --dir reports/assets/<report-slug>/
+python3 utils/render-diagram.py --dir reports/<report-slug>/assets/
 ```
 
 Batch mode writes each `<name>.svg` beside its `<name>.json`. One call per report, not one per
@@ -74,7 +74,7 @@ diagram.
 **3. Embed with a relative path and real alt text:**
 
 ```markdown
-![Option A: controller-centric scheduled remediation topology](assets/<report-slug>/option-a-topology.svg)
+![Option A: controller-centric scheduled remediation topology](assets/option-a-topology.svg)
 ```
 
 ---

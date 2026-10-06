@@ -168,7 +168,10 @@ keleo-pgen-llm/
 │       ├── 02-mapping-guide.md
 │       └── <baseline-name>.json           # Intermediate baseline JSON
 ├── reports/                                # Generated reports output (git-ignored contents)
-│   └── <report-name>.md                   # Plain English reports from /method-based-report
+│   └── <report-slug>/                     # One workspace per report
+│       ├── 00-prompt-history.md           # Session provenance
+│       ├── <report-slug>.md               # Plain English report
+│       └── assets/                        # Diagram specs + rendered SVGs
 ├── bundles/                                # Packaged .keleo output
 │   └── <name>.keleo                       # ZIP archive with manifest + documents
 ├── utils/
@@ -682,13 +685,14 @@ The reporting system is modular — a shared foundation (`.claude/skills/reporti
 All reporting skills follow the same workflow:
 
 1. **Plans** — Identifies practice context, subject, audience, and type-specific inputs
-2. **Loads Context** — Resolves the practice via `utils/resolve-context.py --transitive`
-3. **Analyzes & Selects** — Extracts domain knowledge and selects narrative structures
-4. **Generates Report** — Writes a standalone markdown report to `reports/<report-name>.md`
+2. **Opens a Workspace** — Creates `reports/<report-slug>/` and initialises `00-prompt-history.md` via `utils/prompt-history.py --type report`
+3. **Loads Context** — Resolves the practice via `utils/resolve-context.py --transitive`
+4. **Analyzes & Selects** — Extracts domain knowledge and selects narrative structures
+5. **Generates Report** — Writes a standalone markdown report into the workspace, then records deliverables and finalises the history
 
 Reports use narrative types from the baseline (Report Narrative, Essay Narrative, STAR, SDLC, etc.) to organise content, and practice domain knowledge to inform the analysis — but present everything in plain English with no Keleo terminology.
 
-**Output Location**: `reports/<report-name>.md` (git-ignored — ephemeral deliverables)
+**Output Location**: `reports/<report-slug>/` (git-ignored — ephemeral deliverables). Each report owns a directory holding `00-prompt-history.md`, `<report-slug>.md`, any PDF export, and an `assets/` folder for diagram specs and rendered SVGs — mirroring how a practice owns `practices/<name>/`. Flat reports from before this convention are migrated by `python3 utils/migrate-report-layout.py --fix`.
 
 **Extending**: To add a new report type, see `.claude/skills/reporting-foundation/extension-template.md` for the step-by-step guide and SKILL.md template.
 

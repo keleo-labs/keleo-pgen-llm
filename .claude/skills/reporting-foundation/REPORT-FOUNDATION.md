@@ -4,6 +4,71 @@ Common workflow, rules, and conventions shared by all reporting skills. **Load l
 
 ---
 
+## Report Workspace (Step 0)
+
+Every report owns a directory under `reports/`, mirroring how a practice owns `practices/<name>/`. Everything the report produces lives inside it:
+
+```
+reports/<report-slug>/
+  00-prompt-history.md        Session provenance (see Session Provenance below)
+  <report-slug>.md            The report
+  <report-slug>.pdf           Exports, when produced
+  .published-docs.json        Google Doc republish state, written by publish-doc.py
+  assets/
+    <name>.json               Diagram spec
+    <name>.svg                Rendered diagram
+```
+
+The slug is kebab-case, derived from the report title, and names both the directory and the markdown file inside it. Create the directory at Step 0, before any content is written.
+
+Diagram embeds are relative to the markdown — `![alt](assets/<name>.svg)` — so the whole directory can be moved, copied, or handed over intact.
+
+---
+
+## Session Provenance (Step 0 → close)
+
+Every reporting run records how the report came to exist: the prompt behind it, the practice context that framed it, the narrative decision taken, and what was produced. Use `utils/prompt-history.py` — the same utility the generation skills use — against the report directory.
+
+**Initialise immediately after ExitPlanMode:**
+
+```bash
+python3 utils/prompt-history.py reports/<report-slug>/ --init \
+  --type report --name "<Report Title>" --prompt "<user's original prompt text>"
+```
+
+Then record each source identified during planning:
+
+```bash
+python3 utils/prompt-history.py reports/<report-slug>/ --add-source \
+  --source-type <file|url|google-doc|google-slides> \
+  --source-path "<path or URL>" --source-desc "<brief description>"
+```
+
+**`--init` activates the prompt-history hooks.** From this point until `--finalize`, every user turn and every `AskUserQuestion` exchange in the session is appended to the Interaction Log automatically. You DO need to record, manually, any question you put to the user in plain prose, because the hook captures only the answer:
+
+```bash
+python3 utils/prompt-history.py reports/<report-slug>/ --add-interaction \
+  --interaction-label "<context, e.g. 'Practice selection'>" \
+  --interaction-question "<the question you asked>" \
+  --interaction-answer "<the user's reply, verbatim>"
+```
+
+Resuming a report in a later session re-arms the hooks: `python3 utils/prompt-history.py reports/<report-slug>/ --activate`
+
+**Through Steps 1–3:**
+
+| When | Call |
+|---|---|
+| Each practice, method, or baseline resolved (Step 1) | `--add-dependency --dep-type <practice\|method\|baseline> --dep-name "<name>" --dep-path "<resolved path>" --dep-version "<version>"` |
+| Practice selection and narrative strategy settled (Steps 0, 2) | `--add-decision --decision-label "<Practice Selection\|Narrative Strategy>" --decision-text "<what was chosen and why>"` |
+| Entering and leaving each step | `--start-phase --phase "Step N: <name>"` / `--end-phase --phase "Step N: <name>" --phase-output "<file>"` |
+| Each artifact produced (markdown, PDF, published Doc URL) | `--add-deliverable --deliverable-path "<path or URL>" --deliverable-desc "<what it is>"` |
+| The report is handed over | `--finalize` |
+
+Record the dependency version from the resolved document's `version` field — `extract-reference-names.py <context>.json --metadata` reports it.
+
+---
+
 ## Context Resolution (Step 1)
 
 Use `resolve-context.py` to load the effective context. The `--transitive` flag resolves both practice dependencies (`practiceDependencyNames`) and baseline dependencies automatically.
@@ -167,15 +232,15 @@ a JSON spec — never ASCII art, never hand-written SVG geometry. Four layouts a
 (topologies, pipelines), `stack` (layer models), `timeline` (roadmaps), `hub` (relationship maps).
 
 ```bash
-# Write one <name>.json spec per diagram into reports/assets/<report-slug>/, then:
-python3 utils/render-diagram.py --dir reports/assets/<report-slug>/
+# Write one <name>.json spec per diagram into reports/<report-slug>/assets/, then:
+python3 utils/render-diagram.py --dir reports/<report-slug>/assets/
 python3 utils/render-diagram.py --spec-help    # full spec field reference
 ```
 
 Embed with a relative path and alt text that carries the diagram's claim:
 
 ```markdown
-![Option A: controller-centric scheduled remediation topology](assets/<report-slug>/option-a-topology.svg)
+![Option A: controller-centric scheduled remediation topology](assets/option-a-topology.svg)
 ```
 
 Read `reporting-foundation/diagram-guide.md` for layout selection, when a table beats a diagram, and
@@ -259,10 +324,12 @@ Default to the middle range unless the user specifies otherwise.
 
 ## Output (Step 3)
 
-Write the report to `reports/<report-name>.md` using the Write tool.
+Write the report to `reports/<report-slug>/<report-slug>.md` using the Write tool, in the workspace created at Step 0.
+
+Then close the session provenance: record the markdown (and any PDF or published Doc URL) with `--add-deliverable`, and `--finalize`.
 
 Tell the user:
-1. Where the report was saved
+1. The report directory, and what is in it
 2. Which practice/method provided the analytical framework
 3. Which narrative structure(s) shaped the report
 4. Total word count and citation count
@@ -343,8 +410,11 @@ When the user requests N separate reports from a shared method (e.g., one report
    # Build a structured summary for an agent prompt
    python3 utils/practice-summary.py /tmp/practice.json
    ```
-4. **Launch parallel agents** — construct a detailed prompt per report embedding: the report subject, audience, narrative strategy, extracted domain knowledge (alphas, outcomes, patterns, citations), and any supplementary method knowledge. Launch all agents in a single message for concurrent execution.
-5. **Each agent writes independently** — each agent generates its report to `reports/<report-name>.md` using the standard Steps 1–3 workflow.
+4. **Create a workspace and history per report** — before launching agents, create `reports/<report-slug>/` for each report and `--init` its prompt history, recording the shared plan decisions (practice selection, narrative strategy) into each one. Agents inherit a workspace rather than deciding on one.
+5. **Launch parallel agents** — construct a detailed prompt per report embedding: the report directory, subject, audience, narrative strategy, extracted domain knowledge (alphas, outcomes, patterns, citations), and any supplementary method knowledge. Launch all agents in a single message for concurrent execution.
+6. **Each agent writes independently** — each agent generates its report to `reports/<report-slug>/<report-slug>.md` using the standard Steps 1–3 workflow, and records its own dependencies, phases, and deliverables.
+
+**Hook caveat:** the active-history pointer is global, so automatic interaction capture follows whichever history was initialised last. In a batch run, record anything that matters to a specific report with an explicit `--add-interaction` against that report's directory rather than relying on the hooks.
 
 ---
 
@@ -385,6 +455,23 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - Then: every practice, method, or baseline named in it is a markdown hyperlink
 - And: each link is a `?doc=<document name>` deep link on the configured deployment
 - And: the line is generated with `studio-client.py --link ... --attribution`, not hand-written
+
+### Feature: Report Workspace
+
+#### Scenario: Report is a self-contained directory (@rule:report-613)
+- Given: a reporting skill generates a report
+- When: the output is written
+- Then: the report lives at `reports/<report-slug>/<report-slug>.md`
+- And: its diagram specs and rendered SVGs live in `reports/<report-slug>/assets/`
+- And: every embedded diagram path is relative to the markdown and resolves
+
+#### Scenario: Session provenance is recorded and closed (@rule:report-614)
+- Given: a reporting skill completes a run
+- When: the report directory is inspected
+- Then: `00-prompt-history.md` is present alongside the report
+- And: it records the user's prompt, each practice/method resolved as a dependency, and the narrative strategy decision
+- And: it lists the report as a deliverable
+- And: the session is finalized
 
 ### Feature: Diagrams
 

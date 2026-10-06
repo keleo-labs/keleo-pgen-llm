@@ -9,7 +9,7 @@ Feature: Method-Based Report Generation
 
   Scenario: General-purpose report generation
     When the skill completes all steps
-    Then a markdown report is written to reports/
+    Then a markdown report is written to reports/<report-slug>/<report-slug>.md
     And the report uses narrative structures from the baseline
     And no Keleo terminology appears in the report
     And the report includes APA 7 in-text citations
@@ -25,6 +25,14 @@ Feature: Method-Based Report Generation
     When narrative structures are selected
     Then the primary structure matches the purpose-to-narrative mapping
     And section headings are plain English translations of narrative elements
+
+  Scenario: Report workspace and provenance
+    When the skill completes all steps
+    Then the report directory contains 00-prompt-history.md alongside the report
+    And the history records the user's prompt and each practice resolved as a dependency
+    And the history records the narrative strategy decision and the report as a deliverable
+    And the session is finalized
+    And any diagrams live in the report directory's assets/ folder
 
   Scenario: Missing practice context
     Given the user specifies a practice that cannot be resolved locally

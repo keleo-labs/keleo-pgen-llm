@@ -15,8 +15,8 @@ frame at a legible scale whatever its aspect.
 
 Usage:
     python3 utils/preview-diagram.py <diagram>.svg
-    python3 utils/preview-diagram.py --dir reports/assets/<report-slug>/
-    python3 utils/preview-diagram.py --report reports/<name>.md
+    python3 utils/preview-diagram.py --dir reports/<report-slug>/assets/
+    python3 utils/preview-diagram.py --report reports/<report-slug>/<report-slug>.md
     python3 utils/preview-diagram.py --dir <dir> -o /tmp/previews --width 1200
 
 Writes <name>.png beside the SVG unless -o names an output directory.

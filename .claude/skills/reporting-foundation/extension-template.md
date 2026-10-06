@@ -57,7 +57,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Document | Load at | What it provides |
 |---|---|---|
-| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 1–3 | Context resolution, domain extraction, citations, voice/tone, output format, shared rules |
+| `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 and Step 2 | Narrative selection and element-to-heading mappings |
 
 ---
@@ -104,13 +104,16 @@ In plan mode:
 
 **ExitPlanMode** once the user approves the plan.
 
+**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+
 ---
 
 ## Steps 1–3: Execution
 
 Steps 1–2 follow `reporting-foundation/REPORT-FOUNDATION.md`.
 
-Step 3 output uses this structure:
+Step 3 writes to `reports/<report-slug>/<report-slug>.md`, with diagram specs and SVGs in
+`reports/<report-slug>/assets/`, using this structure:
 
 ```markdown
 # <Title>
@@ -144,7 +147,9 @@ Step 3 output uses this structure:
 
 ## Post-Completion
 
-After generating the report, perform the Post-Completion Review per SKILL-STANDARD.md §11.
+Record the report — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).
+
+Then perform the Post-Completion Review per SKILL-STANDARD.md §11.
 ```
 
 ---

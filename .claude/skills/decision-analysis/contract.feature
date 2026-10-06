@@ -10,7 +10,7 @@ Feature: Decision Analysis
   Scenario: Balanced multi-option analysis
     Given at least two options are identified
     When the skill completes all steps
-    Then an analysis document is written to reports/
+    Then an analysis document is written to reports/<report-slug>/<report-slug>.md
     And all options receive comparable depth
     And every option includes both strengths and weaknesses
 
@@ -23,6 +23,13 @@ Feature: Decision Analysis
     When the decision framework section is written
     Then the framework is applicable beyond the specific instance analysed
     And a reader with different constraints can apply it independently
+
+  Scenario: Report workspace and provenance
+    When the skill completes all steps
+    Then the report directory contains 00-prompt-history.md alongside the analysis
+    And the history records the user's prompt and each practice resolved as a dependency
+    And the history records the narrative strategy decision and the analysis as a deliverable
+    And the session is finalized
 
   Scenario: Options discovered from practice
     Given the user poses a question without listing options
