@@ -1,0 +1,31 @@
+# Accepted findings in history, by fingerprint.
+#
+# CI scans full history, which is the point of it — but that means it sees
+# findings from before these controls existed. Each line below is a conscious
+# acceptance, not a silenced rule: the rules still fire on anything new, and
+# the hook scans the staged diff where none of these appear.
+#
+# All seven are in commits predating the guardrails. None is a credential, and
+# none survives at HEAD: four of the five files were deleted long ago, and the
+# fifth was corrected before this file was written. History was deliberately
+# left intact — the exposure is a username and a directory layout, and a
+# force-push on a public repository breaks every clone for little return.
+#
+# Remove an entry if its commit ever leaves the history. Add one only with a
+# comment saying what it is and why it is acceptable.
+
+# --- Apps Script deployment URL, since replaced by a relative reference ------
+# plan-from-feedback/SKILL.md once pasted a full deployment URL as an example.
+# The endpoint is behind a bearer token held in the gitignored user-config.
+0d51d6793af84219cca62b2cf88dc7bc76262502:.claude/skills/plan-from-feedback/SKILL.md:apps-script-deployment-url:71
+
+# --- Absolute home paths in deleted or corrected files -----------------------
+# The maintainer's /Users/<name>/ path. Not a credential; identifies the
+# machine the file came from. Corrected at HEAD in SKILL.md, and the other
+# four files no longer exist.
+987e8a402cbcdfbf7e5d74ecf2b352d539b97a4b:.claude/skills/plan-from-feedback/SKILL.md:personal-home-path:211
+f7dfe171848037b09b41c686c82e6b27fcdd8271:utils/generate-method-json.py:personal-home-path:202
+f9892693cb82016605986fdf4ad4a12cb12f20d4:prompts/phase-2-segments/segment-generation-rules.md:personal-home-path:3
+f9892693cb82016605986fdf4ad4a12cb12f20d4:scripts/translation/translate-method-to-json.py:personal-home-path:13
+f9892693cb82016605986fdf4ad4a12cb12f20d4:scripts/translation/translate-method-to-json.py:personal-home-path:16
+f9892693cb82016605986fdf4ad4a12cb12f20d4:scripts/validate-cross-references.py:personal-home-path:485

@@ -544,6 +544,31 @@ Gitignored per-user config file. Created automatically by skills on first use.
 | `keleoStudioGasUrl` | Remote bundle repository deployment URL | `studio-client.py --configure` |
 | `keleoStudioGasToken` | Bearer token for bundle repository API | `studio-client.py --configure` |
 
+## Git Safety
+
+**This repository is public on GitHub.** Anything committed is world-readable
+immediately and remains reachable by SHA afterwards. Read `SECURITY.md` before
+committing anything that was not written for publication.
+
+Working material — page snapshots, extracted documents, API dumps — goes in
+`scratch/`, which is ignored wholesale. Generated output already is:
+`practices/`, `baselines/`, `bundles/` and `reports/` track only `.gitkeep`.
+
+Before pushing, run the guardrails check and clear every `FAIL`:
+
+```bash
+python3 ~/.claude/skills/git-guardrails/scripts/guardrails.py --check
+```
+
+It verifies the forge, that you are not on `main`, that both hook stages are
+installed, and that the scan configs exist. The hooks themselves run gitleaks
+and a large-file check at commit, and trufflehog's verified scan at push;
+GitHub Actions repeats both over full history.
+
+Never `--no-verify`, never commit to `main`, and triage a scan finding rather
+than bypassing it — a real credential is rotated before anything else, and a
+false positive gets a commented allowlist entry in `.gitleaks.toml`.
+
 ## Development Workflow
 
 ### Creating Baseline Practices

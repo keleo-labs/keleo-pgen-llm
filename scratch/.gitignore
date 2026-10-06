@@ -1,0 +1,8 @@
+# Working material that must never reach a public repository: page snapshots,
+# extracted documents, API dumps, anything downloaded while investigating.
+#
+# Prevention is the layer that matters most. A file that cannot be staged
+# needs no scanner, and `git add -A` cannot sweep up what is ignored here.
+*
+!.gitignore
+!.gitkeep
