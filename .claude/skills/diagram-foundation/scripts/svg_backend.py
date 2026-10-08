@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from xml.sax.saxutils import escape
 
-from diagram import THEME
+from diagram import THEME, cylinder_ry
 
 _QUOT = {chr(34): "&quot;"}
 
@@ -62,8 +62,8 @@ def _shape(item):
                 f'rx="{_fmt(w / 2)}" ry="{_fmt(h / 2)}" {_paint(item)} />')
 
     if kind == "cylinder":
-        # Ellipse height is capped so a tall datastore does not become a bulb.
-        ry = min(h * 0.16, 11.0)
+        # Shared with node_block, which insets the label past these caps.
+        ry = cylinder_ry(h)
         # Body first — the silhouette from the top of the cap to the bottom
         # of the base — then the lid as a *filled* ellipse rather than a bare
         # arc. An unfilled lid leaves the cap reading as see-through, and an

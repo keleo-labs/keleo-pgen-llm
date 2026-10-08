@@ -367,8 +367,21 @@ def node_block(node, x, y, w, h, centre_within=None):
     sub_lh = THEME["size_sub"] * THEME["line_height"]
 
     block_h = len(label_lines) * lh + (len(sub_lines) * sub_lh if sub_lines else 0)
-    band = centre_within if centre_within is not None else body_h
-    cursor = body_y + (band - block_h) / 2 + THEME["size_label"] * 0.85
+
+    # A cylinder is not a rectangle to its text. The lid is a filled ellipse
+    # over the top 2*ry of the box and the base arc bulges through the bottom
+    # ry, so a label centred in the whole box sits up inside the lid and reads
+    # as though it is printed on the rim. Centre it in what lies between.
+    top_inset = bottom_inset = 0.0
+    if shape == "cylinder":
+        ry = cylinder_ry(body_h)
+        top_inset, bottom_inset = 2 * ry, ry
+
+    if centre_within is not None:
+        band, band_top = centre_within, body_y
+    else:
+        band, band_top = body_h - top_inset - bottom_inset, body_y + top_inset
+    cursor = band_top + (band - block_h) / 2 + THEME["size_label"] * 0.85
     cx = x + w / 2
 
     for line in label_lines:
@@ -390,7 +403,6 @@ SHAPE_SLACK = {
     "hexagon": (1.25, 1.0),
     "event": (1.35, 1.3),
     "stadium": (1.22, 1.0),
-    "cylinder": (1.0, 1.3),
     "note": (1.1, 1.0),
 }
 
@@ -398,9 +410,26 @@ SHAPE_SLACK = {
 # of that node's box.
 PERSON_HEAD = 15.0
 
+
+def cylinder_ry(h):
+    """Vertical radius of a cylinder's end caps, for a box of height h.
+
+    Capped so a tall datastore does not become a bulb. `svg_backend` draws the
+    caps from this and `node_block` keeps the label clear of them, so the two
+    have to agree — hence it lives here rather than in the backend.
+    """
+    return min(h * 0.16, 11.0)
+
 # Flat additions, applied after SHAPE_SLACK: space a shape needs that does not
 # scale with the label.
-SHAPE_PAD = {"person": (0.0, PERSON_HEAD + 4)}
+#
+# A cylinder's caps are chrome, not content: the lid eats 2*ry at the top and
+# the base bulges through ry at the bottom, and ry caps at 11, so roughly 33px
+# of any cylinder holds no text at all. That is a constant, which is why this
+# is a flat pad and not the height multiplier it used to be — a multiplier
+# gave a one-word datastore room to spare and squeezed a wrapped label with a
+# sublabel to barely a pixel of clearance under the lid.
+SHAPE_PAD = {"person": (0.0, PERSON_HEAD + 4), "cylinder": (0.0, 26.0)}
 
 
 def measure_node(node, max_width=None, min_width=None, min_height=None):
