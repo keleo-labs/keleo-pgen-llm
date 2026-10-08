@@ -126,6 +126,10 @@ Build a mental map of the document's structure, coverage, messaging, and gaps re
 
 ## Current Document Assessment
 
+<What the document is trying to do and the lens this assessment applies, before
+the dimensions. Naming the lens is what stops the review reading as a list of
+unconnected observations. Two to four sentences. (@rule:report-618)>
+
 ### Scope and Audience
 <What the document covers, who it targets, and whether these align with its stated purpose.>
 

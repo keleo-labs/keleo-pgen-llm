@@ -388,6 +388,181 @@ def check_attribution(lines, studio_url):
     return findings
 
 
+RE_SECTION_SKIP = re.compile(r"^##\s+(References|Feature:)", re.I)
+
+
+# --- Register (REPORT-FOUNDATION Voice and Tone) ----------------------------------------
+# All three lists produce warnings, never errors. Each is context-dependent:
+# a human subject makes an agency verb correct, and a source may be quoted
+# verbatim. A false positive that blocks a publish costs more than a missed
+# phrase — the same call made for the fragment heuristic.
+
+# A variable given agency over a decision. Matched with a preceding word so
+# "the team decides" can be read and dismissed by eye.
+RE_AGENCY = re.compile(
+    r"\b(\w+)\s+(decides?|choose|chooses|picks?|drives?|dictates?|"
+    r"determines?|wants?|knows?)\b", re.I)
+# "...rather than to choose between good ones" is an infinitive, not agency.
+INFINITIVE_MARKERS = {"to", "cannot", "can", "could", "will", "would", "may",
+                      "might", "must", "should", "helps", "help", "not",
+                      "never", "also", "only", "then", "and", "or"}
+# Subjects for which the verb is correct, so the finding is suppressed.
+HUMAN_SUBJECTS = {
+    "you", "we", "they", "i", "he", "she", "who", "team", "teams", "architect",
+    "architects", "operator", "operators", "engineer", "engineers", "owner",
+    "owners", "customer", "customers", "organisation", "organization",
+    "organisations", "organizations", "board", "sponsor", "someone", "nobody",
+    "anyone", "everyone", "people", "person", "reader", "audience", "author",
+    "presenter", "stakeholder", "stakeholders", "business", "client",
+}
+
+# Rhetorical heading shapes.
+RE_CONTRARIAN = [
+    (re.compile(r",\s+not\s+\w", re.I), "an \"X, not Y\" construction"),
+    (re.compile(r"\bis not a\b|\bare not\b|\bis not\b", re.I),
+     "a negated assertion"),
+    (re.compile(r"^why\b.*\b(fail|fails|failed|breaks?|does ?n[o']t)\b", re.I),
+     "a \"Why X fails\" construction"),
+    (re.compile(r"^the (two|three|four|five|only) (things?|numbers?|reasons?)\b",
+                re.I), "a \"the N things that matter\" construction"),
+]
+
+# Framing that editorialises instead of naming a mechanism.
+DRAMATIC_PHRASES = [
+    "well understood", "works on paper", "work on paper", "in the real world",
+    "start to fail", "starts to fail", "survives a mistake",
+    "the hard part", "breaks the assumption", "breaks down",
+    "nobody tells you", "the dirty secret", "what nobody",
+]
+
+# A bullet with none of these is probably a noun phrase. Deliberately broad:
+# this only ever raises a warning, so over-matching is the safe direction.
+AUXILIARIES = {
+    "is", "are", "was", "were", "be", "been", "being", "am",
+    "has", "have", "had", "do", "does", "did",
+    "can", "could", "will", "would", "shall", "should", "may", "might", "must",
+    "needs", "need", "requires", "require", "means", "gives", "gets",
+}
+VERB_SUFFIX = re.compile(r"\w+(?:s|es|ed|ing)$", re.I)
+# Words ending in -s or -ing that are nouns far more often than verbs.
+NOT_VERBS = {
+    "is", "this", "its", "sites", "clusters", "services", "options", "costs",
+    "jobs", "needs", "means", "times", "windows", "images", "updates",
+    "nothing", "something", "everything", "during", "operations", "logs",
+    "metrics", "policies", "resources", "workloads", "boundaries", "versions",
+}
+
+
+# prompt-history.py writes this file: a records document of tables and stub
+# sections, not prose. Linting it reports a dozen structural "defects" that are
+# simply what the format is.
+PROVENANCE_FILE = "00-prompt-history.md"
+
+
+def check_sections(lines, min_words=25):
+    """A section must frame its parts before presenting them (@rule:report-618).
+
+    The defect is specific: a `##` whose first content is a `###`, a table or a
+    figure. The writer goes straight into the structure because the structure is
+    what the heading promised, and the reader meets `### Option A` without
+    knowing that B and C exist. Sections opening with prose almost always frame
+    themselves, so this only fires where a structure follows the heading.
+    """
+    findings, open_section = [], None
+
+    def close(at_line, first_kind, body_words):
+        if open_section is None or first_kind is None:
+            return
+        n, title = open_section
+        if body_words >= min_words:
+            return
+        findings.append({
+            "check": "sections", "severity": "error", "line": n,
+            "message": (
+                f"section {title!r} opens with {first_kind} after "
+                f"{body_words} words of framing — a reader meets the first "
+                f"part without knowing what set it belongs to. Add two to "
+                f"four sentences saying how many parts there are and what "
+                f"each is for"),
+        })
+
+    first_kind, body_words = None, 0
+    for n, line in enumerate(lines, 1):
+        m = re.match(r"^##\s+(?!#)(.*\S)\s*$", line)
+        if m:
+            close(n, first_kind, body_words)
+            open_section = (n, m.group(1))
+            if RE_SECTION_SKIP.match(line):
+                open_section = None
+            first_kind, body_words = None, 0
+            continue
+        if open_section is None or first_kind is not None:
+            continue
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("### "):
+            first_kind = "a subsection"
+        elif stripped.startswith("|"):
+            first_kind = "a table"
+        elif stripped.startswith("!["):
+            first_kind = "a figure"
+        elif stripped.startswith("#"):
+            first_kind = None
+        else:
+            body_words += len(stripped.split())
+    close(len(lines), first_kind, body_words)
+    return findings
+
+
+def check_tone(lines, headings):
+    """Register violations (@rule:report-619). Warnings only.
+
+    Duplicated rather than imported from lint-deck.py: the two linters live in
+    separate trees — this one in the repository, that one in the vendored deck
+    foundation — and a shared module would have to be vendored into both. The
+    lists are short and the rules are stated once, in prose, in each
+    foundation document.
+    """
+    findings = []
+    for n, level, title in headings:
+        for pattern, label in RE_CONTRARIAN:
+            if pattern.search(title):
+                findings.append({
+                    "check": "tone", "severity": "warning", "line": n,
+                    "message": (f"heading uses {label}, so it withholds "
+                                f"rather than states: {title!r}"),
+                })
+                break
+    for n, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        for subject, verb in RE_AGENCY.findall(stripped):
+            if subject.lower() in HUMAN_SUBJECTS:
+                continue
+            if subject.lower() in INFINITIVE_MARKERS:
+                continue
+            if verb[0].isupper():
+                continue
+            findings.append({
+                "check": "tone", "severity": "warning", "line": n,
+                "message": (f'"{subject} {verb}" gives a decision to '
+                            f"something that cannot make one — name the "
+                            f"person choosing and make this an input to "
+                            f"their choice"),
+            })
+        for phrase in DRAMATIC_PHRASES:
+            if phrase in stripped.lower():
+                findings.append({
+                    "check": "tone", "severity": "warning", "line": n,
+                    "message": (f"{phrase!r} editorialises rather than naming "
+                                f"a mechanism — say what has to be satisfied "
+                                f"instead"),
+                })
+    return findings
+
+
 def check_length(word_count, min_words, max_words):
     findings = []
     if min_words is not None and word_count < min_words:
@@ -443,9 +618,11 @@ def main():
                              "must appear in every report given")
     parser.add_argument("--checks", nargs="+",
                         choices=["terminology", "citations", "diagrams",
-                                 "attribution", "length", "structure"],
+                                 "attribution", "length", "structure",
+                                 "sections", "tone"],
                         default=["terminology", "citations", "diagrams",
-                                 "attribution", "length", "structure"],
+                                 "attribution", "length", "structure",
+                                 "sections", "tone"],
                         help="Which checks to run (default: all)")
     parser.add_argument("--studio-url", metavar="URL",
                         help="keleo-studio-gas deployment URL attribution links "
@@ -459,6 +636,9 @@ def main():
                         help="Lower bound of the target citation count")
     parser.add_argument("--max-citations", type=int,
                         help="Upper bound of the target citation count")
+    parser.add_argument("--min-section-words", type=int, default=25,
+                        help="Framing words a section needs before its first "
+                             "subsection, table or figure (default 25)")
     parser.add_argument("--strict", action="store_true",
                         help="Also flag ordinary-English words that are Keleo terms")
     parser.add_argument("--json", action="store_true",
@@ -495,6 +675,10 @@ def main():
             findings += check_attribution(body_lines, studio_url)
         if "length" in args.checks:
             findings += check_length(word_count, args.min_words, args.max_words)
+        if "tone" in args.checks and Path(path).name != PROVENANCE_FILE:
+            findings += check_tone(body_lines, headings)
+        if "sections" in args.checks and Path(path).name != PROVENANCE_FILE:
+            findings += check_sections(body_lines, args.min_section_words)
 
         bodies.append((path, body_lines))
         results.append({

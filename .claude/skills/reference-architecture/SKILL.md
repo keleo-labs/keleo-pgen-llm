@@ -134,6 +134,11 @@ In plan mode:
 
 ## Architecture Options
 
+<Why there are this many options and what each one is for — the constraint it
+answers, and who it suits. A reader meeting Option A must already know that B and C
+exist and what separates them. Two to four sentences, not a restatement of the
+heading. (@rule:report-618)>
+
 ### Option A: <Name>
 
 ![<Option name> topology](assets/<option-slug>-topology.svg)
@@ -166,6 +171,10 @@ what the practice already knows with `utils/derive-diagram.py`.>
 ---
 
 ## Comparison and Recommendation
+
+<What the comparison turns on, before the matrix. Which dimensions actually separate
+the options and which they all satisfy equally, so a reader knows which columns to
+read closely. Two to four sentences. (@rule:report-618)>
 
 <Decision matrix comparing all options across evaluation dimensions.>
 

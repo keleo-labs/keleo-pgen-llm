@@ -209,6 +209,36 @@ Organization Name. (Year). *Title of work*. URL
 - NO references to Keleo, Practice Language, alphas, states, activity spaces, work products, narrative types, baselines, or any schema constructs
 - The practice provides the *structure and knowledge* — it should be invisible in the output
 
+### Register
+
+Four rules on how the report sounds. They govern the deliverable, not these instructions, and they
+apply equally to decks built from the report — `deck-foundation/slide-grammar.md` §5 carries the
+same four with slide-specific examples. Verify with `python3 utils/lint-report.py <report>.md
+--checks tone` (@rule:report-619).
+
+**Decisions belong to people.** A variable is an input to a choice, never the maker of one.
+Distance does not pick an architecture; an architect weighs distance and picks one. The verb is
+only wrong when its subject is a thing — "the platform team decides the update window" is correct.
+
+| Instead of | Write |
+|---|---|
+| Distance and tolerable loss pick the design | Site separation and recovery point objective are the primary inputs to the design choice |
+| Rehearsal decides whether any of it works | Rehearsal establishes whether the mechanism performs as designed |
+
+**Headings state their subject.** No rhetorical or contrarian construction — `X, not Y`,
+`Why X fails`, `The two things that matter`. A heading can assert strongly and still be plain:
+"Three viable disaster recovery designs", not "Three designs are viable, not one".
+
+**Frame problems pragmatically.** Describe what has to be satisfied, not who was naive. *Well
+understood*, *works on paper*, *in the real world*, *breaks the assumption* and *the hard part*
+editorialise about the reader's competence and give an architect nothing to act on. Write
+"Combining them introduces prerequisites that each approach must satisfy independently", not
+"Combining them is where designs that work on paper start to fail".
+
+**Use the domain's terminology.** Prefer the industry term to the shorthand — *site isolation
+boundary* over *the gap*, *synchronous metro replication* over *metro sync*, *external dependency
+management* over *the air gap problem*. Shorthand is fine once the term has been established.
+
 ---
 
 ## Content Sourcing (Step 3)
@@ -301,8 +331,38 @@ Rules:
 - Sections flow from the selected narrative structure
 - Each section draws on relevant practice domain knowledge translated into plain language
 - Use subsections (###) where depth is needed
+- **Frame a section before presenting its parts** — see below
 - Include concrete examples, criteria, or recommendations where the practice provides them
 - End with actionable content (recommendations, next steps, or conclusions) appropriate to the narrative structure
+
+### Frame a section before its parts
+
+A `##` section whose first content is a `###` subsection, a table or a figure opens with **two to
+four sentences of framing** before that element. Without it the reader arrives at `### Option A`
+with no idea that B and C exist, why there are three, or what distinguishes them.
+
+The framing says what the section covers, why it is divided the way it is, and what separates the
+parts. Where the parts are a **parallel set** — options, phases, workstreams, tiers, perspectives
+— it names the set size and gives each member a one-line role:
+
+```markdown
+## Architecture options
+
+Three designs are viable, and they differ in what they trade against recovery point.
+Option A removes data loss entirely but caps how far apart the sites can sit. Option B
+accepts minutes of loss in exchange for unlimited distance. Option C gives up speed for
+a fraction of the cost and the only protection against a mistake rather than a failure.
+
+### Option A: metro synchronous, active-active
+```
+
+Two failure modes to avoid. The framing must not **restate the heading** ("This section sets out
+the architecture options"), and it must not merely **announce** that the section is beginning. The
+test: a reader who stops after the framing should be able to say what the section concluded.
+
+A section that opens with prose usually frames itself already — the gap appears specifically where
+a structure follows the heading directly, because the structure is what the heading promised.
+Verify with `python3 utils/lint-report.py <report>.md --checks sections`.
 
 ---
 
@@ -514,6 +574,21 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - Then: the section carries a figure making that claim visible
 - And: a section whose content is comparative or quantitative carries a table instead of a diagram
 - And: no figure merely restates its own caption
+
+#### Scenario: Deliverable copy uses a professional register (@rule:report-619)
+- Given: a generated report or deck
+- When: its headings and body copy are reviewed
+- Then: no technical or business variable is described as choosing, deciding, picking or driving an outcome
+- And: headings state their subject or assertion without rhetorical or contrarian construction
+- And: problems are framed as prerequisites, integration and trade-offs rather than as failure or naivety
+- And: domain terminology is used in place of colloquial shorthand
+
+#### Scenario: A section frames its parts before presenting them (@rule:report-618)
+- Given: a report section whose first content is a subsection, a table or a figure
+- When: the section is written
+- Then: two to four sentences of framing precede that first element
+- And: where the parts are a parallel set, the framing names how many there are and the role of each
+- And: the framing neither restates the heading nor merely announces that the section is beginning
 
 #### Scenario: Figures draw the subject's instances, not the practice's types (@rule:report-617)
 - Given: the report's subject has more than one instance of a concern the practice names once (for example a production platform and a disaster recovery platform)

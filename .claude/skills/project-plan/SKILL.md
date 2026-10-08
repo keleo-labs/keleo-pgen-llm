@@ -129,6 +129,10 @@ In plan mode:
 
 ## Objectives and Scope
 
+<What this engagement is for and where its edges are, before the lists.
+Why the scope is drawn here rather than wider or narrower, and what that choice
+rules out. Two to four sentences. (@rule:report-618)>
+
 ### Objectives
 
 <Numbered list of specific, measurable objectives.>
@@ -167,6 +171,10 @@ In plan mode:
 ---
 
 ## Activities and Deliverables
+
+<How many phases or tracks there are, what each one is for, and why the work is
+cut this way — sequence, dependency, or parallel teams. A reader meeting Phase 1
+must already know what follows it. Two to four sentences. (@rule:report-618)>
 
 ### <Phase/Track 1>
 
@@ -214,6 +222,9 @@ When the user requests a Statement of Work (via trigger pattern, plan mode decis
 
 ```markdown
 ## Statement of Work
+
+<What this statement of work commits to and what it deliberately leaves to a
+later phase, before the subsections. Two to four sentences. (@rule:report-618)>
 
 ### Engagement Overview
 

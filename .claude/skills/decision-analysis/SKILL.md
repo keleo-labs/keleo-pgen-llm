@@ -119,6 +119,10 @@ In plan mode:
 
 ## Options Under Consideration
 
+<Why these options and not others — what was ruled out before this list, and what
+each remaining option is for. A reader meeting Option 1 must already know how many
+there are and what separates them. Two to four sentences. (@rule:report-618)>
+
 ### Option 1: <Name>
 
 #### How It Works
