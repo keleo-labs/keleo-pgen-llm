@@ -14,7 +14,7 @@ metadata:
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.1.0
+Version: 2.4.0
 
 Decks whose job is to **win a decision**: value propositions, partner and GSI
 pitches, solution proposals, business cases.
@@ -94,10 +94,19 @@ Both are required, not optional. See DECK-FOUNDATION §5.
 
 - Every content slide carrying a claim gets a `sources` entry, carrying the
   source document's own citation and link.
-- Every content slide gets speaker notes derived from the source's prose —
-  the reasoning, the qualifications, and the answer to the objection the
-  slide invites. A pitch is delivered by a person who must handle pushback;
-  the notes are where that preparation lives.
+- Every content slide gets speaker notes carrying the qualifications and the
+  answer to the objection the slide invites. A pitch is delivered by a person
+  who must handle pushback; the notes are where that preparation lives.
+- The notes are additive, never load-bearing. A pitch deck is forwarded to
+  people who were not pitched to, so the slide must make its case alone
+  (`slide-grammar.md` §2). Anything a reader needs in order to follow the
+  argument belongs on the slide.
+
+Before publishing, run
+`python3 .claude/skills/deck-foundation/scripts/lint-deck.py slides.md` and
+clear its errors. Read its `tone` warnings too — they flag variables given
+agency over decisions, rhetorical titles and editorialising phrases
+(`slide-grammar.md` §5).
 
 ### Positioning constraints
 

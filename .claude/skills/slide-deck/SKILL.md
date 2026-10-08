@@ -14,7 +14,7 @@ metadata:
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.1.0
+Version: 2.4.0
 
 General-purpose deck generation. For a value-proposition or partner pitch use
 `pitch-deck`; for a status or findings readout use `exec-readout`.
@@ -62,8 +62,11 @@ in `sources` and write its speaker notes as you go (DECK-FOUNDATION §5).
 upgraded to native, editable Slides shapes after publishing; any other
 image is embedded as a picture (DECK-FOUNDATION §6).
 
-**Publish and review.** Render the published deck and read every slide. Fix
-what reads badly before reporting completion.
+**Lint, then publish and review.** Run
+`python3 .claude/skills/deck-foundation/scripts/lint-deck.py slides.md` and
+clear its errors first, and read its `tone` warnings — they flag variables given agency over decisions, rhetorical titles and editorialising phrases (`slide-grammar.md` §5) — missing or duplicated titles, bodies over the column
+budget, slides whose notes outweigh them. Then render the published deck and
+read every slide. Fix what reads badly before reporting completion.
 
 ## Deck shape
 
@@ -80,12 +83,20 @@ whenever the deck changes movement — they are cheap and they keep a long deck
 navigable. When following a source, its top-level headings are usually the
 right dividers.
 
+**Every movement runs divider → overview → members.** The divider carries a
+sentence saying why the deck is turning; where three or more parallel members
+follow, the overview names the set and each member's role before the first
+one appears (DECK-FOUNDATION §3). Going straight from `Architecture options`
+to Option A leaves the audience judging a design without knowing what it is
+being judged against.
+
 ## Citations and speaker notes
 
 Required on any deck built from a source (DECK-FOUNDATION §5). A training or
-overview deck is often presented by someone other than its author, which
-makes the notes load-bearing rather than courteous: they are the only place
-the source's reasoning survives.
+overview deck is often delivered by someone other than its author, and often
+read by someone with no presenter at all — so the slide must carry its own
+argument and the notes add the speaker's layer on top, never the half the
+slide left out (`slide-grammar.md` §2, §12).
 
 Figures must be ones the source **asserted**, not numbers lifted from
 citation titles or reference lists (§2.2).

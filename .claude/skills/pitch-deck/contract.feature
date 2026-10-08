@@ -77,7 +77,8 @@ Feature: Pitch Deck
     When the published deck is inspected
     Then every content slide has a speaker-notes box
     And the notes are derived from the source's prose for that section
-    And the notes carry the reasoning and caveats the slide had to compress
+    And the notes carry the caveats and the answers to anticipated objections
+    And the slide remains intelligible when its notes are removed
 
   Scenario: Positioning constraints are respected
     Given the deck concerns Red Hat or partner offerings

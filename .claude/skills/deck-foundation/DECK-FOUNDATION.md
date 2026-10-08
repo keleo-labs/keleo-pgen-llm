@@ -7,12 +7,17 @@
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.5.0
+Version: 3.1.0
 
-> **2.0.0 changes the default.** A deck built from a source document now
-> follows that document's structure instead of being re-argued into a
-> narrative shape. Citations and speaker notes are required rather than
-> optional. See §2.1 and §5.
+> **3.0.0 changes the voice.** A slide now carries complete sentences and
+> stands on its own without a speaker; notes add depth rather than supplying
+> the missing half of the argument. Paid for by cutting item counts, not by
+> longer slides. See §5 and `slide-grammar.md`.
+>
+> **2.0.0 changed the default.** A deck built from a source document follows
+> that document's structure instead of being re-argued into a narrative
+> shape. Citations and speaker notes are required rather than optional. See
+> §2.1 and §5.
 
 Shared workflow for every deck-producing skill. Not a skill itself — the
 `slide-deck`, `pitch-deck` and `exec-readout` skills each read this, then add
@@ -43,13 +48,14 @@ Slides export; the pptx hop is required, which is why §4's constraints exist.
 | 2. Scaffold | `new-deck.py <dir> --title "…"` — creates the project, copies the theme, installs Slidev + Playwright. |
 | 3. Structure | **If there is a source document, derive the spine from it (§2.1).** Otherwise choose a narrative shape from `narrative-guide.md`. Either way, write the slide titles *first*, as a sequence of assertions, and check they read as an argument on their own. |
 | 4. Write | Fill slides using the layouts in §3 and the rules in `slide-grammar.md`. Carry each slide's citations in `sources` and write its speaker notes as you go (§5). |
-| 5. Publish | `publish-deck.py slides.md --name "…" --pdf --review` |
-| 6. Review | Render and **look at every slide** (§7). Fix what reads badly. Never report a deck as done without this. |
+| 5. Lint | `lint-deck.py slides.md` — missing or duplicated titles, bodies over the column budget, slides whose notes outweigh them, fragment bullets. Clear it before publishing. |
+| 6. Publish | `publish-deck.py slides.md --name "…" --pdf --review` |
+| 7. Review | Render and **look at every slide** (§7). Fix what reads badly. Never report a deck as done without this. |
 
-Step 6 is not optional. Layout problems are invisible in markdown and obvious
+Step 7 is not optional. Layout problems are invisible in markdown and obvious
 in a thumbnail.
 
-Steps 5 and 6 cycle: publishing is how you find the layout defects, so expect
+Steps 6 and 7 cycle: publishing is how you find the layout defects, so expect
 several rounds. Drive cannot replace a deck in place, so each round uploads a
 new file — `publish-deck.py` records the ID it created in
 `<workdir>/.published.json` and trashes it on the next run, which is what
@@ -130,7 +136,39 @@ Every content layout — `default`, `columns`, `steps`, `stats`, `quote`,
 Notes:
 - `items` arrays are YAML in frontmatter, not markdown body.
 - `statement` deliberately has no body slot. If the claim needs support on the
-  same slide, it is not a statement slide.
+  same slide, it is not a statement slide. Because nothing can rescue a
+  statement that does not stand alone, it is the layout most likely to strand
+  a reader — reach for `default` when the turn needs a reason.
+- **`section` takes body text, and must carry it.** A divider that is only a
+  number and a noun makes the reader work out why the deck turned. One
+  sentence saying what the previous movement established and what this one
+  resolves is enough:
+
+  ```markdown
+  ---
+  layout: section
+  variant: red
+  number: "02"
+  ---
+
+  # Evaluation framework
+
+  The three designs differ along the same nine dimensions, so those come
+  before the options themselves.
+  ```
+
+- **A movement that presents a set opens with an overview of the set.** Where
+  three or more parallel members follow — options, phases, workstreams, tiers
+  — the slide after the divider names the set and gives each member its
+  one-line role, *before* the first member appears. A `columns` slide does
+  this well.
+
+  This is sharper in a deck than in a report. A reader can glance down a page
+  and see that Options A, B and C exist; an audience sees one slide at a time,
+  so arriving at Option A with no overview means not knowing how many options
+  there are, what separates them, or how long this will take. Framing the set
+  once in an earlier movement does not count — by the time the members arrive
+  it is several minutes gone.
 - `stats` renders a single figure differently from a row of them — a lone
   number sits beside its reading rather than above it.
 
@@ -171,6 +209,29 @@ inferred.
 | Gradients, shadows, border-radius, inline SVG | Flat fills and rules. For a *diagram*, use the `diagram` layout — the build rasterises it and the publish upgrades it to native shapes (§6) |
 | `::marker` colour | Nothing — markers take the paragraph colour in PowerPoint. The marker survives, its colour does not, so do not rely on a red bullet as a brand device |
 | Brand colour on link text | Nothing — Google Slides rewrites every link run to its own HYPERLINK blue and forces an underline. Keep links out of body copy and confine them to the `sources` band, where blue-underlined text reads as a citation |
+| **Title placeholders** | Nothing available in this pipeline — see below |
+
+**No slide has a title placeholder, however it looks**
+
+The exporter emits every heading as a positioned text box, not as a
+PowerPoint title placeholder, and the Drive conversion has nothing to
+promote. Querying a published deck through the Slides API returns no
+`TITLE` placeholder on *any* slide, even though every slide displays a
+heading correctly.
+
+What that costs: Google Slides' outline panel is empty, screen readers get
+no slide title, "find a slide by title" does not work, and anyone extracting
+structure programmatically concludes the deck has no titles — a review of a
+published deck reported exactly that, having read the artifact rather than
+the screen.
+
+There is no post-publish fix. A placeholder comes from the slide's layout,
+and the API cannot convert an existing text box into one. The only real
+route is building slides from a Google Slides template whose layouts carry
+real placeholders, which `slides-template.py` exists to map — a different
+publish path, not a patch to this one. Until then, treat it as known, and
+rely on `lint-deck.py --checks titles` to guarantee the *visible* heading
+every slide needs.
 
 **Text re-wraps on conversion, and the body does not move with it**
 
@@ -190,7 +251,7 @@ Two consequences:
   observed fitting and 55 wrapping to three.
 - **The same applies downward.** Anything pinned below the content — a
   `caption`, the `sources` band — is pushed off the slide entirely when the
-  content above it runs long. See `slide-grammar.md` §4 for the per-column
+  content above it runs long. See `slide-grammar.md` §7 for the per-column
   body budgets this implies.
 - **Never trust the local render for this.** The browser is the engine that
   gets the wrap *wrong* relative to the deliverable.
@@ -256,18 +317,21 @@ It renders as a small grey line at the foot of the slide, links underlined.
 Anything after a `<!-- … -->` block at the end of a slide becomes the
 speaker notes, one notes box per slide.
 
-**Write notes for every content slide, derived from the source's own
-prose.** This is what makes a source-faithful deck usable: the slide carries
-the assertion and its evidence, and the notes carry the paragraph the
-assertion came from — the reasoning, the qualifications, the detail that
-would have crowded the slide.
+**Write notes for every content slide — but the notes are additive, not
+load-bearing.** A deck is forwarded and skimmed at least as often as it is
+narrated, so the slide has to carry the claim *and* enough reasoning to be
+understood alone (`slide-grammar.md` §2). The notes carry what a speaker
+would add on top of a slide that already works.
 
 - Draw on the **source's wording**, condensed. Notes are not a place to
   invent material the document does not contain.
 - Two to five sentences. Enough to speak from, not a script to read.
-- Put the caveats and the anticipated objections here.
-- Where the source made a point the slide had to compress, the notes are
-  where the full version belongs.
+- Put the caveats, the anticipated objections and the secondary data here.
+- **Not** the definition, the mechanism or the logical link the slide needs
+  to make sense. Those go on the slide.
+
+The test is subtraction: delete the notes and reread the slide. A reader
+should end up less informed, not confused.
 
 ## 6. Diagrams and images
 
@@ -357,6 +421,7 @@ To iterate on design only, skip the upload: `npx slidev export slides.md
 | `publish-deck.py` | Build diagrams → export → upload → convert → upgrade diagrams → PDF, trashing the version it replaces |
 | `build-diagrams.py` | Fit each referenced diagram spec to the slide and render it to PNG; writes `build/diagrams.json` |
 | `upgrade-diagrams.py` | Replace published diagram pictures with native Slides shapes. Runs from `publish-deck.py`; skips rather than fails |
+| `lint-deck.py` | Check a deck's markdown before publishing: titles, body budgets, slide/notes balance, fragment bullets, citations |
 | `review-deck.py` | Render a published deck to local PNGs |
 | `inspect-template.py` | Assess a .pptx as a branding donor |
 | `slides-template.py` | Map a Google Slides template's layouts to semantic roles |

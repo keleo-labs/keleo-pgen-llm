@@ -52,6 +52,11 @@ const surface = {
   color: var(--rh-white);
 }
 
+/* The reserved two-line title zone the content layouts use, for the same
+   reason: a divider that carries a rationale sentence has a shape pinned
+   under the heading, and Google Slides sets "The challenge" onto two lines
+   where Chromium fits it on one. Without the reservation the sentence lands
+   on top of the heading. 2.16em is two lines at this line-height. */
 .rh-section__body :deep(h1) {
   font-family: var(--rh-font-display);
   font-size: 3.5rem;
@@ -59,6 +64,7 @@ const surface = {
   line-height: 1.08;
   letter-spacing: -0.02em;
   margin: 0;
+  min-height: 2.16em;
   max-width: 22ch;
 }
 

@@ -14,7 +14,7 @@ metadata:
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.1.0
+Version: 2.4.0
 
 Decks that **report to a decision-maker**: status updates, findings, review
 outcomes, programme reviews, incident summaries.
@@ -95,10 +95,19 @@ Both required (DECK-FOUNDATION §5).
 
 - Carry the source's own citations onto the slides built from them. A senior
   audience asks "says who?" of exactly the claims a readout makes.
-- Write speaker notes for every content slide from the source's prose. For a
-  readout these carry the detail behind a RAG status, the threshold that
-  produced it, and the answer to the obvious follow-up question — the
-  material that would otherwise force a hedge onto the slide itself.
+- Write speaker notes for every content slide. For a readout these carry the
+  detail behind a RAG status, the threshold that produced it, and the answer
+  to the obvious follow-up question.
+- The notes are additive, never load-bearing. A readout is read by the people
+  who missed the meeting more often than by those who attended, so each slide
+  must state its finding and the reason for it in full (`slide-grammar.md`
+  §2). A status nobody can interpret without the speaker is not a status.
+
+Before publishing, run
+`python3 .claude/skills/deck-foundation/scripts/lint-deck.py slides.md` and
+clear its errors. Read its `tone` warnings too — they flag variables given
+agency over decisions, rhetorical titles and editorialising phrases
+(`slide-grammar.md` §5).
 
 ## Diagrams
 
