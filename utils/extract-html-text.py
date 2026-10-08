@@ -387,9 +387,17 @@ def load_html(source):
         str: Raw HTML content.
     """
     if source.startswith("http://") or source.startswith("https://"):
+        # Some documentation CDNs (docs.redhat.com among them) answer HTTP 403
+        # to unrecognised user agents, and also to spoofed browser ones. A
+        # plain library user agent is accepted, so keep the default rather
+        # than inventing a product string. Matches resolve-doc-anchors.py.
         req = urllib.request.Request(
             source,
-            headers={"User-Agent": "extract-html-text/1.0"},
+            headers={
+                "User-Agent": (f"Python-urllib/{sys.version_info.major}"
+                               f".{sys.version_info.minor}"),
+                "Accept": "text/html,application/xhtml+xml",
+            },
         )
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
@@ -480,7 +488,11 @@ def extract_batch(sources, output_dir, want_anchors=False, headings_only=False):
 def load_html_or_raise(source):
     """Like load_html, but raises instead of calling sys.exit (batch-safe)."""
     if source.startswith("http://") or source.startswith("https://"):
-        req = urllib.request.Request(source, headers={"User-Agent": "extract-html-text/1.0"})
+        req = urllib.request.Request(source, headers={
+            "User-Agent": (f"Python-urllib/{sys.version_info.major}"
+                           f".{sys.version_info.minor}"),
+            "Accept": "text/html,application/xhtml+xml",
+        })
         with urllib.request.urlopen(req, timeout=60) as resp:
             charset = resp.headers.get_content_charset() or "utf-8"
             return resp.read().decode(charset, errors="replace")
