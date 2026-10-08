@@ -2,7 +2,7 @@
 name: slide-deck
 description: Create a presentation deck and publish it to Google Slides and PDF. Use for any deck request not covered by pitch-deck or exec-readout — talks, training, overviews, workshops, conference sessions.
 metadata:
-  version: "1.1.0"
+  version: "3.0.0"
 ---
 
 # Slide Deck
@@ -13,8 +13,6 @@ metadata:
 > intended difference is that paths are repo-relative rather than
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
-
-Version: 2.4.0
 
 General-purpose deck generation. For a value-proposition or partner pitch use
 `pitch-deck`; for a status or findings readout use `exec-readout`.

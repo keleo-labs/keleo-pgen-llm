@@ -6,7 +6,7 @@ compatibility: >-
   /opt/homebrew/bin/npx (Node.js 18+), which fetches mermaid-cli on demand.
   The native layouts need Python only.
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Diagram
@@ -17,8 +17,6 @@ metadata:
 > intended difference is that paths are repo-relative rather than
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
-
-Version: 1.0.0
 
 Picking the method is the first decision and the one most often skipped. A
 BPMN model with boundary events shown to a CFO fails; so does a box-and-arrow

@@ -2,7 +2,7 @@
 name: exec-readout
 description: Create an executive readout deck — status report, findings, review outcome, programme update — and publish it to Google Slides and PDF.
 metadata:
-  version: "1.1.0"
+  version: "3.0.0"
 ---
 
 # Exec Readout
@@ -13,8 +13,6 @@ metadata:
 > intended difference is that paths are repo-relative rather than
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
-
-Version: 2.4.0
 
 Decks that **report to a decision-maker**: status updates, findings, review
 outcomes, programme reviews, incident summaries.
