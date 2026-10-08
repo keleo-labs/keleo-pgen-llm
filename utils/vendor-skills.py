@@ -37,6 +37,7 @@ LOCAL = PROJECT_ROOT / ".claude" / "skills"
 
 VENDORED = [
     "diagram-foundation",
+    "diagram",
     "deck-foundation",
     "slide-deck",
     "pitch-deck",

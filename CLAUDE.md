@@ -111,7 +111,11 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── diagram-foundation/          # Shared diagram engine (NOT a skill)
 │       │   ├── DIAGRAM-FOUNDATION.md    # Spec reference, design language, layout choice
+│       │   ├── references/              # Method catalogue + visual language + methods/
 │       │   └── scripts/                 # diagram, svg_backend, slides_backend, render-diagram
+│       ├── diagram/                     # Diagram method selection skill (vendored)
+│       │   ├── SKILL.md
+│       │   └── contract.feature
 │       ├── deck-foundation/             # Shared deck infrastructure (NOT a skill)
 │       │   ├── DECK-FOUNDATION.md       # Pipeline, layouts, conversion safety, citations/notes
 │       │   ├── slide-grammar.md         # How to write an individual slide
@@ -726,7 +730,9 @@ All three skills follow the same workflow:
 
 **Extending**: To add a new deck type, see `.claude/skills/deck-foundation/extension-template.md`.
 
-**Upstream**: This tree is a vendored copy of the user-level skills at `~/.claude/skills/`, carried here so the project distributes with deck capability. Fix defects upstream and re-copy; the only intended difference is repo-relative paths.
+**Upstream**: Six skills are vendored copies of the user-level skills at `~/.claude/skills/` — `diagram-foundation`, `diagram`, `deck-foundation`, `slide-deck`, `pitch-deck` and `exec-readout` — carried here so a clone has diagram and deck capability without a user-level install. Fix defects upstream and re-copy with `python3 utils/vendor-skills.py`; the only intended difference is repo-relative paths. `--check` reports drift without writing.
+
+Two skills the project references are **deliberately not vendored**. `git-guardrails` governs how this repository's git is managed rather than anything the project produces, and `writing-style` is a user preference. A clone without them loses the pre-push scan workflow and the house prose style, neither of which affects generated artifacts.
 
 ### Reporting Issues
 
