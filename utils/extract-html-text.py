@@ -37,6 +37,7 @@ import re
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -76,8 +77,11 @@ class _StructuredHTMLParser(HTMLParser):
     def __init__(self):
         super().__init__()
         self.tokens = []
+        self.links = []               # {"text": str, "href": str} in document order
 
         # State tracking
+        self._link_href = None        # href of the <a> currently open, if any
+        self._link_text = []          # accumulated text of the current <a>
         self._skip_depth = 0          # > 0 means inside a SKIP_TAGS subtree
         self._heading_level = 0       # > 0 means inside <hN>
         self._heading_text = []       # accumulated heading text fragments
@@ -126,6 +130,11 @@ class _StructuredHTMLParser(HTMLParser):
         if self._skip_depth:
             return
 
+        # Links: record href and start collecting the anchor text.
+        if tag == "a" and attrs_dict.get("href"):
+            self._link_href = attrs_dict["href"]
+            self._link_text = []
+
         # Headings
         if tag in HEADING_TAGS:
             self._flush_text()
@@ -154,6 +163,14 @@ class _StructuredHTMLParser(HTMLParser):
             self._skip_depth = max(0, self._skip_depth - 1)
             return
         if self._skip_depth:
+            return
+
+        # End of link
+        if tag == "a" and self._link_href is not None:
+            text = " ".join(self._link_text).strip()
+            self.links.append({"text": text, "href": self._link_href})
+            self._link_href = None
+            self._link_text = []
             return
 
         # End of heading
@@ -196,6 +213,9 @@ class _StructuredHTMLParser(HTMLParser):
         text = data.strip()
         if not text:
             return
+        # Link text is collected alongside, not instead of, normal routing.
+        if self._link_href is not None:
+            self._link_text.append(text)
         # Route text to the right accumulator.
         if self._heading_level:
             self._heading_text.append(text)
@@ -219,6 +239,37 @@ def parse_html(html_content):
     parser.feed(html_content)
     parser.close()
     return parser.tokens
+
+
+def extract_links(html_content, base_url=None, same_host_only=False):
+    """Return the links in an HTML document, in document order.
+
+    Each entry is {"text": str, "href": str}, with `href` resolved against
+    `base_url` when one is given so relative hrefs become usable URLs.
+    Fragment-only links (#section) and non-navigational schemes (mailto:,
+    javascript:) are dropped. Duplicate URLs are collapsed, keeping the first
+    non-empty link text.
+
+    Useful for enumerating the guides in a documentation set before deciding
+    which to extract.
+    """
+    parser = _StructuredHTMLParser()
+    parser.feed(html_content)
+    parser.close()
+
+    host = urllib.parse.urlparse(base_url).netloc if base_url else None
+    seen = {}
+    for link in parser.links:
+        href = link["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
+            continue
+        url = urllib.parse.urljoin(base_url, href) if base_url else href
+        url = urllib.parse.urldefrag(url)[0]
+        if same_host_only and host and urllib.parse.urlparse(url).netloc != host:
+            continue
+        if url not in seen or (not seen[url]["text"] and link["text"]):
+            seen[url] = {"text": link["text"], "href": url}
+    return list(seen.values())
 
 
 #: A line that is an ATX markdown heading, e.g. "### Some heading".
@@ -512,6 +563,20 @@ def build_parser():
         action="store_true",
         help="Output only the heading structure (table of contents)",
     )
+    parser.add_argument(
+        "--links",
+        action="store_true",
+        help=(
+            "Output the page's links as JSON ({text, href}, hrefs resolved "
+            "against the source URL) instead of text. Useful for enumerating "
+            "the guides in a documentation set."
+        ),
+    )
+    parser.add_argument(
+        "--same-host",
+        action="store_true",
+        help="With --links, drop links pointing off the source's host",
+    )
     return parser
 
 
@@ -556,6 +621,21 @@ def main(argv=None):
 
     # Single-source mode
     html_content = load_html(sources[0])
+
+    # --links short-circuits text rendering: the page's outgoing links are the
+    # whole point of the call.
+    if args.links:
+        base = sources[0] if "://" in sources[0] else None
+        links = extract_links(html_content, base_url=base,
+                              same_host_only=args.same_host)
+        payload = json.dumps(links, indent=2, ensure_ascii=False) + "\n"
+        if args.output:
+            Path(args.output).write_text(payload, encoding="utf-8")
+            print(f"Wrote {args.output} ({len(links)} links)")
+        else:
+            sys.stdout.write(payload)
+        return
+
     tokens = parse_source(html_content)
 
     # Determine what to output to stdout

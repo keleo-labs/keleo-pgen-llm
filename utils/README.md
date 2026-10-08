@@ -188,7 +188,7 @@ For decks that live only in Google Slides — no local Slidev source, or a sourc
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| `resolve-doc-anchors.py` | Resolve section references in practice JSON to anchored URLs; matches reference/citation descriptions against heading anchors and appends `#fragment` to URLs | `python3 utils/resolve-doc-anchors.py <file>.json --anchors <map>.json [--fix] [--json]` or `python3 utils/resolve-doc-anchors.py <file>.json --url <page-url> [--fix] [--json]` |
+| `resolve-doc-anchors.py` | Resolve section references in practice JSON to anchored URLs; matches reference/citation descriptions against heading anchors and appends `#fragment` to URLs. `--dump-anchors` prints a document's heading→anchor map with no practice JSON at all, which is what you want when authoring citations by hand so a URL carries a verified fragment rather than pointing at the document root; `--grep` filters that map. Sends a browser user-agent, because several documentation CDNs — docs.redhat.com among them — answer unrecognised agents with HTTP 403 | `python3 utils/resolve-doc-anchors.py <file>.json --anchors <map>.json [--fix] [--json]` <br> `python3 utils/resolve-doc-anchors.py <file>.json --url <page-url> [--fix] [--json]` <br> `python3 utils/resolve-doc-anchors.py --url <page-url> --dump-anchors [--grep TERM]` |
 
 ## Skill Vendoring
 

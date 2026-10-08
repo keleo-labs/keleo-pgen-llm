@@ -22,6 +22,13 @@ Usage:
 
     # Machine-readable output
     python3 utils/resolve-doc-anchors.py practice.json --anchors /tmp/anchors.json --json
+
+    # Dump the heading -> anchor map for a document (no practice JSON needed).
+    # Use this when authoring citations and references by hand so that URLs
+    # carry a verified #fragment instead of pointing at the document root.
+    python3 utils/resolve-doc-anchors.py --url https://docs.redhat.com/.../index --dump-anchors
+    python3 utils/resolve-doc-anchors.py --url https://docs.redhat.com/.../index \\
+        --dump-anchors --grep sigstore
 """
 
 import argparse
@@ -220,10 +227,35 @@ def match_anchor(section_ref, anchor_map):
 # Anchor map fetching from URL
 # ---------------------------------------------------------------------------
 
+# Heading text picked up from rendered docs often carries UI affordances that
+# are not part of the title, such as a copy-permalink control.
+_HEADING_CHROME_RE = re.compile(
+    r"\s*(?:Copy link)?\s*(?:Link copied to clipboard!?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _strip_heading_chrome(text):
+    """Remove rendered UI affordances from extracted heading text."""
+    cleaned = _HEADING_CHROME_RE.sub("", text)
+    cleaned = re.sub(r"\s*Copy link\s*$", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
 class _AnchorExtractor(html.parser.HTMLParser):
-    """Extract id-bearing headings from HTML."""
+    """Extract id-bearing headings from HTML.
+
+    Handles two common layouts:
+
+    1. The id sits on the heading itself, or on an <a> inside it.
+    2. The id sits on a wrapping <section>/<div> and the heading follows
+       inside it. DocBook-derived toolchains (docs.redhat.com, for one)
+       render this way, so the heading text must be attached to the most
+       recently opened id-bearing container.
+    """
 
     _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
+    _CONTAINER_TAGS = {"section", "div", "article"}
 
     def __init__(self):
         super().__init__()
@@ -231,6 +263,9 @@ class _AnchorExtractor(html.parser.HTMLParser):
         self._in_heading = False
         self._current_id = None
         self._current_text = []
+        # Ids from enclosing containers that have not yet been claimed by a
+        # heading, most recent last.
+        self._pending_container_ids = []
 
     def handle_starttag(self, tag, attrs):
         attrs_dict = dict(attrs)
@@ -242,20 +277,38 @@ class _AnchorExtractor(html.parser.HTMLParser):
             # Some docs put the id on an <a> inside the heading
             if not self._current_id and attrs_dict.get("id"):
                 self._current_id = attrs_dict["id"]
+        elif tag in self._CONTAINER_TAGS and attrs_dict.get("id"):
+            self._pending_container_ids.append(attrs_dict["id"])
 
     def handle_endtag(self, tag):
         if tag in self._HEADING_TAGS and self._in_heading:
             self._in_heading = False
-            if self._current_id and self._current_text:
+            anchor_id = self._current_id
+            if not anchor_id and self._pending_container_ids:
+                anchor_id = self._pending_container_ids[-1]
+            if anchor_id and self._current_text:
                 text = " ".join("".join(self._current_text).split())
+                text = _strip_heading_chrome(text)
                 if text:
-                    self.anchors[text] = self._current_id
+                    self.anchors.setdefault(text, anchor_id)
+                # The container id is now spoken for.
+                if (self._pending_container_ids
+                        and self._pending_container_ids[-1] == anchor_id):
+                    self._pending_container_ids.pop()
             self._current_id = None
             self._current_text = []
 
     def handle_data(self, data):
         if self._in_heading:
             self._current_text.append(data)
+
+    def handle_entityref(self, name):
+        if self._in_heading:
+            self._current_text.append(" " if name == "nbsp" else f"&{name};")
+
+    def handle_charref(self, name):
+        if self._in_heading:
+            self._current_text.append(" " if name in ("160", "xa0", "xA0") else f"&#{name};")
 
 
 def fetch_anchors(url, timeout=30):
@@ -264,7 +317,12 @@ def fetch_anchors(url, timeout=30):
     Returns dict mapping heading text -> anchor ID.
     """
     req = urllib.request.Request(url)
-    req.add_header("User-Agent", "PracticeValidator/1.0")
+    # Some documentation CDNs (docs.redhat.com among them) answer HTTP 403 to
+    # unrecognised user agents, and also to spoofed browser ones. A plain
+    # library user agent is accepted, so keep the default rather than
+    # inventing a product string.
+    req.add_header("User-Agent", f"Python-urllib/{sys.version_info.major}.{sys.version_info.minor}")
+    req.add_header("Accept", "text/html,application/xhtml+xml")
     try:
         resp = urllib.request.urlopen(req, timeout=timeout)
         html_bytes = resp.read()
@@ -544,7 +602,9 @@ def main():
     )
     parser.add_argument(
         "json_file",
-        help="Practice/baseline/method JSON file to scan",
+        nargs="?",
+        help="Practice/baseline/method JSON file to scan "
+             "(not required with --dump-anchors)",
     )
 
     source_group = parser.add_mutually_exclusive_group(required=True)
@@ -571,11 +631,18 @@ def main():
         "--timeout", type=int, default=30,
         help="HTTP fetch timeout in seconds (default: 30)",
     )
+    parser.add_argument(
+        "--dump-anchors", action="store_true",
+        help="Print the heading -> anchored URL map and exit "
+             "(no practice JSON required)",
+    )
+    parser.add_argument(
+        "--grep", metavar="TEXT",
+        help="With --dump-anchors, only show headings containing TEXT "
+             "(case-insensitive)",
+    )
 
     args = parser.parse_args()
-
-    # Load practice JSON
-    data = load_json(args.json_file)
 
     # Load or fetch anchor map
     if args.anchors:
@@ -586,6 +653,45 @@ def main():
     if not anchor_map:
         print("Error: anchor map is empty", file=sys.stderr)
         sys.exit(1)
+
+    # --- Dump mode: report headings and the URLs that address them ---
+    if args.dump_anchors:
+        base = args.url.rstrip("/") if args.url else ""
+        needle = args.grep.lower() if args.grep else None
+        rows = [
+            (heading, anchor_id)
+            for heading, anchor_id in anchor_map.items()
+            if needle is None or needle in heading.lower()
+        ]
+        if args.json:
+            print(json.dumps(
+                {
+                    "base_url": base,
+                    "count": len(rows),
+                    "anchors": [
+                        {
+                            "heading": h,
+                            "anchor_id": a,
+                            "url": f"{base}#{a}" if base else f"#{a}",
+                        }
+                        for h, a in rows
+                    ],
+                },
+                indent=2,
+                ensure_ascii=False,
+            ))
+        else:
+            for heading, anchor_id in rows:
+                target = f"{base}#{anchor_id}" if base else f"#{anchor_id}"
+                print(f"{heading}\n  {target}\n")
+            print(f"{len(rows)} heading(s)")
+        return
+
+    if not args.json_file:
+        parser.error("json_file is required unless --dump-anchors is used")
+
+    # Load practice JSON
+    data = load_json(args.json_file)
 
     # Determine base URLs from the anchor source
     # When using --url, the URL itself is the base
