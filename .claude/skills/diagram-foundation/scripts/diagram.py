@@ -70,6 +70,7 @@ THEME = {
     "row_gap": 16,
     "group_pad_x": 16,
     "group_pad_y": 28,
+    "group_pad_bottom": 16,
     "group_gap": 24,
     "pad": 16,
     "line_height": 1.3,
@@ -589,8 +590,36 @@ def layout_flow(spec):
 
     breadth = max(breadth_extent) if breadth_extent else 0
 
+    # A cluster rect is drawn by inflating its members' bounding box, so it
+    # reaches beyond the layer its nodes sit in. Left to the plain layer gap,
+    # one group's rect ends exactly where the next one's begins and the two
+    # read as a single box with a line through it. Widen the gap at every
+    # boundary where a rect actually ends or starts.
+    ordered = sorted(layers)
+    group_ids = {g["id"] for g in spec.get("groups", [])}
+    layer_groups = [
+        {n.get("group") for n in layers[idx] if n.get("group") in group_ids}
+        for idx in ordered
+    ]
+    if horizontal:
+        lead_pad = trail_pad = THEME["group_pad_x"]
+    else:
+        lead_pad, trail_pad = THEME["group_pad_y"], THEME["group_pad_bottom"]
+
+    def boundary_gap(position):
+        """Extra room between layer `position` and the one after it."""
+        if position + 1 >= len(ordered):
+            return 0
+        here, nxt = layer_groups[position], layer_groups[position + 1]
+        ending = {g for g in here - nxt
+                  if all(g not in later for later in layer_groups[position + 1:])}
+        starting = {g for g in nxt - here
+                    if all(g not in before for before in layer_groups[:position + 1])}
+        extra = (trail_pad if ending else 0) + (lead_pad if starting else 0)
+        return extra + THEME["group_gap"] if extra else 0
+
     cursor = pad
-    for position, idx in enumerate(sorted(layers)):
+    for position, idx in enumerate(ordered):
         members = layers[idx]
         offset = pad + (breadth - breadth_extent[position]) / 2
         for n in members:
@@ -600,7 +629,7 @@ def layout_flow(spec):
             else:
                 n["_x"], n["_y"] = offset, cursor
                 offset += n["_w"] + cross_gap
-        cursor += layer_extent[position] + layer_gap
+        cursor += layer_extent[position] + layer_gap + boundary_gap(position)
 
     body = []
     extents = [(n["_x"], n["_y"], n["_x"] + n["_w"], n["_y"] + n["_h"]) for n in nodes]
@@ -615,7 +644,7 @@ def layout_flow(spec):
             gx = min(n["_x"] for n in members) - THEME["group_pad_x"]
             gy = min(n["_y"] for n in members) - THEME["group_pad_y"]
             gw = max(n["_x"] + n["_w"] for n in members) + THEME["group_pad_x"] - gx
-            gh = max(n["_y"] + n["_h"] for n in members) + THEME["group_pad_x"] - gy
+            gh = max(n["_y"] + n["_h"] for n in members) + THEME["group_pad_bottom"] - gy
             extents.append((gx, gy, gx + gw, gy + gh))
             body.append(rect(gx, gy, gw, gh, THEME["group_fill"], THEME["group_stroke"],
                              1, THEME["radius_group"], THEME["group_opacity"]))
