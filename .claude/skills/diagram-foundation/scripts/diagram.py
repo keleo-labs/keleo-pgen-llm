@@ -53,6 +53,11 @@ THEME = {
     "group_opacity": 0.5,
     "radius_node": 4,
     "radius_group": 6,
+    "radius_sticky": 2,
+    "lane_header": 112,
+    "lane_fill": "#fafafa",
+    "band_stroke": "#e4e4e4",
+    "axis": "#8a8d90",
     "font": "'Red Hat Text', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif",
     "size_label": 11,
     "size_sub": 9,
@@ -77,6 +82,78 @@ EMPHASIS = {
     "accent": (THEME["node_fill_accent"], THEME["border_accent"], THEME["stroke_accent"]),
     "selected": (THEME["node_fill_selected"], THEME["border_accent"], THEME["stroke_accent"]),
 }
+
+
+# --------------------------------------------------------------------------
+# Semantic colour roles
+#
+# A second, independent axis to `emphasis`. Emphasis says how much a node
+# matters in *this* diagram; a role says what the node *is* under a notation
+# that assigns meaning to colour. A role decides the fill and border; the
+# node's emphasis still decides the stroke weight, so an accented sticky is a
+# sticky with a heavier border.
+#
+# See references/visual-language.md, which is the table these must match.
+# --------------------------------------------------------------------------
+
+# Event Storming. These hues ARE the notation — a facilitator reads the wall
+# by colour — so they are fixed and do not follow the palette. Softened from
+# the sticky-note originals to sit in the flat register, hue relationships
+# intact.
+STORM_ROLES = {
+    "storm.event":     ("#ffe0b2", "#e8a33d"),   # orange — a domain event
+    "storm.command":   ("#d6e8fb", "#5b9bd5"),   # blue — a requested action
+    "storm.actor":     ("#fff3c4", "#dcc054"),   # small yellow — who commands
+    "storm.aggregate": ("#fdf6d8", "#d9c97a"),   # pale yellow — state holder
+    "storm.policy":    ("#e6ddf5", "#9b85c9"),   # lilac — reactive logic
+    "storm.readmodel": ("#d9eedc", "#6cab77"),   # green — a projection
+    "storm.external":  ("#fbdce8", "#d481a5"),   # pink — outside our control
+    "storm.hotspot":   ("#fcd9d9", "#d96a6a"),   # red — unknown or conflict
+}
+
+# Capability heat, 1 healthy to 5 critical. Fixed rather than palette-derived:
+# neither palette carries a diverging scale, and a heat map whose meaning
+# shifted with the deck theme would be worse than no heat map. Always draw the
+# legend.
+HEAT_ROLES = {
+    "heat.1": ("#dcefdc", "#7fae7f"),
+    "heat.2": ("#eaf2d6", "#a8b878"),
+    "heat.3": ("#fdf2cf", "#d4bb63"),
+    "heat.4": ("#fbe0cc", "#d89a63"),
+    "heat.5": ("#f9d2d2", "#cf6f6f"),
+}
+
+ROLES = {}
+
+
+def _mix(css_a, css_b, t):
+    """Blend two #rrggbb colours, t=0 gives a, t=1 gives b."""
+    def parts(css):
+        css = css.lstrip("#")
+        return [int(css[i:i + 2], 16) for i in (0, 2, 4)]
+    a, b = parts(css_a), parts(css_b)
+    return "#" + "".join(f"{round(x + (y - x) * t):02x}" for x, y in zip(a, b))
+
+
+def _graded_roles():
+    """Roles that read as 'how settled', so they follow the palette.
+
+    Wardley evolution and Gartner pace both describe a position on a single
+    axis from new-and-volatile to old-and-stable. That is a house-style
+    gradient from the accent colour toward neutral, not a fixed semantic, so
+    unlike the Event Storming set these do change with the palette.
+    """
+    accent, neutral = THEME["border_accent"], THEME["border"]
+    graded = {}
+    steps = (("genesis", 0.0), ("custom", 0.33), ("product", 0.66),
+             ("commodity", 1.0))
+    for name, t in steps:
+        stroke = _mix(accent, neutral, t)
+        graded[f"evolution.{name}"] = (_mix(stroke, THEME["node_fill"], 0.84), stroke)
+    for name, t in (("innovation", 0.0), ("differentiation", 0.5), ("record", 1.0)):
+        stroke = _mix(accent, neutral, t)
+        graded[f"pace.{name}"] = (_mix(stroke, THEME["node_fill"], 0.84), stroke)
+    return graded
 
 
 # --------------------------------------------------------------------------
@@ -111,12 +188,20 @@ PALETTES = {
 }
 
 
+def _rebuild_roles():
+    """Refresh ROLES in place. Fixed families first, graded ones from THEME."""
+    ROLES.clear()
+    ROLES.update(STORM_ROLES)
+    ROLES.update(HEAT_ROLES)
+    ROLES.update(_graded_roles())
+
+
 def use_palette(name):
     """Switch the colour family in place. Returns the palette applied.
 
-    THEME and EMPHASIS are mutated rather than rebound because the backends
-    bind them at import (`from diagram import THEME`); rebinding here would
-    leave them pointing at the old dict.
+    THEME, EMPHASIS and ROLES are mutated rather than rebound because the
+    backends bind them at import (`from diagram import THEME`); rebinding here
+    would leave them pointing at the old dict.
     """
     try:
         palette = PALETTES[name]
@@ -133,9 +218,22 @@ def use_palette(name):
         "selected": (THEME["node_fill_selected"], THEME["border_accent"],
                      THEME["stroke_accent"]),
     })
+    _rebuild_roles()
     return palette
 
-LAYOUTS = ("flow", "stack", "timeline", "hub")
+
+_rebuild_roles()
+
+LAYOUTS = ("flow", "stack", "timeline", "hub", "matrix", "wardley",
+           "swimlane", "canvas")
+
+# Node body shapes. All occupy the same bounding box, so a layout measures a
+# node the same way whatever shape it wears. See references/visual-language.md.
+SHAPES = ("rounded", "rect", "stadium", "cylinder", "hexagon", "diamond",
+          "event", "note", "sticky", "person")
+
+DASHES = ("solid", "dashed", "dotted")
+ARROWS = ("arrow", "open", "none", "diamond", "crowsfoot")
 
 
 # --------------------------------------------------------------------------
@@ -197,9 +295,39 @@ def wrap_text(text, size, max_width, max_lines=3, bold=False):
 # Scene primitives
 # --------------------------------------------------------------------------
 
-def rect(x, y, w, h, fill, stroke, sw, radius, opacity=None):
-    return {"t": "rect", "x": x, "y": y, "w": w, "h": h, "fill": fill,
+def rect(x, y, w, h, fill, stroke, sw, radius, opacity=None, shape=None):
+    """A box in the scene.
+
+    `shape` names a body shape from SHAPES; it stays absent for a plain
+    rectangle so existing specs render byte-identically. Every shape fills the
+    same bounding box, so a layout measures a node without caring which one it
+    wears, and the backends decide how to draw it.
+    """
+    item = {"t": "rect", "x": x, "y": y, "w": w, "h": h, "fill": fill,
             "stroke": stroke, "sw": sw, "radius": radius, "opacity": opacity}
+    if shape and shape not in ("rounded", "rect"):
+        item["shape"] = shape
+    return item
+
+
+def resolve_style(node):
+    """(fill, stroke, stroke_width) for a node, from its role then emphasis.
+
+    A role names what the node is and wins on colour; emphasis says how much
+    it matters here and keeps the stroke weight either way.
+    """
+    _, _, weight = EMPHASIS[node.get("emphasis", "default")]
+    role = node.get("role")
+    if role:
+        fill, stroke = ROLES[role]
+        return fill, stroke, weight
+    fill, stroke, _ = EMPHASIS[node.get("emphasis", "default")]
+    return fill, stroke, weight
+
+
+def shape_of(node):
+    """The body shape a node asks for, defaulting to the house rounded box."""
+    return node.get("shape", "rounded")
 
 
 def text(x, y, s, size, fill, weight="400", anchor="middle"):
@@ -214,8 +342,23 @@ def node_block(node, x, y, w, h, centre_within=None):
     Callers that reserve space at the bottom of the box (stack tiers listing
     items) pass it so the label does not drift down into that space.
     """
-    fill, stroke, stroke_width = EMPHASIS[node.get("emphasis", "default")]
-    out = [rect(x, y, w, h, fill, stroke, stroke_width, THEME["radius_node"])]
+    fill, stroke, stroke_width = resolve_style(node)
+    shape = shape_of(node)
+
+    # A person is a head over a body, the C4 convention. The head sits *inside*
+    # the node's own box rather than above it: a glyph drawn outside the
+    # bounding box is invisible to every layout's extent calculation and gets
+    # clipped at the canvas edge.
+    head_band = PERSON_HEAD + 4 if shape == "person" else 0
+    body_y, body_h = y + head_band, h - head_band
+
+    radius = {"rect": 0, "sticky": THEME["radius_sticky"],
+              "stadium": body_h / 2}.get(shape, THEME["radius_node"])
+    out = [rect(x, body_y, w, body_h, fill, stroke, stroke_width, radius,
+                shape=shape)]
+    if head_band:
+        out.append(rect(x + w / 2 - PERSON_HEAD / 2, y, PERSON_HEAD, PERSON_HEAD,
+                        fill, stroke, stroke_width, PERSON_HEAD / 2, shape="event"))
 
     label_lines = node["_label_lines"]
     sub_lines = node.get("_sub_lines", [])
@@ -223,8 +366,8 @@ def node_block(node, x, y, w, h, centre_within=None):
     sub_lh = THEME["size_sub"] * THEME["line_height"]
 
     block_h = len(label_lines) * lh + (len(sub_lines) * sub_lh if sub_lines else 0)
-    band = centre_within if centre_within is not None else h
-    cursor = y + (band - block_h) / 2 + THEME["size_label"] * 0.85
+    band = centre_within if centre_within is not None else body_h
+    cursor = body_y + (band - block_h) / 2 + THEME["size_label"] * 0.85
     cx = x + w / 2
 
     for line in label_lines:
@@ -236,9 +379,43 @@ def node_block(node, x, y, w, h, centre_within=None):
     return out
 
 
-def measure_node(node, max_width=None):
-    """Attach wrapped lines to a node and return its (width, height)."""
+# How much bigger a shape's bounding box must be than the text it holds.
+# A rhombus of a given box only offers about half that box to a horizontal
+# line of text, so sizing it like a rectangle squashes the label against the
+# sloped sides. `rounded` and `rect` are absent, which keeps every existing
+# spec measuring exactly as before.
+SHAPE_SLACK = {
+    "diamond": (1.65, 1.6),
+    "hexagon": (1.25, 1.0),
+    "event": (1.35, 1.3),
+    "stadium": (1.22, 1.0),
+    "cylinder": (1.0, 1.3),
+    "note": (1.1, 1.0),
+}
+
+# Diameter of the head on a `person`, and the band reserved for it at the top
+# of that node's box.
+PERSON_HEAD = 15.0
+
+# Flat additions, applied after SHAPE_SLACK: space a shape needs that does not
+# scale with the label.
+SHAPE_PAD = {"person": (0.0, PERSON_HEAD + 4)}
+
+
+def measure_node(node, max_width=None, min_width=None, min_height=None):
+    """Attach wrapped lines to a node and return its (width, height).
+
+    The returned box accounts for the node's shape: see SHAPE_SLACK.
+
+    `min_width` and `min_height` default to the house node size, which is
+    what keeps a row of boxes even in our own layouts. A caller placing nodes
+    into a layout computed elsewhere should pass 0 for both: imposing our
+    minimum on someone else's geometry makes every box wider than the one the
+    edges were routed around, and the routing then runs through the shape.
+    """
     max_width = max_width or THEME["node_w_max"]
+    min_width = THEME["node_w"] if min_width is None else min_width
+    min_height = THEME["node_h"] if min_height is None else min_height
     inner = max_width - 28
     node["_label_lines"] = wrap_text(node.get("label", ""), THEME["size_label"], inner,
                                      bold=True)
@@ -250,17 +427,73 @@ def measure_node(node, max_width=None):
         + [text_width(l, THEME["size_sub"]) for l in node["_sub_lines"]]
         + [0]
     )
-    w = max(THEME["node_w"], min(max_width, widest + 28))
+    w = max(min_width, min(max_width, widest + 28))
     content_h = (
         len(node["_label_lines"]) * THEME["size_label"] * THEME["line_height"]
         + len(node["_sub_lines"]) * THEME["size_sub"] * THEME["line_height"]
     )
-    h = max(THEME["node_h"], content_h + 18)
-    return w, h
+    h = max(min_height, content_h + 18)
+    shape = shape_of(node)
+    slack_w, slack_h = SHAPE_SLACK.get(shape, (1.0, 1.0))
+    pad_w, pad_h = SHAPE_PAD.get(shape, (0.0, 0.0))
+    return w * slack_w + pad_w, h * slack_h + pad_h
 
 
-def edge_path(x1, y1, x2, y2, exit_dir, entry_dir):
-    """Cubic bezier mirroring computeEdgePath in the studio navigator."""
+def polyline_path(points, dash=None, arrow=None):
+    """An edge that follows a route rather than a single curve.
+
+    Used when something upstream has already worked out how to get past the
+    nodes in between — collapsing that to a straight hop between endpoints
+    throws the avoidance away and drives the line through whatever it was
+    routing around. `points` are in scene coordinates, start to end.
+    """
+    (x1, y1), (x2, y2) = points[0], points[-1]
+    item = {"t": "path", "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            "cp1x": x1, "cp1y": y1, "cp2x": x2, "cp2y": y2,
+            "points": [tuple(p) for p in points]}
+    if dash and dash != "solid":
+        item["dash"] = dash
+    if arrow and arrow != "arrow":
+        item["arrow"] = arrow
+    return item
+
+
+def simplify_path(points, tolerance=8.0):
+    """Ramer–Douglas–Peucker. Drops sample points that carry no shape.
+
+    A renderer that samples a curve hands back a dozen points for a line that
+    is visually straight. Keeping them all would turn one edge into a dozen
+    connectors on a slide, so only the points that actually bend survive.
+    """
+    if len(points) < 3:
+        return list(points)
+
+    (ax, ay), (bx, by) = points[0], points[-1]
+    dx, dy = bx - ax, by - ay
+    span = math.hypot(dx, dy)
+
+    worst, index = 0.0, 0
+    for i in range(1, len(points) - 1):
+        px, py = points[i]
+        if span < 1e-9:
+            gap = math.hypot(px - ax, py - ay)
+        else:
+            gap = abs(dy * px - dx * py + bx * ay - by * ax) / span
+        if gap > worst:
+            worst, index = gap, i
+
+    if worst <= tolerance:
+        return [points[0], points[-1]]
+    return (simplify_path(points[:index + 1], tolerance)[:-1]
+            + simplify_path(points[index:], tolerance))
+
+
+def edge_path(x1, y1, x2, y2, exit_dir, entry_dir, dash=None, arrow=None):
+    """Cubic bezier mirroring computeEdgePath in the studio navigator.
+
+    `dash` and `arrow` are omitted from the item unless they differ from the
+    solid filled-arrow default, so an existing spec renders byte-identically.
+    """
     span = max(abs(x2 - x1), abs(y2 - y1), 1)
     offset = span * 0.45
     cp1x, cp1y = x1, y1
@@ -273,8 +506,13 @@ def edge_path(x1, y1, x2, y2, exit_dir, entry_dir):
             cp1x, cp1y = x1 + px * offset, y1 + py * offset
         if entry_dir == direction:
             cp2x, cp2y = x2 + px * offset, y2 + py * offset
-    return {"t": "path", "x1": x1, "y1": y1, "cp1x": cp1x, "cp1y": cp1y,
+    item = {"t": "path", "x1": x1, "y1": y1, "cp1x": cp1x, "cp1y": cp1y,
             "cp2x": cp2x, "cp2y": cp2y, "x2": x2, "y2": y2}
+    if dash and dash != "solid":
+        item["dash"] = dash
+    if arrow and arrow != "arrow":
+        item["arrow"] = arrow
+    return item
 
 
 def edge_label(x, y, label):
@@ -395,7 +633,8 @@ def layout_flow(spec):
             x1, y1 = a["_x"] + a["_w"] / 2, a["_y"] + a["_h"]
             x2, y2 = b["_x"] + b["_w"] / 2, b["_y"]
             exit_dir, entry_dir = "bottom", "top"
-        body.append(edge_path(x1, y1, x2, y2, exit_dir, entry_dir))
+        body.append(edge_path(x1, y1, x2, y2, exit_dir, entry_dir,
+                              e.get("dash"), e.get("arrow")))
         # Anchor the label in the gap just after the source rather than at the
         # midpoint: an edge that skips a layer would otherwise drop its label
         # on top of a node in the layer it passes through.
@@ -546,11 +785,396 @@ def layout_hub(spec):
     return body + labels, width, height, None
 
 
+def layout_matrix(spec):
+    """A grid with row and column headers. Zachman, pace layering, heat maps.
+
+    Cells carry a `role`, which is how a capability map becomes a heat map
+    without the spec ever naming a colour.
+    """
+    columns = spec["columns"]
+    rows = spec["rows"]
+    pad = THEME["pad"]
+    gap = 6
+    cell_w = spec.get("cellWidth", 150)
+    head_w = spec.get("headerWidth", 130)
+
+    def measure(entry, width):
+        node = dict(entry)
+        node["label"] = node.get("label", "")
+        node["_w"], node["_h"] = measure_node(node, max_width=width)
+        return node
+
+    col_nodes = [measure(c, cell_w) for c in columns]
+    row_nodes = [measure(r, head_w) for r in rows]
+
+    # One height per row, driven by its tallest cell, so the grid stays square.
+    row_heights, grid = [], []
+    for row in rows:
+        raw = row.get("cells", [])
+        cells = [measure(raw[i], cell_w) if i < len(raw) and raw[i] else None
+                 for i in range(len(columns))]
+        row_heights.append(max([THEME["node_h"]]
+                               + [c["_h"] for c in cells if c]))
+        grid.append(cells)
+
+    head_h = max([THEME["node_h"] * 0.8] + [c["_h"] for c in col_nodes])
+
+    body = []
+    x0 = pad + head_w + gap
+    y0 = pad + head_h + gap
+
+    for i, col in enumerate(col_nodes):
+        cx = x0 + i * (cell_w + gap)
+        col.setdefault("emphasis", "muted")
+        body.extend(node_block(col, cx, pad, cell_w, head_h))
+
+    y = y0
+    for r, row in enumerate(row_nodes):
+        row.setdefault("emphasis", "muted")
+        body.extend(node_block(row, pad, y, head_w, row_heights[r]))
+        for c, cell in enumerate(grid[r]):
+            cx = x0 + c * (cell_w + gap)
+            if cell is None:
+                # An empty cell is drawn, faintly. In a Zachman audit the gap
+                # is the finding, so it has to be visible as a gap.
+                body.append(rect(cx, y, cell_w, row_heights[r],
+                                 THEME["canvas"], THEME["band_stroke"], 1,
+                                 THEME["radius_node"]))
+                continue
+            cell.setdefault("shape", "rect")
+            body.extend(node_block(cell, cx, y, cell_w, row_heights[r]))
+        y += row_heights[r] + gap
+
+    width = x0 + len(columns) * (cell_w + gap) - gap + pad
+    height = y - gap + pad
+
+    legend = spec.get("legend", [])
+    if legend:
+        body.extend(_legend(legend, pad, height - pad + 10, width - pad * 2))
+        height += 30
+
+    return body, width, height, None
+
+
+def _legend(entries, x, y, max_width):
+    """A row of swatch-and-label pairs. Required whenever a role carries
+    meaning the reader cannot infer — a heat scale most of all."""
+    out = []
+    swatch, gap, text_gap = 12, 18, 6
+    cursor = x
+    for entry in entries:
+        fill, stroke = ROLES[entry["role"]]
+        label = entry.get("label", entry["role"])
+        out.append(rect(cursor, y, swatch, swatch, fill, stroke,
+                        THEME["stroke_default"], 2))
+        cursor += swatch + text_gap
+        out.append(text(cursor, y + swatch - 2, label, THEME["size_sub"],
+                        THEME["text_muted"], anchor="start"))
+        cursor += text_width(label, THEME["size_sub"]) + gap
+    return out
+
+
+# Wardley's horizontal axis. Four phases of evolution, each occupying a
+# quarter of the span, labelled along the bottom.
+EVOLUTION_BANDS = (
+    (0.00, "Genesis"), (0.25, "Custom-built"),
+    (0.50, "Product"), (0.75, "Commodity"),
+)
+
+
+def layout_wardley(spec):
+    """Components on a value-chain / evolution grid.
+
+    Visibility runs 0 (invisible infrastructure) to 1 (the user anchor) up the
+    y axis; evolution runs 0 (genesis) to 1 (commodity) along x. Components
+    are dots with labels beside them, not boxes — a Wardley map is read as a
+    landscape, and boxes make it look like a flow.
+    """
+    components = spec["components"]
+    pad = THEME["pad"]
+    plot_w = spec.get("width", 760)
+    plot_h = spec.get("height", 420)
+    left = pad + 86          # room for the y axis caption
+    top = pad + 24
+    bottom = top + plot_h
+
+    def px(component):
+        return left + plot_w * max(0.0, min(1.0, component.get("evolution", 0.0)))
+
+    def py(component):
+        return bottom - plot_h * max(0.0, min(1.0, component.get("visibility", 0.0)))
+
+    body = []
+
+    # Evolution bands, drawn first so everything else sits over them.
+    for frac, label in EVOLUTION_BANDS:
+        bx = left + plot_w * frac
+        if frac > 0:
+            body.append({"t": "path", "x1": bx, "y1": top, "cp1x": bx, "cp1y": top,
+                         "cp2x": bx, "cp2y": bottom, "x2": bx, "y2": bottom,
+                         "straight": True, "arrow": "none", "dash": "dotted"})
+        body.append(text(bx + 6, bottom + 16, label, THEME["size_sub"],
+                         THEME["text_muted"], anchor="start"))
+
+    # Axes.
+    for x1, y1, x2, y2 in ((left, top, left, bottom), (left, bottom, left + plot_w, bottom)):
+        body.append({"t": "path", "x1": x1, "y1": y1, "cp1x": x1, "cp1y": y1,
+                     "cp2x": x2, "cp2y": y2, "x2": x2, "y2": y2,
+                     "straight": True, "arrow": "none"})
+    body.append(text(left - 10, top + 10, "Visible", THEME["size_sub"],
+                     THEME["text_muted"], anchor="end"))
+    body.append(text(left - 10, bottom, "Invisible", THEME["size_sub"],
+                     THEME["text_muted"], anchor="end"))
+    body.append(text(left + plot_w, bottom + 32, "Evolution →", THEME["size_sub"],
+                     THEME["text_muted"], anchor="end"))
+    # The anchor names whose value chain this is. It is the one piece of a
+    # Wardley map that cannot be read off the axes, so it is stated, not drawn.
+    if spec.get("anchor"):
+        body.append(text(left, pad + 8, f"Value chain for {spec['anchor']}",
+                         THEME["size_sub"], THEME["text_muted"], anchor="start"))
+
+    by_id = {c["id"]: c for c in components}
+    for edge in spec.get("edges", []):
+        a, b = by_id[edge["from"]], by_id[edge["to"]]
+        body.append({"t": "path", "x1": px(a), "y1": py(a), "cp1x": px(a),
+                     "cp1y": py(a), "cp2x": px(b), "cp2y": py(b),
+                     "x2": px(b), "y2": py(b), "straight": True, "arrow": "none"})
+
+    for move in spec.get("movements", []):
+        c = by_id[move["from"]]
+        target = left + plot_w * max(0.0, min(1.0, move["to"]))
+        body.append({"t": "path", "x1": px(c) + 9, "y1": py(c), "cp1x": px(c) + 9,
+                     "cp1y": py(c), "cp2x": target, "cp2y": py(c),
+                     "x2": target, "y2": py(c), "straight": True, "dash": "dashed"})
+
+    labels = []
+    for c in components:
+        cx, cy = px(c), py(c)
+        fill, stroke, weight = resolve_style(c)
+        dot = 11
+        body.append(rect(cx - dot / 2, cy - dot / 2, dot, dot, fill, stroke,
+                         weight, dot / 2, shape="event"))
+        labels.append(text(cx, cy - 11, c.get("label", ""), THEME["size_label"],
+                           THEME["text"], "600"))
+        if c.get("sublabel"):
+            labels.append(text(cx, cy + 20, c["sublabel"], THEME["size_sub"],
+                               THEME["text_muted"]))
+
+    return body + labels, left + plot_w + pad, bottom + 44 + pad, None
+
+
+def layout_swimlane(spec):
+    """Lanes of steps, left to right, with edges crossing between them.
+
+    Columns are ranked from the edge graph exactly as `flow` does, so an
+    author writes the handoffs and the engine lines the steps up.
+    """
+    lanes = spec["lanes"]
+    edges = spec.get("edges", [])
+    pad = THEME["pad"]
+    head_w = THEME["lane_header"]
+    col_gap = 44
+    lane_pad = 14
+
+    steps, lane_of = [], {}
+    for index, lane in enumerate(lanes):
+        for step in lane.get("steps", []):
+            steps.append(step)
+            lane_of[step["id"]] = index
+    by_id = {s["id"]: s for s in steps}
+
+    incoming = {s["id"]: [] for s in steps}
+    for e in edges:
+        incoming[e["to"]].append(e["from"])
+
+    column = {s["id"]: s["column"] for s in steps if "column" in s}
+
+    def resolve(sid, seen):
+        if sid in column:
+            return column[sid]
+        if sid in seen or not incoming[sid]:
+            column[sid] = 0
+            return 0
+        column[sid] = 1 + max(resolve(p, seen | {sid}) for p in incoming[sid])
+        return column[sid]
+
+    for s in steps:
+        resolve(s["id"], set())
+
+    for s in steps:
+        s["_w"], s["_h"] = measure_node(s, max_width=THEME["node_w_max"])
+
+    col_count = max(column.values()) + 1 if column else 1
+    col_w = [max([s["_w"] for s in steps if column[s["id"]] == c] or [THEME["node_w"]])
+             for c in range(col_count)]
+    col_x = []
+    cursor = pad + head_w
+    for width in col_w:
+        col_x.append(cursor + lane_pad)
+        cursor += width + lane_pad * 2 + col_gap
+    total_w = cursor - col_gap + pad
+
+    lane_h, lane_y = [], []
+    y = pad
+    for index, lane in enumerate(lanes):
+        members = [s for s in steps if lane_of[s["id"]] == index]
+        # A lane holding two steps in one column has to grow to hold both.
+        stacked = {}
+        for s in members:
+            stacked.setdefault(column[s["id"]], []).append(s)
+        height = max(
+            [THEME["node_h"] + lane_pad * 2]
+            + [sum(x["_h"] for x in group) + lane_pad * (len(group) + 1)
+               for group in stacked.values()]
+        )
+        lane_y.append(y)
+        lane_h.append(height)
+        for group in stacked.values():
+            block = sum(x["_h"] for x in group) + 10 * (len(group) - 1)
+            top = y + (height - block) / 2
+            for s in group:
+                s["_x"] = col_x[column[s["id"]]]
+                s["_y"] = top
+                top += s["_h"] + 10
+        y += height
+
+    body = []
+    for index, lane in enumerate(lanes):
+        fill = THEME["lane_fill"] if index % 2 == 0 else THEME["canvas"]
+        body.append(rect(pad, lane_y[index], total_w - pad * 2, lane_h[index],
+                         fill, THEME["band_stroke"], 1, 0))
+        body.append(rect(pad, lane_y[index], head_w, lane_h[index],
+                         THEME["group_fill"], THEME["band_stroke"], 1, 0))
+        caption = {"label": lane.get("label", ""), "emphasis": "muted"}
+        measure_node(caption, max_width=head_w)
+        for i, line in enumerate(caption["_label_lines"]):
+            body.append(text(pad + head_w / 2,
+                             lane_y[index] + lane_h[index] / 2 + i * 14
+                             - (len(caption["_label_lines"]) - 1) * 7 + 4,
+                             line, THEME["size_label"], THEME["text"], "600"))
+
+    labels = []
+    for e in edges:
+        a, b = by_id[e["from"]], by_id[e["to"]]
+        same_lane = lane_of[e["from"]] == lane_of[e["to"]]
+        if same_lane:
+            x1, y1 = a["_x"] + a["_w"], a["_y"] + a["_h"] / 2
+            x2, y2 = b["_x"], b["_y"] + b["_h"] / 2
+            exit_dir, entry_dir = "right", "left"
+        elif b["_y"] > a["_y"]:
+            x1, y1 = a["_x"] + a["_w"] / 2, a["_y"] + a["_h"]
+            x2, y2 = b["_x"] + b["_w"] / 2, b["_y"]
+            exit_dir, entry_dir = "bottom", "top"
+        else:
+            x1, y1 = a["_x"] + a["_w"] / 2, a["_y"]
+            x2, y2 = b["_x"] + b["_w"] / 2, b["_y"] + b["_h"]
+            exit_dir, entry_dir = "top", "bottom"
+        body.append(edge_path(x1, y1, x2, y2, exit_dir, entry_dir,
+                              e.get("dash"), e.get("arrow")))
+        labels.extend(edge_label((x1 + x2) / 2, (y1 + y2) / 2, e.get("label")))
+
+    for s in steps:
+        body.extend(node_block(s, s["_x"], s["_y"], s["_w"], s["_h"]))
+    body.extend(labels)
+
+    return body, total_w, y + pad, None
+
+
+# Event Storming reads top to bottom in a fixed order, so the same kind of
+# sticky lands on the same row in every column. A facilitator scans one row to
+# follow the commands, another to follow the events.
+STORM_ROWS = ("storm.actor", "storm.command", "storm.aggregate", "storm.event",
+              "storm.policy", "storm.readmodel", "storm.external",
+              "storm.hotspot")
+
+STORM_ROW_LABEL = {
+    "storm.actor": "Actors", "storm.command": "Commands",
+    "storm.aggregate": "Aggregates", "storm.event": "Events",
+    "storm.policy": "Policies", "storm.readmodel": "Read models",
+    "storm.external": "External", "storm.hotspot": "Hot spots",
+}
+
+
+def layout_canvas(spec):
+    """An Event Storming wall: a left-to-right timeline of coloured stickies.
+
+    Only the rows actually used are drawn, so a big-picture session showing
+    events and hot spots does not carry six empty bands.
+    """
+    columns = spec["columns"]
+    pad = THEME["pad"]
+    sticky_w = spec.get("stickyWidth", 128)
+    col_gap, row_gap, stack_gap = 14, 12, 8
+    head_w = 92
+
+    for col in columns:
+        for sticky in col.get("stickies", []):
+            sticky.setdefault("role", "storm.event")
+            sticky.setdefault("shape", "sticky")
+            # An actor is physically a smaller sticky on a real wall, which is
+            # most of how it is told apart from a pale-yellow aggregate.
+            width = sticky_w * (0.72 if sticky["role"] == "storm.actor" else 1.0)
+            sticky["_w"] = width
+            measure_node(sticky, max_width=width)
+            sticky["_h"] = max(
+                48.0,
+                len(sticky["_label_lines"]) * THEME["size_label"] * THEME["line_height"]
+                + len(sticky["_sub_lines"]) * THEME["size_sub"] * THEME["line_height"]
+                + 18)
+
+    used = [r for r in STORM_ROWS
+            if any(s["role"] == r for c in columns for s in c.get("stickies", []))]
+    if not used:
+        used = ["storm.event"]
+
+    row_h = {}
+    for role in used:
+        tallest = 0.0
+        for col in columns:
+            group = [s for s in col.get("stickies", []) if s["role"] == role]
+            if group:
+                tallest = max(tallest,
+                              sum(s["_h"] for s in group)
+                              + stack_gap * (len(group) - 1))
+        row_h[role] = max(48.0, tallest)
+
+    body, labels = [], []
+    header_h = 26 if any(c.get("label") for c in columns) else 0
+    y0 = pad + header_h
+    row_y, y = {}, y0
+    for role in used:
+        row_y[role] = y
+        body.append(text(pad, y + row_h[role] / 2 + 3, STORM_ROW_LABEL[role],
+                         THEME["size_sub"], THEME["text_muted"], anchor="start"))
+        y += row_h[role] + row_gap
+    total_h = y - row_gap + pad
+
+    x = pad + head_w
+    for col in columns:
+        if col.get("label"):
+            labels.append(text(x + sticky_w / 2, pad + 14, col["label"],
+                               THEME["size_group"], THEME["text"], "600"))
+        for role in used:
+            group = [s for s in col.get("stickies", []) if s["role"] == role]
+            cursor = row_y[role]
+            for sticky in group:
+                body.extend(node_block(sticky, x + (sticky_w - sticky["_w"]) / 2,
+                                       cursor, sticky["_w"], sticky["_h"]))
+                cursor += sticky["_h"] + stack_gap
+        x += sticky_w + col_gap
+
+    return body + labels, x - col_gap + pad, total_h, None
+
+
 LAYOUT_FUNCS = {
     "flow": layout_flow,
     "stack": layout_stack,
     "timeline": layout_timeline,
     "hub": layout_hub,
+    "matrix": layout_matrix,
+    "wardley": layout_wardley,
+    "swimlane": layout_swimlane,
+    "canvas": layout_canvas,
 }
 
 
@@ -598,12 +1222,126 @@ def validate(spec):
             problems.append("hub layout requires a 'centre' object")
         if not spec.get("satellites"):
             problems.append("hub layout requires a non-empty 'satellites' array")
+    elif layout == "matrix":
+        if not spec.get("columns"):
+            problems.append("matrix layout requires a non-empty 'columns' array")
+        if not spec.get("rows"):
+            problems.append("matrix layout requires a non-empty 'rows' array")
+        for i, row in enumerate(spec.get("rows", [])):
+            overflow = len(row.get("cells", [])) - len(spec.get("columns", []))
+            if overflow > 0:
+                problems.append(
+                    f"row {i} ({row.get('label', '?')!r}) has {overflow} more "
+                    f"cell(s) than there are columns")
+        for entry in spec.get("legend", []):
+            if entry.get("role") not in ROLES:
+                problems.append(f"legend entry has unknown role {entry.get('role')!r}")
+    elif layout == "wardley":
+        components = spec.get("components")
+        if not components:
+            problems.append("wardley layout requires a non-empty 'components' array")
+            return problems
+        ids = set()
+        for c in components:
+            if not c.get("id"):
+                problems.append("every wardley component needs an 'id'")
+            ids.add(c.get("id"))
+            for axis in ("visibility", "evolution"):
+                value = c.get(axis)
+                if value is None:
+                    problems.append(
+                        f"component {c.get('id')!r} needs a '{axis}' between 0 and 1")
+                elif not 0 <= value <= 1:
+                    problems.append(
+                        f"component {c.get('id')!r} has {axis} {value}, "
+                        "which is outside 0 to 1")
+        for e in spec.get("edges", []):
+            for end in ("from", "to"):
+                if e.get(end) not in ids:
+                    problems.append(f"edge {end} {e.get(end)!r} is not a component id")
+        for m in spec.get("movements", []):
+            if m.get("from") not in ids:
+                problems.append(f"movement from {m.get('from')!r} is not a component id")
+    elif layout == "swimlane":
+        lanes = spec.get("lanes")
+        if not lanes:
+            problems.append("swimlane layout requires a non-empty 'lanes' array")
+            return problems
+        ids, seen = set(), set()
+        for lane in lanes:
+            for step in lane.get("steps", []):
+                sid = step.get("id")
+                if not sid:
+                    problems.append("every swimlane step needs an 'id'")
+                elif sid in seen:
+                    problems.append(f"duplicate step id {sid!r}")
+                else:
+                    seen.add(sid)
+                ids.add(sid)
+        if not ids:
+            problems.append("swimlane layout needs at least one step in a lane")
+        for e in spec.get("edges", []):
+            for end in ("from", "to"):
+                if e.get(end) not in ids:
+                    problems.append(f"edge {end} {e.get(end)!r} is not a declared step id")
+    elif layout == "canvas":
+        columns = spec.get("columns")
+        if not columns:
+            problems.append("canvas layout requires a non-empty 'columns' array")
+            return problems
+        if not any(c.get("stickies") for c in columns):
+            problems.append("canvas layout needs at least one sticky")
+        for col in columns:
+            for sticky in col.get("stickies", []):
+                role = sticky.get("role", "storm.event")
+                if role not in STORM_ROWS:
+                    problems.append(
+                        f"sticky {sticky.get('label', '?')!r} has role {role!r}; "
+                        f"a canvas takes one of {', '.join(STORM_ROWS)}")
 
-    for item in spec.get("nodes", []) + spec.get("satellites", []):
+    problems += _check_vocabulary(spec)
+    return problems
+
+
+def _nodes_anywhere(spec):
+    """Every node-shaped object in a spec, whatever the layout calls them."""
+    found = []
+    for key in ("nodes", "satellites", "tiers", "phases", "components",
+                "columns", "rows"):
+        found += [n for n in spec.get(key, []) if isinstance(n, dict)]
+    for lane in spec.get("lanes", []):
+        found += [n for n in lane.get("steps", []) if isinstance(n, dict)]
+    for row in spec.get("rows", []):
+        found += [c for c in row.get("cells", []) if isinstance(c, dict)]
+    for col in spec.get("columns", []):
+        if isinstance(col, dict):
+            found += [s for s in col.get("stickies", []) if isinstance(s, dict)]
+    if isinstance(spec.get("centre"), dict):
+        found.append(spec["centre"])
+    return found
+
+
+def _check_vocabulary(spec):
+    """Emphasis, role, shape and connector styling, across every layout."""
+    problems = []
+    for item in _nodes_anywhere(spec):
         emphasis = item.get("emphasis", "default")
         if emphasis not in EMPHASIS:
             problems.append(f"unknown emphasis {emphasis!r} "
                             f"(use one of {', '.join(EMPHASIS)})")
+        if "role" in item and item["role"] not in ROLES:
+            problems.append(f"unknown role {item['role']!r} "
+                            f"(use one of {', '.join(sorted(ROLES))})")
+        if "shape" in item and item["shape"] not in SHAPES:
+            problems.append(f"unknown shape {item['shape']!r} "
+                            f"(use one of {', '.join(SHAPES)})")
+    for e in spec.get("edges", []):
+        if "dash" in e and e["dash"] not in DASHES:
+            problems.append(f"unknown dash {e['dash']!r} "
+                            f"(use one of {', '.join(DASHES)})")
+        if "arrow" in e and e["arrow"] not in ARROWS:
+            problems.append(f"unknown arrow {e['arrow']!r} "
+                            f"(use one of {', '.join(ARROWS)})")
     return problems
 
 

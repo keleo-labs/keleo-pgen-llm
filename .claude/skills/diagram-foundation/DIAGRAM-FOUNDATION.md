@@ -7,14 +7,21 @@
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 1.0.0
+Version: 1.2.0
 
-Shared diagram engine. A declarative JSON spec goes in; an SVG for a markdown
-report or native Google Slides shapes for a deck comes out. Not a skill — a
-foundation, like `deck-foundation` and `reporting-foundation`.
+Shared diagram engine. A spec goes in; an SVG for a markdown report or native
+Google Slides shapes for a deck comes out. Not a skill — a foundation, like
+`deck-foundation` and `reporting-foundation`.
 
-Consumers: the reporting skills (via `reports/<report-slug>/assets/*.json`), the deck
-skills (via a `diagram:` slide), and `keleo-pgen-llm`, which vendors a copy.
+Consumers: the `diagram` skill, the reporting skills (via
+`reports/<report-slug>/assets/*.json`), the deck skills (via a `diagram:`
+slide), and `keleo-pgen-llm`, which vendors a copy.
+
+**Choosing what to draw is a separate question from drawing it.**
+`references/method-catalogue.md` carries the selection matrix — fifteen
+methods, their audiences, and which of them this engine produces.
+`references/visual-language.md` is the shape, connector and colour vocabulary
+every route draws from.
 
 ## Why a spec and not an SVG
 
@@ -24,14 +31,45 @@ at once — needs the structure, which only the spec carries. Keep the spec
 beside its output and under version control; the SVG and PNG are build
 artifacts.
 
+## Three routes
+
+A spec is either a `.json` using a native layout, or a `.mmd` carrying YAML
+frontmatter and Mermaid source. `spec_loader.load` is the single entry point
+and decides the route; callers do not need to know which they got, except to
+ask `diagram.editable` before expecting shapes.
+
+| Route | How | House style | Editable slides |
+|---|---|---|---|
+| **A. Native** | A layout in `diagram.py` → Scene → SVG or Slides | by construction | yes |
+| **B. Mermaid as layout engine** | Mermaid → SVG → `mermaid_import` → Scene | by construction | yes |
+| **C. Mermaid as renderer** | Mermaid → SVG → `mermaid_theme` | applied as CSS | no |
+
+The rule: a published notation with a mature diagram-as-code grammar (UML,
+ERD) is Mermaid's to draw — reimplementing a standard is waste, and a
+near-miss of UML reads worse than none. A *graph* is Mermaid's to lay out and
+ours to draw. A layout Mermaid has no grammar for — grids, two-axis maps,
+lanes — is ours end to end.
+
+Route B is the interesting one. Mermaid does the hard part and nothing of its
+styling survives: semantics come from the source we were given, geometry from
+its SVG. Anything the importer cannot read falls back to route C **and says
+so**, rather than emitting a half-built scene.
+
+Route C exists because lifelines, activation bars and attribute compartments
+have no Slides equivalent. A picture is the right artifact for them.
+
 ## Layouts
 
 | Layout | Shape | Reach for it when |
 |---|---|---|
-| `flow` | Layered boxes, directed edges, optional cluster groups | Topologies, pipelines, data paths, process flows. The default |
+| `flow` | Layered boxes, directed edges, nestable cluster groups | Topologies, pipelines, data paths, cloud containment. The default |
 | `stack` | Vertical tiers | Layer models, maturity stacks, architecture tiers |
 | `timeline` | Sequential phase bands joined by arrows | Roadmaps, adoption journeys, phased rollouts |
 | `hub` | Centre node with satellites on an ellipse | Relationship maps, integration fan-out |
+| `matrix` | Grid with row and column headers | Zachman, pace layering, capability heat maps, 2×2s |
+| `wardley` | Components on a value-chain / evolution grid | Build versus buy, spotting commoditisation |
+| `swimlane` | Lanes of steps with handoffs between them | Process modelling where who does what is the point |
+| `canvas` | Left-to-right timeline of coloured stickies | Event Storming |
 
 `scripts/render-diagram.py --spec-help` prints the full field reference. Point
 an agent at that command rather than pasting its output into a prompt.
@@ -112,17 +150,45 @@ split it, or raise its abstraction.
 | Backend | Output | Notes |
 |---|---|---|
 | `svg_backend` | Standalone SVG | Native `<text>`, not `foreignObject` — the latter does not render through a markdown `<img>`. Paints an opaque background so dark-theme pages do not swallow the text |
-| `slides_backend` | `batchUpdate` requests | Rounded rectangles with their own fill, outline and text; lines with arrow heads. Genuinely editable in the deck |
+| `slides_backend` | `batchUpdate` requests | Every house shape maps to a real Slides shape type, so a node stays selectable and movable rather than degrading to a picture |
 
-Two differences in the Slides output, both deliberate:
+Three differences in the Slides output, all deliberate:
 
-- **Edges are straight.** `createLine` offers `STRAIGHT`, `BENT` and `CURVED`
-  but not arbitrary béziers. Every vertical and horizontal hop is identical to
-  the SVG; a diagonal that curves in the SVG is a straight diagonal on a slide.
+- **Edges are straight segments.** `createLine` offers `STRAIGHT`, `BENT` and
+  `CURVED` but not arbitrary béziers. A routed edge becomes one connector per
+  leg, with the arrow head on the last; a single hop between its endpoints
+  would discard the routing and drive the line through whatever it avoided.
 - **Type is eased down ~8%.** Google sets text wider than Chromium, which the
   deck foundation already warns about. Box geometry comes from Chromium-
   calibrated metrics, so without the easing a two-line label becomes three and
   overflows the box it was sized for.
+- **Crow's foot has no equivalent.** It is a route C notation only, and an
+  ERD never reaches this backend.
+
+## Gotchas worth knowing before changing the Mermaid routes
+
+Each of these cost a debugging cycle and will again if undone.
+
+- **`measure_node` imposes a house minimum width.** That is right for our own
+  layouts and wrong for an imported one: widening every node past what
+  Mermaid routed around sends the edges through the shapes. `mermaid_import`
+  passes `min_width=0, min_height=0`.
+- **Mermaid transforms nest.** A cylinder's path starts at its left edge and
+  is recentred by a `transform` on the path element itself. Reading only the
+  node group's transform puts the shape half its width off.
+- **An SVG arc is not a pair of coordinates.** `a65,12.8 0,0,0 132,0` carries
+  radii, a rotation and two flags before its endpoint. `_path_bbox` walks the
+  commands; reading numbers in pairs inflates a cylinder several times over.
+- **Sweep flag 0, left to right, bulges *down*.** Mermaid's own cylinder base
+  is the reference. Getting it backwards turns a datastore inside out.
+- **Mermaid's root element already has `role`.** Appending a second one makes
+  the document malformed and every rasteriser rejects it outright.
+- **`-C/--cssFile` is not reliable.** It is fed in as `themeCSS` and the
+  rules did not survive into the output; `classDef` emits `!important` rules
+  that would beat them anyway. The house stylesheet is appended to the
+  `<style>` block in the emitted SVG instead.
+- **mermaid-cli 12 has no target size.** Only `--size`, a maximum, which for
+  SVG moves `max-width` and nothing else. Fit is judged after the fact.
 
 ## Vendoring
 

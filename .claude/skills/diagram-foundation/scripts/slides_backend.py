@@ -81,6 +81,36 @@ FONT_FIT = 0.92
 # needs the matching slack or Slides wraps the label inside it.
 LABEL_PLATE_SLACK = 1.35
 
+# House body shape → Google Slides shape type. Every one of these is a real
+# Slides shape, so a node stays selectable and movable rather than degrading
+# to a picture. See references/visual-language.md for the table this matches.
+SHAPE_TYPE = {
+    "rounded": "ROUND_RECTANGLE",
+    "rect": "RECTANGLE",
+    "stadium": "FLOW_CHART_TERMINATOR",
+    "cylinder": "FLOW_CHART_MAGNETIC_DISK",
+    "hexagon": "HEXAGON",
+    "diamond": "DIAMOND",
+    "event": "ELLIPSE",
+    "note": "FOLDED_CORNER",
+    "sticky": "RECTANGLE",
+    "person": "ROUND_RECTANGLE",
+}
+
+# Slides carries dash on the line's own property rather than in the colour.
+DASH_STYLE = {"solid": "SOLID", "dashed": "DASH", "dotted": "DOT"}
+
+# Crow's foot has no Slides arrow head. An ERD never reaches this backend —
+# it renders as a picture — but degrade to an open head rather than throw if
+# one ever does.
+END_ARROW = {
+    "arrow": "FILL_ARROW",
+    "open": "OPEN_ARROW",
+    "none": "NONE",
+    "diamond": "FILL_DIAMOND",
+    "crowsfoot": "OPEN_ARROW",
+}
+
 
 def scene_requests(scene, page_id, box, prefix="dg"):
     """Return batchUpdate requests drawing a scene inside an EMU box.
@@ -143,10 +173,13 @@ def scene_requests(scene, page_id, box, prefix="dg"):
                 grown = int(width * LABEL_PLATE_SLACK)
                 left -= (grown - width) // 2
                 width = grown
+            shape = item.get("shape")
+            shape_type = (SHAPE_TYPE.get(shape) if shape
+                          else ("ROUND_RECTANGLE" if item["radius"] else "RECTANGLE"))
             requests.append({
                 "createShape": {
                     "objectId": oid,
-                    "shapeType": "ROUND_RECTANGLE" if item["radius"] else "RECTANGLE",
+                    "shapeType": shape_type or "ROUND_RECTANGLE",
                     "elementProperties": _element_properties(
                         page_id, left, ey(item["y"]), width, size(item["h"])),
                 }
@@ -209,26 +242,39 @@ def scene_requests(scene, page_id, box, prefix="dg"):
                 }})
 
         elif item["t"] == "path":
-            x1, y1, x2, y2 = (ex(item["x1"]), ey(item["y1"]),
-                              ex(item["x2"]), ey(item["y2"]))
-            requests.append({"createLine": {
-                "objectId": oid,
-                "lineCategory": "STRAIGHT",
-                "elementProperties": _line_properties(page_id, x1, y1, x2, y2),
-            }})
+            # A routed edge becomes one connector per leg. Slides has no
+            # polyline, and a single straight hop between the endpoints would
+            # throw away the routing and drive the line through whatever it
+            # was drawn to avoid. Only the final leg carries the arrow head.
+            route = item.get("points") or [(item["x1"], item["y1"]),
+                                           (item["x2"], item["y2"])]
             colour, alpha = _rgb(THEME["edge"])
-            requests.append({"updateLineProperties": {
-                "objectId": oid,
-                "fields": "lineFill.solidFill.color,lineFill.solidFill.alpha,"
-                          "weight,endArrow",
-                "lineProperties": {
-                    "lineFill": {"solidFill": {"color": {"rgbColor": colour},
-                                               "alpha": alpha}},
-                    "weight": {"magnitude": int(THEME["edge_width"] * EMU_PER_PX * scale),
-                               "unit": "EMU"},
-                    "endArrow": "FILL_ARROW",
-                },
-            }})
+            for leg, (a, b) in enumerate(zip(route, route[1:])):
+                leg_id = oid if leg == 0 else f"{oid}s{leg:02d}"
+                x1, y1, x2, y2 = ex(a[0]), ey(a[1]), ex(b[0]), ey(b[1])
+                requests.append({"createLine": {
+                    "objectId": leg_id,
+                    "lineCategory": "STRAIGHT",
+                    "elementProperties": _line_properties(page_id, x1, y1, x2, y2),
+                }})
+                last = leg == len(route) - 2
+                requests.append({"updateLineProperties": {
+                    "objectId": leg_id,
+                    "fields": "lineFill.solidFill.color,lineFill.solidFill.alpha,"
+                              "weight,endArrow,dashStyle",
+                    "lineProperties": {
+                        "lineFill": {"solidFill": {"color": {"rgbColor": colour},
+                                                   "alpha": alpha}},
+                        "weight": {"magnitude": int(THEME["edge_width"]
+                                                    * EMU_PER_PX * scale),
+                                   "unit": "EMU"},
+                        "endArrow": (END_ARROW.get(item.get("arrow", "arrow"),
+                                                   "FILL_ARROW")
+                                     if last else "NONE"),
+                        "dashStyle": DASH_STYLE.get(item.get("dash", "solid"),
+                                                    "SOLID"),
+                    },
+                }})
 
         elif item["t"] == "text" and owning_box(item) is None:
             # A label with no box of its own — a group caption or an edge

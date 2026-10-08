@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Render declarative diagram specs into SVG, or into Google Slides requests.
+"""Render diagram specs into SVG, or into Google Slides requests.
 
-Layout lives in diagram.py and emits a backend-neutral scene; this is the CLI
-over the two backends. Standard library only.
+Two spec forms, three routes, one CLI. A `.json` spec is laid out natively by
+diagram.py. A `.mmd` spec is Mermaid source with frontmatter: a flowchart is
+laid out by Mermaid and redrawn here in house shapes, and every other Mermaid
+diagram type keeps its own picture and gets themed. `spec_loader` decides
+which; see references/method-catalogue.md for why.
 
 Usage:
     render-diagram.py <spec>.json -o <out>.svg
+    render-diagram.py <spec>.mmd  -o <out>.svg
     render-diagram.py <spec>.json --stdout
     render-diagram.py --dir <dir>/                 # render every spec in place
-    render-diagram.py <spec>.json --fit 16:9       # transpose to suit a frame
+    render-diagram.py <spec>.json --fit 16:9       # suit a frame
+    render-diagram.py <spec>.json --palette redhat
     render-diagram.py <spec>.json --emit slides --page-id p \
                       --box 914400,914400,7315200,3657600 -o requests.json
     render-diagram.py --spec-help
@@ -24,8 +29,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import svg_backend  # noqa: E402
-from diagram import build_scene, fit_to_aspect, validate  # noqa: E402
+import spec_loader  # noqa: E402
+from diagram import PALETTES, use_palette  # noqa: E402
+from mermaid_render import MermaidUnavailable  # noqa: E402
 from slides_backend import scene_requests  # noqa: E402
 
 SPEC_HELP = """\
@@ -82,6 +88,94 @@ Centre node with satellites on an ellipse. Relationship maps, fan-out.
   centre     {label, sublabel?, emphasis?}
   satellites [{label, sublabel?, emphasis?, edgeLabel?}]
 
+layout: "matrix"
+----------------
+A grid with row and column headers. Zachman, pace layering, capability heat
+maps, 2x2s.
+
+  columns       [{label, sublabel?}]
+  rows          [{label, sublabel?, cells: [cell|null, ...]}]
+  legend        [{role, label}]    required when cells carry a role
+  cellWidth     optional, default 150
+  headerWidth   optional, default 130
+
+A null cell is drawn as an empty outline. In a completeness audit the gap is
+the finding, so it has to be visible as a gap.
+
+layout: "wardley"
+-----------------
+Components on a value-chain / evolution grid. Build-versus-buy, spotting
+commoditisation.
+
+  anchor      who the value chain serves, e.g. "Account team"
+  components  [{id, label, sublabel?, visibility, evolution, emphasis?}]
+  edges       [{from, to}]        the value chain; undirected, no arrow heads
+  movements   [{from, to}]        `to` is a target evolution, drawn dashed
+
+visibility 1 is the user anchor, 0 is invisible infrastructure. evolution runs
+0 genesis to 1 commodity. Both are 0 to 1.
+
+layout: "swimlane"
+------------------
+Lanes of steps with handoffs between them. Process modelling where who does
+what is the point.
+
+  lanes   [{label, steps: [{id, label, sublabel?, shape?, column?}]}]
+  edges   [{from, to, label?, dash?, arrow?}]
+
+Columns are ranked from the edge graph, as in `flow`. Set `column` to pin a
+step that has no incoming edge.
+
+layout: "canvas"
+----------------
+An Event Storming wall: a left-to-right timeline of coloured stickies.
+
+  columns  [{label?, stickies: [{label, sublabel?, role}]}]
+
+`role` is one of storm.actor, storm.command, storm.aggregate, storm.event,
+storm.policy, storm.readmodel, storm.external, storm.hotspot. Each lands on
+its own row, in that order, and only rows in use are drawn.
+
+Shapes, roles and connectors
+----------------------------
+Any node in any layout may carry:
+
+  shape     rounded (default) | rect | stadium | cylinder | hexagon |
+            diamond | event | note | sticky | person
+  emphasis  default | muted | accent | selected
+  role      a semantic colour — storm.*, heat.1-5, evolution.*, pace.*
+
+Any edge may carry:
+
+  dash      solid (default) | dashed | dotted
+  arrow     arrow (default) | open | none | diamond | crowsfoot
+
+See references/visual-language.md for what each one means.
+
+Mermaid specs (.mmd)
+--------------------
+A `.mmd` file is YAML frontmatter, then Mermaid source:
+
+  ---
+  method: c4-container
+  title: Keleo Studio containers
+  description: Deployable units and the protocols between them.
+  render: scene        # scene (default) | picture
+  ---
+  flowchart TB
+    subgraph studio["Keleo Studio"]
+      web[Web app]:::accent --> api[API service]
+      api --> db[(Document store)]
+    end
+
+`render: scene` lets Mermaid lay the graph out, then redraws it here in house
+shapes — so it becomes editable Google Slides shapes like any native spec.
+Only a flowchart can do this; a sequenceDiagram, erDiagram, classDiagram or
+stateDiagram keeps Mermaid's own picture, themed to the palette, and says so.
+
+In a .mmd source, a role is written with a hyphen because Mermaid class names
+cannot contain a dot: `:::storm-event`, not `:::storm.event`.
+
 Fitting a frame
 ---------------
 --fit W:H transposes a `flow` between TB and LR when the other orientation
@@ -109,17 +203,6 @@ Example
 """
 
 
-def load_spec(path):
-    """Return (spec, error)."""
-    try:
-        with open(path, encoding="utf-8") as handle:
-            return json.load(handle), None
-    except FileNotFoundError:
-        return None, f"File not found: {path}"
-    except json.JSONDecodeError as exc:
-        return None, f"Invalid JSON in {path}: {exc}"
-
-
 def parse_ratio(raw):
     try:
         w, _, h = raw.partition(":")
@@ -129,31 +212,27 @@ def parse_ratio(raw):
 
 
 def prepare(path, fit_ratio):
-    """Load, validate and optionally transpose. Returns (spec, note, error)."""
-    spec, error = load_spec(path)
-    if error:
-        return None, None, error
-    problems = validate(spec)
-    if problems:
-        return None, None, f"{path}: " + "; ".join(problems)
-    note = None
-    if fit_ratio:
-        spec, note = fit_to_aspect(spec, fit_ratio)
-    return spec, note, None
+    """Load by whichever route the file calls for. Returns (diagram, error)."""
+    try:
+        return spec_loader.load(path, fit_ratio), None
+    except (spec_loader.SpecError, MermaidUnavailable) as exc:
+        return None, str(exc)
+    except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
+        return None, f"{path}: could not lay out ({exc})"
 
 
 def render_file(spec_path, out_path, fit_ratio=None):
     """Render one spec file to SVG. Returns (ok, message)."""
-    spec, note, error = prepare(spec_path, fit_ratio)
+    diagram, error = prepare(spec_path, fit_ratio)
     if error:
         return False, error
     try:
-        svg = svg_backend.render(build_scene(spec), spec)
+        svg = diagram.svg()
     except (KeyError, TypeError, ValueError, ZeroDivisionError) as exc:
         return False, f"{spec_path}: could not render ({exc})"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(svg, encoding="utf-8")
-    suffix = f" — {note}" if note else ""
+    suffix = f" — {diagram.note}" if diagram.note else ""
     return True, f"{out_path}{suffix}"
 
 
@@ -163,10 +242,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Run --spec-help for the full spec reference.",
     )
-    parser.add_argument("spec", nargs="?", help="Path to a diagram spec JSON file")
+    parser.add_argument("spec", nargs="?",
+                        help="Path to a diagram spec: .json or .mmd")
     parser.add_argument("-o", "--output", help="Output path (default: spec path with .svg)")
     parser.add_argument("--dir", dest="directory",
-                        help="Render every *.json spec in a directory alongside itself")
+                        help="Render every *.json and *.mmd spec in a directory "
+                             "alongside itself")
+    parser.add_argument("--palette", choices=sorted(PALETTES), default="navigator",
+                        help="Colour family (default: navigator)")
     parser.add_argument("--stdout", action="store_true", help="Write output to stdout")
     parser.add_argument("--emit", choices=["svg", "slides"], default="svg",
                         help="Output form (default: svg)")
@@ -185,10 +268,16 @@ def main():
         print(SPEC_HELP)
         return 0
 
+    # Before anything is laid out: use_palette mutates THEME in place and the
+    # backends bound it at import, so a later switch would not reach them.
+    use_palette(args.palette)
+
     if args.directory:
-        specs = sorted(Path(args.directory).glob("*.json"))
+        specs = sorted(p for p in Path(args.directory).iterdir()
+                       if spec_loader.is_spec(p))
         if not specs:
-            print(f"No .json specs found in {args.directory}", file=sys.stderr)
+            print(f"No .json or .mmd specs found in {args.directory}",
+                  file=sys.stderr)
             return 1
         failures = 0
         for spec_path in specs:
@@ -204,9 +293,18 @@ def main():
     if args.emit == "slides":
         if not args.page_id or not args.box:
             parser.error("--emit slides needs --page-id and --box")
-        spec, note, error = prepare(args.spec, args.fit)
+        diagram, error = prepare(args.spec, args.fit)
         if error:
             print(error, file=sys.stderr)
+            return 1
+        if not diagram.editable:
+            # A picture has no geometry to turn into shapes. Say so plainly
+            # rather than emitting an empty request list the caller would
+            # read as success.
+            print(f"{args.spec}: this diagram renders as a picture, so it has "
+                  "no shapes to emit. Publish the SVG or PNG instead."
+                  + (f" ({diagram.note})" if diagram.note else ""),
+                  file=sys.stderr)
             return 1
         try:
             box = tuple(float(v) for v in args.box.split(","))
@@ -214,24 +312,24 @@ def main():
                 raise ValueError
         except ValueError:
             parser.error("--box wants four EMU values: X,Y,W,H")
-        requests = scene_requests(build_scene(spec), args.page_id, box, args.prefix)
+        requests = scene_requests(diagram.scene(), args.page_id, box, args.prefix)
         payload = json.dumps({"requests": requests}, indent=2) + "\n"
         if args.stdout or not args.output:
             sys.stdout.write(payload)
         else:
             Path(args.output).write_text(payload, encoding="utf-8")
             print(f"wrote {args.output} ({len(requests)} requests)"
-                  + (f" — {note}" if note else ""))
+                  + (f" — {diagram.note}" if diagram.note else ""))
         return 0
 
     if args.stdout:
-        spec, note, error = prepare(args.spec, args.fit)
+        diagram, error = prepare(args.spec, args.fit)
         if error:
             print(error, file=sys.stderr)
             return 1
-        sys.stdout.write(svg_backend.render(build_scene(spec), spec))
-        if note:
-            print(note, file=sys.stderr)
+        sys.stdout.write(diagram.svg())
+        if diagram.note:
+            print(diagram.note, file=sys.stderr)
         return 0
 
     out_path = Path(args.output) if args.output else Path(args.spec).with_suffix(".svg")

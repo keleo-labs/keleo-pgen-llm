@@ -7,7 +7,7 @@
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 2.3.0
+Version: 2.5.0
 
 > **2.0.0 changes the default.** A deck built from a source document now
 > follows that document's structure instead of being re-argued into a
@@ -273,8 +273,15 @@ would have crowded the slide.
 
 A deck can carry both. The difference is whether a **spec** exists.
 
+**Which diagram to draw** is a separate decision from how to draw it, and
+the wrong method costs more than a bad layout.
+`diagram-foundation/references/method-catalogue.md` carries the selection
+matrix; the `diagram` skill walks it. Reach for that before authoring a spec
+by hand.
+
 **Spec-backed diagram.** Reference a spec in the format
-`diagram-foundation/scripts/render-diagram.py` reads:
+`diagram-foundation/scripts/render-diagram.py` reads — either a `.json`
+native layout or a `.mmd` carrying Mermaid source:
 
 ```yaml
 ---
@@ -294,6 +301,15 @@ and move.
 
 The upgrade is additive. If it cannot find the slide, or the batch fails, the
 deck keeps the picture and stays usable; the publish reports what it skipped.
+
+**Not every diagram can become shapes.** A native spec and a Mermaid
+flowchart both can. A sequence, ERD, class or state diagram cannot —
+lifelines and attribute compartments have no Slides equivalent — so those
+stay pictures and the upgrade pass says so rather than failing. The manifest
+carries each diagram's laid-out scene, or `null` where there is none; it is
+the handoff between `build-diagrams.py` and `upgrade-diagrams.py`, and the
+scene travels in it because a Mermaid-backed diagram has no declarative spec
+to rebuild from without invoking Mermaid a second time.
 
 **Colour.** Diagrams render in the Red Hat palette on a slide rather than the
 engine's default navigator blue, so a figure reads as part of the deck. Only

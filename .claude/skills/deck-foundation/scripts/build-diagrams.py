@@ -39,8 +39,9 @@ DIAGRAM_SCRIPTS = Path(__file__).resolve().parent.parent.parent / "diagram-found
 sys.path.insert(0, str(DIAGRAM_SCRIPTS))
 
 try:
-    import svg_backend
-    from diagram import build_scene, fit_to_aspect, use_palette, validate
+    import spec_loader
+    from diagram import use_palette
+    from mermaid_render import MermaidUnavailable
 except ImportError as exc:  # pragma: no cover - surfaced to the user
     print(f"Error: diagram-foundation not found at {DIAGRAM_SCRIPTS} ({exc})",
           file=sys.stderr)
@@ -83,21 +84,26 @@ def build(source: Path, width: int, check: bool,
         if not spec_path.exists():
             raise RuntimeError(f"diagram spec not found: {ref}")
 
-        spec = json.loads(spec_path.read_text(encoding="utf-8"))
-        problems = validate(spec)
-        if problems:
-            raise RuntimeError(f"{ref}: " + "; ".join(problems))
+        try:
+            diagram = spec_loader.load(spec_path, FRAME_RATIO)
+        except (spec_loader.SpecError, MermaidUnavailable) as exc:
+            raise RuntimeError(str(exc)) from None
 
-        fitted, note = fit_to_aspect(spec, FRAME_RATIO)
-        if note:
-            notes.append(f"{spec_path.stem}: {note}")
+        if diagram.note:
+            notes.append(f"{spec_path.stem}: {diagram.note}")
 
+        # The scene travels in the manifest rather than the spec, because a
+        # Mermaid-backed diagram has no declarative spec to rebuild it from —
+        # and re-deriving one would mean invoking Mermaid a second time at
+        # publish. A picture-only diagram carries no scene and is skipped by
+        # the upgrade pass.
         entry = {
             "order": order,
             "marker": spec_path.stem,
             "spec": str(spec_path),
             "png": str(spec_path.with_suffix(".png")),
-            "fitted": fitted,
+            "editable": diagram.editable,
+            "scene": diagram.scene(),
         }
         manifest.append(entry)
 
@@ -105,9 +111,7 @@ def build(source: Path, width: int, check: bool,
             continue
 
         svg_path = spec_path.with_suffix(".svg")
-        svg_path.write_text(
-            svg_backend.render(build_scene(dict(fitted)), fitted), encoding="utf-8"
-        )
+        svg_path.write_text(diagram.svg(), encoding="utf-8")
         rasterise(svg_path, spec_path.with_suffix(".png"), width)
 
     return manifest, notes

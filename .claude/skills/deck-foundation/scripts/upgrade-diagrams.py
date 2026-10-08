@@ -32,7 +32,7 @@ DIAGRAM_SCRIPTS = HERE.parent.parent / "diagram-foundation" / "scripts"
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(DIAGRAM_SCRIPTS))
 
-from diagram import build_scene, use_palette  # noqa: E402
+from diagram import use_palette  # noqa: E402
 from gwsclient import GwsError, run  # noqa: E402
 from slides_backend import scene_requests  # noqa: E402
 
@@ -90,6 +90,12 @@ def upgrade(presentation_id: str, manifest: list[dict]) -> tuple[int, list[str]]
 
     for entry in manifest:
         marker = entry["marker"]
+        # A diagram that renders as a picture has no geometry to turn into
+        # shapes — a sequence diagram's lifelines and an ERD's attribute rows
+        # have no Slides equivalent. The picture stays, and the deck is fine.
+        if not entry.get("scene"):
+            skipped.append(f"{marker}: renders as a picture, kept as one")
+            continue
         found = locate(presentation, marker)
         if not found:
             skipped.append(f"{marker}: no slide carries its marker")
@@ -97,7 +103,7 @@ def upgrade(presentation_id: str, manifest: list[dict]) -> tuple[int, list[str]]
         page_id, doomed, box = found
 
         try:
-            scene = build_scene(dict(entry["fitted"]))
+            scene = entry["scene"]
             requests = [{"deleteObject": {"objectId": oid}} for oid in doomed]
             requests += scene_requests(scene, page_id, box,
                                        prefix=f"d{entry['order']:02d}")
