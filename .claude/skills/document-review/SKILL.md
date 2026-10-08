@@ -35,7 +35,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 |---|---|---|
 | `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection (this skill uses fixed structures — guide is for reference only) |
-| `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3, if the review needs a visual | Diagram layouts, spec authoring, embedding convention |
+| `.claude/skills/reporting-foundation/diagram-guide.md` | Steps 2–3 — figure candidates are identified during domain extraction | The eight layouts and the Mermaid routes, deriving figures from the practice graph with `derive-diagram.py` — `--view pattern-matrix` draws a coverage audit, where an empty cell is the finding — spec authoring, embedding convention |
 
 ---
 

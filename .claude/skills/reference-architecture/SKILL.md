@@ -32,7 +32,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 |---|---|---|
 | `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection reference |
-| `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3 | Diagram layouts, spec authoring, embedding convention — every option needs a topology diagram |
+| `.claude/skills/reporting-foundation/diagram-guide.md` | Steps 2–3 — figure candidates are identified during domain extraction | The eight layouts and the Mermaid routes, deriving figures from the practice graph with `derive-diagram.py`, drawing the subject's instances rather than the practice's types, spec authoring, embedding convention — every option needs a topology diagram |
 
 ---
 
@@ -138,10 +138,18 @@ In plan mode:
 
 ![<Option name> topology](assets/<option-slug>-topology.svg)
 
-<Rendered with `utils/render-diagram.py` from a `flow` spec — see
-`reporting-foundation/diagram-guide.md`. Never ASCII art.>
+*Figure N — <Option name> topology*
+
+<Rendered with `utils/render-diagram.py` from a `flow` spec. Never ASCII art.>
 
 <How it works — mechanism, components, data flow.>
+
+<A reference architecture normally carries more than one figure per option. Beyond the
+topology, reach for a `stack` where the design is a layer model, a `timeline` where
+adoption is phased, and a `matrix` where the point is coverage across two axes. Where the
+deployment has several instances of one thing — production and DR, per-region clusters —
+draw the instances, not the type. See `reporting-foundation/diagram-guide.md`, and derive
+what the practice already knows with `utils/derive-diagram.py`.>
 
 **Strengths:**
 - <strength 1>

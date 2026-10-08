@@ -37,7 +37,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 |---|---|---|
 | `.claude/skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, framework attribution, shared rules |
 | `.claude/skills/reporting-foundation/narrative-guide.md` | Step 0 | Narrative selection reference |
-| `.claude/skills/reporting-foundation/diagram-guide.md` | Step 3, if the plan needs a visual | Diagram layouts — `timeline` suits phased roadmaps, `flow` suits dependency chains |
+| `.claude/skills/reporting-foundation/diagram-guide.md` | Steps 2–3 — figure candidates are identified during domain extraction | The eight layouts and the Mermaid routes, deriving figures from the practice graph with `derive-diagram.py` — `--view journey` turns a practice pattern straight into a phased `timeline`, `flow` suits dependency chains, and `swimlane` suits handoffs between roles |
 
 ---
 
