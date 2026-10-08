@@ -1399,7 +1399,8 @@ def main():
     parser.add_argument("--full-text", action="store_true",
                         help="Show full context text (no truncation) with --long-contexts or --context-element")
     parser.add_argument("--metadata", action="store_true",
-                        help="Show document metadata (kind, name, version, schemaVersion, baselinePracticeName)")
+                        help="Show document metadata (kind, name, version, schemaVersion, "
+                             "baseline/dependency names, and a method's practiceNames)")
     parser.add_argument("--structure", action="store_true",
                         help="Show top-level key overview (type and count/length for each key)")
     parser.add_argument("--coverage", action="store_true",
@@ -1477,7 +1478,7 @@ def main():
 
     if args.metadata:
         meta_fields = ["kind", "name", "version", "schemaVersion", "baselinePracticeName",
-                       "practiceDependencyNames"]
+                       "baselinePracticeNames", "practiceDependencyNames", "practiceNames"]
         meta = {k: data.get(k) for k in meta_fields if data.get(k) is not None}
         if args.json:
             print(json.dumps(meta, indent=2))

@@ -90,6 +90,17 @@ tags = ["internal-reference"]
 
 [allowlist]
 description = "Paths that cannot carry a real secret"
+
+# Lines the generic entropy rules misread. Keep these anchored on enough
+# surrounding syntax that they cannot also match a real assignment.
+regexTarget = "line"
+regexes = [
+  # An argparse option whose metavar is "KEY" and whose choices come from a
+  # *_KEYS constant reads to generic-api-key as a high-entropy key assignment.
+  # The constant is a list of element-type names.
+  '''metavar="KEY",\s*choices=[A-Z_]+_KEYS''',
+]
+
 paths = [
   '''\.gitleaks\.toml$''',          # this file names the patterns it hunts for
   '''(^|/)SECURITY\.md$''',         # documents leak classes by example

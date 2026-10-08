@@ -204,6 +204,55 @@ def resolve_transitive_practices(practices, search_dirs, dd=None, index=None):
     return result
 
 
+def resolve_method_practices(methods, practices, search_dirs, dd=None, index=None):
+    """Add a method's externalized member practices (practiceNames) to the practice tier.
+
+    Methods in .keleo bundles reference their practices by name rather than
+    embedding them, so a method JSON resolved straight from practices/ carries
+    no members and would otherwise merge into an empty effective context.
+
+    Returns (practices, unresolved) where unresolved lists the practiceNames
+    entries that no search dir could supply.
+    """
+    if not methods:
+        return practices, []
+    if dd is None:
+        dd = _load_discover_module()
+    if index is None:
+        index, _ = dd.build_index(search_dirs)
+
+    existing = {name for name, _ in practices}
+    result = list(practices)
+    unresolved = []
+
+    for method_name, method_data in methods:
+        for p_name in method_data.get("practiceNames", []):
+            if p_name in existing:
+                continue
+            match = dd.resolve_name(p_name, index, prefer_filesystem=True)
+            if match["status"] != "found":
+                unresolved.append({
+                    "method": method_name,
+                    "practiceName": p_name,
+                    "reason": match["status"],
+                    "candidates": [c.get("path") for c in match.get("candidates", [])],
+                })
+                continue
+            p_data, _err = dd.load_resolved_json(match)
+            if not p_data or detect_kind(p_data) == "practiceBaseline":
+                unresolved.append({
+                    "method": method_name,
+                    "practiceName": p_name,
+                    "reason": "unreadable" if not p_data else "resolved-to-baseline",
+                    "candidates": [],
+                })
+                continue
+            existing.add(p_name)
+            result.append((p_name, p_data))
+
+    return result, unresolved
+
+
 def collect_practice_baselines(practices, baselines, dd, index):
     """Ensure baselines referenced by practices are in the baselines tier."""
     existing = {name for name, _ in baselines}
@@ -350,10 +399,16 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
 
     documents = load_inputs(file_paths)
     tiers = classify_documents(documents)
+    unresolved_members = []
 
     if transitive:
         dd = _load_discover_module()
         index, _ = dd.build_index(search_dirs)
+
+        if tiers["methods"]:
+            tiers["practices"], unresolved_members = resolve_method_practices(
+                tiers["methods"], tiers["practices"], search_dirs, dd, index
+            )
 
         if tiers["practices"]:
             tiers["practices"] = resolve_transitive_practices(
@@ -453,6 +508,26 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
             "aliasCount": len(aliases),
         },
     }
+
+    warnings = []
+    if unresolved_members:
+        report["unresolvedMethodPractices"] = unresolved_members
+        detail = ", ".join(
+            f"{u['practiceName']} ({u.get('reason', 'not-found')})"
+            for u in unresolved_members
+        )
+        warnings.append(
+            f"Method member practices left out of the effective context: {detail}. "
+            "Resolve the method from its .keleo bundle, which carries one copy of each "
+            "member, or pass the intended path explicitly."
+        )
+    if not effective.get("alphas") and not effective.get("focuses"):
+        warnings.append(
+            "Effective context has no alphas or focuses — nothing was merged. "
+            "Check that the inputs carry content rather than only name references."
+        )
+    if warnings:
+        report["warnings"] = warnings
 
     return effective, report
 

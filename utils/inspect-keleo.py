@@ -69,6 +69,21 @@ def inspect_package(keleo_path):
     }, None
 
 
+def _resolve_output(output_path, archive_name):
+    """Resolve -o to a file path.
+
+    A directory (existing, or written with a trailing separator) receives the
+    document under its own filename from the archive, so callers extracting
+    several documents can pass one destination directory. Parent directories
+    are created either way.
+    """
+    target = Path(output_path)
+    if target.is_dir() or str(output_path).endswith(("/", "\\")):
+        target = target / Path(archive_name).name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
 def extract_document(keleo_path, doc_name, output_path=None):
     """Extract a specific document from a .keleo package by its name field."""
     path = Path(keleo_path)
@@ -82,7 +97,8 @@ def extract_document(keleo_path, doc_name, output_path=None):
                     doc = json.loads(z.read(name))
                     if doc.get("name") == doc_name:
                         if output_path:
-                            Path(output_path).write_text(
+                            target = _resolve_output(output_path, name)
+                            target.write_text(
                                 json.dumps(doc, indent=2, ensure_ascii=False)
                             )
                         return doc, None

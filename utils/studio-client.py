@@ -9,6 +9,7 @@ Usage:
     python3 utils/studio-client.py --index [--max-age 3600]
     python3 utils/studio-client.py --docs [--kind practice]
     python3 utils/studio-client.py --check [name] [--deep]
+    python3 utils/studio-client.py --check-embedded "Platform Adoption Essentials"
     python3 utils/studio-client.py --link "Practice Name" ["Other Name" ...] [--markdown]
     python3 utils/studio-client.py --link "Practice A" "Practice B" --attribution
     python3 utils/studio-client.py --pull "Practice Name"
@@ -573,6 +574,126 @@ def cmd_check(name=None, as_json=False, deep=False):
     return results
 
 
+def _local_document_version(doc_name):
+    """Return the on-disk version of a document by name, or None.
+
+    Looks in baselines/ and practices/, which is where the definitive copies
+    live; bundles only ever carry snapshots of these.
+    """
+    root = get_project_root()
+    for sub in ("baselines", "practices"):
+        base = root / sub
+        if not base.is_dir():
+            continue
+        for path in base.glob("*/*.json"):
+            if "backup-" in str(path):
+                continue
+            try:
+                with open(path) as fh:
+                    doc = json.load(fh)
+            except (json.JSONDecodeError, OSError):
+                continue
+            if isinstance(doc, dict) and doc.get("name") == doc_name:
+                return doc.get("version"), str(path)
+    return None, None
+
+
+def cmd_check_embedded(doc_name, max_age=DEFAULT_MAX_AGE, as_json=False):
+    """Report which remote packages embed a stale copy of a named document.
+
+    The remote keeps every published version as its own slug, so older slugs
+    are historical snapshots rather than drift. Only the newest slug per
+    package name is compared — that is the one a fresh download resolves to.
+    """
+    documents, err = _fetch_documents(max_age)
+    if err == "auth_expired":
+        _handle_auth_error()
+    if documents is None:
+        print(f"Error fetching document index: {err}", file=sys.stderr)
+        sys.exit(1)
+    if err:
+        print(f"Warning: {err}", file=sys.stderr)
+
+    cached = _load_cached_index()
+    if not cached or _index_age_seconds(cached) > max_age:
+        cached = cmd_index(max_age=max_age, as_json=False)
+
+    # slug → package identity, and package name → newest slug
+    by_slug = {b.get("slug"): b for b in cached.get("bundles", []) if b.get("slug")}
+    newest_slug = {}
+    for bundle in by_slug.values():
+        pkg = bundle.get("name", "")
+        if not pkg:
+            continue
+        current = newest_slug.get(pkg)
+        if current is None or _parse_semver(bundle.get("version", "")) > _parse_semver(current.get("version", "")):
+            newest_slug[pkg] = bundle
+
+    current_slugs = {b["slug"] for b in newest_slug.values()}
+    local_version, local_path = _local_document_version(doc_name)
+    local_versions = _build_local_versions()
+
+    results, superseded = [], 0
+    for entry in documents:
+        if entry.get("name") != doc_name:
+            continue
+        slug = entry.get("bundleSlug")
+        if slug not in current_slugs:
+            superseded += 1
+            continue
+        bundle = by_slug.get(slug, {})
+        pkg = bundle.get("name", slug)
+        embedded = entry.get("version")
+        stale = bool(local_version and embedded
+                     and _parse_semver(embedded) < _parse_semver(local_version))
+        local_bundle = local_versions.get(pkg)
+        results.append({
+            "package": pkg,
+            "remoteSlug": slug,
+            "remotePackageVersion": bundle.get("version"),
+            "embeddedVersion": embedded,
+            "stale": stale,
+            "localBundlePath": local_bundle["path"] if local_bundle else None,
+            "localBundleVersion": local_bundle["version"] if local_bundle else None,
+        })
+
+    results.sort(key=lambda r: r["package"].lower())
+    stale_results = [r for r in results if r["stale"]]
+    pushable = [r for r in stale_results if r["localBundlePath"]]
+    summary = {
+        "document": doc_name,
+        "localVersion": local_version,
+        "localPath": local_path,
+        "currentPackages": len(results),
+        "stalePackages": len(stale_results),
+        "pushable": len(pushable),
+        "noLocalSource": len(stale_results) - len(pushable),
+        "supersededSlugsSkipped": superseded,
+    }
+
+    if as_json:
+        print(json.dumps({"summary": summary, "results": results}, indent=2))
+        return results
+
+    if not local_version:
+        print(f"Warning: no on-disk copy of '{doc_name}' found; "
+              "cannot judge staleness.", file=sys.stderr)
+    print(f"Document: {doc_name}  (on disk: v{local_version or '—'})")
+    print(f"Current remote packages embedding it: {len(results)}\n")
+    for r in results:
+        mark = "STALE " if r["stale"] else "ok    "
+        local = f"local bundle v{r['localBundleVersion']}" if r["localBundlePath"] else "NO LOCAL BUNDLE"
+        print(f"  {mark} {r['package']:45s} embeds v{r['embeddedVersion'] or '—':8s} {local}")
+    print(f"\n--- Summary ---")
+    print(f"Current packages:    {summary['currentPackages']}")
+    print(f"Stale:               {summary['stalePackages']}")
+    print(f"  pushable locally:  {summary['pushable']}")
+    print(f"  no local source:   {summary['noLocalSource']}")
+    print(f"Superseded slugs skipped: {superseded}")
+
+    return results
+
+
 def _fetch_bundle(name, output_path, quiet=False):
     """Download a remote .keleo bundle to output_path.
 
@@ -718,16 +839,63 @@ def cmd_pull(name, as_json=False):
     return report
 
 
-def cmd_push(file_path, as_json=False):
+def cmd_push_many(file_paths, as_json=False, delay=0):
+    """Upload several bundles, continuing past individual failures.
+
+    A partial upload is the normal failure mode on a long run, so each result
+    is recorded and a non-zero exit reports that some did not land.
+
+    `delay` paces the uploads. Back-to-back pushes of large bundles have been
+    seen to return success without the write landing — the remote drops them
+    under load — so spacing the requests is the difference between a reported
+    success and an actual one. Always verify with --check-embedded afterwards.
+    """
+    if len(file_paths) == 1:
+        return cmd_push(file_paths[0], as_json=as_json)
+
+    reports, failures = [], []
+    for i, file_path in enumerate(file_paths, 1):
+        if delay and i > 1:
+            time.sleep(delay)
+        if not as_json:
+            print(f"[{i}/{len(file_paths)}] {file_path}", flush=True)
+        try:
+            reports.append(cmd_push(file_path, as_json=False, _exit_on_error=False))
+        except _PushError as exc:
+            failures.append({"path": file_path, "error": str(exc)})
+            print(f"  FAILED: {exc}", file=sys.stderr, flush=True)
+
+    if as_json:
+        print(json.dumps({"uploaded": reports, "failed": failures}, indent=2))
+    else:
+        print(f"\n--- Summary ---")
+        print(f"Uploaded: {len(reports)}  Failed: {len(failures)}")
+        for f in failures:
+            print(f"  FAILED {f['path']}: {f['error']}")
+
+    if failures:
+        sys.exit(1)
+    return reports
+
+
+class _PushError(Exception):
+    """A single bundle failed to upload."""
+
+
+def cmd_push(file_path, as_json=False, _exit_on_error=True):
     """Upload a .keleo bundle to remote."""
+    def _fail(message):
+        if _exit_on_error:
+            print(f"Error: {message}", file=sys.stderr)
+            sys.exit(1)
+        raise _PushError(message)
+
     path = Path(file_path)
     if not path.exists():
-        print(f"Error: File not found: {path}", file=sys.stderr)
-        sys.exit(1)
+        _fail(f"File not found: {path}")
 
     if not zipfile.is_zipfile(path):
-        print(f"Error: Not a valid .keleo archive: {path}", file=sys.stderr)
-        sys.exit(1)
+        _fail(f"Not a valid .keleo archive: {path}")
 
     try:
         with zipfile.ZipFile(path, "r") as zf:
@@ -736,8 +904,7 @@ def cmd_push(file_path, as_json=False):
             local_name = manifest.get("name") or pkg.get("name", path.stem)
             local_version = manifest.get("version") or pkg.get("version", "?")
     except (zipfile.BadZipFile, json.JSONDecodeError, KeyError) as e:
-        print(f"Error reading bundle: {e}", file=sys.stderr)
-        sys.exit(1)
+        _fail(f"Error reading bundle: {e}")
 
     url, token = _get_credentials()
 
@@ -748,8 +915,7 @@ def cmd_push(file_path, as_json=False):
     if err == "auth_expired":
         _handle_auth_error()
     if err:
-        print(f"Error uploading: {err}", file=sys.stderr)
-        sys.exit(1)
+        _fail(f"Error uploading: {err}")
 
     report = {
         "name": local_name,
@@ -784,13 +950,17 @@ def main():
                        help="Fetch and cache the remote document listing")
     group.add_argument("--check", nargs="?", const="", metavar="NAME",
                        help="Compare local vs remote versions (all or specific name)")
+    group.add_argument("--check-embedded", metavar="NAME",
+                       help="Report which current remote packages embed a "
+                            "stale copy of the named document, comparing "
+                            "against the on-disk version")
     group.add_argument("--link", nargs="+", metavar="NAME",
                        help="Build deep links into keleo-studio-gas for the "
                             "named practices/methods")
     group.add_argument("--pull", metavar="NAME",
                        help="Download a .keleo bundle from remote")
-    group.add_argument("--push", metavar="FILE",
-                       help="Upload a .keleo bundle to remote")
+    group.add_argument("--push", nargs="+", metavar="FILE",
+                       help="Upload one or more .keleo bundles to remote")
 
     parser.add_argument("--max-age", type=int, default=DEFAULT_MAX_AGE,
                         help=f"Max age in seconds for cached index (default: {DEFAULT_MAX_AGE})")
@@ -818,6 +988,9 @@ def main():
                              "line with every framework hyperlinked")
     parser.add_argument("--strict", action="store_true",
                         help="With --link: exit 1 if any name is unpublished")
+    parser.add_argument("--delay", type=float, default=0, metavar="SECONDS",
+                        help="With --push: pause between uploads. Paces long "
+                             "runs, which the remote otherwise drops silently")
     parser.add_argument("--json", action="store_true",
                         help="Output as JSON")
 
@@ -835,12 +1008,15 @@ def main():
         cmd_link(args.link, element=args.element, markdown=args.markdown,
                  attribution=args.attribution, as_json=args.json,
                  max_age=args.max_age, strict=args.strict)
+    elif args.check_embedded:
+        cmd_check_embedded(args.check_embedded, max_age=args.max_age,
+                           as_json=args.json)
     elif args.check is not None:
         cmd_check(name=args.check or None, as_json=args.json, deep=args.deep)
     elif args.pull:
         cmd_pull(args.pull, as_json=args.json)
     elif args.push:
-        cmd_push(args.push, as_json=args.json)
+        cmd_push_many(args.push, as_json=args.json, delay=args.delay)
 
 
 if __name__ == "__main__":

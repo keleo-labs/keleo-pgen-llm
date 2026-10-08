@@ -6,9 +6,14 @@ metadata, alphas (with types, targets, states), patterns (with view names),
 patternGroups, outcomes, work products, activities, personas, and schema
 feature coverage flags.
 
+`--show` switches to a detail view instead, printing the underlying text —
+persona competencies and narratives, alpha state checklists, work product
+levels of detail, citations — for reading a practice rather than summarising it.
+
 Usage:
     python3 utils/practice-summary.py <practice>.json [--baseline <baseline>.json] [--json]
     python3 utils/practice-summary.py --dir <dir>/ [--baseline <baseline>.json] [--json]
+    python3 utils/practice-summary.py <practice>.json --show personas --name "Architect"
 """
 
 import argparse
@@ -339,6 +344,89 @@ def print_human_readable(summary):
               f"could={tp['could']} ({tp['could']*100//total}%)")
 
 
+DETAIL_KEYS = [
+    "personas", "personaGroups", "alphas", "workProducts",
+    "activities", "outcomes", "narratives", "citations",
+]
+
+
+def _matches(name, needle):
+    """Case-insensitive substring match; an empty needle matches everything."""
+    return not needle or needle.lower() in (name or "").lower()
+
+
+def _print_narratives(narratives, indent):
+    """Print narratives with their ordered contexts."""
+    pad = " " * indent
+    for n in narratives:
+        type_name = n.get("narrativeTypeName", "")
+        suffix = f" [{type_name}]" if type_name else ""
+        print(f"{pad}narrative: {n.get('name')}{suffix}")
+        if n.get("description"):
+            print(f"{pad}  {n['description']}")
+        for c in sorted(n.get("narrativeContexts", []), key=lambda x: x.get("seq", 0)):
+            print(f"{pad}  {c.get('narrativeElementName')}: {c.get('context', '')}")
+        if n.get("citationNames"):
+            print(f"{pad}  cites: {', '.join(n['citationNames'])}")
+
+
+def print_detail(data, keys, needle):
+    """Print full detail for the requested element types.
+
+    Complements the summary view, which deliberately reduces elements to names
+    and counts. Reading a persona's narrative or an alpha's state checklists
+    needs the underlying text, not a count of it.
+    """
+    for key in keys:
+        items = [i for i in (data.get(key) or []) if _matches(i.get("name"), needle)]
+        if not items:
+            continue
+        print(f"=== {key} ({len(items)}) ===")
+        for item in items:
+            print(f"- {item.get('name')}")
+            if item.get("description"):
+                print(f"    {item['description']}")
+
+            if key == "citations":
+                for field in ("author", "date", "source", "url", "pages"):
+                    if item.get(field):
+                        print(f"    {field}: {item[field]}")
+
+            if item.get("competencies"):
+                comps = ", ".join(
+                    f"{c.get('competencyName')} ({c.get('competencyLevelName')})"
+                    for c in item["competencies"]
+                )
+                print(f"    competencies: {comps}")
+
+            if item.get("personaNames"):
+                print(f"    personas: {', '.join(item['personaNames'])}")
+            if item.get("personaGroupNames"):
+                print(f"    groups: {', '.join(item['personaGroupNames'])}")
+            if item.get("ledBy"):
+                print(f"    ledBy: {item['ledBy']}")
+            if item.get("measureDescription"):
+                print(f"    measure: {item['measureDescription']}")
+
+            for state in item.get("states", []):
+                print(f"    state: {state.get('name')} — {state.get('description', '')}")
+                for given in (state.get("background") or {}).get("given", []):
+                    print(f"      given: {given}")
+                for c in state.get("checklist", []):
+                    pri = c.get("priority", "must")
+                    print(f"      [{pri}] {c.get('name')}: {c.get('description', '')}")
+
+            for lod in item.get("levelsOfDetail", []):
+                print(f"    lod: {lod.get('name')} — {lod.get('description', '')}")
+                for c in lod.get("checklist", []):
+                    pri = c.get("priority", "must")
+                    print(f"      [{pri}] {c.get('name')}: {c.get('description', '')}")
+
+            if item.get("narratives"):
+                _print_narratives(item["narratives"], 4)
+        print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Generate structured practice summary for subagent prompt construction"
@@ -349,7 +437,17 @@ def main():
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument("--names-only", action="store_true",
                         help="List only name, kind, and version per file (compact)")
+    parser.add_argument("--show", nargs="+", metavar="KEY", choices=DETAIL_KEYS + ["all"],
+                        help="Print full detail (descriptions, checklists, narratives, "
+                             f"competencies) for these element types instead of the "
+                             f"summary. Choices: {', '.join(DETAIL_KEYS)}, all")
+    parser.add_argument("--name", metavar="SUBSTRING",
+                        help="With --show, restrict output to elements whose name "
+                             "contains this substring (case-insensitive)")
     args = parser.parse_args()
+
+    if args.name and not args.show:
+        parser.error("--name requires --show")
 
     if not args.json_file and not args.dir:
         parser.error("Either json_file or --dir is required")
@@ -377,6 +475,18 @@ def main():
             name = data.get("name", f.stem)
             version = data.get("version", "?")
             print(f"{name} ({kind}) v{version}")
+        return
+
+    if args.show:
+        keys = DETAIL_KEYS if "all" in args.show else args.show
+        for i, f in enumerate(files):
+            if i > 0:
+                print("\n" + "=" * 60 + "\n")
+            data = load_json(f)
+            # Not gated on detect_kind: a resolved effective context carries the
+            # same element arrays and is the common thing to interrogate.
+            print(f"{data.get('name', f.stem)} [{f}]\n")
+            print_detail(data, keys, args.name)
         return
 
     summaries = []
