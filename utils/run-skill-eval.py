@@ -66,25 +66,50 @@ ARMS = ("with-skill", "without-skill")
 
 # Copied into every cell: the inputs a run resolves against. Deliberately not
 # CLAUDE.md, not .claude/, not memory -- those are the contamination.
+#
+# `prompts/` is the judgement call. It holds the phase prompts the skill
+# orchestrates, so including it makes the without-skill arm "without the
+# skill's orchestration" rather than "without guidance" -- in the first real
+# run that arm followed the phase prompts unaided and produced a complete,
+# fully-passing practice. Both readings are defensible; the default includes
+# them, because the question worth answering is what the skill's orchestration
+# adds over the prompts it already ships, not what an unguided agent does.
+# `--no-prompts` measures the harder comparison.
 SHARED_INPUTS = ("deps", "references", "prompts", "utils")
+SHARED_INPUTS_NO_PROMPTS = tuple(n for n in SHARED_INPUTS if n != "prompts")
 
 ISOLATION_ENV = {
     "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1",
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
 }
 
+# The generation skills open with a mandatory plan-mode gate and will stop to ask
+# a clarifying question. Headless there is nobody to answer, so the first real
+# run of this harness produced a with-skill cell that wrote its prompt history,
+# recorded "Answered: <pending>" and halted after 40 turns -- scoring 0 against a
+# without-skill arm that ran to completion. That measured the gate, not the skill.
+#
+# Both arms get this, so it cannot bias the comparison.
+NONINTERACTIVE_PREAMBLE = (
+    "You are running non-interactively in a benchmark harness. There is no user "
+    "to answer questions or approve a plan. Do not enter plan mode, do not call "
+    "ExitPlanMode, and do not stop to ask anything. Where you would have asked, "
+    "choose the most reasonable option, write the assumption down in the "
+    "prompt-history file, and continue. Complete the whole task end to end."
+)
+
 # Anything here in a without-skill workspace means the arm is not actually
 # running without the skill, and the measured delta is meaningless.
 CONTAMINANTS = ("CLAUDE.md", ".claude", "AGENTS.md", ".cursor", "memory")
 
 
-def _copy_inputs(dest: Path):
+def _copy_inputs(dest: Path, inputs=SHARED_INPUTS):
     """Copy the resolvable inputs into a cell, following symlinks.
 
     deps/ and references/ are symlinks into ../../keleo-language; a cell lives
     outside this tree, so the targets must be materialised rather than linked.
     """
-    for name in SHARED_INPUTS:
+    for name in inputs:
         src = PROJECT_ROOT / name
         if not src.exists():
             continue
@@ -92,10 +117,10 @@ def _copy_inputs(dest: Path):
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
 
-def prepare_cell(workdir: Path, arm: str, skill_name: str):
+def prepare_cell(workdir: Path, arm: str, skill_name: str, inputs=SHARED_INPUTS):
     """Build one cell's workspace. Returns the workspace path."""
     workdir.mkdir(parents=True, exist_ok=True)
-    _copy_inputs(workdir)
+    _copy_inputs(workdir, inputs)
     for name in ("practices", "baselines", "bundles", "reports"):
         (workdir / name).mkdir(exist_ok=True)
 
@@ -147,6 +172,7 @@ def run_cell(workdir: Path, prompt: str, arm: str, timeout: int, dry_run: bool):
     cmd = [
         shutil.which("claude") or "claude",
         "-p", prompt,
+        "--append-system-prompt", NONINTERACTIVE_PREAMBLE,
         "--output-format", "json",
         "--permission-mode", "bypassPermissions",
         "--setting-sources", "project,local",
@@ -373,6 +399,9 @@ def main():
     parser.add_argument("--runs", type=int, default=1, help="Runs per cell (default: 1)")
     parser.add_argument("--timeout", type=int, default=7200,
                         help="Per-cell timeout in seconds (default: 7200)")
+    parser.add_argument("--no-prompts", action="store_true",
+                        help="Withhold prompts/ from cells, so the without-skill arm "
+                             "has no phase prompts to follow either")
     parser.add_argument("--dry-run", action="store_true",
                         help="Prepare and check cells, print the command, run nothing")
     parser.add_argument("--selftest", action="store_true",
@@ -413,7 +442,9 @@ def main():
                 # under runs/ afterwards.
                 staging = Path(tempfile.mkdtemp(prefix="keleo-cell-", dir="/tmp"))
                 try:
-                    cell_dir = prepare_cell(staging / "ws", arm, skill_name)
+                    cell_dir = prepare_cell(
+                        staging / "ws", arm, skill_name,
+                        SHARED_INPUTS_NO_PROMPTS if args.no_prompts else SHARED_INPUTS)
                     problems = check_isolation(cell_dir, arm)
                     if problems:
                         for p in problems:
