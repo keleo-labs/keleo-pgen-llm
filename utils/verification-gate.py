@@ -369,6 +369,41 @@ def render_markdown(verdict):
     return "\n".join(lines).rstrip() + "\n"
 
 
+def calibration_warnings(phase, verifier_names):
+    """Note any verifier at this gate that has never been proven to catch anything.
+
+    A clean verdict from a verifier nobody has tested looks exactly like a clean
+    verdict from one that works. This does not block -- the gate is already
+    user-reviewed, and stopping a generation over an edited brief would be
+    hostile -- but the reviewer should know which verifiers are unproven.
+    See utils/calibrate-verifiers.py.
+    """
+    state_path = (Path(__file__).resolve().parent.parent / ".claude" / "skills" /
+                  "verification-foundation" / "calibration.json")
+    if not state_path.exists():
+        return []
+    try:
+        recorded = json.loads(state_path.read_text(encoding="utf-8")).get("calibrations", {})
+    except (OSError, ValueError):
+        return []
+
+    label = _phase_label(phase)
+    unproven = [name for name in sorted(verifier_names)
+                if not recorded.get(f"{label}:{name}", {}).get("passed")]
+    if not unproven:
+        return []
+    return [{
+        "verifiers": ["calibration"],
+        "rule": "process-calibration",
+        "severity": "info",
+        "message": (
+            f"{len(unproven)} verifier(s) at this gate have no passing calibration: "
+            f"{', '.join(unproven)}"
+        ),
+        "evidence": "python3 utils/calibrate-verifiers.py --check",
+    }]
+
+
 def _run_gate(directory, phase, expect=None):
     """The main() pipeline without argument parsing or output, for the selftest."""
     files, reconcile_path = discover_inputs(directory, phase)
@@ -632,6 +667,8 @@ def main():
             })
 
     findings, unmatched = apply_reconciliation(dedupe(raw), reconcile)
+    findings.extend(calibration_warnings(
+        args.phase, [_verifier_name(p, args.phase) for p in files]))
 
     verdict = build_verdict(directory, args.phase, findings, summaries, reconcile, unmatched)
     markdown = render_markdown(verdict)

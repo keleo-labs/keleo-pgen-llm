@@ -253,6 +253,37 @@ that keep this proportionate:
 
 ---
 
+## 11a. Calibration
+
+A clean verdict from a verifier nobody has tested looks exactly like a clean verdict
+from one that works. A brief that has drifted into vagueness returns nothing and the
+gate reads it as a pass.
+
+`utils/calibrate-verifiers.py` runs a verifier against a matched pair held in
+`tests/calibration/<phase>/<verifier>/`: a clean artifact it should pass, and the same
+artifact carrying one planted defect of the kind that verifier exists to catch. Passing
+means both — flagging the clean one is too eager, and the catch must *name* the planted
+defect rather than merely raise something.
+
+The prompt is extracted from the brief itself, not copied, so rewording a brief
+invalidates its calibration rather than silently diverging from it.
+
+| Command | When |
+|---|---|
+| `python3 utils/calibrate-verifiers.py --check` | Offline. Reports stale and missing calibrations. Free |
+| `python3 utils/calibrate-verifiers.py --verifier <name> --phase <N>` | After editing that brief. Two short sessions on small fixtures |
+| `python3 utils/calibrate-verifiers.py --all` | After a change affecting several briefs |
+
+Results land in `calibration.json`. The gate reads it and adds an **info** finding
+naming any verifier at that gate with no passing calibration. It does not block: the
+gate is already user-reviewed, and halting a generation over an edited brief would be
+hostile. Run `--check` before relying on a gate's verdict for anything consequential.
+
+Most verifiers have no pair yet; `--check` lists them. Each one added is a verifier
+whose clean verdicts start meaning something.
+
+---
+
 ## 12. Briefs
 
 | File | Phase | Verifiers |
