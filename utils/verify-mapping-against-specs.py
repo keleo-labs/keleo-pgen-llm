@@ -62,18 +62,61 @@ ALPHA_BOLD_RE = re.compile(
     re.MULTILINE,
 )
 
+# Mapping guides in this repo head alpha sections at h3, h4 or h5 depending on
+# how deeply the guide nests its practice sections — all three are in active
+# use. Pinning this to h3 made the extractor silently return nothing for two
+# thirds of the library, which reads as a clean pass rather than a miss.
 ALPHA_HEADING_RE = re.compile(
-    r'^###\s+Alpha:\s+(.+?)(?:\s+\(([^)]+)\))?\s*$',
+    r'^#{3,6}\s+Alpha:\s+(.+?)(?:\s+\(([^)]+)\))?\s*$',
     re.MULTILINE,
 )
 
 
+def _labelled_value(block, label):
+    """Find `label: value` in a markdown block, however the author emphasised it.
+
+    Guides write all of `**contributesTo:** X`, `**contributesTo**: X`,
+    `contributesTo: X` and backtick-wrapped values — the colon lands inside
+    or outside the emphasis depending on the author. Allowing asterisks on
+    only one side of it captured the strays as part of the value, so a correct
+    target read back as "** Platform" or ": Inference Platform".
+
+    Anchoring to the start of a line (after an optional list marker) also
+    keeps prose mentions out: a sentence like "Edge Device Fleet ->
+    `contributesTo` Platform" in a delineation summary, or a heading like
+    "### contributesTo Target Spread", must not be mistaken for the field.
+
+    Returns a match-like shim exposing .group(1), or None.
+    """
+    m = re.search(
+        rf'^\s*[-*]?\s*\*{{0,2}}{re.escape(label)}\*{{0,2}}\s*:?\s*\*{{0,2}}\s*(.+?)\s*$',
+        block,
+        re.MULTILINE,
+    )
+    if not m:
+        return None
+    value = m.group(1).strip().strip("`").strip().rstrip("*").strip()
+    return _Captured(value)
+
+
+class _Captured:
+    """Minimal stand-in for a regex match, carrying one cleaned group."""
+
+    __slots__ = ("_value",)
+
+    def __init__(self, value):
+        self._value = value
+
+    def group(self, _index=1):
+        return self._value
+
+
 def _parse_alpha_block(name, alpha_type, block):
     """Parse a single alpha block into a structured dict."""
-    ct = re.search(r'\*{0,2}contributesTo:?\*{0,2}\s*(.+)', block)
-    mt = re.search(r'\*{0,2}mapsTo:?\*{0,2}\s*(.+)', block)
-    focus = re.search(r'\*{0,2}Focus Name:?\*{0,2}\s*(.+)', block)
-    desc = re.search(r'\*{0,2}Description:?\*{0,2}\s*(.+)', block)
+    ct = _labelled_value(block, "contributesTo")
+    mt = _labelled_value(block, "mapsTo")
+    focus = _labelled_value(block, "Focus Name")
+    desc = _labelled_value(block, "Description")
 
     if not alpha_type or alpha_type == "?":
         md = re.search(r'\*\*Mapping Decision:\*\*\s*(SPECIALIZATION|REDECLARATION|VARIANT)', block)
@@ -166,12 +209,20 @@ def extract_alphas(text):
 
 
 def extract_aliases(text):
-    """Extract alias mappings."""
+    """Extract alias mappings.
+
+    Two labels for the canonical name are in active use: "Canonical Name",
+    which this extractor originally required, and "Element Name", which is
+    what the alias template in phases/phase-2-skill.md tells authors to write.
+    Both appear across the library, and bold markers are inconsistent, so
+    accept either rather than silently reporting zero aliases for guides that
+    followed the documented template.
+    """
     aliases = []
     pattern = re.compile(
-        r'\*\*Element Type:\*\*\s*(\w+)\s*\n'
-        r'\s*-\s*\*\*Canonical Name:\*\*\s*(.+?)\n'
-        r'\s*-\s*\*\*Alias Name:\*\*\s*(.+?)\n',
+        r'\*{0,2}Element Type:?\*{0,2}\s*(\w+)\s*\n'
+        r'\s*-?\s*\*{0,2}(?:Canonical Name|Element Name):?\*{0,2}\s*(.+?)\n'
+        r'\s*-?\s*\*{0,2}Alias Name:?\*{0,2}\s*(.+?)\n',
         re.MULTILINE,
     )
     for m in pattern.finditer(text):
@@ -180,13 +231,69 @@ def extract_aliases(text):
             "canonicalName": m.group(2).strip(),
             "aliasName": m.group(3).strip(),
         })
+    aliases.extend(_extract_alias_table(text))
     return aliases
 
 
+def _extract_alias_table(text):
+    """Read aliases written as a markdown table rather than a key-value list.
+
+    Both shapes occur across the library. A table looks like:
+
+        | Element Type | Element Name (CANONICAL) | Alias Name |
+        |:---|:---|:---|
+        | Alpha | Edge Device Image | Bootable Container Image |
+    """
+    aliases = []
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        cells = [c.strip().strip("*").strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3:
+            continue
+        lowered = [c.lower() for c in cells]
+        # Locate columns by header rather than position: guides add extra
+        # columns such as "Scope test" after the alias, so the alias is not
+        # reliably the last cell.
+        try:
+            type_col = next(j for j, c in enumerate(lowered) if c.startswith("element type"))
+            alias_col = next(j for j, c in enumerate(lowered) if "alias name" in c)
+            name_col = next(j for j, c in enumerate(lowered)
+                            if j not in (type_col, alias_col) and "name" in c)
+        except StopIteration:
+            continue
+
+        # Skip the header and its separator row, then read until the table ends.
+        for row in lines[i + 2:]:
+            if not row.strip().startswith("|"):
+                break
+            values = [c.strip().strip("`").strip("*").strip()
+                      for c in row.strip().strip("|").split("|")]
+            if max(type_col, name_col, alias_col) >= len(values):
+                continue
+            if set("".join(values)) <= set("-: "):
+                continue
+            if not (values[type_col] and values[name_col] and values[alias_col]):
+                continue
+            aliases.append({
+                "elementType": values[type_col],
+                "canonicalName": values[name_col],
+                "aliasName": values[alias_col],
+            })
+    return aliases
+
+
+# Activities appear either as a bold run-in label or as an h3-h6 heading;
+# both forms are widespread across existing guides. Matching only the bold
+# form missed every heading-style guide silently.
 ACTIVITY_HEADER_RE = re.compile(
-    r'^\*\*Activity:\s+(.+?)\*\*',
+    r'^(?:\*\*Activity:\s+(?P<bold>.+?)\*\*|#{3,6}\s+Activity:\s+(?P<head>.+?)\s*$)',
     re.MULTILINE,
 )
+
+
+def _activity_name(match):
+    """Return the activity name from either the bold or heading alternative."""
+    return (match.group("bold") or match.group("head")).strip()
 
 
 def extract_activities(text):
@@ -218,7 +325,7 @@ def extract_activities(text):
         )
 
         activities.append({
-            "name": match.group(1).strip(),
+            "name": _activity_name(match),
             "activitySpaceName": as_match.group(1).strip() if as_match else None,
             "contributesToAlphas": [a.strip() for a in ct_alphas],
             "competencies": comps,

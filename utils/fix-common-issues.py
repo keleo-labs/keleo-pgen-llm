@@ -1445,11 +1445,15 @@ def fix_self_ref_backgrounds(data):
 
 
 def fix_unknown_activity_spaces(data, baseline):
-    """Replace unknown activitySpaceNames with the closest valid baseline match.
+    """Replace unknown activitySpaceNames with the closest valid match.
 
-    Uses a simple heuristic: if the unknown name contains keywords that match
-    a baseline activity space, use that.  Falls back to 'Execute the Sales Play'
-    if no heuristic match is found.
+    `baseline` should be the merged vocabulary from `resolve_reference_context`,
+    not the leaf baseline: activity spaces are inherited down the chain, and
+    checking against the leaf alone treats valid inherited references as
+    unknown.
+
+    Only rewrites on a confident keyword match (two or more shared words).
+    Anything it cannot resolve is left for the validator to report.
     """
     if not baseline:
         return []
@@ -1473,12 +1477,12 @@ def fix_unknown_activity_spaces(data, baseline):
                 best = sp
                 break
         if not best:
-            for sp in sorted(bl_spaces):
-                if any(w in sp.lower() for w in ["execute", "play", "sell"]):
-                    best = sp
-                    break
-        if not best:
-            best = sorted(bl_spaces)[0]
+            # No confident match. Leave the reference alone: the previous
+            # fallbacks picked any space containing "execute"/"play"/"sell",
+            # then the alphabetically first one, which silently rewrote valid
+            # references to an unrelated space. A reference this tool cannot
+            # resolve is for the validator to report, not for it to guess at.
+            continue
         act_name = activity.get("name", "")
         activity["activitySpaceName"] = best
         fixes.append({
@@ -1976,9 +1980,6 @@ def main():
     if args.fix_self_ref_backgrounds or args.all:
         all_fixes.extend(fix_self_ref_backgrounds(data))
 
-    if args.fix_unknown_activity_spaces or args.all:
-        all_fixes.extend(fix_unknown_activity_spaces(data, baseline))
-
     if args.fix_nested_narratives or args.all:
         all_fixes.extend(fix_nested_narratives(data))
 
@@ -1986,6 +1987,12 @@ def main():
     # chain, so validate them against the merged vocabulary rather than
     # whichever baseline happened to be passed on the command line.
     vocabulary, vocab_source = resolve_reference_context(file_path, baseline)
+
+    # Activity spaces inherit the same way. Checking them against the leaf
+    # baseline alone flagged valid references to spaces defined further up the
+    # chain, so this runs after the merged vocabulary is resolved.
+    if args.fix_unknown_activity_spaces or args.all:
+        all_fixes.extend(fix_unknown_activity_spaces(data, vocabulary))
 
     if args.fix_narrative_types or args.all:
         nt_fixes = fix_narrative_types(data, vocabulary)

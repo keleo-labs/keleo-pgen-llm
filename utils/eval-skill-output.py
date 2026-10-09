@@ -231,6 +231,7 @@ def discover_files(directory):
         "analysis": None,
         "distillation": None,
         "mapping": None,
+        "mapping_guides": [],
         "json_files": [],
     }
     analysis = d / "01-analysis-report.md"
@@ -239,9 +240,11 @@ def discover_files(directory):
     distillation = d / "01.5-distilled-essentials.md"
     if distillation.exists():
         files["distillation"] = str(distillation)
-    mapping = d / "02-mapping-guide.md"
-    if mapping.exists():
-        files["mapping"] = str(mapping)
+    # Single practice uses 02-mapping-guide.md; a multi-practice method emits one
+    # guide per practice as 02-mapping-guide-practice-<slug>.md. Discover both.
+    files["mapping_guides"] = [str(f) for f in sorted(d.glob("02-mapping-guide*.md"))]
+    if files["mapping_guides"]:
+        files["mapping"] = files["mapping_guides"][0]
 
     for f in sorted(d.glob("*.json")):
         name = f.name
@@ -340,13 +343,14 @@ def eval_file_existence(files, kind):
             results.append(make_assertion("files:distillation", False,
                                           "01.5-distilled-essentials.md not found", phase=1.5))
 
-    if files["mapping"]:
-        wc = word_count(files["mapping"])
+    if files["mapping_guides"]:
+        found = ", ".join(f"{Path(f).name} ({word_count(f):,} words)"
+                          for f in files["mapping_guides"])
         results.append(make_assertion("files:mapping", True,
-                                      f"02-mapping-guide.md found ({wc:,} words)", phase=2))
+                                      f"mapping guide(s) found: {found}", phase=2))
     else:
         results.append(make_assertion("files:mapping", False,
-                                      "02-mapping-guide.md not found", phase=2))
+                                      "no 02-mapping-guide*.md found", phase=2))
 
     if files["json_files"]:
         names = [Path(f).name for f in files["json_files"]]
@@ -651,8 +655,9 @@ def eval_directory(directory, baseline=None, schema=None, parent=None, phase_fil
         assertion_results.extend(eval_phase_1(files["analysis"]))
     if 1.5 in phases and files["distillation"]:
         assertion_results.extend(eval_phase_1_5(files["distillation"]))
-    if 2 in phases and files["mapping"]:
-        assertion_results.extend(eval_phase_2(files["mapping"]))
+    if 2 in phases and files["mapping_guides"]:
+        for mg in files["mapping_guides"]:
+            assertion_results.extend(eval_phase_2(mg))
     if 3 in phases and files["json_files"]:
         for jf in files["json_files"]:
             assertion_results.extend(eval_phase_3(jf, baseline, schema, parents or None))
