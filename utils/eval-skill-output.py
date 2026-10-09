@@ -115,10 +115,51 @@ ASSESS_CATEGORY_MAP = {
     "qual:keyword-count": ("keyword-count",),
     "qual:outcomes": ("outcomes",),
     "xref:outcome-refs": ("outcome-refs",),
+    # assess-practice.py detects these but nothing surfaced them as an assertion,
+    # so a practice could carry a defect the validator had already found and still
+    # score a clean eval. Several are defects recorded in project memory
+    # (citation name format, contributesTo concentration, checklist bloat,
+    # pattern progression, reference actionability).
+    "xref:persona": ("crossref-persona", "crossref-persona-group"),
+    "rel:acyclicity": ("acyclicity-persona-group",),
+    "rel:mapsto-lod": ("mapsto-lod-mismatch",),
+    "xref:reference-integrity": ("reference-alpha", "reference-state", "reference-links"),
+    "qual:gherkin-structure": ("gherkin-structure",),
+    "qual:gherkin-placement": ("gherkin-placement", "gherkin-baseline-overuse"),
+    "qual:citation-names": ("citation-name-format",),
+    "qual:citation-structure": ("citation-structure", "citation-missing-url"),
+    "qual:checklist-bloat": ("checklist-bloat",),
+    "qual:checklist-echo": ("checklist-echo", "checklist-desc-echo"),
+    "qual:checklist-style": ("checklist-style", "checklist-skeleton-test"),
+    "qual:contributesto-targeting": ("contributesto-concentration", "contributesto-bypass"),
+    "qual:relationship-type": ("relationship-type",),
+    "qual:relatesto-targets": ("relatesto-target",),
+    "qual:pattern-progression": ("pattern-alpha-progression", "pattern-misaligned-state"),
+    "qual:pattern-shape": ("pattern-few-views", "pattern-single-alpha", "pattern-sparse-alpha"),
+    "qual:pattern-views": ("pattern-view-completeness", "pattern-view-state-density"),
+    "qual:reference-quality": ("reference-evidence", "reference-merge", "reference-anchor"),
+    "qual:versioning": ("versioning",),
+}
+
+# Categories assess-practice.py emits that are deliberately NOT assertions:
+#   baseline, parent  - harness load failures, not output quality. They also make
+#                       the bref:* assertions skip entirely (eval_phase_3), so the
+#                       selftest checks for silent skips rather than grading these.
+#   citation-url      - live network check; non-deterministic, would flake in CI.
+#   partof-candidate, partof-mapsto-candidate - info-level advisories a practice
+#                       may legitimately decline, so failing on them is wrong.
+#   schema            - already covered by schema:valid.
+NON_ASSERTION_CATEGORIES = {
+    "baseline", "parent", "citation-url", "reference-uri",
+    "partof-candidate", "partof-mapsto-candidate", "schema",
 }
 
 ERROR_ASSERTIONS = {
-    "structure:kind", "structure:sections", "structure:counts", "structure:uniqueness",
+    # "structure:counts" is deliberately absent: assess-practice.py only ever
+    # reports count shortfalls as warnings because the cardinalities are
+    # aspirational guidance (CLAUDE.md, "Aspirational cardinality"), not hard
+    # rules. Listing it here made it an error assertion that could never fail.
+    "structure:kind", "structure:sections", "structure:uniqueness",
     "rel:alpha-baseline", "rel:alpha-practice", "rel:integrity", "rel:competency-levels",
     "rel:redeclaration",
     "xref:activity-alpha", "xref:activity-wp", "xref:activity-persona", "xref:lod-alpha",
@@ -128,6 +169,20 @@ ERROR_ASSERTIONS = {
     "rel:contributes-to-state",
     "schema:valid", "schema:baseline-refs", "schema:integrity",
     "xref:outcome-refs",
+    # Newly surfaced. Error severity mirrors how assess-practice.py grades them:
+    # unresolved references and cycles are errors there, so they block here too.
+    "xref:persona", "rel:acyclicity", "rel:mapsto-lod",
+    "xref:reference-integrity", "qual:gherkin-structure",
+}
+
+# Error assertions whose underlying categories assess-practice.py only ever
+# reports at warning severity. Without this, `passed = error_count == 0` makes
+# them permanently green -- a free pass in every eval score, which is exactly
+# the inflation the selftest exists to catch. Floating alphas are a hard rule
+# in CLAUDE.md ("NO FLOATING ALPHAS: All new alphas MUST have contributesTo OR
+# mapsTo"), so the eval blocks even though a human reviewer sees a warning.
+BLOCK_ON_WARNING = {
+    "rel:alpha-practice",
 }
 
 ASSERTION_TEXTS = {
@@ -210,6 +265,25 @@ ASSERTION_TEXTS = {
     "qual:keyword-count": "Keywords count within 10-20 range",
     "qual:outcomes": "Practice has 1-3 outcomes with measureDescription",
     "xref:outcome-refs": "Outcome contribution references resolve",
+    "xref:persona": "Persona and persona group references resolve",
+    "rel:acyclicity": "Persona group composition is acyclic",
+    "rel:mapsto-lod": "mapsTo variants keep the parent's levels of detail",
+    "xref:reference-integrity": "References resolve to an alpha, state and links",
+    "qual:gherkin-structure": "Gherkin background/test blocks well-formed",
+    "qual:gherkin-placement": "Gherkin used on the right elements, sparingly in baselines",
+    "qual:citation-names": "Citation names use the work title, not Author (Year)",
+    "qual:citation-structure": "Citations carry the required elements and a URL",
+    "qual:checklist-bloat": "Checklist sizes within range",
+    "qual:checklist-echo": "Checklist items do not echo their parent name or description",
+    "qual:checklist-style": "Checklist items independently assessable, no skeleton tests",
+    "qual:contributesto-targeting": "contributesTo spread across appropriate parents",
+    "qual:relationship-type": "relatesTo relationship types are meaningful",
+    "qual:relatesto-targets": "relatesTo targets resolve in the effective context",
+    "qual:pattern-progression": "Pattern alphas show progression, states aligned",
+    "qual:pattern-shape": "Patterns have enough views and alphas",
+    "qual:pattern-views": "Pattern views complete and adequately dense",
+    "qual:reference-quality": "References are actionable artifacts with anchored URLs",
+    "qual:versioning": "version and schemaVersion present",
 }
 
 
@@ -537,16 +611,27 @@ def eval_phase_3(json_path, baseline=None, schema=None, parents=None):
             continue
         if assertion_id == "rel:redeclaration" and not baseline and not parents:
             continue
+        # Baselines carry no references, patterns or work products (CLAUDE.md,
+        # "Key Structural Differences"), so grading those would always pass
+        # vacuously and inflate the baseline pass rate.
+        if kind == "practiceBaseline" and assertion_id in (
+            "xref:reference-integrity", "qual:reference-quality",
+            "qual:pattern-progression", "qual:pattern-shape", "qual:pattern-views",
+            "rel:mapsto-lod",
+        ):
+            continue
 
         error_count = sum(err_cats.get(cat, 0) for cat in categories)
         warn_count = sum(warn_cats.get(cat, 0) for cat in categories)
 
         if assertion_id in ERROR_ASSERTIONS:
-            passed = error_count == 0
+            blocking = error_count + (warn_count if assertion_id in BLOCK_ON_WARNING else 0)
+            passed = blocking == 0
             if error_count > 0:
                 evidence = f"{error_count} error(s) in {', '.join(categories)}"
             elif warn_count > 0:
-                evidence = f"0 errors, {warn_count} warning(s)"
+                note = " (blocking)" if assertion_id in BLOCK_ON_WARNING else ""
+                evidence = f"0 errors, {warn_count} warning(s){note}"
             else:
                 evidence = "0 issues"
         else:
@@ -734,6 +819,119 @@ def run_batch_evals(evals_path, eval_id=None):
     }
 
 
+PROJECT_ROOT = UTILS_DIR.parent
+FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
+GOOD_FIXTURE = FIXTURE_DIR / "practice-good.json"
+FIXTURE_BASELINE = PROJECT_ROOT / "deps" / "platform-adoption-kernel.json"
+FIXTURE_SCHEMA = PROJECT_ROOT / "deps" / "language.schema.json"
+
+
+def _load_mutations():
+    """Load the mutation catalogue from tests/ without making it an importable package."""
+    import importlib.util
+    path = PROJECT_ROOT / "tests" / "mutations.py"
+    spec = importlib.util.spec_from_file_location("keleo_selftest_mutations", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.MUTATIONS
+
+
+def _grade_fixture(data, tmpdir, label, schema=None):
+    """Write a practice dict to a temp file and return {assertion_id: passed}."""
+    path = Path(tmpdir) / f"{label}.json"
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    results = eval_phase_3(str(path), str(FIXTURE_BASELINE), schema)
+    return {a["id"]: a["passed"] for a in results}
+
+
+def selftest(verbose=False):
+    """Prove the grader can catch the defects it claims to detect.
+
+    The clean fixture must pass every assertion; each planted defect must flip
+    its named assertion from pass to fail. An assertion no mutation can trip is
+    reported as UNCOVERED -- it contributes a free pass to every eval score
+    until something exercises it.
+
+    Pattern borrowed from ponytail's agentic benchmark (MIT): validate the
+    instrument on a good and a bad reference before trusting any measurement.
+    """
+    import copy
+    import tempfile
+
+    if not GOOD_FIXTURE.exists():
+        print(f"XX missing fixture: {GOOD_FIXTURE}", file=sys.stderr)
+        return 1
+    if not FIXTURE_BASELINE.exists():
+        print(f"XX missing baseline: {FIXTURE_BASELINE}", file=sys.stderr)
+        print("   deps/ symlinks into ../../keleo-language — see CLAUDE.md, First-Time Setup.",
+              file=sys.stderr)
+        return 1
+
+    # The schema is a symlink into keleo-language. Where that is not present the
+    # rest of the instruments can still be proven, so skip schema:valid rather
+    # than refusing to run -- but say so, because a quietly narrower selftest is
+    # the failure this whole mode exists to prevent.
+    schema = str(FIXTURE_SCHEMA) if FIXTURE_SCHEMA.exists() else None
+    if schema is None:
+        print(f"!! {FIXTURE_SCHEMA} not found — running without schema validation")
+
+    base = load_json(str(GOOD_FIXTURE), exit_on_error=False)
+    mutations = _load_mutations()
+    failures = 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        clean = _grade_fixture(base, tmp, "clean", schema)
+        clean_failed = sorted(k for k, ok in clean.items() if not ok)
+        if clean_failed:
+            print(f"XX clean fixture fails {len(clean_failed)} assertion(s): "
+                  f"{', '.join(clean_failed)}")
+            print("   Fix the fixture (or the assertion) -- a defect cannot be "
+                  "proven detectable on an assertion that is already failing.")
+            failures += len(clean_failed)
+        else:
+            print(f"ok clean fixture passes all {len(clean)} assertions")
+
+        caught, missed, unusable = [], [], []
+        for assertion_id, slug, what, mutate in mutations:
+            mutated = copy.deepcopy(base)
+            try:
+                mutate(mutated)
+            except Exception as exc:                      # the fixture moved under the mutation
+                unusable.append((assertion_id, slug, f"mutation failed to apply: {exc}"))
+                continue
+            if not clean.get(assertion_id, False):
+                unusable.append((assertion_id, slug, "assertion already fails on the clean fixture"))
+                continue
+            graded = _grade_fixture(mutated, tmp, slug, schema)
+            if graded.get(assertion_id, True):
+                missed.append((assertion_id, slug, what))
+            else:
+                caught.append((assertion_id, slug))
+                if verbose:
+                    collateral = sorted(k for k, ok in graded.items()
+                                        if not ok and k != assertion_id and clean.get(k))
+                    note = f"  (also trips {', '.join(collateral)})" if collateral else ""
+                    print(f"   ok {assertion_id:32} {slug}{note}")
+
+    print(f"\ncaught {len(caught)}/{len(caught) + len(missed)} planted defects")
+    for assertion_id, slug, what in missed:
+        print(f"XX {assertion_id:32} not caught by '{slug}' -- {what}")
+        failures += 1
+    for assertion_id, slug, why in unusable:
+        print(f"!! {assertion_id:32} '{slug}' unusable -- {why}")
+        failures += 1
+
+    covered = {m[0] for m in mutations}
+    uncovered = sorted(k for k in clean if k not in covered)
+    if uncovered:
+        print(f"\nUNCOVERED ({len(uncovered)}) -- no mutation proves these can fail:")
+        for assertion_id in uncovered:
+            print(f"   {assertion_id:32} {ASSERTION_TEXTS.get(assertion_id, '')}")
+
+    print(f"\nselftest: {'all instruments valid' if not failures else f'{failures} BROKEN'}")
+    return 0 if not failures else 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Evaluate skill output quality using agentskills.io-compatible grading"
@@ -758,7 +956,16 @@ def main():
     parser.add_argument("--eval-id", type=int, help="Run specific eval by ID (with --evals)")
     parser.add_argument("--specs", metavar="SPECS_JSON",
                         help="Annotate assertions with spec IDs from specs-index.json")
+    parser.add_argument("--selftest", action="store_true",
+                        help="Prove each assertion catches a planted defect (no API, no network)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="With --selftest, list each caught defect and its collateral failures")
+    parser.add_argument("--no-selftest", action="store_true",
+                        help="Skip the selftest gate on --evals (scores an unproven grader)")
     args = parser.parse_args()
+
+    if args.selftest:
+        sys.exit(selftest(verbose=args.verbose))
 
     specs_data = None
     cat_to_specs = {}
@@ -766,6 +973,15 @@ def main():
         specs_data, cat_to_specs = load_specs_index(args.specs)
 
     if args.evals:
+        # Scoring a batch with instruments nobody has proven produces numbers
+        # nobody should act on, so the selftest gates the batch the way
+        # ponytail's judge.py gates its matrix.
+        if not args.no_selftest:
+            if selftest():
+                print("\ngrader not trustworthy; refusing to run the batch "
+                      "(pass --no-selftest to override)", file=sys.stderr)
+                sys.exit(1)
+            print()
         result = run_batch_evals(args.evals, eval_id=args.eval_id)
     elif args.directory:
         if not Path(args.directory).is_dir():

@@ -302,6 +302,9 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
     is_baseline = kind == "practiceBaseline"
     alphas = data.get("alphas", [])
     alpha_names = {a.get("name") for a in alphas}
+    # A practice alpha may relate to one of its own alphas or to anything in the
+    # effective context it resolves against.
+    known_alpha_names = alpha_names | set(baseline_alpha_names or ())
 
     for idx, alpha in enumerate(alphas):
         alpha_name = alpha.get("name", f"<unnamed-{idx}>")
@@ -387,8 +390,40 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
                     "autoFixable": False,
                 })
 
+            if maps_to and maps_to.lower() in alpha_name.lower():
+                issues.append({
+                    "severity": "warning",
+                    "category": "mapsto-naming",
+                    "path": f"{prefix}.name",
+                    "message": (
+                        f"mapsTo variant '{alpha_name}' contains parent type name "
+                        f"'{maps_to}' — IS-A semantics make the repetition redundant"
+                    ),
+                    "autoFixable": True,
+                })
+
             relates_to = alpha.get("relatesTo", [])
             for rel_idx, rel in enumerate(relates_to):
+                # Baseline alphas get their relatesTo targets resolved above; practice
+                # alphas did not, so a dangling reference shipped silently. Warning, not
+                # error: a target can also sit in a sibling practice that this one never
+                # declared as a dependency, or in an effective context regenerated before
+                # that sibling finished Phase 3. Both are worth seeing, neither is
+                # unambiguously broken output.
+                target = rel.get("alphaName")
+                if target and target not in known_alpha_names:
+                    issues.append({
+                        "severity": "warning",
+                        "category": "relatesto-target",
+                        "path": f"{prefix}.relatesTo[{rel_idx}].alphaName",
+                        "message": (
+                            f"relatesTo target '{target}' is not in this practice or its "
+                            f"effective context — undeclared dependency, stale context, "
+                            f"or a typo"
+                        ),
+                        "autoFixable": False,
+                    })
+
                 if "direction" not in rel:
                     issues.append({
                         "severity": "error",
@@ -2237,6 +2272,20 @@ def check_references(data, kind, baseline_data=None):
                         "category": "reference-links",
                         "path": f"{path}.links[{li}].uri",
                         "message": f"Reference '{ref_name}' link '{link.get('name', '')}' has empty URI",
+                        "autoFixable": False,
+                    })
+                elif "#" not in uri and not link.get("pages"):
+                    # A reference points at a specific artifact, not a whole document.
+                    # Without an anchor or a page locator the reader lands on the front
+                    # page and has to hunt for what was cited.
+                    issues.append({
+                        "severity": "warning",
+                        "category": "reference-anchor",
+                        "path": f"{path}.links[{li}].uri",
+                        "message": (
+                            f"Reference '{ref_name}' link '{link.get('name', '')}' has no "
+                            f"anchor fragment and no pages locator: {uri}"
+                        ),
                         "autoFixable": False,
                     })
 

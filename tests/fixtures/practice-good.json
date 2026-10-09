@@ -1,0 +1,1304 @@
+{
+  "kind": "practice",
+  "name": "Selftest Reference Onboarding",
+  "description": "A deliberately small extension practice used as the known-good reference for the eval harness selftest. It covers team onboarding onto an internal platform, from a first guided pilot through to unaided self-service adoption.",
+  "schemaVersion": "2.16.0",
+  "version": "1.0.0",
+  "baselinePracticeName": "Platform Adoption Essentials",
+  "keywords": [
+    "onboarding",
+    "platform adoption",
+    "golden path",
+    "developer experience",
+    "self-service",
+    "internal developer platform",
+    "paved road",
+    "team enablement",
+    "cognitive load",
+    "platform as a product",
+    "adoption metrics",
+    "developer workspace"
+  ],
+  "authors": [
+    "keleo-pgen-llm eval harness"
+  ],
+  "createdAt": "2026-10-09",
+  "updatedAt": "2026-10-09",
+  "citations": [
+    {
+      "name": "Team Topologies: Organizing Business and Technology Teams for Fast Flow",
+      "description": "Defines the platform team as a team type whose purpose is to reduce the cognitive load of stream-aligned teams by offering self-service internal products.",
+      "authors": [
+        "Matthew Skelton",
+        "Manuel Pais"
+      ],
+      "date": "2019",
+      "source": "IT Revolution Press",
+      "url": "https://teamtopologies.com/book",
+      "kind": "citation"
+    },
+    {
+      "name": "CNCF Platforms White Paper",
+      "description": "Describes platforms as products offering curated, self-service capabilities to internal users, and sets out attributes and maturity signals for platform teams.",
+      "authors": [
+        "CNCF Platforms Working Group"
+      ],
+      "date": "2023",
+      "source": "Cloud Native Computing Foundation",
+      "url": "https://tag-app-delivery.cncf.io/whitepapers/platforms/#attributes-of-a-platform",
+      "kind": "citation"
+    },
+    {
+      "name": "What I Talk About When I Talk About Platforms",
+      "description": "Argues that a digital platform is a foundation of self-service APIs and tools that lets delivery teams ship with autonomy, and that adoption must be earned rather than mandated.",
+      "authors": [
+        "Evan Bottcher"
+      ],
+      "date": "2018",
+      "source": "martinfowler.com",
+      "url": "https://martinfowler.com/articles/talk-about-platforms.html#ADigitalPlatformIsAFoundationOfSelf-servicedApis",
+      "kind": "citation"
+    }
+  ],
+  "assets": [
+    {
+      "name": "platform-onboarding-icon",
+      "description": "Icon for the Platform Onboarding alpha",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "onboarding-readiness-icon",
+      "description": "Icon for the Onboarding Readiness alpha",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "developer-workspace-icon",
+      "description": "Icon for the Developer Workspace alpha",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "onboarding-guide-icon",
+      "description": "Icon for the Onboarding Guide work product",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "adoption-dashboard-icon",
+      "description": "Icon for the Adoption Dashboard work product",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "platform-engineer-icon",
+      "description": "Icon for the Platform Engineer persona",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    },
+    {
+      "name": "onboarding-team-icon",
+      "description": "Icon for the Onboarding Team persona group",
+      "fontFamily": "Font Awesome 6 Free",
+      "fontCharacter": "",
+      "type": "font-character"
+    }
+  ],
+  "alphas": [
+    {
+      "name": "Platform Onboarding",
+      "description": "The progression of a delivery team from first guided contact with the platform to unaided self-service use of it.",
+      "focusName": "Solution",
+      "contributesTo": "Platform Consumption Interface",
+      "assetNames": [
+        {
+          "assetName": "platform-onboarding-icon",
+          "type": "icon"
+        }
+      ],
+      "relatesTo": [
+        {
+          "relationship": "measures adoption of",
+          "alphaName": "Platform Consumption Interface",
+          "direction": "outgoing"
+        },
+        {
+          "relationship": "depends on readiness of",
+          "alphaName": "Onboarding Readiness",
+          "direction": "outgoing"
+        }
+      ],
+      "states": [
+        {
+          "name": "Piloted",
+          "description": "A first delivery team has onboarded with platform team support.",
+          "seq": 1,
+          "contributesToState": "Available",
+          "checklist": [
+            {
+              "name": "A pilot team has deployed a workload through the platform",
+              "description": "The pilot team has taken a representative workload from source to running state using only platform-provided capabilities.",
+              "seq": 1
+            },
+            {
+              "name": "Onboarding friction points are recorded",
+              "description": "The platform team has captured the specific points where the pilot team needed direct help.",
+              "seq": 2
+            },
+            {
+              "name": "A named platform engineer supported the pilot end to end",
+              "description": "One platform engineer accompanied the pilot team through the whole onboarding path.",
+              "seq": 3
+            }
+          ]
+        },
+        {
+          "name": "Standardised",
+          "description": "Onboarding follows a documented, repeatable path that several teams have completed.",
+          "seq": 2,
+          "contributesToState": "Self Service",
+          "checklist": [
+            {
+              "name": "The onboarding path is documented end to end",
+              "description": "Every step from access request to first deployment is written down and kept current.",
+              "seq": 1
+            },
+            {
+              "name": "Three or more teams have onboarded through the documented path",
+              "description": "The path has been exercised by enough teams to show it generalises beyond the pilot.",
+              "seq": 2
+            },
+            {
+              "name": "Time to first deployment is measured per team",
+              "description": "The platform team records elapsed time from onboarding start to first successful deployment.",
+              "seq": 3
+            }
+          ]
+        },
+        {
+          "name": "Self Served",
+          "description": "Teams complete onboarding without platform team involvement.",
+          "seq": 3,
+          "contributesToState": "Optimized",
+          "checklist": [
+            {
+              "name": "A team has onboarded with no platform team contact",
+              "description": "At least one team reached first deployment using only self-service materials and tooling.",
+              "seq": 1
+            },
+            {
+              "name": "Onboarding requests are served by automation",
+              "description": "Access, workspace creation and starter templates are provisioned without manual handling.",
+              "seq": 2
+            },
+            {
+              "name": "Adoption figures are published to platform stakeholders",
+              "description": "Onboarding volume and time to first deployment are reported on a regular cadence.",
+              "seq": 3
+            }
+          ]
+        }
+      ],
+      "kind": "alpha"
+    },
+    {
+      "name": "Onboarding Readiness",
+      "description": "The state of the prerequisites a delivery team must satisfy before it can be onboarded onto the platform.",
+      "focusName": "Solution",
+      "contributesTo": "Requirements",
+      "assetNames": [
+        {
+          "assetName": "onboarding-readiness-icon",
+          "type": "icon"
+        }
+      ],
+      "relatesTo": [
+        {
+          "relationship": "gates",
+          "alphaName": "Platform Onboarding",
+          "direction": "incoming"
+        }
+      ],
+      "states": [
+        {
+          "name": "Stated",
+          "description": "The prerequisites for onboarding have been written down.",
+          "seq": 1,
+          "contributesToState": "Conceived",
+          "checklist": [
+            {
+              "name": "Prerequisites for onboarding are listed",
+              "description": "The platform team has named what a delivery team must have in place before it starts.",
+              "seq": 1
+            },
+            {
+              "name": "An owner is named for each prerequisite",
+              "description": "Every prerequisite has a person or team accountable for satisfying it.",
+              "seq": 2
+            },
+            {
+              "name": "The prerequisite list is published where delivery teams can find it",
+              "description": "The list is held somewhere delivery teams already look rather than in platform team notes.",
+              "seq": 3
+            }
+          ]
+        },
+        {
+          "name": "Checkable",
+          "description": "Each prerequisite can be verified without asking the delivery team.",
+          "seq": 2,
+          "contributesToState": "Bounded",
+          "checklist": [
+            {
+              "name": "Each prerequisite has an objective check",
+              "description": "A prerequisite is satisfied or not by evidence the platform team can observe directly.",
+              "seq": 1
+            },
+            {
+              "name": "Checks run against a candidate team on request",
+              "description": "The platform team can run the full readiness check for a named team on demand.",
+              "seq": 2
+            },
+            {
+              "name": "Check results are recorded against the team",
+              "description": "The outcome of each readiness check is kept so progress is visible over time.",
+              "seq": 3
+            }
+          ]
+        },
+        {
+          "name": "Enforced",
+          "description": "Onboarding cannot start until the readiness checks pass.",
+          "seq": 3,
+          "contributesToState": "Acceptable",
+          "checklist": [
+            {
+              "name": "Readiness checks gate the start of onboarding",
+              "description": "The onboarding path refuses to begin for a team whose checks have not passed.",
+              "seq": 1
+            },
+            {
+              "name": "Check failures return a specific remedy to the team",
+              "description": "A failed check tells the delivery team what to do next rather than only that it failed.",
+              "seq": 2
+            },
+            {
+              "name": "Exceptions to the gate are recorded with a reason",
+              "description": "Where the gate is bypassed, the decision and its justification are written down.",
+              "seq": 3
+            }
+          ]
+        }
+      ],
+      "kind": "alpha"
+    },
+    {
+      "name": "Developer Workspace",
+      "description": "A provisioned working environment a delivery team receives through the platform, treated as a named variant of a platform asset.",
+      "focusName": "Solution",
+      "mapsTo": "Platform Asset",
+      "assetNames": [
+        {
+          "assetName": "developer-workspace-icon",
+          "type": "icon"
+        }
+      ],
+      "relatesTo": [
+        {
+          "relationship": "is provisioned during",
+          "alphaName": "Platform Onboarding",
+          "direction": "outgoing"
+        }
+      ],
+      "states": [
+        {
+          "name": "Identified",
+          "description": "The need for a workspace of this shape has been recognised.",
+          "seq": 1,
+          "checklist": [
+            {
+              "name": "A team has requested a workspace",
+              "description": "A named delivery team has asked for a working environment through the platform.",
+              "seq": 1
+            },
+            {
+              "name": "The workload the workspace must host is described",
+              "description": "The request states what will run in the workspace.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Specified",
+          "description": "The workspace contents and limits have been defined.",
+          "seq": 2,
+          "checklist": [
+            {
+              "name": "Workspace resource limits are set",
+              "description": "Compute, memory and storage ceilings for the workspace are stated.",
+              "seq": 1
+            },
+            {
+              "name": "The toolchain included in the workspace is listed",
+              "description": "The request records which tools the workspace ships with.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Provisioned",
+          "description": "The workspace exists and the team can reach it.",
+          "seq": 3,
+          "checklist": [
+            {
+              "name": "The team can authenticate to the workspace",
+              "description": "Members of the requesting team can sign in and reach their workspace.",
+              "seq": 1
+            },
+            {
+              "name": "The workspace was created by automation",
+              "description": "Creation ran through the platform's provisioning path rather than by hand.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Integrated",
+          "description": "The workspace is connected to the platform's shared services.",
+          "seq": 4,
+          "checklist": [
+            {
+              "name": "The workspace reaches the source repository",
+              "description": "Code can be fetched and pushed from inside the workspace.",
+              "seq": 1
+            },
+            {
+              "name": "The workspace reaches the build service",
+              "description": "A build can be triggered from the workspace.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Operational",
+          "description": "The team works in the workspace day to day.",
+          "seq": 5,
+          "checklist": [
+            {
+              "name": "The team deploys from the workspace",
+              "description": "Deployments to a platform environment originate from the workspace.",
+              "seq": 1
+            },
+            {
+              "name": "Watch workspace availability and alert on loss",
+              "description": "The platform team is alerted when a workspace becomes unreachable.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Value Yielding",
+          "description": "The workspace demonstrably shortens the team's delivery cycle.",
+          "seq": 6,
+          "checklist": [
+            {
+              "name": "Lead time is measured for teams using the workspace",
+              "description": "The platform team records delivery lead time for workspace users.",
+              "seq": 1
+            },
+            {
+              "name": "The measured lead time is reported to stakeholders",
+              "description": "The figure reaches the people funding the platform.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Retiring",
+          "description": "The workspace is being withdrawn.",
+          "seq": 7,
+          "checklist": [
+            {
+              "name": "Work held only in the workspace has been moved out",
+              "description": "Anything of lasting value has been relocated before withdrawal.",
+              "seq": 1
+            },
+            {
+              "name": "The withdrawal date is agreed with the team",
+              "description": "The delivery team knows when the workspace stops being available.",
+              "seq": 2
+            }
+          ]
+        }
+      ],
+      "kind": "alpha"
+    }
+  ],
+  "workProducts": [
+    {
+      "name": "Onboarding Guide",
+      "description": "The written path a delivery team follows from access request to first successful deployment on the platform.",
+      "contributesToAlphaNames": [
+        "Platform Onboarding"
+      ],
+      "assetNames": [
+        {
+          "assetName": "onboarding-guide-icon",
+          "type": "icon"
+        }
+      ],
+      "levelsOfDetail": [
+        {
+          "name": "Outline Path",
+          "description": "Onboarding steps listed in order, each with an owner.",
+          "seq": 1,
+          "contributesTo": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Piloted"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Every onboarding step is listed in order",
+              "description": "The guide names each step a team takes, in the sequence they occur.",
+              "seq": 1
+            },
+            {
+              "name": "Each step names who performs it",
+              "description": "A reader can tell whether a step is theirs or the platform team's.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Worked Path",
+          "description": "Each step carries exact commands and expected results.",
+          "seq": 2,
+          "contributesTo": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Standardised"
+            },
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Self Served"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Each step shows the exact command or form to use",
+              "description": "A team can follow the step without inferring what to type or submit.",
+              "seq": 1
+            },
+            {
+              "name": "Each step states the result that confirms success",
+              "description": "A team can tell whether a step worked before moving to the next.",
+              "seq": 2
+            },
+            {
+              "name": "A worked example runs end to end",
+              "description": "The guide contains one complete pass that a reader can follow verbatim.",
+              "seq": 3
+            }
+          ]
+        }
+      ],
+      "kind": "workProduct"
+    },
+    {
+      "name": "Adoption Dashboard",
+      "description": "Reported view of onboarding volume, time to first deployment, and the unaided share.",
+      "contributesToAlphaNames": [
+        "Platform Onboarding",
+        "Onboarding Readiness"
+      ],
+      "assetNames": [
+        {
+          "assetName": "adoption-dashboard-icon",
+          "type": "icon"
+        }
+      ],
+      "expectedMetrics": [
+        {
+          "name": "timeToFirstDeployment",
+          "description": "Elapsed time from a team starting onboarding to its first successful deployment on the platform.",
+          "unit": "hours"
+        },
+        {
+          "name": "unaidedOnboardingShare",
+          "description": "Share of onboardings completed with no platform team involvement.",
+          "unit": "percent"
+        }
+      ],
+      "levelsOfDetail": [
+        {
+          "name": "Counted",
+          "description": "Onboarding volume is reported as a running count per period.",
+          "seq": 1,
+          "contributesTo": [
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Checkable"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Onboardings per period are counted",
+              "description": "The dashboard shows how many teams onboarded in each reporting period.",
+              "seq": 1
+            },
+            {
+              "name": "The count is drawn from platform records rather than reported by hand",
+              "description": "Figures come from the platform's own data.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Timed And Attributed",
+          "description": "Volume reported with time to first deployment and aided status.",
+          "seq": 2,
+          "contributesTo": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Self Served"
+            },
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Enforced"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Time to first deployment is shown per team",
+              "description": "Each onboarding carries its elapsed time.",
+              "seq": 1
+            },
+            {
+              "name": "Onboardings needing platform team help are distinguished",
+              "description": "The dashboard separates aided from unaided onboardings.",
+              "seq": 2
+            },
+            {
+              "name": "The trend over time is visible",
+              "description": "A reader can see whether the figures are improving.",
+              "seq": 3
+            }
+          ]
+        }
+      ],
+      "kind": "workProduct"
+    },
+    {
+      "name": "Workspace Record",
+      "description": "The standing record of a team's workspace, from request through operation to withdrawal.",
+      "contributesToAlphaNames": [
+        "Developer Workspace",
+        "Onboarding Readiness"
+      ],
+      "levelsOfDetail": [
+        {
+          "name": "Requested",
+          "description": "The request states who asked and what the workspace must hold.",
+          "seq": 1,
+          "contributesTo": [
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Identified"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Specified"
+            },
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Stated"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Record the requesting team and the workload",
+              "description": "The record names who asked for the workspace and what will run in it.",
+              "seq": 1
+            },
+            {
+              "name": "Record the resource ceilings and toolchain",
+              "description": "The record states the workspace limits and the tools it ships with.",
+              "seq": 2
+            }
+          ]
+        },
+        {
+          "name": "Live",
+          "description": "The record tracks the running workspace and what it connects to.",
+          "seq": 2,
+          "contributesTo": [
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Provisioned"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Integrated"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Operational"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Record the provisioning run that created the workspace",
+              "description": "The record links to the automated run that produced the workspace.",
+              "seq": 1
+            },
+            {
+              "name": "Record the shared services the workspace reaches",
+              "description": "The record lists the repository and build service connections in place.",
+              "seq": 2
+            },
+            {
+              "name": "Record who uses the workspace day to day",
+              "description": "The record names the team members working in the workspace.",
+              "seq": 3
+            }
+          ]
+        },
+        {
+          "name": "Closed",
+          "description": "The record carries the workspace's delivery effect and its withdrawal.",
+          "seq": 3,
+          "contributesTo": [
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Value Yielding"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Retiring"
+            }
+          ],
+          "checklist": [
+            {
+              "name": "Record the delivery lead time of the team using the workspace",
+              "description": "The record carries the measured lead time for workspace users.",
+              "seq": 1
+            },
+            {
+              "name": "Record where work held in the workspace was moved",
+              "description": "The record shows the destination of anything of lasting value.",
+              "seq": 2
+            },
+            {
+              "name": "Record the agreed withdrawal date",
+              "description": "The record states when the workspace stops being available.",
+              "seq": 3
+            }
+          ]
+        }
+      ],
+      "kind": "workProduct"
+    }
+  ],
+  "personas": [
+    {
+      "name": "Platform Engineer",
+      "description": "Builds and operates the self-service capabilities a delivery team uses during onboarding, and owns the onboarding path itself.",
+      "competencies": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Masters"
+        },
+        {
+          "competencyName": "Site Reliability",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "tags": {
+        "domainTags": [
+          "platform",
+          "developer-experience"
+        ],
+        "lifecycleTags": [
+          "build",
+          "operate"
+        ],
+        "organizationalTags": [
+          "platform-team"
+        ]
+      },
+      "assetNames": [
+        {
+          "assetName": "platform-engineer-icon",
+          "type": "icon"
+        }
+      ],
+      "kind": "persona"
+    },
+    {
+      "name": "Onboarding Delivery Lead",
+      "description": "Leads the delivery team being onboarded and decides when it is ready to start.",
+      "competencies": [
+        {
+          "competencyName": "Platform Strategic Alignment",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "tags": {
+        "domainTags": [
+          "delivery"
+        ],
+        "lifecycleTags": [
+          "plan",
+          "adopt"
+        ],
+        "organizationalTags": [
+          "stream-aligned-team"
+        ]
+      },
+      "kind": "persona"
+    }
+  ],
+  "personaGroups": [
+    {
+      "name": "Onboarding Team",
+      "description": "The pairing of platform and delivery people who carry a single team through onboarding.",
+      "personaNames": [
+        "Platform Engineer",
+        "Onboarding Delivery Lead"
+      ],
+      "tags": {
+        "organizationalTags": [
+          "cross-functional"
+        ]
+      },
+      "assetNames": [
+        {
+          "assetName": "onboarding-team-icon",
+          "type": "icon"
+        }
+      ],
+      "kind": "personaGroup"
+    }
+  ],
+  "activities": [
+    {
+      "name": "Run A Guided Onboarding Pilot",
+      "description": "Take one delivery team through the whole onboarding path with a platform engineer alongside.",
+      "activitySpaceName": "Develop the Golden Paths",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Platform Onboarding",
+          "stateName": "Piloted"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Outline Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Write Down The Onboarding Prerequisites",
+      "description": "Name what a team must have in place before onboarding, and publish the list.",
+      "activitySpaceName": "Define Platform Capabilities",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Onboarding Readiness",
+          "stateName": "Stated"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Outline Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Make Readiness Checks Observable",
+      "description": "Turn each written prerequisite into a check the platform team can run unaided.",
+      "activitySpaceName": "Implement Policy-as-Code",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Onboarding Readiness",
+          "stateName": "Checkable"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Adoption Dashboard",
+          "levelOfDetailName": "Counted"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Gate Onboarding On Readiness",
+      "description": "Wire readiness checks into the start of onboarding so it cannot begin until they pass.",
+      "activitySpaceName": "Establish Secure Guardrails",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Onboarding Readiness",
+          "stateName": "Enforced"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Adoption Dashboard",
+          "levelOfDetailName": "Timed And Attributed"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Document The Repeatable Path",
+      "description": "Turn what the pilot learned into a written path with exact commands and results.",
+      "activitySpaceName": "Develop the Golden Paths",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Platform Onboarding",
+          "stateName": "Standardised"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Worked Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Automate Workspace Provisioning",
+      "description": "Replace manual workspace creation with provisioning that runs from the team's own request, so onboarding completes without platform team handling.",
+      "activitySpaceName": "Integrate Toolchain Services",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Platform Onboarding",
+          "stateName": "Self Served"
+        },
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Provisioned"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Worked Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Connect The Workspace To Shared Services",
+      "description": "Join a provisioned workspace to the source repository and build service.",
+      "activitySpaceName": "Integrate Toolchain Services",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Integrated"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Worked Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Shape The Workspace Request",
+      "description": "Capture what a team needs its workspace to hold, and set its limits and toolchain.",
+      "activitySpaceName": "Define Platform Capabilities",
+      "focusName": "Solution",
+      "ledBy": "Onboarding Delivery Lead",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Platform Strategic Alignment"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Platform Strategic Alignment",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Identified"
+        },
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Specified"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Onboarding Guide",
+          "levelOfDetailName": "Outline Path"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Run The Workspace Day To Day",
+      "description": "Operate provisioned workspaces as a running service, watching availability and reporting the delivery lead time of the teams using them.",
+      "activitySpaceName": "Operate and Evolve the System",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Operational"
+        },
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Value Yielding"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Adoption Dashboard",
+          "levelOfDetailName": "Timed And Attributed"
+        }
+      ],
+      "kind": "activity"
+    },
+    {
+      "name": "Withdraw A Workspace",
+      "description": "Move anything of lasting value out of a workspace and agree its withdrawal date.",
+      "activitySpaceName": "Decommission and Retire",
+      "focusName": "Solution",
+      "ledBy": "Platform Engineer",
+      "involves": [
+        "Onboarding Team"
+      ],
+      "requiredCompetencies": [
+        "Engineering"
+      ],
+      "recommendedCompetencyLevels": [
+        {
+          "competencyName": "Engineering",
+          "competencyLevelName": "Applies"
+        }
+      ],
+      "contributesTo": [
+        {
+          "alphaName": "Developer Workspace",
+          "stateName": "Retiring"
+        }
+      ],
+      "worksOn": [
+        {
+          "workProductName": "Adoption Dashboard",
+          "levelOfDetailName": "Counted"
+        }
+      ],
+      "kind": "activity"
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Onboarding Adoption Journey",
+      "description": "Coordinates onboarding from a single supported pilot, through a documented repeatable path, to unaided self-service adoption.",
+      "narrativeTypeName": "Crawl-Walk-Run",
+      "patternViews": [
+        {
+          "name": "Crawl",
+          "description": "One team is taken through onboarding with a platform engineer alongside, and the prerequisites are written down for the first time.",
+          "seq": 1,
+          "alphaStates": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Piloted"
+            },
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Stated"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Specified"
+            }
+          ]
+        },
+        {
+          "name": "Walk",
+          "description": "The path is documented and repeated across several teams, readiness becomes checkable, and workspaces are provisioned and connected.",
+          "seq": 2,
+          "alphaStates": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Standardised"
+            },
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Checkable"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Integrated"
+            }
+          ]
+        },
+        {
+          "name": "Run",
+          "description": "Teams onboard unaided, readiness gates the path automatically, and workspaces run as a measured service.",
+          "seq": 3,
+          "alphaStates": [
+            {
+              "alphaName": "Platform Onboarding",
+              "stateName": "Self Served"
+            },
+            {
+              "alphaName": "Onboarding Readiness",
+              "stateName": "Enforced"
+            },
+            {
+              "alphaName": "Developer Workspace",
+              "stateName": "Value Yielding"
+            }
+          ]
+        }
+      ],
+      "kind": "pattern"
+    }
+  ],
+  "outcomes": [
+    {
+      "name": "Shorter Time To First Deployment",
+      "description": "A delivery team reaches its first successful deployment in materially less elapsed time.",
+      "measureDescription": "Measured by the elapsed time from a team starting onboarding to its first successful deployment, compared between teams onboarded before and after the path was documented, and tracked as a trend across onboarding cohorts.",
+      "metricContributions": [
+        {
+          "alphaName": "Platform Onboarding",
+          "metricName": "timeToFirstDeployment",
+          "workProductName": "Adoption Dashboard",
+          "recognizedAtStateName": "Standardised"
+        }
+      ]
+    },
+    {
+      "name": "Onboarding Without Platform Team Effort",
+      "description": "Delivery teams complete onboarding using self-service materials and automated provisioning, releasing platform engineers from accompanying each one.",
+      "measureDescription": "Measured by the share of onboardings completed with no platform team involvement, and by the count of platform engineer hours spent accompanying onboarding per reporting period.",
+      "metricContributions": [
+        {
+          "alphaName": "Platform Onboarding",
+          "metricName": "unaidedOnboardingShare",
+          "workProductName": "Adoption Dashboard",
+          "recognizedAtStateName": "Self Served"
+        }
+      ],
+      "objectiveContributions": [
+        {
+          "patternName": "Onboarding Adoption Journey",
+          "recognizedAtPatternViewName": "Run",
+          "forecastWeights": [
+            {
+              "patternViewName": "Crawl",
+              "weight": 0.1
+            },
+            {
+              "patternViewName": "Walk",
+              "weight": 0.5
+            },
+            {
+              "patternViewName": "Run",
+              "weight": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "references": [
+    {
+      "name": "CNCF Platform Maturity Self-Assessment",
+      "alphaName": "Platform Onboarding",
+      "stateName": "Standardised",
+      "description": "Maturity model table a platform team scores itself against in a workshop to place its onboarding capability.",
+      "links": [
+        {
+          "name": "Platform Engineering Maturity Model",
+          "uri": "https://tag-app-delivery.cncf.io/whitepapers/platform-eng-maturity-model/#maturity-model",
+          "pages": "Maturity model table, aspects Investment through Measurement"
+        }
+      ]
+    },
+    {
+      "name": "Team Topologies Platform Team Interaction Templates",
+      "alphaName": "Onboarding Readiness",
+      "stateName": "Stated",
+      "description": "Fillable team-API template stating what a delivery team provides before onboarding.",
+      "links": [
+        {
+          "name": "Team Topologies Templates And Tools",
+          "uri": "https://teamtopologies.com/key-concepts-content/team-api-template",
+          "pages": "Team API template"
+        }
+      ]
+    }
+  ],
+  "narratives": [
+    {
+      "name": "Earning Platform Adoption Rather Than Mandating It",
+      "narrativeTypeName": "The Three-Act Structure & StoryBrand",
+      "description": "Frames onboarding as the point where a platform earns its adoption, because a delivery team that cannot get started unaided will route around the platform.",
+      "citationNames": [
+        "What I Talk About When I Talk About Platforms",
+        "Team Topologies: Organizing Business and Technology Teams for Fast Flow"
+      ],
+      "narrativeContexts": [
+        {
+          "seq": 1,
+          "narrativeElementName": "Act I: The Hero and the Problem",
+          "context": "A delivery team wants to ship, and is handed a platform it has never used. Where getting started needs a conversation with the platform team, the team's first experience of the platform is a queue."
+        },
+        {
+          "seq": 2,
+          "narrativeElementName": "Act II: The Guide and the Plan",
+          "context": "The platform team treats onboarding as a product surface rather than a support task, writing the path down, making readiness checkable, and provisioning workspaces from the team's own request."
+        },
+        {
+          "seq": 3,
+          "narrativeElementName": "Act III: Call to Action and Success",
+          "context": "Teams reach their first deployment without platform team contact, and the platform team's effort shifts from accompanying onboardings to widening what the platform offers."
+        }
+      ]
+    }
+  ],
+  "practiceElementAliases": [
+    {
+      "practiceElementType": "Alpha",
+      "practiceElementName": "Developer Workspace",
+      "aliasName": "Team Workspace"
+    }
+  ]
+}

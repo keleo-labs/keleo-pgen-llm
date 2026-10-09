@@ -369,6 +369,178 @@ def render_markdown(verdict):
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _run_gate(directory, phase, expect=None):
+    """The main() pipeline without argument parsing or output, for the selftest."""
+    files, reconcile_path = discover_inputs(directory, phase)
+    raw, summaries = collect_findings(files, phase)
+    raw.extend(check_expected(files, phase, expect or []))
+    reconcile = None
+    if reconcile_path:
+        reconcile, _ = load_json_pair(reconcile_path)
+    findings, unmatched = apply_reconciliation(dedupe(raw), reconcile)
+    return build_verdict(directory, phase, findings, summaries, reconcile, unmatched)
+
+
+# Each case: (label, phase, findings files, reconcile doc or None, expect list,
+#             expected gate, expected live-finding count)
+_SELFTEST_CASES = [
+    (
+        "clean phase passes", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "summary": "ok", "findings": []}},
+        None, None, "pass", 0,
+    ),
+    (
+        "a confirmed error blocks", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "summary": "1 issue", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        None, None, "fail", 1,
+    ),
+    (
+        "a warning passes but is carried", 2,
+        {"coverage": {"verifier": "coverage", "summary": "1 gap", "findings": [
+            {"rule": "coverage-002", "severity": "warning",
+             "message": "Source concern thinly covered", "evidence": "section 3"}]}},
+        None, None, "pass-with-warnings", 1,
+    ),
+    (
+        "the reconciler can dismiss a false positive", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "summary": "1 issue", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        {"overallVerdict": "pass", "summary": "false positive",
+         "confirmed": [{"originalMessage": "Claim has no support in the source",
+                        "verdict": "false-positive", "reasoning": "the source does say this"}]},
+        None, "pass", 0,
+    ),
+    (
+        "needs-context downgrades an error to a warning", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        {"overallVerdict": "pass", "summary": "needs context",
+         "confirmed": [{"originalMessage": "Claim has no support in the source",
+                        "verdict": "needs-context", "reasoning": "source is a sibling doc"}]},
+        None, "pass-with-warnings", 1,
+    ),
+    (
+        "an unrecognised verdict keeps the finding", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        {"overallVerdict": "pass", "summary": "typo in the verdict word",
+         "confirmed": [{"originalMessage": "Claim has no support in the source",
+                        "verdict": "dismissed", "reasoning": "not a verdict the gate knows"}]},
+        None, "fail", 1,
+    ),
+    (
+        "a paraphrased reconciler verdict does not dismiss", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        {"overallVerdict": "pass", "summary": "paraphrased",
+         "confirmed": [{"originalMessage": "The claim is unsupported",
+                        "verdict": "false-positive", "reasoning": "paraphrase"}]},
+        None, "fail", 1,
+    ),
+    (
+        "the same finding from two verifiers is deduped", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "findings": [
+            {"rule": "fidelity-001", "severity": "error",
+             "message": "Claim has no support in the source", "evidence": "line 42"}]},
+         "coverage": {"verifier": "coverage", "findings": [
+             {"rule": "fidelity-001", "severity": "error",
+              "message": "Claim has no support in the source", "evidence": "line 42"}]}},
+        None, None, "fail", 1,
+    ),
+    (
+        "a verifier that never wrote its file blocks", 2,
+        {"source-fidelity": {"verifier": "source-fidelity", "findings": []}},
+        None, ["source-fidelity", "alpha-semantics"], "fail", 1,
+    ),
+    (
+        "the report stage uses its own filename prefix", "report",
+        {"citation-integrity": {"verifier": "citation-integrity", "findings": [
+            {"rule": "cite-001", "severity": "error",
+             "message": "Citation does not support the claim", "evidence": "para 2"}]}},
+        None, None, "fail", 1,
+    ),
+    (
+        "phase 1.5 is not rendered as phase 1.0", 1.5,
+        {"distillation-fidelity": {"verifier": "distillation-fidelity", "findings": []}},
+        None, None, "pass", 0,
+    ),
+]
+
+
+def selftest():
+    """Prove the gate blocks on what it claims to block on.
+
+    Writes synthetic findings files into a temp directory and drives the real
+    collect/dedupe/reconcile/verdict path over them. Without this, a refactor
+    that stopped the gate failing on a confirmed error would look like a clean
+    run on every practice.
+
+    Pattern borrowed from ponytail's agentic benchmark (MIT): prove the
+    instrument on a good and a bad reference before trusting a measurement.
+    """
+    import tempfile
+
+    failures = 0
+    for label, phase, findings_files, reconcile, expect, want_gate, want_count in _SELFTEST_CASES:
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            vdir = verification_dir(directory)
+            vdir.mkdir(parents=True, exist_ok=True)
+            for verifier, doc in findings_files.items():
+                findings_path(directory, phase, verifier).write_text(
+                    json.dumps(doc), encoding="utf-8")
+            if reconcile:
+                findings_path(directory, phase, RECONCILE_STEM).write_text(
+                    json.dumps(reconcile), encoding="utf-8")
+
+            try:
+                verdict = _run_gate(directory, phase, expect)
+            except Exception as exc:
+                print(f"XX {label}: raised {type(exc).__name__}: {exc}")
+                failures += 1
+                continue
+
+            got_gate = verdict["gate"]
+            got_count = len(verdict["findings"])
+            if got_gate != want_gate or got_count != want_count:
+                print(f"XX {label}: gate={got_gate} findings={got_count} "
+                      f"(wanted gate={want_gate} findings={want_count})")
+                failures += 1
+            else:
+                print(f"ok {label}")
+
+    # The verdict is written into the directory it reads from, so a second run
+    # must not ingest its own output as a verifier called "verdict".
+    with tempfile.TemporaryDirectory() as tmp:
+        directory = Path(tmp)
+        vdir = verification_dir(directory)
+        vdir.mkdir(parents=True, exist_ok=True)
+        findings_path(directory, 2, "source-fidelity").write_text(json.dumps(
+            {"verifier": "source-fidelity", "findings": [
+                {"rule": "fidelity-001", "severity": "error",
+                 "message": "Claim has no support in the source", "evidence": "line 42"}]}),
+            encoding="utf-8")
+        first = _run_gate(directory, 2)
+        (vdir / "phase-2-verdict.json").write_text(json.dumps(first), encoding="utf-8")
+        (vdir / "phase-2-summary.md").write_text(render_markdown(first), encoding="utf-8")
+        second = _run_gate(directory, 2)
+        if len(second["findings"]) != len(first["findings"]):
+            print(f"XX re-running the gate double-counts: {len(first['findings'])} "
+                  f"-> {len(second['findings'])} findings")
+            failures += 1
+        else:
+            print("ok re-running the gate does not ingest its own verdict")
+
+    print(f"\nselftest: {'all instruments valid' if not failures else f'{failures} BROKEN'}")
+    return 0 if not failures else 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Collect verification-agent findings for a phase and gate on errors",
@@ -379,9 +551,12 @@ def main():
             "the matching -reconcile.json."
         ),
     )
-    parser.add_argument("directory", help="Practice, baseline or report output directory")
+    parser.add_argument("directory", nargs="?",
+                        help="Practice, baseline or report output directory")
+    parser.add_argument("--selftest", action="store_true",
+                        help="Prove the gate blocks on what it claims to (no API, no network)")
     parser.add_argument(
-        "--phase", required=True, choices=["1", "1.5", "2", "3", "report"],
+        "--phase", choices=["1", "1.5", "2", "3", "report"],
         help="Stage whose findings to consolidate (`report` for the reporting skills' single gate)",
     )
     parser.add_argument(
@@ -412,6 +587,12 @@ def main():
         help="Print the findings path a named verifier should write to, then exit",
     )
     args = parser.parse_args()
+
+    if args.selftest:
+        sys.exit(selftest())
+
+    if not args.directory or not args.phase:
+        parser.error("directory and --phase are required (or pass --selftest)")
 
     directory = Path(args.directory)
     label = _phase_label(args.phase)

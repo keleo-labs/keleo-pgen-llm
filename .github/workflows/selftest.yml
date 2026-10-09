@@ -1,0 +1,33 @@
+name: Harness selftest
+
+# Proves the eval and verification instruments still catch the defects they
+# claim to catch. Deterministic and offline: no API key, no network, no cost.
+# An assertion that can no longer fail silently inflates every eval score, so
+# this runs on every push rather than only before a release.
+#
+# The grader selftest needs deps/platform-adoption-kernel.json (tracked here)
+# and, for schema:valid, deps/language.schema.json — a symlink into the
+# keleo-language repo, which a runner does not have. The selftest reports that
+# it is running without schema validation rather than failing; everything else
+# is proven either way.
+
+on: [push, pull_request]
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install the schema validator
+        run: pip install --quiet jsonschema
+
+      - name: Verification gate selftest
+        run: python3 utils/verification-gate.py --selftest
+
+      - name: Grader selftest
+        run: python3 utils/eval-skill-output.py --selftest
