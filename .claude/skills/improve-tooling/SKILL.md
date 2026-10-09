@@ -173,6 +173,36 @@ When creating a new script:
 - Then: All existing CLI arguments and flags still work identically
 - And: New functionality is added as new flags or modes
 
+### Feature: Minimal Implementation (@rule:structural-811)
+
+The mechanical-vs-semantic gate decides *whether* to script something. This
+decides *how much* to write once that is settled. Every line added here is a
+line some later session has to read, keep working, and fix. Adapted from
+[ponytail](https://github.com/DietrichGebert/ponytail) (MIT).
+
+#### Scenario: The reuse ladder is climbed in order (@rule:structural-812)
+- Given: A mechanical need has been confirmed
+- When: Deciding what to write
+- Then: The first rung that fully solves it is taken, in this order:
+  - 1. Does it need to exist at all? Name what was skipped in one line
+  - 2. An existing `utils/` script — extend it rather than add a sibling, treating the new and existing requirements as one problem
+  - 3. A helper in `utils/_shared.py`
+  - 4. The Python standard library (the project takes no third-party pip dependencies)
+  - 5. The minimum code that works
+- And: A new script is only written when rungs 1–4 genuinely do not reach
+
+#### Scenario: Laziness applies to the solution, never the change (@rule:structural-813)
+- Given: A utility is created or extended
+- Then: Every caller, skill reference, and `utils/README.md` entry the change touches is updated
+- And: These are never cut to save effort: schema validation, cross-reference integrity checks, error handling that would lose a generated artifact, anything the user asked for
+
+#### Scenario: A deliberate shortcut names its ceiling (@rule:structural-814)
+- Given: A simpler implementation is chosen that will not hold in every case
+- Then: A comment records it as `shortcut: <the limit>, <when to upgrade>`
+- And: The limit and the upgrade trigger are both stated, because a marker with no trigger is the one that rots
+- And: The ledger is one grep, so no script or skill is added to collect it:
+  `grep -rnE --include='*.py' --include='*.md' '(#|//) ?shortcut:' utils/ .claude/skills/`
+
 ### Feature: Registry Currency (@rule:process-809)
 
 #### Scenario: Registry updated after changes (@rule:process-810)

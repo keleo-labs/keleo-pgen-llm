@@ -31,8 +31,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Scenarios sit at h3 in most skills but at h4 in improve-tooling, which nests
+# them under an h3 Feature. Matching only h3 silently extracted nothing from
+# that skill -- indistinguishable from a skill with no specs. Accept h3-h6, the
+# same latitude verify-mapping-against-specs.py already allows for the same
+# reason.
 SCENARIO_HEADER_RE = re.compile(
-    r"^###\s+Scenario:\s+(.+?)\s+\(@rule:([a-z]+-\d{3})\)\s*$"
+    r"^#{3,6}\s+Scenario:\s+(.+?)\s+\(@rule:([a-z]+-\d{3})\)\s*$"
 )
 
 STEP_RE = re.compile(
@@ -40,7 +45,7 @@ STEP_RE = re.compile(
 )
 
 FEATURE_HEADER_RE = re.compile(
-    r"^##\s+Feature:\s+(.+)$"
+    r"^#{2,4}\s+Feature:\s+(.+)$"
 )
 
 VALID_CATEGORIES = {
