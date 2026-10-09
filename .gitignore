@@ -20,7 +20,15 @@ archive
 # Kept A/B eval workspaces from run-skill-eval.py. Preserved on purpose so a
 # changed assertion can be re-scored offline with --rescore, but each one is a
 # full copy of a generated practice and its inputs.
-runs/
+# Exception: what a run concluded, and why a run is not to be quoted, outlives
+# the workspace it came from. Ignore the contents rather than the directory —
+# git does not descend into an excluded directory, so a negation under `runs/`
+# would never be reached.
+runs/*
+!runs/*/
+runs/*/*
+!runs/*/FINDING.md
+!runs/*/benchmark.json
 
 
 .claude/settings.local.json

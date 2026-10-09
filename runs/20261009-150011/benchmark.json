@@ -1,0 +1,27 @@
+{
+  "byArm": {
+    "with-skill": {
+      "cells": 1,
+      "mean_pass_rate": 0.0,
+      "mean_error_pass_rate": 1.0,
+      "median_total_tokens": 14676,
+      "median_duration_ms": 251695,
+      "median_cost_usd": 2.4701
+    },
+    "without-skill": {
+      "cells": 1,
+      "mean_pass_rate": 1.0,
+      "mean_error_pass_rate": 1.0,
+      "median_total_tokens": 331215,
+      "median_duration_ms": 3411148,
+      "median_cost_usd": 28.5865
+    }
+  },
+  "delta": {
+    "mean_pass_rate": -1.0,
+    "mean_error_pass_rate": 0.0,
+    "median_total_tokens": -316539,
+    "median_duration_ms": -3159453,
+    "median_cost_usd": -26.1164
+  }
+}
