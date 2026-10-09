@@ -1,6 +1,6 @@
 # Skill Specification Standard
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
@@ -38,7 +38,8 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
   - `document-review`: 680–699
   - `method-based-report` (type-specific): 700–719
   - Reserved for future report types: 720–799
-- `improve-tooling`: 800–999
+- `improve-tooling`: 800–949
+- Cross-cutting standards defined in this document: 950–999
 
 ### 1.2 Feature Grouping
 
@@ -307,3 +308,122 @@ python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive -
 ```
 
 With `--auto-pull`, remote-only dependencies are downloaded automatically before re-resolving.
+
+---
+
+## 13. Content Defect Reporting
+
+### 13.1 Scope
+
+This section applies to every skill that **consumes** practice, method, or baseline
+content it is not itself authoring in this run — the reporting family reading an
+effective context, `generate-method` and `create-baseline-method` reading a baseline and
+its dependency practices, `update-method` reading the document it revises, and
+`plan-from-feedback` reading documents named by register rows.
+
+### 13.2 The Rule: Accommodate, Then File
+
+When consumed content turns out to be defective, do both of these, in this order:
+
+1. **Accommodate the challenge.** Work around the defect and deliver the artifact. Pick
+   the next-best element, describe the progression you can evidence, say less where the
+   practice says less. Never halt the workflow over a defect in content you did not
+   author, and never ask the user whether to record it.
+2. **File it.** Every defect you worked around goes into the issue register as a Status
+   `New` row, so `/plan-from-feedback` can triage it against the document that owns it.
+
+A defect you accommodated and did not file is lost. The register is the only durable
+record — a note in the conversation is not one.
+
+### 13.3 What Counts as a Content Defect
+
+| Observation | File it? |
+|---|---|
+| Content is wrong, self-contradictory, or contradicts the source methodology it cites | Yes — `Issue` |
+| Content is absent, thin, or missing where the document's own structure implies it exists | Yes — `Enhancement` |
+| An element is modelled in a way you had to reason around and cannot justify from the document | Yes — `Question` |
+| Keleo Studio renders, navigates, or behaves oddly around the content | Yes — record it; studio-side triage omits what pgen-llm cannot act on |
+| The **user's source material** is thin or contradictory | No — that is an input gap, not a document defect. Raise it with the user. |
+| Output **this run** produced is wrong | No — fix it. A defect you can correct before handover is not register material. |
+| A skill instruction or utility script is at fault | No — that is `/improve-tooling` (§7.4, §11.3) |
+| A defect you fixed in this same run, in that same document | No — `update-method` and `plan-from-feedback` resolve in place; a row for an already-closed fix wastes a triager's time |
+
+A defect in a **dependency or baseline** is filed against *that* document, not against the
+one you are authoring. Resolve its canonical `name`, `version`, and `kind` from the
+document itself — never from the consuming document's reference to it.
+
+### 13.4 Collection
+
+Record each defect **at the point of discovery**, not from memory at the end of the run:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<slug>-<timestamp>.json \
+  --type Issue --summary "<title under 120 chars>" \
+  --description "<what was observed, where, and what was expected instead>" \
+  --document "<Canonical Document Name>" --document-version <version> --document-kind <kind> \
+  --element "<Exact Element Name>" --element-type <type>
+```
+
+The utility creates the file on first call, validates each draft as it is added, and
+declines to add the same summary against the same document twice — so one defect seen in
+three sections yields one row.
+
+Write the description for a triager who was not in this session: what the document says,
+what the practice implied it should say, and what you did instead. Do not pre-judge the
+resolution; triage owns that.
+
+### 13.5 Filing
+
+Once, before handover, invoke `report-issue` in mid-execution mode via the Skill tool:
+
+```
+Skill(report-issue) with:
+  Mode: mid-execution
+  Drafts: /tmp/keleo-defects-<slug>-<timestamp>.json
+  Context: <which skill and phase found them>
+```
+
+It enriches any missing document and element metadata, validates, duplicate-checks, and
+appends — without a confirmation round, because the run itself is the authorisation.
+Report the row numbers it returns in your own completion summary, alongside anything it
+skipped as a duplicate.
+
+### 13.6 Shared Gherkin Rules
+
+These rules are cross-cutting; they are not extracted into any skill's `specs-index.json`
+(the same arrangement as the shared rules in `reporting-foundation/REPORT-FOUNDATION.md`).
+
+#### Scenario: Consumed content defects are accommodated, not escalated (@rule:process-950)
+- Given: A skill is consuming practice, method, or baseline content it did not author in this run
+- When: Part of that content is wrong, missing, or self-contradictory
+- Then: The skill works around the defect and completes its deliverable
+- And: The workflow is not halted and the user is not asked whether to record it
+
+#### Scenario: Every accommodated defect reaches the register (@rule:process-951)
+- Given: A defect in consumed content was worked around during the run
+- When: The skill reaches handover
+- Then: A register row exists for that defect with Status "New"
+- And: The row names the document that owns the defect, not the document being authored
+
+#### Scenario: Defects are drafted at the point of discovery (@rule:process-952)
+- Given: A defect is observed mid-run
+- When: It is recorded
+- Then: `issue-register.py --add-draft` appends it to the run's drafts file immediately
+- And: The same defect observed again in the same run does not produce a second row
+
+#### Scenario: Defects fixed in-run are not filed (@rule:process-953)
+- Given: A skill corrects a defect in the document it is revising, within the same run
+- When: The run reaches handover
+- Then: No register row is filed for that defect
+
+#### Scenario: Non-content problems are routed elsewhere (@rule:process-954)
+- Given: The problem lies in the user's source material, this run's own output, or a skill or utility
+- When: The defect gate is applied
+- Then: No register row is filed
+- And: The problem is raised with the user, fixed in place, or routed to `/improve-tooling` respectively
+
+#### Scenario: Filed rows are surfaced at handover (@rule:process-955)
+- Given: Rows were filed during the run
+- When: The skill reports completion
+- Then: The filed row numbers are listed, with the document and element each concerns
+- And: Any draft skipped as a duplicate of an open row is named with the row that covers it

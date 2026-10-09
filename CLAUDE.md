@@ -781,6 +781,8 @@ The skill is the reciprocal of `/plan-from-feedback` — it fills the register's
 
 Register access is wrapped by `utils/issue-register.py` (gws CLI). The skill is defined in `.claude/skills/report-issue/SKILL.md`, with its behavioural contract in `contract.feature`.
 
+**Automatic filing from other skills.** Any skill consuming practice, method, or baseline content it did not author in that run follows `SKILL-STANDARD.md` §13: accommodate the defect, deliver the artifact, and file what it worked around. Defects are drafted at the point of discovery with `issue-register.py --add-draft` and filed as one batch at handover, by invoking `report-issue` in **mid-execution mode** — which skips capture and appends without a confirmation round, since the run itself is the authorisation. Validation failures and duplicates of open rows are skipped rather than filed, and the skill reports every row number it wrote. This covers the generation skills (defects in the baseline or dependencies), `update-method` (defects left standing outside the chosen mode), `plan-from-feedback` (defects no row covers), and the five reporting skills.
+
 ### Processing Feedback
 
 Use the `/plan-from-feedback` skill to triage and resolve issues from a feedback register:

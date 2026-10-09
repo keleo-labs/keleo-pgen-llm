@@ -28,6 +28,7 @@ This skill updates existing Practice or Method JSON files to align with the late
 | Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
 | Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Deferring or working around a defect instead of fixing it in this run | §13 — file what you leave standing with `/report-issue` |
 | Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
 | Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
 | Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
@@ -413,6 +414,26 @@ When the user requests updating ALL practices in a method/bundle:
 - **Completion:** Comparison report (what changed, what preserved, validation summary)
 
 **Backup:** Always run `python3 utils/backup-practice.py <directory>/` before overwriting.
+
+### Defects You Do Not Fix Here
+
+This skill fixes the document it is pointed at, so most defects it finds need no register
+row — a fix in this run closes the matter. Two kinds do need one:
+
+| Defect | Action |
+|---|---|
+| In the **baseline** or a **dependency practice** | File it. You are not editing those documents; the next run inherits the same problem. |
+| In the target document, but **out of the chosen mode's scope** or deliberately deferred | File it. The user chose Auto-Fix or Mode 3 over a full reanalysis; what you left standing must be visible to triage, not buried in a comparison report. |
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<slug>.json \
+  --type Issue --summary "<title>" --description "<observed / expected / why it was not fixed here>" \
+  --document "<Document Name>" --document-version <version> --document-kind <kind> \
+  --element "<Element Name>" --element-type <type>
+```
+
+File the batch at completion by invoking `report-issue` in mid-execution mode, and
+include the row numbers in the comparison report. Gate: `SKILL-STANDARD.md` §13.
 
 ---
 

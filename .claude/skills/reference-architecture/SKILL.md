@@ -45,6 +45,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 | Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 |
 | Creating or extending a utility script | §7.4 |
 | Finishing the workflow without auditing the session | §11 |
+| Working around a defect in the practice content you are consuming | §13 — accommodate it, then file it with `/report-issue` |
 
 ---
 

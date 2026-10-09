@@ -34,6 +34,7 @@ Each phase is delegated to a subagent that reads a **phase skill document** in `
 | Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
 | Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Working around a defect in a baseline or dependency practice | §13 — accommodate it, then file it with `/report-issue` |
 | Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
 | Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
 | Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
@@ -301,6 +302,27 @@ In plan mode:
      --dep-type <baseline|practice|method|bundle> --dep-name "<Name>" \
      --dep-path "<resolved-path>" --dep-version "<version>"
    ```
+
+### Defects in Inherited Content
+
+The baseline and the dependency practices are **inputs**, not your output — you do not
+edit them here. When one of them is defective (an alpha with no viable
+`contributesTo` target, a competency whose levels you have to work around, a state
+progression the baseline contradicts elsewhere), accommodate it and carry on mapping,
+then record it:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<practice-slug>.json \
+  --type Issue --summary "<title>" --description "<observed / expected / what you did instead>" \
+  --document "<Baseline or Dependency Name>" --document-version <version> \
+  --document-kind <practiceBaseline|practice|method> \
+  --element "<Element Name>" --element-type <type>
+```
+
+File against the document that **owns** the defect, with its own name, version and kind
+— not the practice you are authoring. Defects in your own output are fixed in Phase 3,
+never filed. Keep drafting through Phases 1–3 and file the batch once at handover by
+invoking `report-issue` in mid-execution mode. Gate and routing: `SKILL-STANDARD.md` §13.
 
 ---
 
@@ -742,10 +764,11 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 **After completing the skill workflow OR after completing planning**, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then:
 
-1. **Utils remediation (apply immediately)**: Audit session for inline scripts or workarounds → extend/create utilities
-2. **Permission gaps (propose to user)**: Bash commands that triggered prompts but could be auto-allowed
-3. **Skill improvements (propose to user)**: Instruction gaps that led to wrong output or repeated corrections
-4. **Report**: Tell the user what was remediated and what is proposed
+1. **Content defects (file immediately)**: If any defects in inherited content were drafted, invoke `report-issue` in mid-execution mode with the drafts path and report the row numbers (§13)
+2. **Utils remediation (apply immediately)**: Audit session for inline scripts or workarounds → extend/create utilities
+3. **Permission gaps (propose to user)**: Bash commands that triggered prompts but could be auto-allowed
+4. **Skill improvements (propose to user)**: Instruction gaps that led to wrong output or repeated corrections
+5. **Report**: Tell the user what was filed, what was remediated, and what is proposed
 
 ---
 

@@ -17,6 +17,7 @@
 | Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
 | Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Working around a defect in a parent baseline or any practice you are reading | §13 — accommodate it, then file it with `/report-issue` |
 | Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
 | Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
 | Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
@@ -899,6 +900,24 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 ```
 
 **Success criteria:** `error_pass_rate: 1.0` on full validation. All 5 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
+
+## Defects in Content You Read
+
+A baseline run often reads existing documents it is not authoring — a parent baseline
+being extended, practices consulted for how a concern is already modelled. Those are
+inputs. When one is defective, accommodate it (distil around the gap, do not inherit a
+contradiction) and record it rather than silently absorbing it:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<baseline-slug>.json \
+  --type Issue --summary "<title>" --description "<observed / expected / what you did instead>" \
+  --document "<Document Name>" --document-version <version> --document-kind practiceBaseline \
+  --element "<Element Name>" --element-type <type>
+```
+
+Defects in the baseline **you** are generating are fixed in Phase 3, never filed. File
+the batch once at completion by invoking `report-issue` in mid-execution mode, and report
+the row numbers. Gate and routing: `SKILL-STANDARD.md` §13.
 
 ## Skill Invocation
 

@@ -50,6 +50,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 | Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
 | Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Working around a defect in the practice content you are consuming | §13 — accommodate it, then file it with `/report-issue` |
 
 ---
 

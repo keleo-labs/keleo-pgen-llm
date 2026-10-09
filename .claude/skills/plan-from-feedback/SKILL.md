@@ -35,6 +35,7 @@ The reciprocal skill is `/report-issue`, which files new rows into the same regi
 | Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
 | Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Noticing a defect no register row covers while triaging | §13 — fix it in run, or file it with `/report-issue` |
 
 ---
 
@@ -463,3 +464,4 @@ After processing all actionable items:
 1. Present a summary of all issues processed, their resolutions, and the status updates written
 2. Note any issues that were set to Planned (awaiting action) or where clarification was needed
 3. If L2 or L3 changes were made, remind the user these may need separate commits in their respective repos
+4. File any defect you noticed while triaging that no register row covers (SKILL-STANDARD §13). Fixing it in this run and resolving it against the row you were working is fine — a row is only needed for what you leave standing. Draft them with `issue-register.py --add-draft` as you go, then invoke `report-issue` in mid-execution mode and report the row numbers alongside the resolutions.

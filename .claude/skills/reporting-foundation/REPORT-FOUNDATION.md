@@ -159,6 +159,35 @@ From the effective context, build a mental model of:
 
 ---
 
+## Content Defects (Steps 1–3)
+
+The practice you are reporting from is not yours to fix mid-report, and it will not always
+hold up. An alpha with two states, a pattern whose views all sit at the same state, a
+persona with no narrative, a checklist item that contradicts the state it belongs to —
+each forces you to write around a gap.
+
+**Accommodate it, then file it.** Write the report from what the practice does support;
+do not pad the gap with invention and do not stop to ask the user what to do. Then record
+the defect so it reaches triage:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<report-slug>.json \
+  --type Issue --summary "<title>" --description "<observed / expected / what you did instead>" \
+  --document "<Practice Name>" --document-version <version> --document-kind practice \
+  --element "<Element Name>" --element-type <type>
+```
+
+Defects in a dependency or baseline are filed against *that* document — read its name,
+version and kind from the document itself, not from the effective context's reference
+to it.
+
+Do this at the point of discovery, through Steps 1–3, not from memory at the end. File
+the batch once, before handover, by invoking `report-issue` in mid-execution mode with
+the drafts path. The full gate — what counts, what does not, how to route the rest — is
+`SKILL-STANDARD.md` §13.
+
+---
+
 ## Citation Pool (Step 2)
 
 Extract citations from the effective context to support claims and recommendations in the report. These are the original source documents cited by the practice — methodology papers, technical guides, vendor documentation, research — not references to the practice itself.
@@ -443,6 +472,9 @@ python3 utils/prompt-history.py reports/<report-slug>/ --add-decision \
 
 ### Handover
 
+If any content defects were drafted (see Content Defects above), file them now — invoke
+`report-issue` in mid-execution mode with the drafts path, before closing provenance.
+
 Then close the session provenance: record the markdown (and any PDF or published Doc URL) with `--add-deliverable`, and `--finalize`.
 
 Tell the user:
@@ -451,6 +483,7 @@ Tell the user:
 3. Which narrative structure(s) shaped the report
 4. Total word count and citation count
 5. The verification verdict, and any warnings they should see
+6. Any content defects filed to the register — row number, document, and element — and what you wrote around them
 
 ---
 

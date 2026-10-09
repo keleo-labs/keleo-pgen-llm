@@ -27,6 +27,45 @@ Feature: Report Issue
     Then the user is prompted for the register URL
     And the ID is saved under the same keys plan-from-feedback reads
 
+  # --- Invocation modes ---
+
+  Scenario: Mid-execution invocation skips capture
+    Given another skill invokes this skill with a drafts file path
+    When the skill runs
+    Then the user is not asked to describe any issue
+    And the drafts are filed as the calling skill wrote them
+
+  Scenario: Mid-execution invocation appends without confirmation
+    Given a mid-execution invocation with validated, non-duplicate drafts
+    When the append runs
+    Then no confirmation round is presented to the user
+    And the rows are written with Status "New"
+
+  Scenario: Mid-execution duplicate of an open issue
+    Given a mid-execution draft matches an open row above the similarity threshold
+    When duplicates are checked
+    Then that draft is not filed
+    And the covering row number is named in the report returned to the calling skill
+
+  Scenario: Mid-execution draft fails validation
+    Given a mid-execution draft is missing a required field
+    When the drafts are validated
+    Then that draft is not filed
+    And it is reported back unfiled rather than completed with invented detail
+
+  Scenario: Mid-execution enrichment cannot resolve a document
+    Given a mid-execution draft has no document version or kind
+    And the document resolves to multiple candidates
+    When document context is enriched
+    Then the user is not asked to disambiguate
+    And the unresolved fields are left blank and noted in the report
+
+  Scenario: Mid-execution report is compact
+    Given a mid-execution invocation completes
+    When the skill returns
+    Then the output lists only rows filed and rows skipped with reasons
+    And no further commentary is added to the conversation
+
   # --- Capture ---
 
   Scenario: Single issue capture
@@ -142,8 +181,9 @@ Feature: Report Issue
 
   # --- Append ---
 
-  Scenario: Confirmation before writing
-    Given validated drafts with no blocking duplicates
+  Scenario: Confirmation before writing on direct invocation
+    Given the skill was invoked directly by the user
+    And validated drafts with no blocking duplicates
     When the append is about to run
     Then the drafts are presented to the user
     And no row is written until the user confirms

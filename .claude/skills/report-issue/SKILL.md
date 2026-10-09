@@ -29,6 +29,57 @@ Capture issues, enhancements, and questions from the user and append them to the
 
 ---
 
+## Invocation Modes
+
+Auto-detect the mode from how the skill was reached.
+
+### Direct invocation
+
+The user invokes `/report-issue`, with or without a description of the problem. Run
+Steps 0–4 as written below, including the Step 4 confirmation round.
+
+### Mid-execution invocation
+
+Another skill found a defect in practice content it was consuming and is filing it under
+`SKILL-STANDARD.md` §13. The request names a drafts file:
+
+```
+Mode: mid-execution
+Drafts: /tmp/keleo-defects-<slug>-<timestamp>.json
+Context: <which skill and phase found them>
+```
+
+In this mode:
+
+| Step | Behaviour |
+|---|---|
+| 0 — Configuration | Unchanged. If the register or `issueReporterEmail` is unconfigured, ask once via AskUserQuestion exactly as a first direct run would. |
+| 1 — Capture | **Skip.** The drafts are already written. Do not re-elicit, and do not reword what the calling skill observed. |
+| 2 — Enrich | Run **only** for drafts missing `documentVersion`, `documentKind`, or `elementType`. Resolve them mechanically; leave blank what cannot be resolved. Never ask the user to disambiguate — pick nothing rather than guessing, and say so in the report. |
+| 3 — Check | Unchanged. Validate and duplicate-check in full. |
+| 4 — Append | **Append without a confirmation round.** The calling run is the authorisation. |
+
+The guard-rails below replace the confirmation prompt — do not skip them:
+
+- A draft that fails validation is **not** filed. Report it back unfiled rather than
+  repairing it with invented detail.
+- A draft matching an open row (New, Planned, In Progress) above threshold is **skipped**,
+  not filed twice. Name the row that covers it.
+- A draft matching a Resolved or Closed row is filed, with the earlier row number
+  referenced in the description — a recurrence is worth knowing about.
+
+Return a compact report for the calling skill to surface at its handover:
+
+```
+Filed: row 72 — [Issue] Pipeline Health declares only two states (CRM Foundations / Pipeline Health)
+Filed: row 73 — [Enhancement] Win Themes persona has no narrative (CRM Foundations / Win Themes)
+Skipped: "Pattern views repeat the same state" — row 68 [In Progress] already covers it
+```
+
+Do not emit any other commentary in this mode. The calling skill owns the conversation.
+
+---
+
 ## Supporting Standards
 
 `.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
@@ -80,7 +131,7 @@ Ask once, then reuse it silently on later runs.
 
 ---
 
-## Step 1: Capture
+## Step 1: Capture *(direct invocation only)*
 
 The user may report one issue or several in a single message. Treat each distinct problem as its own register row — do not merge unrelated observations into one entry, and do not split one problem into several rows just because it has multiple symptoms.
 
@@ -153,7 +204,20 @@ An issue about Keleo Studio rendering, navigation, or interaction is still worth
 
 ## Step 3: Validate and Check for Duplicates
 
-Write the drafts to a scratch file outside the repo (`/tmp/keleo-issues-<timestamp>.json`) as an array of issue objects:
+In mid-execution mode the drafts file already exists — skip to the validation commands below.
+
+In direct mode, build the drafts file outside the repo (`/tmp/keleo-issues-<timestamp>.json`), one issue at a time:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-issues-<timestamp>.json \
+  --type Issue --summary "Pattern views repeat the same alpha state" \
+  --description "Every pattern view in the annual rhythm shows Ecosystem Discover at Published..." \
+  --document "EcoTech Sales Foundations" --document-version 1.0.2 --document-kind method \
+  --element "Partner Ecosystem Annual Operating Rhythm" --element-type pattern \
+  --secondary "Ecosystem Discover" --secondary-type alpha
+```
+
+Each call validates the draft before writing, so a missing field surfaces immediately. The resulting file is an array of issue objects:
 
 ```json
 [
@@ -185,6 +249,8 @@ Fix every validation **error** before proceeding. Act on **warnings** — an ove
 
 ### Handling duplicates
 
+In mid-execution mode, apply the guard-rails from Invocation Modes instead of the table below: skip open duplicates, file recurrences, report both.
+
 | Existing row status | Action |
 |---|---|
 | New, Planned, or In Progress | Tell the user which row already covers it and ask via AskUserQuestion: skip, or file anyway because it's materially different |
@@ -197,7 +263,9 @@ Never silently drop an issue the user asked you to file, and never silently file
 
 ## Step 4: Confirm and Append
 
-The register is shared with other people. **Always show the user what will be written and get confirmation before appending** — this is an outward-facing write, and an inaccurate row costs a triager's time.
+In mid-execution mode, skip the confirmation and go straight to the append command, then return the compact report described in Invocation Modes.
+
+In direct mode: the register is shared with other people. **Always show the user what will be written and get confirmation before appending** — this is an outward-facing write, and an inaccurate row costs a triager's time.
 
 Present the drafts as a compact table (Type, Summary, Document, Element) plus the full description text for each, then confirm.
 

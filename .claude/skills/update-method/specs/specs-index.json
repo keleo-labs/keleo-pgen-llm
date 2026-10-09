@@ -19,7 +19,7 @@
         "assess-practice.py is run first to determine suggestedUpdateMode",
         "The update mode is auto-fix, remap, light-reanalysis, or full-reanalysis based on assessment output"
       ],
-      "line": 686,
+      "line": 707,
       "assess_categories": [],
       "automatable": false
     },
@@ -37,7 +37,7 @@
         "backup-practice.py has created a timestamped backup of the directory",
         "The backup contains all JSON and markdown files"
       ],
-      "line": 692,
+      "line": 713,
       "assess_categories": [],
       "automatable": false
     },
@@ -55,7 +55,7 @@
         "Fix utilities are run without user interaction",
         "Re-assessment confirms 0 errors before reporting success"
       ],
-      "line": 698,
+      "line": 719,
       "assess_categories": [],
       "automatable": false
     },
@@ -73,7 +73,7 @@
         "discover-dependencies.py resolves all baselinePracticeName and practiceDependencyNames",
         "Resolved dependencies are confirmed with the user before proceeding"
       ],
-      "line": 704,
+      "line": 725,
       "assess_categories": [],
       "automatable": false
     },
@@ -91,7 +91,7 @@
         "All valid existing alphas, activities, work products, and narratives are preserved",
         "Only superseded or invalid content is replaced"
       ],
-      "line": 710,
+      "line": 731,
       "assess_categories": [],
       "automatable": false
     },
@@ -109,7 +109,7 @@
         "eval-skill-output.py is run with error_pass_rate checked",
         "The result is reported to the user with any remaining warnings"
       ],
-      "line": 716,
+      "line": 737,
       "assess_categories": [],
       "automatable": false
     },
@@ -127,7 +127,7 @@
         "diff-practice-json.py shows what changed vs the original",
         "The user sees added, removed, and modified elements"
       ],
-      "line": 722,
+      "line": 743,
       "assess_categories": [],
       "automatable": false
     },
@@ -145,7 +145,7 @@
         "The user is asked to choose between remap, light-reanalysis, and full-reanalysis",
         "The recommended mode and reason from assessment are presented"
       ],
-      "line": 728,
+      "line": 749,
       "assess_categories": [],
       "automatable": false
     },
@@ -164,7 +164,7 @@
         "The ChangeRequest is written to the practice directory",
         "A Downstream Impact Report is presented to the user listing affected practices"
       ],
-      "line": 734,
+      "line": 755,
       "assess_categories": [],
       "automatable": false
     },
@@ -184,7 +184,7 @@
         "Each dependent is classified as auto-propagatable or manual remap needed",
         "The user is told which practices need /update-method remap vs auto-fix"
       ],
-      "line": 741,
+      "line": 762,
       "assess_categories": [],
       "automatable": false
     },
@@ -202,7 +202,7 @@
         "A dry-run is shown to the user first",
         "Changes are only applied after user confirms"
       ],
-      "line": 749,
+      "line": 770,
       "assess_categories": [],
       "automatable": false
     },
@@ -221,7 +221,7 @@
         "UPDATE sections retain valid existing entries as baseline",
         "New content is traceable to source materials or the stated change context"
       ],
-      "line": 755,
+      "line": 776,
       "assess_categories": [],
       "automatable": false
     },
@@ -241,7 +241,7 @@
         "Only the gates for phases the update touched are run",
         "Any fix applied in response to a finding is followed by rebundling"
       ],
-      "line": 762,
+      "line": 783,
       "assess_categories": [],
       "automatable": false
     }

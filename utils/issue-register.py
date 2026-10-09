@@ -17,6 +17,14 @@ Usage:
     # Validate a draft issue file without touching the register (offline)
     python3 utils/issue-register.py --validate drafts/issues.json
 
+    # Accumulate one defect at a time into a drafts file (offline; creates it
+    # if absent). Used by skills that find content defects mid-run and file
+    # them in one batch at the end — see SKILL-STANDARD.md §13.
+    python3 utils/issue-register.py --add-draft /tmp/keleo-defects-crm.json \
+        --type Issue --summary "Pipeline Health has two states" \
+        --description "The alpha declares Identified and Qualified only..." \
+        --document "CRM Foundations" --element "Pipeline Health" --element-type alpha
+
     # Check drafts against existing rows for near-duplicates
     python3 utils/issue-register.py --check-duplicates drafts/issues.json
 
@@ -69,6 +77,7 @@ Draft issue file format — a single object or an array of objects:
 import argparse
 import difflib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -285,6 +294,11 @@ def validate_drafts(drafts, default_email=None):
 
 def normalize(text):
     return re.sub(r"[^a-z0-9 ]", " ", (text or "").lower()).split()
+
+
+def normalize_key(text):
+    """Whitespace- and punctuation-insensitive key for exact-repeat matching."""
+    return " ".join(normalize(text))
 
 
 def similarity(a, b):
@@ -535,6 +549,59 @@ def cmd_validate(drafts, default_email, as_json):
     return errors
 
 
+def cmd_add_draft(path, draft, default_email, as_json):
+    """Append one draft to a drafts file, creating it if absent.
+
+    Offline — never contacts the register. Validates the new draft on its own
+    so a malformed defect is rejected at the point of discovery rather than at
+    the end of a long run.
+    """
+    errors, warnings = validate_drafts([draft], default_email)
+    if errors:
+        if as_json:
+            print(json.dumps({"written": False, "errors": errors, "warnings": warnings}, indent=2))
+        else:
+            for message in errors:
+                print(f"ERROR: {message}", file=sys.stderr)
+            print("Nothing written.", file=sys.stderr)
+        return 1
+
+    existing = []
+    if os.path.exists(path):
+        existing = load_drafts(path)
+
+    summary_key = normalize_key(draft.get("summary"))
+    document_key = normalize_key(draft.get("documentName"))
+    for other in existing:
+        if normalize_key(other.get("summary")) == summary_key and \
+                normalize_key(other.get("documentName")) == document_key:
+            message = (f"Already in {path}: \"{draft['summary'].strip()}\" "
+                       f"against the same document — not added twice.")
+            if as_json:
+                print(json.dumps({"written": False, "skipped": "duplicate-in-file",
+                                  "reason": message, "count": len(existing)}, indent=2))
+            else:
+                print(message)
+            return 0
+
+    existing.append({k: v for k, v in draft.items() if v})
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
+            f.write("\n")
+    except OSError as exc:
+        fail(f"Cannot write draft file {path}: {exc}")
+
+    if as_json:
+        print(json.dumps({"written": True, "path": path, "count": len(existing),
+                          "warnings": warnings}, indent=2))
+    else:
+        for message in warnings:
+            print(f"  WARN:  {message}")
+        print(f"Added draft {len(existing)} to {path}: {draft['summary'].strip()}")
+    return 0
+
+
 def cmd_check_duplicates(spreadsheet_id, drafts, threshold, as_json):
     sheet_title, _sheet_id, _table = get_table(spreadsheet_id)
     _header, rows = read_rows(spreadsheet_id, sheet_title)
@@ -646,6 +713,9 @@ def main():
                       help="List register issues, optionally filtered by --status")
     mode.add_argument("--validate", metavar="FILE",
                       help="Validate a draft issue file without contacting the register")
+    mode.add_argument("--add-draft", metavar="FILE",
+                      help="Append one draft issue (from the --type/--summary/... flags) "
+                           "to a drafts file, creating it if absent. Offline.")
     mode.add_argument("--check-duplicates", metavar="FILE",
                       help="Compare draft issues against existing register rows")
     mode.add_argument("--append", metavar="FILE",
@@ -669,8 +739,44 @@ def main():
                         help="With --append or --resolve: preview without writing")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    draft = parser.add_argument_group(
+        "draft fields", "Used with --add-draft to describe the single issue being added")
+    draft.add_argument("--type", choices=VALID_TYPES, help="Issue, Enhancement, or Question")
+    draft.add_argument("--summary", help=f"Issue title, under {SUMMARY_MAX} characters")
+    draft.add_argument("--description", help="What was observed, where, and what was expected")
+    draft.add_argument("--document", metavar="NAME",
+                       help="Canonical name of the document the issue is about")
+    draft.add_argument("--document-version", metavar="VERSION",
+                       help="Version read from the document, never invented")
+    draft.add_argument("--document-kind", metavar="KIND", choices=VALID_KINDS,
+                       help="practice, practiceBaseline, or method")
+    draft.add_argument("--element", metavar="NAME",
+                       help="Exact name of the element the issue is about")
+    draft.add_argument("--element-type", metavar="TYPE", help="Practice Language element type")
+    draft.add_argument("--secondary", metavar="NAME",
+                       help="Second element, when the issue concerns a relationship")
+    draft.add_argument("--secondary-type", metavar="TYPE", help="Element type of --secondary")
+    draft.add_argument("--page", metavar="PAGE", default="cli",
+                       help="Where the issue was observed (default: cli)")
+
     args = parser.parse_args()
     default_email = args.email or load_user_config().get("issueReporterEmail")
+
+    if args.add_draft:
+        sys.exit(cmd_add_draft(args.add_draft, {
+            "type": args.type,
+            "summary": args.summary,
+            "description": args.description,
+            "documentName": args.document,
+            "documentVersion": args.document_version,
+            "documentKind": args.document_kind,
+            "selectedElement": args.element,
+            "elementType": args.element_type,
+            "secondaryElement": args.secondary,
+            "secondaryType": args.secondary_type,
+            "page": args.page,
+            "email": args.email,
+        }, default_email, args.json))
 
     if args.validate:
         errors = cmd_validate(load_drafts(args.validate), default_email, args.json)
