@@ -437,6 +437,75 @@ def source_stem(source):
     return "page"
 
 
+def _clean_segment(seg):
+    """Reduce one path segment to a filesystem-safe token."""
+    seg = re.sub(r"\.(x?html?|htm)$", "", seg, flags=re.IGNORECASE)
+    return re.sub(r"[^A-Za-z0-9._-]+", "-", seg).strip("-")
+
+
+def _meaningful_segments(source):
+    """Path segments with the generic trailing ones removed."""
+    generic = {"", "index", "index.html", "index.htm"}
+    segments = re.split(r"[/\\]", source.split("?")[0].split("#")[0])
+    return [seg for seg in segments if seg and seg.lower() not in generic]
+
+
+def assign_stems(sources):
+    """Give every source a unique, self-describing output stem.
+
+    Documentation sets collide constantly on their last path segment: the
+    1.1 and 1.3 copies of the same guide both end `.../html-single/architecture/index`.
+    Numbering the second one `architecture-2` makes the files unique but not
+    identifiable — a reader has no way to tell which version they are holding,
+    and picking the wrong one leads to confident conclusions about the wrong
+    document.
+
+    So on collision, disambiguate with the nearest preceding path segment that
+    actually differs across the colliding group (`1.3-architecture`,
+    `1.1-architecture`), falling back to an ordinal only when no segment
+    distinguishes them.
+    """
+    bases = [source_stem(s) for s in sources]
+    stems = list(bases)
+
+    groups = {}
+    for i, base in enumerate(bases):
+        groups.setdefault(base, []).append(i)
+
+    for base, idxs in groups.items():
+        if len(idxs) == 1:
+            continue
+
+        segs = {i: _meaningful_segments(sources[i]) for i in idxs}
+        longest = max(len(s) for s in segs.values())
+        resolved = False
+
+        for back in range(1, longest):
+            values = {
+                i: _clean_segment(segs[i][-1 - back]) if len(segs[i]) > back else ""
+                for i in idxs
+            }
+            if len(set(values.values())) == len(idxs) and all(values.values()):
+                for i in idxs:
+                    stems[i] = f"{values[i]}-{base}"
+                resolved = True
+                break
+
+        if not resolved:
+            for n, i in enumerate(idxs, 1):
+                stems[i] = base if n == 1 else f"{base}-{n}"
+
+    # Disambiguation can itself collide with an unrelated stem; settle that
+    # positionally, since by here the paths genuinely offer nothing to tell
+    # them apart.
+    final = []
+    used = {}
+    for stem in stems:
+        used[stem] = used.get(stem, 0) + 1
+        final.append(stem if used[stem] == 1 else f"{stem}-{used[stem]}")
+    return final
+
+
 def extract_batch(sources, output_dir, want_anchors=False, headings_only=False):
     """Extract many sources into one directory, one text file per source.
 
@@ -449,14 +518,8 @@ def extract_batch(sources, output_dir, want_anchors=False, headings_only=False):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     entries = []
-    seen = {}
-    for source in sources:
-        stem = source_stem(source)
-        # Disambiguate collisions rather than silently overwriting.
-        seen[stem] = seen.get(stem, 0) + 1
-        if seen[stem] > 1:
-            stem = f"{stem}-{seen[stem]}"
-
+    stems = assign_stems(sources)
+    for source, stem in zip(sources, stems):
         entry = {"source": source, "stem": stem}
         try:
             tokens = parse_source(load_html_or_raise(source))
