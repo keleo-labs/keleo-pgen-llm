@@ -17,6 +17,11 @@ reviews/*
 practice-resources/*
 archive
 
+# Kept A/B eval workspaces from run-skill-eval.py. Preserved on purpose so a
+# changed assertion can be re-scored offline with --rescore, but each one is a
+# full copy of a generated practice and its inputs.
+runs/
+
 
 .claude/settings.local.json
 .claude/settings.json
