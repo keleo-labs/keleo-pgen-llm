@@ -204,6 +204,12 @@ unconnected observations. Two to four sentences. (@rule:report-618)>
 
 ---
 
+## Verification
+
+Lint and the verification gate are mandatory before handover — see REPORT-FOUNDATION → Output (Step 3). Brief the `type-specific` verifier on this skill's row in `verification-foundation/verifiers/report.md`: every criticism cites the specific part of the reviewed document it refers to, recommendations are actionable rather than restatements of the gap, and strengths are identified as well as gaps.
+
+Give the `source-fidelity` verifier the reviewed document as a source. A review's claims about what a document says must trace to that document — misquoting the thing under review is this skill's version of an invented statistic.
+
 ## Post-Completion
 
 Record the review report — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).

@@ -689,14 +689,17 @@ Mechanical validation checks structure, counts and cross-references. The verific
 
 The protocol and the agent briefs live in `.claude/skills/verification-foundation/` — a shared foundation, **not a skill**, following the same arrangement as `reporting-foundation` and `deck-foundation`. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach.
 
-| Phase | Verifiers |
+| Stage | Verifiers |
 |-------|-----------|
 | 1 — Analysis | `source-fidelity`, `source-coverage`, `citation-integrity` |
 | 1.5 — Distillation (baseline only) | `distillation-fidelity`, `focus-coherence` |
 | 2 — Mapping | `source-fidelity`, `alpha-semantics`, `coverage`, `naming-consistency`, plus `cross-practice-consistency` once for methods |
 | 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
+| Reports — single gate | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style`, plus a `type-specific` verifier for all but `method-based-report` |
 
-Findings are consolidated and gated by `utils/verification-gate.py`. **Confirmed errors block the phase.** Warnings flow into the user review gate. `update-method` scopes its gates to changed elements only.
+The reporting skills have one gate rather than four, because the workflow produces one durable artifact: Steps 1–2 are in-context analysis and Step 0 is already user-gated in plan mode. Their gate sits in `reporting-foundation/REPORT-FOUNDATION.md` → Output (Step 3) and runs before any PDF export or Google Doc publish.
+
+Findings are consolidated and gated by `utils/verification-gate.py` (`--phase report` for reports). **Confirmed errors block the phase.** Warnings flow into the user review gate. `update-method` scopes its gates to changed elements only.
 
 The gate costs real tokens — roughly 12 verifier agents for a single practice, 30 for a four-practice method, with sources read a second time at Phases 1 and 2. `VERIFY-FOUNDATION.md` §11 sets the sampling, concurrency and effort controls that keep this proportionate.
 
@@ -718,7 +721,8 @@ All reporting skills follow the same workflow:
 2. **Opens a Workspace** — Creates `reports/<report-slug>/` and initialises `00-prompt-history.md` via `utils/prompt-history.py --type report`
 3. **Loads Context** — Resolves the practice via `utils/resolve-context.py --transitive`
 4. **Analyzes & Selects** — Extracts domain knowledge and selects narrative structures
-5. **Generates Report** — Writes a standalone markdown report into the workspace, then records deliverables and finalises the history
+5. **Generates Report** — Writes a standalone markdown report into the workspace
+6. **Lints and Verifies** — Runs `utils/lint-report.py` with all checks, then the verification gate (see Verifying Generated Output above), before recording deliverables and finalising the history
 
 Reports use narrative types from the baseline (Report Narrative, Essay Narrative, STAR, SDLC, etc.) to organise content, and practice domain knowledge to inform the analysis — but present everything in plain English with no Keleo terminology.
 

@@ -1,5 +1,7 @@
 # Report Foundation
 
+**Version:** 1.1.0
+
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
 ---
@@ -406,6 +408,41 @@ Default to the middle range unless the user specifies otherwise.
 
 Write the report to `reports/<report-slug>/<report-slug>.md` using the Write tool, in the workspace created at Step 0.
 
+### Mechanical lint (required)
+
+Earlier sections point at `lint-report.py` with a `--checks` subset for one concern at a time. Those are hints while drafting. Once the report is written, run **all** checks:
+
+```bash
+python3 utils/lint-report.py reports/<report-slug>/<report-slug>.md
+```
+
+Exits 1 on any error. Clear every error before the verification gate — a mechanically broken report wastes verifier tokens.
+
+### Verification gate (required)
+
+The lint checks the report's shape: terminology leaks, citation correspondence, diagram rendering, attribution links, section framing, length. It cannot tell you whether a claim is true, whether a cited work exists, or whether the report actually used the practice it names.
+
+Read `.claude/skills/verification-foundation/verifiers/report.md` and launch its verifiers in a single message. Read `VERIFY-FOUNDATION.md` §4–5 first if you have not this session.
+
+```bash
+python3 utils/verification-gate.py reports/<report-slug>/ --phase report --gate --summary \
+  --expect source-fidelity,citation-integrity,domain-grounding,register-and-style,type-specific
+```
+
+Drop `type-specific` for `method-based-report`, which has no type-specific verifier.
+
+Exit 1 means a blocking error survived — follow the remediation loop in `VERIFY-FOUNDATION.md` §8 before handing the report over. **Run this before any PDF export or Google Doc publish**; publishing a report that fails the gate means republishing it.
+
+Record the verdict:
+
+```bash
+python3 utils/prompt-history.py reports/<report-slug>/ --add-decision \
+  --decision-label "Verification Gate" \
+  --decision-text "<verdict>: <N> errors, <M> warnings. <What was fixed or dismissed, and on what evidence>"
+```
+
+### Handover
+
 Then close the session provenance: record the markdown (and any PDF or published Doc URL) with `--add-deliverable`, and `--finalize`.
 
 Tell the user:
@@ -413,6 +450,7 @@ Tell the user:
 2. Which practice/method provided the analytical framework
 3. Which narrative structure(s) shaped the report
 4. Total word count and citation count
+5. The verification verdict, and any warnings they should see
 
 ---
 
@@ -493,6 +531,7 @@ When the user requests N separate reports from a shared method (e.g., one report
 4. **Create a workspace and history per report** — before launching agents, create `reports/<report-slug>/` for each report and `--init` its prompt history, recording the shared plan decisions (practice selection, narrative strategy) into each one. Agents inherit a workspace rather than deciding on one.
 5. **Launch parallel agents** — construct a detailed prompt per report embedding: the report directory, subject, audience, narrative strategy, extracted domain knowledge (alphas, outcomes, patterns, citations), and any supplementary method knowledge. Launch all agents in a single message for concurrent execution.
 6. **Each agent writes independently** — each agent generates its report to `reports/<report-slug>/<report-slug>.md` using the standard Steps 1–3 workflow, and records its own dependencies, phases, and deliverables.
+7. **Verify every report** — a full verifier set per report, four agents at a time, and one gate per report directory. Batching across reports is what keeps this affordable; sampling is not an option, because an invented statistic in an unsampled report ships. Lint each report first, as in Output (Step 3).
 
 **Hook caveat:** the active-history pointer is global, so automatic interaction capture follows whichever history was initialised last. In a batch run, record anything that matters to a specific report with an explicit `--add-interaction` against that report's directory rather than relying on the hooks.
 
@@ -552,6 +591,42 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - And: it records the user's prompt, each practice/method resolved as a dependency, and the narrative strategy decision
 - And: it lists the report as a deliverable
 - And: the session is finalized
+
+#### Scenario: Report is linted and verified before handover (@rule:report-723)
+- Given: a report has been written to its workspace
+- When: the report is handed to the user, exported, or published
+- Then: `lint-report.py` has been run with all checks and reports no errors
+- And: the verification gate has been run with `--expect` naming every verifier launched
+- And: no blocking error survives reconciliation
+- And: the verdict is recorded in `00-prompt-history.md` as a decision
+- And: both ran before any PDF export or Google Doc publish
+
+### Feature: Source Fidelity
+
+These rules are checked by verification agents, not by a script — no tool can tell whether a claim is true. The briefs live in `.claude/skills/verification-foundation/verifiers/report.md`.
+
+#### Scenario: Claims are grounded or owned (@rule:report-720)
+- Given: a report makes a factual claim, statistic, benchmark, or attributed recommendation
+- When: the source fidelity verifier runs
+- Then: the claim traces to the effective context, traces to a cited source, or is the report's own analysis
+- And: a quantified claim with no source is reported as an error
+- And: the report's own analysis reads as analysis rather than as established fact
+
+#### Scenario: Cited works exist and support their claims (@rule:report-721)
+- Given: a report cites a source in support of a claim
+- When: the citation integrity verifier runs
+- Then: the cited work exists with the stated author, date and publisher
+- And: its URL resolves and points at the work rather than a site root
+- And: the cited work supports what the sentence attributes to it
+- And: a citation for a work that does not exist is reported as an error
+
+#### Scenario: The named framework was actually used (@rule:report-722)
+- Given: a report attributes its analytical framework to a practice or method
+- When: the domain grounding verifier runs
+- Then: the selected narrative structure is reconstructable from the section sequence
+- And: the report's dimensions, criteria and recommendations derive from the practice's content
+- And: a framework named in the attribution line but unused in the report is reported as an error
+- And: a report that would read identically with no practice at all is reported as an error
 
 ### Feature: Diagrams
 

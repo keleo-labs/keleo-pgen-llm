@@ -127,6 +127,10 @@ For multi-practice reports, also follow the Multi-Source Reports section.
 
 ---
 
+## Verification
+
+Lint and the verification gate are mandatory before handover — see REPORT-FOUNDATION → Output (Step 3). This skill has **no type-specific verifier**, so run the four base verifiers and omit `type-specific` from `--expect`.
+
 ## Post-Completion
 
 Record the report — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).

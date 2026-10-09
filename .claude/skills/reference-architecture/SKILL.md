@@ -239,6 +239,10 @@ read closely. Two to four sentences. (@rule:report-618)>
 
 ---
 
+## Verification
+
+Lint and the verification gate are mandatory before handover — see REPORT-FOUNDATION → Output (Step 3). Brief the `type-specific` verifier on this skill's row in `verification-foundation/verifiers/report.md`: options genuinely distinct rather than variations of one design, each evaluated against the same stated framework, and sizing figures sourced rather than silently estimated.
+
 ## Post-Completion
 
 Record the architecture document — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).

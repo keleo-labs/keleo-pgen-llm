@@ -40,3 +40,24 @@ Feature: Project Plan Generation
     When the plan is generated
     Then the plan distinguishes between what the PoC will and will not demonstrate
     And success criteria focus on validation rather than production readiness
+
+  Scenario: Plan is linted and verified before handover
+    Given a plan has been written to its workspace
+    When it is handed over, exported, or published
+    Then lint-report.py has run with all checks and reports no errors
+    And the verification gate has run with --expect naming every verifier launched
+    And no blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: Type-specific verification of estimates and scope
+    Given the verification gate runs for a project plan
+    When the type-specific verifier checks the plan
+    Then every estimate traces to a stated assumption
+    And the assumptions are listed in the plan rather than left implied
+    And a SOW's scope matches the plan's activities and deliverables
+
+  Scenario: SOW is verified as its own deliverable
+    Given a SOW was produced alongside the plan
+    When the verification gate runs
+    Then the SOW is linted and verified in its own right
+    And it is not treated as covered by the plan's verdict

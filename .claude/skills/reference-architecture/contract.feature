@@ -38,3 +38,18 @@ Feature: Reference Architecture Generation
     When the architecture document is generated
     Then the executive summary describes key trade-offs instead of a recommendation
     And the comparison section presents balanced assessment without a verdict
+
+  Scenario: Document is linted and verified before handover
+    Given an architecture document has been written to its workspace
+    When it is handed over, exported, or published
+    Then lint-report.py has run with all checks and reports no errors
+    And the verification gate has run with --expect naming every verifier launched
+    And no blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: Type-specific verification of architecture options
+    Given the verification gate runs for an architecture document
+    When the type-specific verifier checks the options
+    Then each option is genuinely distinct rather than a variation of one design
+    And every option is evaluated against the same stated evaluation framework
+    And sizing figures and capacity numbers are sourced rather than silently estimated

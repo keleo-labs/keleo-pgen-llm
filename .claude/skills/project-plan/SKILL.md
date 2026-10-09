@@ -309,6 +309,12 @@ later phase, before the subsections. Two to four sentences. (@rule:report-618)>
 
 ---
 
+## Verification
+
+Lint and the verification gate are mandatory before handover — see REPORT-FOUNDATION → Output (Step 3). Brief the `type-specific` verifier on this skill's row in `verification-foundation/verifiers/report.md`: every estimate traces to a stated assumption, the assumptions are listed rather than implied, and a SOW's scope matches the plan's activities and deliverables without quietly widening or narrowing them.
+
+Where a SOW was produced, lint and verify it too — it is a second deliverable, and the one with commercial consequences.
+
 ## Post-Completion
 
 Record the plan, the SOW if one was produced, and any PDF or published Google Doc URL as separate deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance). The SOW is a second document in the same workspace: `reports/<report-slug>/<report-slug>-sow.md`.

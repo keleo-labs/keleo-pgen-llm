@@ -36,3 +36,19 @@ Feature: Decision Analysis
     When the skill enters planning
     Then candidate options are proposed from the practice's domain knowledge
     And the user confirms or adjusts the option list before analysis
+
+  Scenario: Analysis is linted and verified before handover
+    Given a decision analysis has been written to its workspace
+    When it is handed over, exported, or published
+    Then lint-report.py has run with all checks and reports no errors
+    And the verification gate has run with --expect naming every verifier launched
+    And no blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: Type-specific verification of balance
+    Given the verification gate runs for a decision analysis
+    When the type-specific verifier checks the options
+    Then every option receives comparable depth of treatment
+    And no option is weakened by thin treatment rather than by evidence
+    And stated trade-offs are real rather than token weaknesses on a favoured option
+    And the recommendation follows from the analysis rather than the analysis being arranged to reach it

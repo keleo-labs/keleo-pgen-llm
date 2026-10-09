@@ -217,6 +217,12 @@ there are and what separates them. Two to four sentences. (@rule:report-618)>
 
 ---
 
+## Verification
+
+Lint and the verification gate are mandatory before handover — see REPORT-FOUNDATION → Output (Step 3). Brief the `type-specific` verifier on this skill's row in `verification-foundation/verifiers/report.md`: options get balanced depth with none strawmanned by thin treatment, stated trade-offs are real rather than token weaknesses on a favoured option, and the verdict follows from the analysis rather than the analysis being arranged to reach it.
+
+That last one is this skill's characteristic failure. A decision analysis that reads as justification for a conclusion already held is worse than no analysis, because it launders a preference as a finding.
+
 ## Post-Completion
 
 Record the analysis — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).

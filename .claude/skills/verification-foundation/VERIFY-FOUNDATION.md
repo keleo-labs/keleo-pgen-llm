@@ -46,6 +46,9 @@ verifier tokens.
 | `generate-method` | Phase 1, Phase 2, Phase 3 |
 | `create-baseline-method` | Phase 1, Phase 1.5, Phase 2, Phase 3 |
 | `update-method` | Scoped to changed elements only — see §9 |
+| The five reporting skills | One gate, after the report is written — see `verifiers/report.md` |
+
+The reporting skills have one gate rather than several because their workflow produces one durable artifact: Steps 1–2 are in-context analysis, and Step 0 is already user-gated in plan mode. Their mechanical predecessor is `lint-report.py` rather than `eval-skill-output.py`.
 
 ---
 
@@ -258,6 +261,7 @@ that keep this proportionate:
 | `verifiers/phase-1.5.md` | Distillation (baseline only) | `distillation-fidelity`, `focus-coherence` |
 | `verifiers/phase-2.md` | Mapping | `source-fidelity`, `alpha-semantics`, `coverage`, `naming-consistency`, `cross-practice-consistency` |
 | `verifiers/phase-3.md` | JSON generation | `generation-drift`, `reference-citation-fidelity` |
+| `verifiers/report.md` | Reports (single gate) | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style`, `type-specific` |
 
 Each brief is literal prompt text. Pass it through to the Agent tool with the paths
 filled in — do not paraphrase it, or the calibration described in §5 is lost.

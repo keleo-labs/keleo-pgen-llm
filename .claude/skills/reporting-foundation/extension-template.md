@@ -12,18 +12,28 @@ How to create a new specialised reporting skill that builds on the shared report
 4. **Write the SKILL.md** — follow the template below
 5. **Register** — add the skill to `CLAUDE.md` directory structure and skill descriptions
 6. **Add trigger patterns** — in the SKILL.md frontmatter
+7. **Declare the type-specific verifier** — add a row to the per-type table in `.claude/skills/verification-foundation/verifiers/report.md`, and a Verification section to the SKILL.md pointing at it (see Design Decisions below)
 
 ### Current Rule ID Allocation (600–799)
 
 | Owner | Range |
 |-------|-------|
-| Shared foundation (REPORT-FOUNDATION.md) | 600–619 |
+| Shared foundation (REPORT-FOUNDATION.md) | 600–619, **720–739** |
 | reference-architecture | 620–639 |
 | project-plan | 640–659 |
 | decision-analysis | 660–679 |
 | document-review | 680–699 |
 | method-based-report (type-specific) | 700–719 |
-| Reserved | 720–799 |
+| Reserved | 740–799 |
+
+The foundation holds two blocks because 600–619 filled up. Its verification rules
+(720–723) took the next free block rather than spilling into 620–639, which
+`reference-architecture` already uses up to 624. **Check actual usage before claiming a
+range** — this table has been wrong before:
+
+```bash
+grep -roh "@rule:report-[0-9]*" .claude/skills/ | sort -u
+```
 
 ---
 
@@ -165,3 +175,5 @@ When designing a new reporting skill, decide:
 3. **What output structure is mandatory?** Specialised skills define a fixed output skeleton. This is their main value — users know what they'll get. The base skill's output structure is flexible.
 
 4. **Which Gherkin rules encode type-specific quality?** These rules distinguish the specialised skill from the base. They should be verifiable and specific (not just "report is good").
+
+5. **What does this type's verification gate need beyond the base four?** Every reporting skill inherits lint plus the verification gate from REPORT-FOUNDATION → Output (Step 3), with `source-fidelity`, `citation-integrity`, `domain-grounding` and `register-and-style`. Most types also warrant a `type-specific` verifier. Ask what this report type gets *wrong* in a way the base four would not catch — a decision analysis arranged to reach a predetermined verdict, a plan whose estimates rest on unstated assumptions — and add a row for it to the per-type table in `.claude/skills/verification-foundation/verifiers/report.md`. If the honest answer is nothing, say so in the skill's Verification section and omit `type-specific` from `--expect`, as `method-based-report` does.

@@ -75,8 +75,15 @@ def _normalize(text):
 
 
 def _phase_label(phase):
-    """Render a phase number for filenames: 1, 1.5, 2, 3 (never 1.0)."""
-    as_float = float(phase)
+    """Render a phase for filenames: 1, 1.5, 2, 3 (never 1.0), or a named stage.
+
+    The reporting skills have one gate rather than numbered phases, so they
+    pass `report` and their findings land at `report-<verifier>.json`.
+    """
+    try:
+        as_float = float(phase)
+    except (TypeError, ValueError):
+        return str(phase)
     return str(int(as_float)) if as_float.is_integer() else str(as_float)
 
 
@@ -84,9 +91,18 @@ def verification_dir(directory):
     return Path(directory) / VERIFICATION_DIRNAME
 
 
+def _prefix(phase):
+    """Filename prefix for a stage: `phase-2-` for a numbered phase, `report-`
+    for a named one. A named stage is already its own word, so `phase-report-`
+    would read as a phase called "report".
+    """
+    label = _phase_label(phase)
+    return f"phase-{label}-" if label[0].isdigit() else f"{label}-"
+
+
 def findings_path(directory, phase, verifier):
     """The path a verification agent should write its findings to."""
-    return verification_dir(directory) / f"phase-{_phase_label(phase)}-{verifier}.json"
+    return verification_dir(directory) / f"{_prefix(phase)}{verifier}.json"
 
 
 def discover_inputs(directory, phase):
@@ -99,7 +115,7 @@ def discover_inputs(directory, phase):
     if not vdir.is_dir():
         return [], None
 
-    prefix = f"phase-{_phase_label(phase)}-"
+    prefix = _prefix(phase)
     reconcile = None
     files = []
     for path in sorted(vdir.glob(f"{prefix}*.json")):
@@ -112,7 +128,7 @@ def discover_inputs(directory, phase):
 
 
 def _verifier_name(path, phase):
-    return path.stem[len(f"phase-{_phase_label(phase)}-"):]
+    return path.stem[len(_prefix(phase)):]
 
 
 def collect_findings(files, phase):
@@ -358,14 +374,15 @@ def main():
         description="Collect verification-agent findings for a phase and gate on errors",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Verifiers write to <directory>/_verification/phase-<N>-<verifier>.json; "
-            "the reconciler writes phase-<N>-reconcile.json."
+            "Verifiers write to <directory>/_verification/phase-<N>-<verifier>.json "
+            "(or report-<verifier>.json with --phase report); the reconciler writes "
+            "the matching -reconcile.json."
         ),
     )
-    parser.add_argument("directory", help="Practice or baseline output directory")
+    parser.add_argument("directory", help="Practice, baseline or report output directory")
     parser.add_argument(
-        "--phase", required=True, choices=["1", "1.5", "2", "3"],
-        help="Phase whose findings to consolidate",
+        "--phase", required=True, choices=["1", "1.5", "2", "3", "report"],
+        help="Stage whose findings to consolidate (`report` for the reporting skills' single gate)",
     )
     parser.add_argument(
         "--expect", metavar="NAMES",
@@ -412,7 +429,7 @@ def main():
 
     if not files and not expected:
         print(
-            f"Error: no findings files matching phase-{label}-*.json in "
+            f"Error: no findings files matching {_prefix(args.phase)}*.json in "
             f"{verification_dir(directory)}",
             file=sys.stderr,
         )
@@ -441,8 +458,9 @@ def main():
     if not args.no_write:
         vdir = verification_dir(directory)
         vdir.mkdir(parents=True, exist_ok=True)
-        out = Path(args.output) if args.output else vdir / f"phase-{label}-verdict.json"
-        md = Path(args.markdown) if args.markdown else vdir / f"phase-{label}-summary.md"
+        stem = _prefix(args.phase)
+        out = Path(args.output) if args.output else vdir / f"{stem}verdict.json"
+        md = Path(args.markdown) if args.markdown else vdir / f"{stem}summary.md"
         out.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
         md.write_text(markdown, encoding="utf-8")
         verdict["verdictPath"] = str(out)
@@ -451,7 +469,7 @@ def main():
     if args.one_line:
         counts = verdict["counts"]
         print(
-            f"{verdict['gate'].upper()} phase-{label} "
+            f"{verdict['gate'].upper()} {_prefix(args.phase).rstrip('-')} "
             f"{counts['error']}E/{counts['warning']}W/{counts['info']}I {directory}"
         )
     elif args.summary:

@@ -39,3 +39,17 @@ Feature: Method-Based Report Generation
     When context resolution fails
     Then the skill suggests downloading from the remote bundle library
     And provides clear error guidance
+
+  Scenario: Report is linted and verified before handover
+    Given a report has been written to its workspace
+    When the report is handed over, exported, or published
+    Then lint-report.py has run with all checks and reports no errors
+    And the verification gate has run with --expect naming every verifier launched
+    And no blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: No type-specific verifier
+    Given this is the general-purpose reporting skill
+    When the verification gate runs
+    Then the four base verifiers run
+    And type-specific is omitted from --expect
