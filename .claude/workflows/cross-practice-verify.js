@@ -102,26 +102,22 @@ phase('Verify')
 
 const practiceData = JSON.stringify(scanResult.practices, null, 2)
 
-const verified = await agent(`You are a CROSS-PRACTICE CONSISTENCY VERIFIER. Check for naming conflicts, alias collisions, and alpha overlap across practices sharing a baseline.
+// The brief is shared with the generation skills' Phase 2 gate so the two
+// cannot drift — see .claude/skills/verification-foundation/.
+const verified = await agent(`Read .claude/skills/verification-foundation/verifiers/phase-2.md
+and follow the brief under the heading for the \`cross-practice-consistency\` verifier,
+exactly as written. Also read
+.claude/skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
+findings contract and severity calibration.
+
+The practices have already been scanned, so work from the data below rather than
+re-reading the mapping guides.
 
 **Practices to compare (${scanResult.practices.length} total):**
 ${practiceData}
 
-**Check these concerns:**
-
-1. **Alpha name collisions**: Two practices defining NEW alphas with the same name (not redeclarations). This would cause a merge conflict.
-
-2. **Alias collisions**: Two practices aliasing different canonical elements to the same alias name. This creates ambiguity.
-
-3. **Alias-alpha name conflicts**: An alias name in one practice matching an alpha name in another. This confuses resolution.
-
-4. **Activity name collisions**: Two practices with identically named activities in different activity spaces. Activities with the same name in the same activity space are expected.
-
-5. **Keyword overlap**: High keyword overlap (>50%) between practices may indicate they should be merged or one is redundant.
-
-6. **Competency level consistency**: If one practice uses "Masters" and another uses "Expert" for similar activities, flag the inconsistency.
-
-Only report genuine cross-practice conflicts. Same-name redeclarations of baseline alphas are expected and correct.`, {
+**Return** your findings in this response rather than writing a file: this workflow
+collects them in-process.`, {
   label: 'verify',
   phase: 'Verify',
   schema: FINDINGS_SCHEMA,

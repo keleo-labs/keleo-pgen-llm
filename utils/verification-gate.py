@@ -1,0 +1,470 @@
+#!/usr/bin/env python3
+"""Collect verification-agent findings for a phase, reconcile them, and gate on errors.
+
+Each verification agent writes its findings to
+`<output-dir>/_verification/phase-<N>-<verifier>.json` in the findings shape:
+
+    {"verifier": "source-fidelity", "summary": "...", "findings": [
+        {"rule": "fidelity-001", "severity": "error",
+         "message": "...", "evidence": "..."}
+    ]}
+
+The reconciliation agent writes `<output-dir>/_verification/phase-<N>-reconcile.json`
+in the verdict shape:
+
+    {"overallVerdict": "fail", "summary": "...",
+     "confirmed": [{"originalMessage": "...", "verdict": "confirmed",
+                    "reasoning": "..."}],
+     "newFindings": [{"severity": "warning", "message": "...", "evidence": "..."}]}
+
+This script is purely mechanical: it merges, dedupes, applies the reconciler's
+verdicts, writes a consolidated verdict plus a markdown summary, and sets the
+exit code. Deciding whether a finding is real stays with the reconciliation
+agent.
+
+Usage:
+    # Consolidate and gate after a phase's verifiers have run
+    python3 utils/verification-gate.py practices/my-practice/ --phase 2 --gate
+
+    # Fail if a verifier crashed without writing its findings file
+    python3 utils/verification-gate.py practices/my-practice/ --phase 2 --gate \\
+        --expect source-fidelity,alpha-semantics,coverage,naming-consistency
+
+    # One-line verdict for a progress report
+    python3 utils/verification-gate.py practices/my-practice/ --phase 1 --one-line
+
+    # Inspect the merged findings without writing anything
+    python3 utils/verification-gate.py practices/my-practice/ --phase 3 --json --no-write
+"""
+
+import argparse
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from _shared import load_json_pair  # noqa: E402
+
+
+VERIFICATION_DIRNAME = "_verification"
+RECONCILE_STEM = "reconcile"
+
+# This script writes its verdict into the same directory it reads findings
+# from, so a second run would otherwise ingest its own output as a verifier
+# called "verdict" and double-count every finding.
+RESERVED_STEMS = {"verdict", "summary"}
+
+SEVERITY_ORDER = {"error": 0, "warning": 1, "info": 2}
+BLOCKING_SEVERITIES = {"error"}
+
+# A reconciler verdict of "needs-context" means the finding could not be
+# cleared on the evidence available. It does not block the phase, but it must
+# stay visible — silently dropping it would turn an unanswered question into a
+# pass.
+VERDICT_ACTIONS = {
+    "confirmed": "keep",
+    "false-positive": "dismiss",
+    "needs-context": "downgrade",
+}
+
+
+def _normalize(text):
+    """Collapse a message to a dedupe key: case, whitespace and tail punctuation."""
+    return re.sub(r"\s+", " ", (text or "").strip().lower()).rstrip(".!?,;:")
+
+
+def _phase_label(phase):
+    """Render a phase number for filenames: 1, 1.5, 2, 3 (never 1.0)."""
+    as_float = float(phase)
+    return str(int(as_float)) if as_float.is_integer() else str(as_float)
+
+
+def verification_dir(directory):
+    return Path(directory) / VERIFICATION_DIRNAME
+
+
+def findings_path(directory, phase, verifier):
+    """The path a verification agent should write its findings to."""
+    return verification_dir(directory) / f"phase-{_phase_label(phase)}-{verifier}.json"
+
+
+def discover_inputs(directory, phase):
+    """Find every findings file for a phase, separating the reconcile verdict.
+
+    Returns (findings_files, reconcile_file_or_None) with findings_files sorted
+    by verifier name so output ordering is stable across runs.
+    """
+    vdir = verification_dir(directory)
+    if not vdir.is_dir():
+        return [], None
+
+    prefix = f"phase-{_phase_label(phase)}-"
+    reconcile = None
+    files = []
+    for path in sorted(vdir.glob(f"{prefix}*.json")):
+        stem = path.stem[len(prefix):]
+        if stem == RECONCILE_STEM:
+            reconcile = path
+        elif stem not in RESERVED_STEMS:
+            files.append(path)
+    return files, reconcile
+
+
+def _verifier_name(path, phase):
+    return path.stem[len(f"phase-{_phase_label(phase)}-"):]
+
+
+def collect_findings(files, phase):
+    """Read findings files into a flat list, stamping each with its verifier.
+
+    A file that is unreadable or malformed becomes an error-severity finding of
+    its own rather than being skipped — a verifier whose output cannot be parsed
+    has not verified anything, and the gate must say so.
+    """
+    collected = []
+    summaries = {}
+
+    for path in files:
+        verifier = _verifier_name(path, phase)
+        data, parse_error = load_json_pair(path)
+
+        if data is None:
+            collected.append({
+                "verifier": verifier,
+                "rule": "process-verification",
+                "severity": "error",
+                "message": f"Verifier '{verifier}' produced unreadable findings",
+                "evidence": parse_error or f"Could not parse {path}",
+            })
+            continue
+
+        if not isinstance(data, dict) or not isinstance(data.get("findings"), list):
+            collected.append({
+                "verifier": verifier,
+                "rule": "process-verification",
+                "severity": "error",
+                "message": f"Verifier '{verifier}' output is not in the findings shape",
+                "evidence": f"{path} has no 'findings' array",
+            })
+            continue
+
+        summaries[verifier] = data.get("summary", "")
+        for finding in data["findings"]:
+            if not isinstance(finding, dict):
+                continue
+            collected.append({
+                "verifier": data.get("verifier", verifier),
+                "rule": finding.get("rule", ""),
+                "severity": finding.get("severity", "warning"),
+                "message": finding.get("message", ""),
+                "evidence": finding.get("evidence", ""),
+            })
+
+    return collected, summaries
+
+
+def check_expected(files, phase, expected):
+    """Report verifiers that were expected to run but wrote no findings file."""
+    present = {_verifier_name(p, phase) for p in files}
+    return [
+        {
+            "verifier": name,
+            "rule": "process-verification",
+            "severity": "error",
+            "message": f"Expected verifier '{name}' did not write findings",
+            "evidence": f"No {findings_path('<dir>', phase, name).name} in {VERIFICATION_DIRNAME}/",
+        }
+        for name in expected
+        if name not in present
+    ]
+
+
+def dedupe(findings):
+    """Merge findings that say the same thing, keeping the highest severity.
+
+    Verifiers overlap by design — coverage and source-fidelity will both notice
+    a dropped concern. Reporting it twice inflates the error count and makes the
+    gate look worse than the output is.
+    """
+    merged = {}
+    order = []
+
+    for finding in findings:
+        key = (finding.get("rule", ""), _normalize(finding.get("message")))
+        if key not in merged:
+            merged[key] = dict(finding)
+            merged[key]["verifiers"] = [finding.get("verifier", "")]
+            merged[key].pop("verifier", None)
+            order.append(key)
+            continue
+
+        existing = merged[key]
+        if finding.get("verifier") and finding["verifier"] not in existing["verifiers"]:
+            existing["verifiers"].append(finding["verifier"])
+        if SEVERITY_ORDER.get(finding.get("severity"), 9) < SEVERITY_ORDER.get(existing.get("severity"), 9):
+            # The verifier that rated it highest is the one justifying the
+            # block, so its wording and evidence are the ones worth showing.
+            existing["severity"] = finding["severity"]
+            if finding.get("message"):
+                existing["message"] = finding["message"]
+            if finding.get("evidence"):
+                existing["evidence"] = finding["evidence"]
+        elif not existing.get("evidence") and finding.get("evidence"):
+            existing["evidence"] = finding["evidence"]
+
+    return [merged[k] for k in order]
+
+
+def apply_reconciliation(findings, reconcile):
+    """Apply the reconciler's per-finding verdicts and fold in its new findings.
+
+    Matching is on the normalized message. A reconciler that paraphrases a
+    finding will not match it, and the finding stays as the verifier reported
+    it — conservative in the right direction.
+    """
+    if not reconcile:
+        return findings, []
+
+    verdicts = {}
+    for entry in reconcile.get("confirmed") or []:
+        if not isinstance(entry, dict):
+            continue
+        verdicts[_normalize(entry.get("originalMessage"))] = entry
+
+    unmatched = []
+    for finding in findings:
+        entry = verdicts.pop(_normalize(finding.get("message")), None)
+        if not entry:
+            finding["reconciled"] = "unmatched"
+            continue
+
+        verdict = entry.get("verdict", "confirmed")
+        finding["reconciled"] = verdict
+        finding["reasoning"] = entry.get("reasoning", "")
+        action = VERDICT_ACTIONS.get(verdict, "keep")
+        if action == "dismiss":
+            finding["dismissed"] = True
+        elif action == "downgrade" and finding.get("severity") == "error":
+            finding["severity"] = "warning"
+
+    unmatched = list(verdicts.values())
+
+    for entry in reconcile.get("newFindings") or []:
+        if not isinstance(entry, dict):
+            continue
+        findings.append({
+            "verifiers": [RECONCILE_STEM],
+            "rule": entry.get("rule", ""),
+            "severity": entry.get("severity", "warning"),
+            "message": entry.get("message", ""),
+            "evidence": entry.get("evidence", ""),
+            "reconciled": "confirmed",
+        })
+
+    return findings, unmatched
+
+
+def build_verdict(directory, phase, findings, summaries, reconcile, unmatched):
+    live = [f for f in findings if not f.get("dismissed")]
+    dismissed = [f for f in findings if f.get("dismissed")]
+
+    errors = [f for f in live if f.get("severity") in BLOCKING_SEVERITIES]
+    warnings = [f for f in live if f.get("severity") == "warning"]
+    infos = [f for f in live if f.get("severity") == "info"]
+
+    if errors:
+        gate = "fail"
+    elif warnings:
+        gate = "pass-with-warnings"
+    else:
+        gate = "pass"
+
+    verdict = {
+        "directory": str(directory),
+        "phase": _phase_label(phase),
+        "gate": gate,
+        "summary": (
+            f"{len(errors)} error, {len(warnings)} warning, {len(infos)} info "
+            f"({len(dismissed)} dismissed) from {len(summaries)} verifiers"
+        ),
+        "counts": {
+            "error": len(errors),
+            "warning": len(warnings),
+            "info": len(infos),
+            "dismissed": len(dismissed),
+        },
+        "verifiers": summaries,
+        "findings": live,
+    }
+
+    if dismissed:
+        verdict["dismissed"] = dismissed
+    if reconcile and reconcile.get("summary"):
+        verdict["reconcileSummary"] = reconcile["summary"]
+    if unmatched:
+        # A reconciler verdict with no matching finding usually means it
+        # paraphrased the message. Surface it so the mismatch is visible rather
+        # than silently discarded.
+        verdict["unmatchedVerdicts"] = unmatched
+
+    return verdict
+
+
+def render_markdown(verdict):
+    """Render the verdict for pasting into the user review gate."""
+    phase = verdict["phase"]
+    counts = verdict["counts"]
+    lines = [
+        f"## Verification gate — Phase {phase}",
+        "",
+        f"**Verdict:** {verdict['gate']} — {verdict['summary']}",
+        "",
+    ]
+
+    if verdict.get("reconcileSummary"):
+        lines += [verdict["reconcileSummary"], ""]
+
+    for severity, heading in (("error", "Errors (blocking)"),
+                              ("warning", "Warnings"),
+                              ("info", "Observations")):
+        group = [f for f in verdict["findings"] if f.get("severity") == severity]
+        if not group:
+            continue
+        lines.append(f"### {heading}")
+        lines.append("")
+        for finding in group:
+            rule = f"`{finding['rule']}` " if finding.get("rule") else ""
+            who = ", ".join(finding.get("verifiers") or []) or "unknown"
+            lines.append(f"- {rule}{finding.get('message', '')} _({who})_")
+            if finding.get("evidence"):
+                lines.append(f"  - Evidence: {finding['evidence']}")
+            if finding.get("reasoning"):
+                lines.append(f"  - Reconciler: {finding['reasoning']}")
+        lines.append("")
+
+    if counts["dismissed"]:
+        lines.append(
+            f"_{counts['dismissed']} finding(s) dismissed as false positives "
+            f"by the reconciler._"
+        )
+        lines.append("")
+
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Collect verification-agent findings for a phase and gate on errors",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Verifiers write to <directory>/_verification/phase-<N>-<verifier>.json; "
+            "the reconciler writes phase-<N>-reconcile.json."
+        ),
+    )
+    parser.add_argument("directory", help="Practice or baseline output directory")
+    parser.add_argument(
+        "--phase", required=True, choices=["1", "1.5", "2", "3"],
+        help="Phase whose findings to consolidate",
+    )
+    parser.add_argument(
+        "--expect", metavar="NAMES",
+        help="Comma-separated verifier names that must have written findings",
+    )
+    parser.add_argument(
+        "--gate", action="store_true",
+        help="Exit 1 when a blocking error survives reconciliation",
+    )
+    parser.add_argument("--summary", action="store_true", help="Print the markdown summary")
+    parser.add_argument("--one-line", action="store_true", help="Print a single-line verdict")
+    parser.add_argument("--json", action="store_true", help="Print the verdict JSON to stdout")
+    parser.add_argument(
+        "--no-write", action="store_true",
+        help="Do not write the verdict or markdown files",
+    )
+    parser.add_argument(
+        "--output", "-o", metavar="FILE",
+        help="Verdict JSON path (default: <directory>/_verification/phase-<N>-verdict.json)",
+    )
+    parser.add_argument(
+        "--markdown", metavar="FILE",
+        help="Markdown summary path (default: <directory>/_verification/phase-<N>-summary.md)",
+    )
+    parser.add_argument(
+        "--path-for", metavar="VERIFIER",
+        help="Print the findings path a named verifier should write to, then exit",
+    )
+    args = parser.parse_args()
+
+    directory = Path(args.directory)
+    label = _phase_label(args.phase)
+
+    if args.path_for:
+        print(findings_path(directory, args.phase, args.path_for))
+        sys.exit(0)
+
+    if not directory.is_dir():
+        print(f"Error: not a directory: {directory}", file=sys.stderr)
+        sys.exit(2)
+
+    files, reconcile_path = discover_inputs(directory, args.phase)
+    expected = [n.strip() for n in args.expect.split(",") if n.strip()] if args.expect else []
+
+    if not files and not expected:
+        print(
+            f"Error: no findings files matching phase-{label}-*.json in "
+            f"{verification_dir(directory)}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    raw, summaries = collect_findings(files, args.phase)
+    raw.extend(check_expected(files, args.phase, expected))
+
+    reconcile = None
+    if reconcile_path:
+        reconcile, reconcile_error = load_json_pair(reconcile_path)
+        if reconcile is None:
+            raw.append({
+                "verifier": RECONCILE_STEM,
+                "rule": "process-verification",
+                "severity": "error",
+                "message": "Reconciliation output is unreadable",
+                "evidence": reconcile_error or f"Could not parse {reconcile_path}",
+            })
+
+    findings, unmatched = apply_reconciliation(dedupe(raw), reconcile)
+
+    verdict = build_verdict(directory, args.phase, findings, summaries, reconcile, unmatched)
+    markdown = render_markdown(verdict)
+
+    if not args.no_write:
+        vdir = verification_dir(directory)
+        vdir.mkdir(parents=True, exist_ok=True)
+        out = Path(args.output) if args.output else vdir / f"phase-{label}-verdict.json"
+        md = Path(args.markdown) if args.markdown else vdir / f"phase-{label}-summary.md"
+        out.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
+        md.write_text(markdown, encoding="utf-8")
+        verdict["verdictPath"] = str(out)
+        verdict["summaryPath"] = str(md)
+
+    if args.one_line:
+        counts = verdict["counts"]
+        print(
+            f"{verdict['gate'].upper()} phase-{label} "
+            f"{counts['error']}E/{counts['warning']}W/{counts['info']}I {directory}"
+        )
+    elif args.summary:
+        print(markdown, end="")
+    elif args.json or not args.no_write:
+        print(json.dumps(verdict, indent=2))
+    else:
+        print(json.dumps(verdict, indent=2))
+
+    if args.gate:
+        sys.exit(1 if verdict["gate"] == "fail" else 0)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

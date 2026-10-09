@@ -4,10 +4,15 @@ export const meta = {
   whenToUse: 'After Phase 2 mapping, before Phase 3 JSON generation',
   phases: [
     { title: 'Mechanical', detail: 'Run verify-mapping-against-specs.py' },
-    { title: 'Semantic', detail: 'Independent perspective-diverse verification agents' },
+    { title: 'Semantic', detail: 'Verifier agents from verification-foundation/verifiers/phase-2.md' },
     { title: 'Reconcile', detail: 'Merge findings and produce final verdict' },
   ],
 }
+
+// Opt-in deep run of the Phase 2 verification gate. The generation skills run
+// the same briefs inline via the Agent tool as a blocking gate — see
+// .claude/skills/verification-foundation/VERIFY-FOUNDATION.md. Use this
+// workflow to re-verify an existing mapping guide outside a generation run.
 
 const FINDINGS_SCHEMA = {
   type: 'object',
@@ -108,75 +113,47 @@ const parentInfo = parents.length > 0
   ? `Parent practices: ${parents.join(', ')}. Some contributesTo targets may resolve to parent practice alphas — do NOT flag these as errors.`
   : 'No parent practices specified.'
 
+// The briefs live in the verification foundation, shared with the generation
+// skills, so the opt-in deep run and the skills' default inline run check the
+// same things. Inlining them here let the two drift.
+const BRIEFS = '.claude/skills/verification-foundation/verifiers/phase-2.md'
+
+const verifierBrief = (name) => `Read ${BRIEFS} and follow the brief under the heading
+for the \`${name}\` verifier, exactly as written. Also read
+.claude/skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
+findings contract and severity calibration.
+
+**Substitutions for this run:**
+- \`{GUIDE}\` = ${mappingGuide}
+- \`{REPORT}\` = ${analysisReport || '(no Phase 1 analysis report supplied — skip checks that require it)'}
+- \`{BASELINE}\` = ${baseline || '(no baseline supplied — skip checks that require it)'}
+- \`{PARENTS}\` = ${parentInfo}
+- \`{SUFFIX}\` = (empty)
+- \`{SOURCES}\` = (not supplied in this workflow — work from the analysis report)
+
+**Return** your findings in this response rather than writing a file: this workflow
+collects them in-process. Use the same findings shape the brief specifies.`
+
 const semanticAgents = await parallel([
-  () => agent(`You are an ALPHA RELATIONSHIP VERIFIER. Read the Phase 2 mapping guide and verify that alpha relationships are semantically correct.
+  () => agent(verifierBrief('source-fidelity'), {
+    label: 'source-fidelity',
+    phase: 'Semantic',
+    schema: FINDINGS_SCHEMA,
+  }),
 
-**File to read:** ${mappingGuide}
-${baseline ? `**Baseline to read:** ${baseline}` : ''}
-${parentInfo}
-
-**Check these specific concerns:**
-
-1. **contributesTo semantic correctness**: Does each new alpha's contributesTo target make sense? A "Cognitive Load" alpha contributing to "Team" makes sense. A "Security Policy" contributing to "Requirements" would be suspicious.
-
-2. **relatesTo meaningfulness**: Are relatesTo relationships genuine inter-alpha dependencies, or are they vague/redundant? Look for relationships that could be stated more precisely.
-
-3. **State progression coherence**: Do each alpha's states form a logical progression from initial to mature? States should represent increasing capability or maturity, not random milestones.
-
-4. **Redeclaration appropriateness**: For redeclared alphas, are the added checklists actually enriching the baseline states with practice-specific detail, or are they generic/unrelated?
-
-5. **Alpha granularity**: Are new alphas at the right granularity? Too fine-grained (should be an activity), too broad (should be split), or overlapping with siblings?
-
-**Important**: Only report genuine concerns. Do not flag things that are clearly correct. Be specific — cite alpha names, state names, and exact issues. Return findings with severity "error" for definite problems and "warning" for questionable choices.`, {
+  () => agent(verifierBrief('alpha-semantics'), {
     label: 'alpha-semantics',
     phase: 'Semantic',
     schema: FINDINGS_SCHEMA,
   }),
 
-  () => agent(`You are a COVERAGE AND COMPLETENESS VERIFIER. Read the Phase 2 mapping guide and verify mapping completeness.
-
-**File to read:** ${mappingGuide}
-${analysisReport ? `**Phase 1 analysis to read:** ${analysisReport}` : ''}
-${baseline ? `**Baseline to read:** ${baseline}` : ''}
-
-**Check these specific concerns:**
-
-1. **Concern coverage**: If a Phase 1 analysis report is available, verify that all major concerns from Phase 1 are addressed in the mapping — either as alphas, activities, work product contributions, or explicit checklist items. Flag concerns that appear to be dropped.
-
-2. **Activity-state gap**: For each alpha, verify that every state beyond the first has at least one activity whose contributesTo references that state. States without activities are "paper states" that can never be achieved.
-
-3. **Pattern completeness**: If patterns are defined, verify they reference all practice alphas (not just a subset). Missing alphas from patterns create incomplete lifecycle views.
-
-4. **Work product coverage**: Verify that major evidence artifacts are captured as work products. Flag alphas that have states but no work product proving those states.
-
-5. **Competency coverage**: Verify activities reference appropriate competencies at appropriate levels (not everything at "Masters" or everything at "Basic").
-
-**Important**: Only report genuine gaps. Some concerns are intentionally addressed through checklists rather than dedicated elements — that's valid. Be specific in your findings.`, {
+  () => agent(verifierBrief('coverage'), {
     label: 'coverage-check',
     phase: 'Semantic',
     schema: FINDINGS_SCHEMA,
   }),
 
-  () => agent(`You are a NAMING AND CONSISTENCY VERIFIER. Read the Phase 2 mapping guide and verify naming quality and internal consistency.
-
-**File to read:** ${mappingGuide}
-${baseline ? `**Baseline to read:** ${baseline}` : ''}
-
-**Check these specific concerns:**
-
-1. **Description quality**: Descriptions should be single sentences that capture WHAT the element is, not HOW it works. Flag multi-sentence descriptions or descriptions that read like instructions.
-
-2. **Name uniqueness**: All element names (alphas, activities, work products, patterns) should be unique across the entire practice. Flag any duplicates.
-
-3. **Alias correctness**: If aliases are defined, verify they use domain-appropriate terminology. Verify alias names are NOT used in structural references (contributesTo, mapsTo, activitySpaceName should use canonical baseline names, not aliases).
-
-4. **Keyword appropriateness**: Keywords should be domain-specific technical terms that enable search/discovery. Flag generic words (e.g., "management", "process") or terms that don't appear in the practice content.
-
-5. **Checklist quality**: Checklist items should be verifiable assertions (can be checked as done/not done), not vague aspirations. Flag items that are too abstract to verify.
-
-6. **Narrative structure**: Narratives should use the structured format (narrativeTypeName + narrativeContexts), not free-form prose paragraphs.
-
-**Important**: Focus on naming and consistency issues, not semantic correctness (that's another agent's job). Be specific in your findings.`, {
+  () => agent(verifierBrief('naming-consistency'), {
     label: 'naming-quality',
     phase: 'Semantic',
     schema: FINDINGS_SCHEMA,

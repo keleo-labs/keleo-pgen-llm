@@ -178,7 +178,11 @@ def _print_alpha_list(alphas, detail=False, alpha_names=None, indent="  "):
         for s in states:
             if detail:
                 desc = s.get("description", "")
-                checklists = s.get("checklists", [])
+                # The schema field is `checklist`, singular (State.checklist).
+                # Reading `checklists` reported "(0 checklists)" for every state
+                # in every practice, which reads as "all checklists lost" to
+                # anything diffing this output against a mapping guide.
+                checklists = s.get("checklist", [])
                 cl_names = [c["name"] if isinstance(c, dict) else c for c in checklists]
                 desc_suffix = f" - {desc}" if desc else ""
                 print(f"{indent}  State {s.get('seq', '?')}: {s['name']}{desc_suffix} ({len(checklists)} checklists)")
@@ -873,7 +877,9 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
                             "seq": s.get("seq"),
                             "name": s["name"],
                             "description": s.get("description", ""),
-                            "checklists": [c["name"] if isinstance(c, dict) else c for c in s.get("checklists", [])]
+                            # Output key stays plural for consumers; the source
+                            # field is `checklist`, singular, per the schema.
+                            "checklists": [c["name"] if isinstance(c, dict) else c for c in s.get("checklist", [])]
                         } for s in a.get("states", [])]
                     out.append(info)
                 return out

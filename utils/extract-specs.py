@@ -15,6 +15,11 @@ Usage:
 
     # Include stats
     python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
+
+    # Read an index back and list the rules no script can check, for a
+    # verification agent's brief
+    python3 utils/extract-specs.py \
+      --list-manual .claude/skills/generate-method/specs/specs-index.json
 """
 
 import argparse
@@ -40,7 +45,7 @@ FEATURE_HEADER_RE = re.compile(
 
 VALID_CATEGORIES = {
     "structural", "semantic", "naming", "coverage",
-    "narrative", "process", "aliasing",
+    "narrative", "process", "aliasing", "fidelity",
 }
 
 ASSESS_CATEGORY_BRIDGE = {
@@ -220,11 +225,101 @@ def parse_skill_md(path):
     return result
 
 
+def list_manual(index_path, as_json=False, category=None):
+    """Print the scenarios in an index that no script can check.
+
+    Automatable scenarios are already enforced by assess-practice.py and
+    eval-skill-output.py. The manual-only ones are precisely the contract a
+    verification agent has to carry, so a brief reads them from here rather
+    than restating them and drifting.
+    """
+    with open(index_path, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    scenarios = [s for s in index.get("scenarios", []) if not s.get("automatable")]
+    if category:
+        scenarios = [s for s in scenarios if s["id"].rsplit("-", 1)[0] == category]
+
+    if as_json:
+        print(json.dumps({
+            "skill": index.get("skill"),
+            "source": index.get("source"),
+            "scenarios": scenarios,
+        }, indent=2))
+        return
+
+    if not scenarios:
+        print(f"No manual-only scenarios in {index_path}")
+        return
+
+    print(f"# Manual-only rules — {index.get('skill')} ({len(scenarios)})")
+    for s in scenarios:
+        print()
+        print(f"## {s['id']} — {s['name']}")
+        print(f"Feature: {s.get('feature', 'n/a')}")
+        for label, key in (("Given", "given"), ("When", "when"), ("Then", "then")):
+            for step in s.get(key) or []:
+                print(f"  {label}: {step}")
+
+
+def to_markdown(index_path, category=None):
+    """Render an index back into the `## Feature:` / `### Scenario:` block it came from.
+
+    The inverse of extraction. Needed when a SKILL.md is refactored and loses
+    its scenario block while the generated index survives — regenerating from
+    the stripped SKILL.md would silently delete every rule, so the index has to
+    be reconstituted into the source first.
+    """
+    with open(index_path, "r", encoding="utf-8") as f:
+        index = json.load(f)
+
+    scenarios = index.get("scenarios", [])
+    if category:
+        scenarios = [s for s in scenarios if s["id"].rsplit("-", 1)[0] == category]
+
+    by_feature = {}
+    for s in scenarios:
+        by_feature.setdefault(s.get("feature", "Uncategorised"), []).append(s)
+
+    blocks = []
+    for feature in index.get("features", []) + [
+        f for f in by_feature if f not in index.get("features", [])
+    ]:
+        if feature not in by_feature:
+            continue
+        lines = [f"## Feature: {feature}", ""]
+        for s in by_feature[feature]:
+            lines.append(f"### Scenario: {s['name']} (@rule:{s['id']})")
+            for label, key in (("Given", "given"), ("When", "when"), ("Then", "then")):
+                for step in s.get(key) or []:
+                    lines.append(f"- {label}: {step}")
+            lines.append("")
+        blocks.append("\n".join(lines))
+
+    print("\n".join(blocks).rstrip() + "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Extract Gherkin scenarios from SKILL.md into specs-index.json"
     )
-    parser.add_argument("skill_md", help="Path to SKILL.md file")
+    parser.add_argument("skill_md", nargs="?", help="Path to SKILL.md file")
+    parser.add_argument(
+        "--list-manual", metavar="INDEX",
+        help="Read a specs-index.json and list the scenarios no script can check",
+    )
+    parser.add_argument(
+        "--to-markdown", metavar="INDEX",
+        help="Render a specs-index.json back into its SKILL.md scenario block",
+    )
+    parser.add_argument(
+        "--category", metavar="NAME",
+        help="With --list-manual or --to-markdown, restrict to one rule category",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="With --list-manual, emit JSON instead of markdown",
+    )
     parser.add_argument(
         "-o", "--output",
         help="Output path for specs-index.json (default: <skill-dir>/specs/specs-index.json)",
@@ -234,6 +329,25 @@ def main():
         help="Print stats summary to stderr",
     )
     args = parser.parse_args()
+
+    if args.list_manual:
+        index_path = Path(args.list_manual)
+        if not index_path.exists():
+            print(json.dumps({"error": f"File not found: {index_path}"}))
+            sys.exit(1)
+        list_manual(index_path, as_json=args.json, category=args.category)
+        sys.exit(0)
+
+    if args.to_markdown:
+        index_path = Path(args.to_markdown)
+        if not index_path.exists():
+            print(json.dumps({"error": f"File not found: {index_path}"}))
+            sys.exit(1)
+        to_markdown(index_path, category=args.category)
+        sys.exit(0)
+
+    if not args.skill_md:
+        parser.error("skill_md is required unless --list-manual or --to-markdown is given")
 
     skill_path = Path(args.skill_md)
     if not skill_path.exists():

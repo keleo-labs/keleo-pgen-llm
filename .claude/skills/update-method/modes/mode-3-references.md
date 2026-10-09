@@ -116,6 +116,18 @@ For a **single practice**, follow steps 1-5 below. For a **method** (multiple pr
    python3 utils/assess-practice.py <practice>.json --baseline <baseline>.json --schema deps/language.schema.json
    ```
 
+4. **Verify the references.** `assess-practice.py --online` confirms a URI resolves. It
+   cannot tell you whether a reference is an actionable artifact or a documentation
+   page wearing one's clothes, nor whether it illustrates the alpha at the state it
+   claims. Read `.claude/skills/verification-foundation/verifiers/phase-3.md` and run
+   the `reference-citation-fidelity` verifier — scoped to the references you just
+   added, per `VERIFY-FOUNDATION.md` §9. This is the only verifier Mode 3 needs.
+
+   ```bash
+   python3 utils/verification-gate.py <directory>/ --phase 3 --gate --summary \
+     --expect reference-citation-fidelity
+   ```
+
 5. **Bump version (patch):**
    ```bash
    python3 utils/apply-versioning.py <practice>.json --bump patch --fix

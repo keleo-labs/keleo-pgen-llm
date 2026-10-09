@@ -1,5 +1,7 @@
 # Skill Specification Standard
 
+**Version:** 1.1.0
+
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
 ---
@@ -64,6 +66,7 @@ Steps should be concrete and verifiable: "The alpha has exactly one of `contribu
 | `narrative` | Citation linkage, placement, quality, self-containment | Narratives have citationNames, context length 1-3 sentences |
 | `process` | Workflow steps, phase ordering, gate checks | Phase 1 before Phase 2, delineation gate decision |
 | `aliasing` | Terminology aliases, keywords, domain term handling | One alias per element, alias names not in structural refs |
+| `fidelity` | Output traces to the sources provided and cited | Structural claims traceable to a source span, citation supports its claim, no invention between phases |
 
 ---
 
@@ -86,7 +89,15 @@ Each Gherkin scenario serves three purposes simultaneously:
 - **Automatable** — the `Then` steps can be verified programmatically by `assess-practice.py` or `validate-phase-output.py`. The scenario has a non-empty `assess_categories` mapping in `extract-specs.py`.
 - **Manual-only** — the `Then` steps require human or LLM judgment (e.g., "The analysis covers all four perspectives with balanced depth"). Marked `"automatable": false` in specs-index.json.
 
-Target: at least 75% of scenarios should be automatable. Manual-only rules should still be structured as Gherkin — they serve as agent instructions and can be checked by adversarial verification agents.
+Target: at least 75% of scenarios should be automatable. Manual-only rules should still be structured as Gherkin — they serve as agent instructions and are the contract the verification agents carry.
+
+`fidelity` rules are manual-only by nature: no script can tell you whether a claim traces to its source. Exclude them from the 75% denominator rather than weakening them to make the ratio work.
+
+To list the manual-only rules a verification agent must check:
+
+```bash
+python3 utils/extract-specs.py --list-manual <skill>/specs/specs-index.json [--category fidelity]
+```
 
 ---
 
@@ -228,6 +239,12 @@ Rules in `create-baseline-method` are structurally complementary to `generate-me
 ### 10.3 Cross-Skill Consistency
 
 Rules that appear identically in multiple skills should be maintained in one canonical location and referenced from others. If a rule diverges between skills, it should be split into separate scenarios with distinct IDs.
+
+### 10.4 Verification Foundation
+
+`.claude/skills/verification-foundation/` holds the verification protocol and agent briefs shared by the three generation skills. It is a foundation, not a skill — the same arrangement as `reporting-foundation`, `deck-foundation` and `diagram-foundation`.
+
+A generation skill gates each phase on it: mechanical validation, then the verification gate, then the user review gate. Skills reference the briefs; they do not restate them. A brief that is paraphrased into a SKILL.md loses the severity calibration it was written with.
 
 ---
 

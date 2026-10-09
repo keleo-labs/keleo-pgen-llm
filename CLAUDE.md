@@ -87,6 +87,9 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── create-baseline-method/       # Baseline practice creation skill
 │       │   └── SKILL.md
+│       ├── verification-foundation/      # Shared verification protocol (NOT a skill)
+│       │   ├── VERIFY-FOUNDATION.md      # Gate placement, fan-out, findings contract, cost
+│       │   └── verifiers/                # Per-phase agent briefs (phase-1, 1.5, 2, 3)
 │       ├── reporting-foundation/         # Shared reporting infrastructure (NOT a skill)
 │       │   ├── REPORT-FOUNDATION.md      # Common workflow, voice/tone, citations, output
 │       │   ├── narrative-guide.md        # Narrative type palette + purpose mapping
@@ -673,6 +676,29 @@ This skill automates the three-phase pipeline:
 **Output Location**: All files for a practice are co-located in `practices/<practice-name>/`
 
 The skill is defined in `.claude/skills/generate-method/SKILL.md` and uses the phase prompts from `prompts/`.
+
+### Verifying Generated Output
+
+Every phase of all three generation skills ends with a **verification gate** before the user review gate:
+
+```
+producing agent(s) → mechanical validation → verification gate → user review gate → next phase
+```
+
+Mechanical validation checks structure, counts and cross-references. The verification gate checks meaning: verification agents re-read the source materials and establish that the output traces back to them, that citations support what they are attached to, and that nothing was invented between phases.
+
+The protocol and the agent briefs live in `.claude/skills/verification-foundation/` — a shared foundation, **not a skill**, following the same arrangement as `reporting-foundation` and `deck-foundation`. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach.
+
+| Phase | Verifiers |
+|-------|-----------|
+| 1 — Analysis | `source-fidelity`, `source-coverage`, `citation-integrity` |
+| 1.5 — Distillation (baseline only) | `distillation-fidelity`, `focus-coherence` |
+| 2 — Mapping | `source-fidelity`, `alpha-semantics`, `coverage`, `naming-consistency`, plus `cross-practice-consistency` once for methods |
+| 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
+
+Findings are consolidated and gated by `utils/verification-gate.py`. **Confirmed errors block the phase.** Warnings flow into the user review gate. `update-method` scopes its gates to changed elements only.
+
+The gate costs real tokens — roughly 12 verifier agents for a single practice, 30 for a four-practice method, with sources read a second time at Phases 1 and 2. `VERIFY-FOUNDATION.md` §11 sets the sampling, concurrency and effort controls that keep this proportionate.
 
 ### Generating Reports
 

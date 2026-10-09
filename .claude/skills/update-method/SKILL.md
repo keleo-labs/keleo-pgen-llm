@@ -1,5 +1,6 @@
 ---
 name: update-method
+version: 1.1.0
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"
@@ -460,6 +461,39 @@ python3 utils/fix-citation-urls.py <dir>/<name>.json
 3. If no replacement exists: `python3 utils/fix-citation-urls.py <file>.json --fix` (removes the broken URL field, preserves the citation)
 4. If the citation is no longer valid at all: `python3 utils/fix-citation-urls.py <file>.json --fix --remove-citations` (removes entire citation and all citationNames references)
 
+### Verification Gate (scoped to what changed)
+
+Mechanical validation confirms the updated document is well-formed. It does not confirm
+that new or reworked content traces to its sources, or that Phase 3 invented nothing
+while regenerating. Run the verification gate for the phases the update actually
+touched — **scoped to changed elements only.** Re-verifying an unchanged 60K-word
+mapping guide is waste.
+
+Get the changed-element list first; it is what scopes every brief:
+
+```bash
+python3 utils/diff-practice-json.py <backup-dir>/<name>.json <dir>/<name>.json --json
+```
+
+| Mode | Gates to run |
+|---|---|
+| Mode 1 (full reanalysis) | Phase 1, 2 and 3 gates in full, as `generate-method` |
+| Mode 1B (light reanalysis) | Phase 1 and 2 gates, scoped to the sections reanalysis touched |
+| Mode 2 (remap) | Phase 2 and 3 gates, scoped to remapped elements |
+| Mode 3 (references) | `reference-citation-fidelity` only |
+
+Read `.claude/skills/verification-foundation/VERIFY-FOUNDATION.md` §9 for the scoping
+rule, then the relevant `verifiers/phase-<N>.md`. Pass the changed-element list into
+each brief and instruct the verifier to confine itself to those elements.
+
+```bash
+python3 utils/verification-gate.py practices/<name>/ --phase 3 --gate --summary \
+  --expect generation-drift,reference-citation-fidelity
+```
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. **Any fix means
+rebundling.** Record the verdict with `prompt-history.py --add-decision`.
+
 ### ChangeRequest Generation (MANDATORY)
 
 After any update that modifies a practice/baseline/method JSON, generate a ChangeRequest capturing the delta between the backup version and the updated version. ChangeRequests enable automatic downstream propagation of renames and structural changes via `apply-change-request.py`.
@@ -724,6 +758,14 @@ Validates that the update workflow follows correct assessment-first, backup-safe
 - Then: PRESERVE sections appear verbatim in the updated analysis report
 - And: UPDATE sections retain valid existing entries as baseline
 - And: New content is traceable to source materials or the stated change context
+
+### Scenario: Re-verification is scoped to changed elements (@rule:fidelity-401)
+- Given: An update has modified a practice, method or baseline JSON
+- When: The verification gate runs
+- Then: diff-practice-json.py has produced the changed-element list
+- And: Each verifier brief is scoped to those elements rather than the whole document
+- And: Only the gates for phases the update touched are run
+- And: Any fix applied in response to a finding is followed by rebundling
 
 ## Key Principles
 

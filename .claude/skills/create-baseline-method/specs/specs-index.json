@@ -5,7 +5,8 @@
     "Baseline Structural Integrity",
     "Baseline Alpha Semantics",
     "Baseline Naming and Quality",
-    "Baseline Process Compliance"
+    "Baseline Process Compliance",
+    "Baseline Source Fidelity"
   ],
   "scenarios": [
     {
@@ -21,7 +22,7 @@
       "then": [
         "The `kind` property is \"practiceBaseline\""
       ],
-      "line": 538,
+      "line": 716,
       "assess_categories": [
         "structure"
       ],
@@ -40,7 +41,7 @@
       "then": [
         "focuses, alphas, activitySpaces, competencies, and narrativeTypes arrays are present and non-empty"
       ],
-      "line": 543,
+      "line": 721,
       "assess_categories": [
         "structure"
       ],
@@ -58,9 +59,10 @@
       ],
       "then": [
         "The JSON does NOT contain activities, workProducts, or patterns arrays with content",
-        "These elements belong in extension practices, not baselines"
+        "These elements belong in extension practices, not baselines",
+        "patternGroups ARE allowed but with empty entries arrays (canonical categories for extensions to adopt)"
       ],
-      "line": 548,
+      "line": 726,
       "assess_categories": [
         "structure"
       ],
@@ -79,11 +81,28 @@
       "then": [
         "The focuses array contains 2-4 focus definitions"
       ],
-      "line": 554,
+      "line": 733,
       "assess_categories": [
         "structure"
       ],
       "automatable": true
+    },
+    {
+      "id": "structural-207",
+      "name": "Baseline outcomes structural integrity",
+      "feature": "Baseline Structural Integrity",
+      "given": [
+        "A baseline practice JSON with outcomes array"
+      ],
+      "when": [],
+      "then": [
+        "Each outcome has name and description",
+        "Each outcome has measureDescription",
+        "Outcomes count is between 1 and 3"
+      ],
+      "line": 738,
+      "assess_categories": [],
+      "automatable": false
     },
     {
       "id": "structural-205",
@@ -98,7 +117,7 @@
       "then": [
         "Each competency has exactly 5 competencyLevels"
       ],
-      "line": 559,
+      "line": 744,
       "assess_categories": [
         "structure"
       ],
@@ -117,7 +136,7 @@
       "then": [
         "Each narrativeType has 3-7 narrativeElements with name, description, and howToUse"
       ],
-      "line": 564,
+      "line": 749,
       "assess_categories": [
         "structure"
       ],
@@ -137,7 +156,7 @@
         "The alpha does NOT have a `contributesTo` property",
         "Baseline alphas are root-level and relate to each other via `relatesTo`"
       ],
-      "line": 573,
+      "line": 758,
       "assess_categories": [
         "baseline-alpha"
       ],
@@ -156,7 +175,7 @@
       "then": [
         "The alpha has a non-empty `relatesTo` array showing inter-alpha relationships"
       ],
-      "line": 579,
+      "line": 764,
       "assess_categories": [
         "baseline-alpha"
       ],
@@ -175,7 +194,7 @@
       "then": [
         "Each relatesTo entry has `relationship`, `alphaName`, and `direction` (outgoing|incoming|mutual)"
       ],
-      "line": 584,
+      "line": 769,
       "assess_categories": [
         "integrity"
       ],
@@ -195,7 +214,7 @@
         "Each activitySpace has a `contributesTo` array referencing alpha states",
         "Every non-initial alpha state is targeted by at least one activitySpace"
       ],
-      "line": 589,
+      "line": 774,
       "assess_categories": [
         "crossref-activity-alpha"
       ],
@@ -214,7 +233,7 @@
       "then": [
         "The alpha has 5-7 states representing progressive maturity"
       ],
-      "line": 595,
+      "line": 780,
       "assess_categories": [
         "alpha-state-minimum"
       ],
@@ -234,7 +253,7 @@
         "Names use vendor-neutral, framework-level language",
         "Implementation-specific terms (product names, tool names) are generalized"
       ],
-      "line": 604,
+      "line": 789,
       "assess_categories": [],
       "automatable": false
     },
@@ -251,7 +270,7 @@
       "then": [
         "Level names follow the standard progression: Basic, Applies, Masters, Adapts, Innovating"
       ],
-      "line": 610,
+      "line": 795,
       "assess_categories": [
         "competency-levels"
       ],
@@ -271,7 +290,7 @@
         "background, test, and examples properties are used sparingly",
         "Detailed Gherkin structure is deferred to the practice layer"
       ],
-      "line": 615,
+      "line": 800,
       "assess_categories": [
         "gherkin-structure"
       ],
@@ -290,7 +309,7 @@
       "then": [
         "01.5-distilled-essentials.md exists with 8-15 essential concerns and 2-4 focus areas"
       ],
-      "line": 625,
+      "line": 810,
       "assess_categories": [],
       "automatable": false
     },
@@ -307,7 +326,7 @@
       "then": [
         "01-analysis-report.md is the primary input, NOT the original source materials directly"
       ],
-      "line": 630,
+      "line": 815,
       "assess_categories": [],
       "automatable": false
     },
@@ -325,22 +344,80 @@
         "validate-baseline-json.py has been run with 0 schema errors",
         "assess-practice.py confirms 0 error-severity issues"
       ],
-      "line": 635,
+      "line": 820,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-204",
+      "name": "Verification gate precedes each user review gate",
+      "feature": "Baseline Process Compliance",
+      "given": [
+        "A baseline phase has completed and passed mechanical validation"
+      ],
+      "when": [
+        "The output is presented to the user for review"
+      ],
+      "then": [
+        "verification-gate.py has been run for that phase with `--expect` naming every verifier launched",
+        "No blocking error survives reconciliation",
+        "The verdict is recorded in the prompt history as a decision"
+      ],
+      "line": 826,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-201",
+      "name": "Distilled elements trace to Phase 1 concerns",
+      "feature": "Baseline Source Fidelity",
+      "given": [
+        "Phase 1.5 has reduced the analysis to essential elements"
+      ],
+      "when": [
+        "The Phase 1.5 verification gate runs"
+      ],
+      "then": [
+        "Every essential alpha, activity space and competency has an identifiable antecedent in 01-analysis-report.md",
+        "Every substantive Phase 1 concern is absorbed, generalised, or dropped with a stated rationale",
+        "Elements with no Phase 1 antecedent are reported as errors"
+      ],
+      "line": 837,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-202",
+      "name": "Focus groupings are justified by the analysis",
+      "feature": "Baseline Source Fidelity",
+      "given": [
+        "Phase 1.5 has defined 2-4 focus areas"
+      ],
+      "when": [
+        "The focus coherence verifier runs"
+      ],
+      "then": [
+        "The distillation states why these focuses, grounded in concern patterns from the analysis",
+        "Every distilled alpha is assigned to exactly one focus it fits more naturally than any other",
+        "Use of the default Value/Solution/Endeavor triad is justified against the domain rather than assumed"
+      ],
+      "line": 844,
       "assess_categories": [],
       "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 17,
-    "total_features": 4,
+    "total_scenarios": 21,
+    "total_features": 5,
     "automatable": 13,
-    "manual_only": 4,
+    "manual_only": 8,
     "by_category": {
       "coverage": 2,
+      "fidelity": 2,
       "naming": 2,
-      "process": 3,
+      "process": 4,
       "semantic": 4,
-      "structural": 6
+      "structural": 7
     }
   }
 }

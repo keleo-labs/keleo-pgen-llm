@@ -2,6 +2,7 @@
   "skill": "generate-method",
   "source": ".claude/skills/generate-method/SKILL.md",
   "features": [
+    "Source Fidelity",
     "Alpha Relationship Integrity",
     "Narrative Quality",
     "Element Naming",
@@ -11,6 +12,83 @@
     "Process Compliance"
   ],
   "scenarios": [
+    {
+      "id": "fidelity-001",
+      "name": "Structural claims trace to a source",
+      "feature": "Source Fidelity",
+      "given": [
+        "A phase has produced an analysis report or mapping guide"
+      ],
+      "when": [
+        "The verification gate for that phase runs"
+      ],
+      "then": [
+        "Every alpha, state, outcome, work product, activity and persona traces to a named span in a source material or in the preceding phase output",
+        "Claims that cannot be traced after directed searching are reported as errors",
+        "Claims traceable in substance but overstated relative to the source are reported as warnings"
+      ],
+      "line": 764,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-002",
+      "name": "Citations support the claims attached to them",
+      "feature": "Source Fidelity",
+      "given": [
+        "A document declares citations"
+      ],
+      "when": [
+        "The citation verifier runs"
+      ],
+      "then": [
+        "Each citation `name` is the work title, not an author-date label",
+        "Each cited work exists and its authors, date and publisher are correct",
+        "Each citation URL resolves and points at the cited work rather than a site root",
+        "Each claim attributed to a citation is supported by the cited work"
+      ],
+      "line": 771,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-003",
+      "name": "No generation drift between mapping guide and JSON",
+      "feature": "Source Fidelity",
+      "given": [
+        "Phase 3 has generated a practice, method or baseline JSON"
+      ],
+      "when": [
+        "The Phase 3 verification gate runs"
+      ],
+      "then": [
+        "Every element in the JSON is derivable from the mapping guide or the baseline",
+        "Outcome `measureDescription` asserts no metric or target the mapping guide does not state",
+        "Every element specified in the mapping guide is present in the JSON"
+      ],
+      "line": 779,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-004",
+      "name": "Verification gate precedes each user review gate",
+      "feature": "Source Fidelity",
+      "given": [
+        "A phase has completed and passed mechanical validation"
+      ],
+      "when": [
+        "The output is presented to the user for review"
+      ],
+      "then": [
+        "The phase verification gate has been run with `--expect` naming every verifier launched",
+        "No blocking error survives reconciliation",
+        "The verdict is recorded in the prompt history as a decision"
+      ],
+      "line": 786,
+      "assess_categories": [],
+      "automatable": false
+    },
     {
       "id": "semantic-001",
       "name": "No floating alphas",
@@ -25,7 +103,7 @@
         "The alpha has exactly one of `contributesTo` or `mapsTo`",
         "The target resolves to a baseline, practice-local, or dependency alpha"
       ],
-      "line": 875,
+      "line": 796,
       "assess_categories": [
         "practice-alpha"
       ],
@@ -44,7 +122,7 @@
       "then": [
         "If both `contributesTo` and `mapsTo` are present, they reference different alphas"
       ],
-      "line": 881,
+      "line": 802,
       "assess_categories": [
         "integrity"
       ],
@@ -63,7 +141,7 @@
       "then": [
         "The state names and sequence exactly match the parent alpha's states"
       ],
-      "line": 886,
+      "line": 807,
       "assess_categories": [
         "integrity"
       ],
@@ -82,7 +160,7 @@
       "then": [
         "The alpha name may include or omit the parent alpha's type name"
       ],
-      "line": 891,
+      "line": 812,
       "assess_categories": [
         "mapsto-naming"
       ],
@@ -102,7 +180,7 @@
         "The alpha has neither `contributesTo` nor `mapsTo`",
         "Only practice-specific checklists, narratives, and Gherkin guidance are added"
       ],
-      "line": 897,
+      "line": 817,
       "assess_categories": [
         "redeclaration-compliance"
       ],
@@ -122,7 +200,7 @@
         "The value exactly matches a CompetencyLevel.name from the baseline for that competency",
         "Level names are extracted with `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`"
       ],
-      "line": 903,
+      "line": 823,
       "assess_categories": [
         "competency-levels"
       ],
@@ -141,7 +219,7 @@
       "then": [
         "No `relatesTo` array is added (baseline relationships are inherited)"
       ],
-      "line": 909,
+      "line": 829,
       "assess_categories": [
         "baseline-alpha"
       ],
@@ -161,7 +239,7 @@
         "Every entry has `relationship`, `alphaName`, and `direction` fields",
         "`direction` is one of `outgoing`, `incoming`, or `mutual`"
       ],
-      "line": 914,
+      "line": 834,
       "assess_categories": [
         "integrity"
       ],
@@ -180,7 +258,7 @@
       "then": [
         "The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`"
       ],
-      "line": 920,
+      "line": 840,
       "assess_categories": [
         "contributes-to-state"
       ],
@@ -199,7 +277,7 @@
       "then": [
         "Every reference exactly matches the baseline element's `name` (case-sensitive)"
       ],
-      "line": 925,
+      "line": 845,
       "assess_categories": [
         "baseline-ref-focus",
         "baseline-ref-alpha",
@@ -223,7 +301,7 @@
         "The narrative has `narrativeTypeName` and `narrativeContexts` array",
         "Each context has `seq`, `narrativeElementName`, and `context` fields"
       ],
-      "line": 958,
+      "line": 852,
       "assess_categories": [
         "narrative-structure"
       ],
@@ -244,7 +322,7 @@
         "The description explains what the narrative covers, not the framework structure",
         "Contexts contain direct story content without mentioning the narrative type"
       ],
-      "line": 964,
+      "line": 858,
       "assess_categories": [
         "narrative-self-reference"
       ],
@@ -264,7 +342,7 @@
         "Each context is coherent without its element heading visible",
         "Bare lists include a framing introduction sentence"
       ],
-      "line": 971,
+      "line": 865,
       "assess_categories": [
         "narrative-self-containment"
       ],
@@ -284,7 +362,7 @@
         "Element-specific narratives are on the element's `narratives[]` property",
         "Only practice/method-level narratives go in the top-level `narratives[]` array"
       ],
-      "line": 977,
+      "line": 871,
       "assess_categories": [
         "narrative-placement"
       ],
@@ -303,7 +381,7 @@
       "then": [
         "The narrative includes a `citationNames` array with at least one citation reference"
       ],
-      "line": 983,
+      "line": 877,
       "assess_categories": [
         "narrative-citations"
       ],
@@ -323,7 +401,7 @@
         "Element descriptions are at most 20 words",
         "State and LOD descriptions are at most 12 words"
       ],
-      "line": 992,
+      "line": 884,
       "assess_categories": [
         "description-length"
       ],
@@ -343,9 +421,10 @@
         "The name is a short noun phrase (not truncated from the description)",
         "The name is not identical to the description"
       ],
-      "line": 998,
+      "line": 890,
       "assess_categories": [
-        "checklist-quality"
+        "checklist-quality",
+        "checklist-polarity"
       ],
       "automatable": true
     },
@@ -362,7 +441,7 @@
       "then": [
         "No name appears in more than one element type"
       ],
-      "line": 1004,
+      "line": 896,
       "assess_categories": [
         "uniqueness"
       ],
@@ -382,7 +461,7 @@
         "Names describe artifact content maturity (e.g., \"Outline\", \"Comprehensive\", \"Automated\")",
         "Names do not use generic labels (\"Level 1\", \"Basic\") or concern progression terms (\"Established\", \"Optimized\")"
       ],
-      "line": 1009,
+      "line": 901,
       "assess_categories": [
         "lod-naming"
       ],
@@ -401,7 +480,7 @@
       "then": [
         "The activity name is distinct from the ActivitySpace name"
       ],
-      "line": 1015,
+      "line": 907,
       "assess_categories": [
         "activity-name-distinctness"
       ],
@@ -420,7 +499,7 @@
       "then": [
         "The alpha has at least 3 states"
       ],
-      "line": 1024,
+      "line": 914,
       "assess_categories": [
         "alpha-state-minimum"
       ],
@@ -439,7 +518,7 @@
       "then": [
         "The work product has at least 2 levels of detail"
       ],
-      "line": 1029,
+      "line": 919,
       "assess_categories": [
         "workproduct-lod-minimum"
       ],
@@ -458,7 +537,7 @@
       "then": [
         "At least one LOD has `contributesTo` targeting the alpha state"
       ],
-      "line": 1034,
+      "line": 924,
       "assess_categories": [
         "evidence-coverage"
       ],
@@ -478,7 +557,7 @@
         "Every practice alpha appears in at least one PatternView",
         "Each alpha appears in every view (backfilled if needed)"
       ],
-      "line": 1039,
+      "line": 929,
       "assess_categories": [
         "pattern-coverage"
       ],
@@ -497,7 +576,7 @@
       "then": [
         "At least one activity has `contributesTo` targeting the alpha state"
       ],
-      "line": 1045,
+      "line": 935,
       "assess_categories": [
         "activity-state-gap"
       ],
@@ -516,7 +595,7 @@
       "then": [
         "Each baseline element has at most one alias"
       ],
-      "line": 1054,
+      "line": 942,
       "assess_categories": [
         "alias-uniqueness"
       ],
@@ -536,7 +615,7 @@
         "Only canonical baseline names appear in structural reference fields",
         "Alias names never appear in structural reference fields"
       ],
-      "line": 1059,
+      "line": 947,
       "assess_categories": [
         "alias-isolation"
       ],
@@ -555,7 +634,7 @@
       "then": [
         "The array contains between 10 and 20 keywords"
       ],
-      "line": 1065,
+      "line": 953,
       "assess_categories": [
         "keyword-count"
       ],
@@ -574,7 +653,7 @@
       "then": [
         "The `kind` property is \"practice\" for single practices, \"method\" for multi-practice methods"
       ],
-      "line": 1074,
+      "line": 960,
       "assess_categories": [
         "structure"
       ],
@@ -593,7 +672,7 @@
       "then": [
         "alphas, activities, workProducts, patterns, and citations arrays are present and non-empty"
       ],
-      "line": 1079,
+      "line": 965,
       "assess_categories": [
         "structure"
       ],
@@ -613,7 +692,7 @@
         "Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline",
         "Every stateName resolves to a valid state on that alpha"
       ],
-      "line": 1084,
+      "line": 970,
       "assess_categories": [
         "crossref-pattern"
       ],
@@ -632,7 +711,7 @@
       "then": [
         "Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state"
       ],
-      "line": 1090,
+      "line": 976,
       "assess_categories": [
         "crossref-activity-alpha"
       ],
@@ -651,7 +730,7 @@
       "then": [
         "Every workProductName and levelOfDetailName in worksOn resolves to defined elements"
       ],
-      "line": 1095,
+      "line": 981,
       "assess_categories": [
         "crossref-activity-wp"
       ],
@@ -671,7 +750,7 @@
         "01-analysis-report.md exists with all 8 required sections",
         "Analysis has sufficient depth (5+ numbered subsections and 3+ source references)"
       ],
-      "line": 1104,
+      "line": 988,
       "assess_categories": [],
       "automatable": false
     },
@@ -689,7 +768,7 @@
         "02-mapping-guide.md exists with all 7 required sections",
         "At least 3 alphas, 5 activities, and 1 pattern are mapped"
       ],
-      "line": 1110,
+      "line": 994,
       "assess_categories": [],
       "automatable": false
     },
@@ -707,22 +786,23 @@
         "validate-practice-json.py has been run with 0 schema errors",
         "assess-practice.py has been run with 0 error-severity issues"
       ],
-      "line": 1116,
+      "line": 1000,
       "assess_categories": [],
       "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 36,
-    "total_features": 7,
+    "total_scenarios": 40,
+    "total_features": 8,
     "automatable": 33,
-    "manual_only": 3,
+    "manual_only": 7,
     "by_category": {
       "aliasing": 3,
       "coverage": 5,
+      "fidelity": 3,
       "naming": 5,
       "narrative": 5,
-      "process": 3,
+      "process": 4,
       "semantic": 10,
       "structural": 5
     }

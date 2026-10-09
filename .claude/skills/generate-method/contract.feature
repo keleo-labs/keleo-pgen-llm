@@ -53,3 +53,27 @@ Feature: Practice Generation from Methodology Documentation
     Then package-keleo.py creates a .keleo archive with --verify
     And all transitive dependencies are included in topological order
     And _effective-context.json is never included as a document
+
+  Scenario: Verification gate at every phase
+    Given a phase has completed and passed mechanical validation
+    When the verification gate runs
+    Then the verifiers named in verification-foundation/verifiers/phase-<N>.md have been launched
+    And each has written findings to <output-dir>/_verification/phase-<N>-<verifier>.json
+    And verification-gate.py has been run with --gate and --expect naming every verifier launched
+    And the phase does not advance while a blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: Source fidelity blocks untraceable content
+    Given the Phase 1 or Phase 2 verification gate runs
+    When a structural claim cannot be traced to a source after directed searching
+    Then the finding is reported at error severity
+    And the gate exits 1
+    And the content is corrected, or the finding is dismissed with the source span cited as evidence
+
+  Scenario: Phase 3 semantic judgement is verified
+    Given Phase 3 has generated JSON from a mapping guide
+    When the generation-drift verifier runs
+    Then outcome measureDescription asserts no metric the mapping guide does not state
+    And no element appears in the JSON that is absent from both the mapping guide and the baseline
+    And no element specified in the mapping guide is missing from the JSON
+    And any fix applied in response is followed by rebundling

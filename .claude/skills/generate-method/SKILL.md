@@ -1,5 +1,6 @@
 ---
 name: generate-method
+version: 1.1.0
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -125,6 +126,13 @@ Subagents read these instead of the phase prompts. Each is a self-contained orch
 - **phases/phase-1-skill.md** - Analysis phase subagent instructions
 - **phases/phase-2-skill.md** - Mapping phase subagent instructions
 - **phases/phase-3-skill.md** - JSON generation phase subagent instructions
+
+### Verification Foundation
+
+`.claude/skills/verification-foundation/` holds the verification protocol shared with
+`create-baseline-method` and `update-method`. Read `VERIFY-FOUNDATION.md` once per
+session, then only `verifiers/phase-<N>.md` at the gate you reach — the briefs are
+literal prompt text to pass through to verification agents.
 
 ### Utility Quick Reference
 
@@ -350,6 +358,26 @@ No conversational context required — only file contents.
 
 Fix any FAIL assertions before proceeding.
 
+#### Verification Gate — Analysis
+
+Mechanical validation checks the report's shape. It cannot tell you whether the content
+traces to the sources. Read `.claude/skills/verification-foundation/verifiers/phase-1.md`
+and launch its three verifiers in a single message.
+
+```bash
+python3 utils/verification-gate.py practices/<name>/ --phase 1 --gate --summary \
+  --expect source-fidelity,source-coverage,citation-integrity
+```
+
+Exit 1 means a blocking error survived — follow the remediation loop in
+`VERIFY-FOUNDATION.md` §8 before continuing. Record the verdict:
+
+```bash
+python3 utils/prompt-history.py practices/<practice-name>/ --add-decision \
+  --decision-label "Phase 1 Verification Gate" \
+  --decision-text "<verdict>: <N> errors, <M> warnings. <What was fixed or dismissed, and on what evidence>"
+```
+
 #### User Review Gate — Analysis
 
 **Present the Phase 1 output for user review before proceeding.**
@@ -477,6 +505,21 @@ For the full Primary Alpha Focus Strategy with worked examples, read `references
 
 Fix any FAIL assertions before proceeding.
 
+#### Verification Gate — Mapping
+
+Read `.claude/skills/verification-foundation/verifiers/phase-2.md`. Launch the four
+practice-scoped verifiers; for a method, run them **per practice** (four agents at a
+time) plus `cross-practice-consistency` once.
+
+```bash
+python3 utils/verification-gate.py practices/<name>/ --phase 2 --gate --summary \
+  --expect source-fidelity,alpha-semantics,coverage,naming-consistency
+```
+
+For methods, list every per-practice verifier slug in `--expect`. Follow the
+remediation loop in `VERIFY-FOUNDATION.md` §8 on exit 1, then record the verdict with
+`prompt-history.py --add-decision` as at Phase 1.
+
 #### User Review Gate — Mapping
 
 **Present the Phase 2 output for user review before proceeding.**
@@ -562,6 +605,26 @@ Fix any FAIL assertions before proceeding.
      python3 utils/post-validate-method.py practices/<name>/ --fix --one-line
      ```
      Re-run `eval-skill-output.py` to confirm. Fix remaining issues manually if needed.
+
+4.5 **Verification Gate — JSON Generation**
+
+   Phase 3 is largely mechanical and the steps above cover the mechanical part. What
+   they do not cover is the judgement Phase 3 exercises where the mapping guide is
+   silent — outcome `measureDescription` and forecast weights, narrative type choice
+   and context prose, alias coining, reference actionability, icon and competency
+   level selection. Read
+   `.claude/skills/verification-foundation/verifiers/phase-3.md` and launch its two
+   verifiers (per practice for methods).
+
+   ```bash
+   python3 utils/verification-gate.py practices/<name>/ --phase 3 --gate --summary \
+     --expect generation-drift,reference-citation-fidelity
+   ```
+
+   On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. **Any fix to a
+   practice JSON means rebundling** — re-run `package-keleo.py`, since the subagent
+   packaged before this gate ran. Record the verdict with
+   `prompt-history.py --add-decision` as at Phase 1.
 
 5. Record phase completion:
    ```bash
@@ -683,3 +746,259 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 2. **Permission gaps (propose to user)**: Bash commands that triggered prompts but could be auto-allowed
 3. **Skill improvements (propose to user)**: Instruction gaps that led to wrong output or repeated corrections
 4. **Report**: Tell the user what was remediated and what is proposed
+
+---
+
+## Rules
+
+Gherkin scenarios serving triple duty — agent instruction, eval assertion, and
+verification contract (SKILL-STANDARD.md §3). Regenerate the specs index after any
+change here:
+
+```bash
+python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
+```
+
+## Feature: Source Fidelity
+
+### Scenario: Structural claims trace to a source (@rule:fidelity-001)
+- Given: A phase has produced an analysis report or mapping guide
+- When: The verification gate for that phase runs
+- Then: Every alpha, state, outcome, work product, activity and persona traces to a named span in a source material or in the preceding phase output
+- Then: Claims that cannot be traced after directed searching are reported as errors
+- Then: Claims traceable in substance but overstated relative to the source are reported as warnings
+
+### Scenario: Citations support the claims attached to them (@rule:fidelity-002)
+- Given: A document declares citations
+- When: The citation verifier runs
+- Then: Each citation `name` is the work title, not an author-date label
+- Then: Each cited work exists and its authors, date and publisher are correct
+- Then: Each citation URL resolves and points at the cited work rather than a site root
+- Then: Each claim attributed to a citation is supported by the cited work
+
+### Scenario: No generation drift between mapping guide and JSON (@rule:fidelity-003)
+- Given: Phase 3 has generated a practice, method or baseline JSON
+- When: The Phase 3 verification gate runs
+- Then: Every element in the JSON is derivable from the mapping guide or the baseline
+- Then: Outcome `measureDescription` asserts no metric or target the mapping guide does not state
+- Then: Every element specified in the mapping guide is present in the JSON
+
+### Scenario: Verification gate precedes each user review gate (@rule:process-004)
+- Given: A phase has completed and passed mechanical validation
+- When: The output is presented to the user for review
+- Then: The phase verification gate has been run with `--expect` naming every verifier launched
+- Then: No blocking error survives reconciliation
+- Then: The verdict is recorded in the prompt history as a decision
+
+
+## Feature: Alpha Relationship Integrity
+
+### Scenario: No floating alphas (@rule:semantic-001)
+- Given: A new alpha is defined that does not exist in the baseline
+- When: Phase 3 generates the alpha JSON
+- Then: The alpha has exactly one of `contributesTo` or `mapsTo`
+- Then: The target resolves to a baseline, practice-local, or dependency alpha
+
+### Scenario: contributesTo and mapsTo may coexist on different targets (@rule:semantic-002)
+- Given: A new alpha declares a parent relationship
+- When: The alpha JSON is generated
+- Then: If both `contributesTo` and `mapsTo` are present, they reference different alphas
+
+### Scenario: mapsTo variants match parent states exactly (@rule:semantic-003)
+- Given: A new alpha has `mapsTo` pointing to a parent alpha
+- When: The alpha's states are generated
+- Then: The state names and sequence exactly match the parent alpha's states
+
+### Scenario: mapsTo variant names may include or omit parent type (@rule:semantic-010)
+- Given: A new alpha has `mapsTo` pointing to a parent alpha
+- When: The alpha name is chosen
+- Then: The alpha name may include or omit the parent alpha's type name
+
+### Scenario: Redeclared alphas have no contributesTo or mapsTo (@rule:semantic-005)
+- Given: An alpha name matches a baseline or parent practice alpha
+- When: The alpha is included in the practice JSON
+- Then: The alpha has neither `contributesTo` nor `mapsTo`
+- Then: Only practice-specific checklists, narratives, and Gherkin guidance are added
+
+### Scenario: Competency level names match baseline exactly (@rule:semantic-006)
+- Given: An activity or persona references a competency level
+- When: The `competencyLevelName` value is set
+- Then: The value exactly matches a CompetencyLevel.name from the baseline for that competency
+- Then: Level names are extracted with `python3 utils/extract-reference-names.py <baseline>.json --sections competencies`
+
+### Scenario: relatesTo only on new alphas (@rule:semantic-007)
+- Given: An alpha is a redeclaration of a baseline alpha
+- When: The alpha JSON is generated
+- Then: No `relatesTo` array is added (baseline relationships are inherited)
+
+### Scenario: relatesTo entries have required fields (@rule:semantic-008)
+- Given: A new alpha defines `relatesTo` relationships
+- When: The relatesTo array is generated
+- Then: Every entry has `relationship`, `alphaName`, and `direction` fields
+- Then: `direction` is one of `outgoing`, `incoming`, or `mutual`
+
+### Scenario: contributesToState references valid parent state (@rule:semantic-009)
+- Given: A state on a new alpha declares `contributesToState`
+- When: The state JSON is generated
+- Then: The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`
+
+### Scenario: Baseline references are case-sensitive (@rule:semantic-011)
+- Given: The practice references baseline elements (alphas, focuses, activitySpaces, competencies)
+- When: Symbolic reference values are set
+- Then: Every reference exactly matches the baseline element's `name` (case-sensitive)
+
+## Feature: Narrative Quality
+
+### Scenario: Narratives are structured objects (@rule:narrative-001)
+- Given: A narrative is defined on any element or at practice level
+- When: The narrative JSON is generated
+- Then: The narrative has `narrativeTypeName` and `narrativeContexts` array
+- Then: Each context has `seq`, `narrativeElementName`, and `context` fields
+
+### Scenario: Narrative names describe subject matter (@rule:narrative-003)
+- Given: A narrative has a `name` and `description`
+- When: The narrative JSON is generated
+- Then: The name describes the subject matter, not the template type
+- Then: The description explains what the narrative covers, not the framework structure
+- Then: Contexts contain direct story content without mentioning the narrative type
+
+### Scenario: Narrative contexts are self-contained (@rule:narrative-005)
+- Given: A narrative has contexts with `narrativeElementName` labels
+- When: The context strings are generated
+- Then: Each context is coherent without its element heading visible
+- Then: Bare lists include a framing introduction sentence
+
+### Scenario: Narratives placed on correct elements (@rule:narrative-002)
+- Given: A narrative describes a specific alpha, activity, or work product
+- When: The narrative is attached in the JSON
+- Then: Element-specific narratives are on the element's `narratives[]` property
+- Then: Only practice/method-level narratives go in the top-level `narratives[]` array
+
+### Scenario: All narratives have citation references (@rule:narrative-006)
+- Given: A narrative is defined
+- When: The narrative JSON is generated
+- Then: The narrative includes a `citationNames` array with at least one citation reference
+
+## Feature: Element Naming
+
+### Scenario: Descriptions are single sentences under word limit (@rule:naming-001)
+- Given: An element has a `description` field
+- When: The description is generated
+- Then: Element descriptions are at most 20 words
+- Then: State and LOD descriptions are at most 12 words
+
+### Scenario: Checklist names are noun-phrase labels (@rule:naming-002)
+- Given: A checklist item on an alpha state has `name` and `description`
+- When: The checklist JSON is generated
+- Then: The name is a short noun phrase (not truncated from the description)
+- Then: The name is not identical to the description
+
+### Scenario: Global name uniqueness across element types (@rule:naming-003)
+- Given: Multiple PracticeElement types are defined (alphas, workProducts, activities, personas, patterns)
+- When: All element names are collected
+- Then: No name appears in more than one element type
+
+### Scenario: LOD names describe content maturity (@rule:naming-004)
+- Given: A work product has levels of detail
+- When: LOD names are chosen
+- Then: Names describe artifact content maturity (e.g., "Outline", "Comprehensive", "Automated")
+- Then: Names do not use generic labels ("Level 1", "Basic") or concern progression terms ("Established", "Optimized")
+
+### Scenario: Activity names differ from ActivitySpace names (@rule:naming-005)
+- Given: An activity is assigned to an ActivitySpace
+- When: The activity name is chosen
+- Then: The activity name is distinct from the ActivitySpace name
+
+## Feature: Coverage Completeness
+
+### Scenario: Alpha state minimum (@rule:coverage-001)
+- Given: An alpha is defined in the practice
+- When: States are assigned to the alpha
+- Then: The alpha has at least 3 states
+
+### Scenario: Work product LOD minimum (@rule:coverage-002)
+- Given: A work product is defined in the practice
+- When: Levels of detail are assigned
+- Then: The work product has at least 2 levels of detail
+
+### Scenario: Alpha states have supporting LODs (@rule:coverage-003)
+- Given: An alpha state exists on a new (non-baseline) alpha
+- When: Work product LODs are checked
+- Then: At least one LOD has `contributesTo` targeting the alpha state
+
+### Scenario: Patterns cover all practice alphas (@rule:coverage-004)
+- Given: A pattern is defined in the practice
+- When: PatternViews are checked
+- Then: Every practice alpha appears in at least one PatternView
+- Then: Each alpha appears in every view (backfilled if needed)
+
+### Scenario: Alpha states have supporting activities (@rule:coverage-005)
+- Given: An alpha state beyond the initial state exists on a new alpha
+- When: Activity contributesTo references are checked
+- Then: At least one activity has `contributesTo` targeting the alpha state
+
+## Feature: Terminology Aliasing
+
+### Scenario: One alias per element maximum (@rule:aliasing-001)
+- Given: The practice defines terminology aliases
+- When: Aliases are assigned to baseline elements
+- Then: Each baseline element has at most one alias
+
+### Scenario: Alias names excluded from structural references (@rule:aliasing-002)
+- Given: An alias maps a baseline name to a domain-specific name
+- When: The practice JSON uses symbolic references (alphaName, contributesTo, activitySpaceName, etc.)
+- Then: Only canonical baseline names appear in structural reference fields
+- Then: Alias names never appear in structural reference fields
+
+### Scenario: Keyword count within range (@rule:aliasing-003)
+- Given: The practice defines a keywords array
+- When: Keywords are generated
+- Then: The array contains between 10 and 20 keywords
+
+## Feature: Structural Integrity
+
+### Scenario: JSON has correct kind discriminator (@rule:structural-001)
+- Given: Phase 3 generates a JSON file
+- When: The JSON is validated
+- Then: The `kind` property is "practice" for single practices, "method" for multi-practice methods
+
+### Scenario: All required sections present in JSON (@rule:structural-002)
+- Given: Phase 3 generates a practice JSON
+- When: The JSON is validated
+- Then: alphas, activities, workProducts, patterns, and citations arrays are present and non-empty
+
+### Scenario: Pattern cross-references resolve (@rule:structural-003)
+- Given: A pattern references alpha names and state names in patternViews
+- When: Phase 3 generates the JSON
+- Then: Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline
+- Then: Every stateName resolves to a valid state on that alpha
+
+### Scenario: Activity-alpha cross-references resolve (@rule:structural-004)
+- Given: An activity has contributesTo entries referencing alphas and states
+- When: Phase 3 generates the JSON
+- Then: Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state
+
+### Scenario: Activity-work product cross-references resolve (@rule:structural-005)
+- Given: An activity has worksOn entries referencing work products and LODs
+- When: Phase 3 generates the JSON
+- Then: Every workProductName and levelOfDetailName in worksOn resolves to defined elements
+
+## Feature: Process Compliance
+
+### Scenario: Phase 1 completed before Phase 2 (@rule:process-001)
+- Given: The three-phase pipeline is being executed
+- When: Phase 2 mapping begins
+- Then: 01-analysis-report.md exists with all 8 required sections
+- Then: Analysis has sufficient depth (5+ numbered subsections and 3+ source references)
+
+### Scenario: Phase 2 completed before Phase 3 (@rule:process-002)
+- Given: The three-phase pipeline is being executed
+- When: Phase 3 JSON generation begins
+- Then: 02-mapping-guide.md exists with all 7 required sections
+- Then: At least 3 alphas, 5 activities, and 1 pattern are mapped
+
+### Scenario: Validation run after JSON generation (@rule:process-003)
+- Given: Phase 3 has generated a JSON file
+- When: The phase is marked complete
+- Then: validate-practice-json.py has been run with 0 schema errors
+- Then: assess-practice.py has been run with 0 error-severity issues

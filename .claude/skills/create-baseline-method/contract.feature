@@ -44,3 +44,24 @@ Feature: Baseline Practice Creation from Foundational Framework
     When packaging runs
     Then package-keleo.py creates a .keleo archive with --verify
     And parent baseline is included if baselinePracticeName is set
+
+  Scenario: Verification gate at every phase
+    Given a phase has completed and passed mechanical validation
+    When the verification gate runs
+    Then the verifiers named in verification-foundation/verifiers/phase-<N>.md have been launched
+    And verification-gate.py has been run with --gate and --expect naming every verifier launched
+    And the phase does not advance while a blocking error survives reconciliation
+    And the verdict is recorded in 00-prompt-history.md as a decision
+
+  Scenario: Distillation is verified against the analysis
+    Given Phase 1.5 has reduced the analysis to essential elements
+    When the Phase 1.5 verification gate runs
+    Then every distilled alpha, activity space and competency has an antecedent in 01-analysis-report.md
+    And every substantive Phase 1 concern is absorbed, generalised, or dropped with a stated rationale
+    And the focus groupings are justified against the domain rather than defaulted
+
+  Scenario: Phase 3 gate runs before packaging
+    Given Phase 3 has generated the baseline JSON
+    When the verification gate runs
+    Then it runs before package-keleo.py
+    And a baseline built on a failed gate is not packaged

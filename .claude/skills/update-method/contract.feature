@@ -61,3 +61,12 @@ Feature: Practice/Method Update to Latest Guidance
     Then schemaVersion matches deps/language.schema.json
     And dependencyVersions are populated from resolved dependencies
     And version bump matches update mode (patch for auto-fix/references, minor for remap/reanalysis)
+
+  Scenario: Verification is scoped to what changed
+    Given an update has modified a practice, method or baseline JSON
+    When the verification gate runs
+    Then diff-practice-json.py has produced the changed-element list
+    And each verifier brief is scoped to those elements rather than the whole document
+    And only the gates for phases the update touched are run
+    And Mode 3 reference updates run the reference-citation-fidelity verifier only
+    And any fix applied in response to a finding is followed by rebundling

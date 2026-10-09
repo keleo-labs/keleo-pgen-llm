@@ -19,7 +19,7 @@
         "assess-practice.py is run first to determine suggestedUpdateMode",
         "The update mode is auto-fix, remap, light-reanalysis, or full-reanalysis based on assessment output"
       ],
-      "line": 825,
+      "line": 686,
       "assess_categories": [],
       "automatable": false
     },
@@ -37,7 +37,7 @@
         "backup-practice.py has created a timestamped backup of the directory",
         "The backup contains all JSON and markdown files"
       ],
-      "line": 831,
+      "line": 692,
       "assess_categories": [],
       "automatable": false
     },
@@ -55,7 +55,7 @@
         "Fix utilities are run without user interaction",
         "Re-assessment confirms 0 errors before reporting success"
       ],
-      "line": 837,
+      "line": 698,
       "assess_categories": [],
       "automatable": false
     },
@@ -73,7 +73,7 @@
         "discover-dependencies.py resolves all baselinePracticeName and practiceDependencyNames",
         "Resolved dependencies are confirmed with the user before proceeding"
       ],
-      "line": 843,
+      "line": 704,
       "assess_categories": [],
       "automatable": false
     },
@@ -91,7 +91,7 @@
         "All valid existing alphas, activities, work products, and narratives are preserved",
         "Only superseded or invalid content is replaced"
       ],
-      "line": 849,
+      "line": 710,
       "assess_categories": [],
       "automatable": false
     },
@@ -109,7 +109,7 @@
         "eval-skill-output.py is run with error_pass_rate checked",
         "The result is reported to the user with any remaining warnings"
       ],
-      "line": 855,
+      "line": 716,
       "assess_categories": [],
       "automatable": false
     },
@@ -127,7 +127,7 @@
         "diff-practice-json.py shows what changed vs the original",
         "The user sees added, removed, and modified elements"
       ],
-      "line": 861,
+      "line": 722,
       "assess_categories": [],
       "automatable": false
     },
@@ -145,7 +145,64 @@
         "The user is asked to choose between remap, light-reanalysis, and full-reanalysis",
         "The recommended mode and reason from assessment are presented"
       ],
-      "line": 867,
+      "line": 728,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-409",
+      "name": "ChangeRequest generated after update",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An update has modified an existing practice/baseline/method JSON"
+      ],
+      "when": [
+        "The updated JSON differs from the backup version"
+      ],
+      "then": [
+        "generate-change-request.py produces a ChangeRequest JSON",
+        "The ChangeRequest is written to the practice directory",
+        "A Downstream Impact Report is presented to the user listing affected practices"
+      ],
+      "line": 734,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-410",
+      "name": "Downstream impact report presented",
+      "feature": "Update Process Integrity",
+      "given": [
+        "A ChangeRequest has been generated with operations and nameChanges"
+      ],
+      "when": [
+        "discover-dependencies.py --dependents finds downstream practices"
+      ],
+      "then": [
+        "The user is shown each dependent practice name, path, and role",
+        "Each nameChange affecting that dependent is listed",
+        "Each dependent is classified as auto-propagatable or manual remap needed",
+        "The user is told which practices need /update-method remap vs auto-fix"
+      ],
+      "line": 741,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-411",
+      "name": "Downstream auto-propagation requires confirmation",
+      "feature": "Update Process Integrity",
+      "given": [
+        "Downstream dependents have auto-propagatable nameChanges"
+      ],
+      "when": [
+        "apply-change-request.py is invoked"
+      ],
+      "then": [
+        "A dry-run is shown to the user first",
+        "Changes are only applied after user confirms"
+      ],
+      "line": 749,
       "assess_categories": [],
       "automatable": false
     },
@@ -154,7 +211,7 @@
       "name": "Content preservation during light reanalysis",
       "feature": "Update Process Integrity",
       "given": [
-        "The update uses light reanalysis mode (Phase 1B → 2 → 3)"
+        "The update uses light reanalysis mode (Phase 1B \u2192 2 \u2192 3)"
       ],
       "when": [
         "Sections are classified as PRESERVE or UPDATE based on user scope"
@@ -164,18 +221,39 @@
         "UPDATE sections retain valid existing entries as baseline",
         "New content is traceable to source materials or the stated change context"
       ],
-      "line": 647,
+      "line": 755,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-401",
+      "name": "Re-verification is scoped to changed elements",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An update has modified a practice, method or baseline JSON"
+      ],
+      "when": [
+        "The verification gate runs"
+      ],
+      "then": [
+        "diff-practice-json.py has produced the changed-element list",
+        "Each verifier brief is scoped to those elements rather than the whole document",
+        "Only the gates for phases the update touched are run",
+        "Any fix applied in response to a finding is followed by rebundling"
+      ],
+      "line": 762,
       "assess_categories": [],
       "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 9,
+    "total_scenarios": 13,
     "total_features": 1,
     "automatable": 0,
-    "manual_only": 9,
+    "manual_only": 13,
     "by_category": {
-      "process": 9
+      "fidelity": 1,
+      "process": 12
     }
   }
 }

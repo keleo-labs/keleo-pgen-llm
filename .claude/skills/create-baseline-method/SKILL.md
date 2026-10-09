@@ -3,6 +3,7 @@
 ## Metadata
 
 **Name:** create-baseline-method
+**Version:** 1.1.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -203,6 +204,7 @@ These documents must be readable for all phases:
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
 3. **`deps/language.schema.json`** - JSON Schema definition
 4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
+5. **`.claude/skills/verification-foundation/`** — Verification protocol shared with the other generation skills. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach
 
 ## Phase 1: Analysis
 
@@ -258,6 +260,20 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
 ```
 
 Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Analysis
+
+Mechanical validation checks shape, not fidelity. Read
+`.claude/skills/verification-foundation/verifiers/phase-1.md` and launch its three
+verifiers in a single message.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 1 --gate --summary \
+  --expect source-fidelity,source-coverage,citation-integrity
+```
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 1 Verification Gate".
 
 #### User Review Gate — Analysis
 
@@ -354,6 +370,21 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
 ```
 
 Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Distillation
+
+Distillation is where material gets silently dropped and where convenient new concepts
+appear that no source asked for. Read
+`.claude/skills/verification-foundation/verifiers/phase-1.5.md` and launch its two
+verifiers.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 1.5 --gate --summary \
+  --expect distillation-fidelity,focus-coherence
+```
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 1.5 Verification Gate".
 
 #### User Review Gate — Distillation
 
@@ -461,6 +492,25 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
 ```
 
 Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Mapping
+
+Read `.claude/skills/verification-foundation/verifiers/phase-2.md` and launch its four
+verifiers. A baseline has one producing agent, so one verifier set — skip
+`cross-practice-consistency`, which is for methods. Substitute `{REPORT}` with the
+distilled essentials: for a baseline, Phase 2's antecedent is Phase 1.5, not Phase 1.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 2 --gate --summary \
+  --expect source-fidelity,alpha-semantics,coverage,naming-consistency
+```
+
+Two briefs need baseline framing when you pass them through: baseline alphas carry
+`relatesTo` and never `contributesTo` or `mapsTo`, so `alpha-semantics` checks
+relationship meaningfulness and state coherence rather than parent selection.
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 2 Verification Gate".
 
 #### User Review Gate — Mapping
 
@@ -587,6 +637,24 @@ python3 utils/eval-skill-output.py baselines/<name>/ \
   --parent <parent-baseline.json> --schema deps/language.schema.json --summary
 ```
 Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
+
+**Verification Gate — Baseline JSON**
+
+The checks above cover the mechanical part. They do not cover the judgement Phase 3
+exercises where the mapping guide is silent. Read
+`.claude/skills/verification-foundation/verifiers/phase-3.md` and launch its two
+verifiers. Run this **before** packaging — a `.keleo` built on a failed gate has to be
+rebuilt.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 3 --gate --summary \
+  --expect generation-drift,reference-citation-fidelity
+```
+
+Baselines have no `references` array, so `reference-citation-fidelity` covers citations
+and acknowledgements only. On exit 1, follow the remediation loop in
+`VERIFY-FOUNDATION.md` §8. Record the verdict with `prompt-history.py --add-decision`,
+label "Phase 3 Verification Gate".
 
 Record phase completion:
 ```bash
@@ -754,6 +822,31 @@ Validates that the four-phase baseline pipeline is executed correctly.
 - When: The phase is marked complete
 - Then: validate-baseline-json.py has been run with 0 schema errors
 - And: assess-practice.py confirms 0 error-severity issues
+
+### Scenario: Verification gate precedes each user review gate (@rule:process-204)
+- Given: A baseline phase has completed and passed mechanical validation
+- When: The output is presented to the user for review
+- Then: verification-gate.py has been run for that phase with `--expect` naming every verifier launched
+- And: No blocking error survives reconciliation
+- And: The verdict is recorded in the prompt history as a decision
+
+## Feature: Baseline Source Fidelity
+
+Validates that distilled baseline elements trace to the analysis they were reduced from.
+
+### Scenario: Distilled elements trace to Phase 1 concerns (@rule:fidelity-201)
+- Given: Phase 1.5 has reduced the analysis to essential elements
+- When: The Phase 1.5 verification gate runs
+- Then: Every essential alpha, activity space and competency has an identifiable antecedent in 01-analysis-report.md
+- And: Every substantive Phase 1 concern is absorbed, generalised, or dropped with a stated rationale
+- And: Elements with no Phase 1 antecedent are reported as errors
+
+### Scenario: Focus groupings are justified by the analysis (@rule:fidelity-202)
+- Given: Phase 1.5 has defined 2-4 focus areas
+- When: The focus coherence verifier runs
+- Then: The distillation states why these focuses, grounded in concern patterns from the analysis
+- And: Every distilled alpha is assigned to exactly one focus it fits more naturally than any other
+- And: Use of the default Value/Solution/Endeavor triad is justified against the domain rather than assumed
 
 ## Common Pitfalls
 
