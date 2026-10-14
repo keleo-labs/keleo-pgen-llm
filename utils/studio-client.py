@@ -449,8 +449,40 @@ def cmd_link(names, element=None, markdown=False, attribution=False,
     return links
 
 
+def _entry_point_version(zf, manifest):
+    """Read the version of a package's entry-point document.
+
+    Package version and the versions of the documents inside are independent and
+    have been observed to invert on the live remote — a higher package version
+    holding older content. The document version is what actually says whether a
+    bundle carries newer work.
+    """
+    documents = manifest.get("documents", [])
+    target = next((d for d in documents if d.get("entryPoint")), None)
+    if target is None and documents:
+        target = documents[-1]
+    if not target:
+        return None
+    path = target.get("path", "")
+    if not path:
+        return None
+    try:
+        if path not in zf.namelist():
+            return None
+        doc = json.loads(zf.read(path))
+    except (KeyError, json.JSONDecodeError):
+        return None
+    return doc.get("version") if isinstance(doc, dict) else None
+
+
 def _build_local_versions():
-    """Build a name→version mapping from local bundles/ directory."""
+    """Build a name→version mapping from the local bundles/ directory.
+
+    Carries both the package version and the entry-point document version.
+    Where several local bundles share a name, the one with the newest *document*
+    is preferred — selecting on package version is what produces the inversion
+    this mapping exists to expose.
+    """
     bundles_dir = get_project_root() / "bundles"
     versions = {}
     if not bundles_dir.is_dir():
@@ -465,33 +497,49 @@ def _build_local_versions():
                 pkg = manifest.get("package", {})
                 name = manifest.get("name") or pkg.get("name", "")
                 version = manifest.get("version") or pkg.get("version", "")
+                doc_version = _entry_point_version(zf, manifest)
                 if name:
+                    candidate = {
+                        "version": version,
+                        "documentVersion": doc_version,
+                        "path": str(keleo_file),
+                        "slug": keleo_file.stem,
+                    }
                     existing = versions.get(name)
-                    if existing is None or _parse_semver(version) > _parse_semver(existing["version"]):
-                        versions[name] = {
-                            "version": version,
-                            "path": str(keleo_file),
-                            "slug": keleo_file.stem,
-                        }
+                    if existing is None or _rank_bundle(candidate) > _rank_bundle(existing):
+                        versions[name] = candidate
         except (zipfile.BadZipFile, json.JSONDecodeError, KeyError):
             continue
 
     return versions
 
 
-def cmd_check(name=None, as_json=False, deep=False):
-    """Compare local vs remote versions, and with deep=True their content too."""
-    cached = _load_cached_index()
-    if not cached or _index_age_seconds(cached) > DEFAULT_MAX_AGE:
-        cached = cmd_index(max_age=DEFAULT_MAX_AGE, as_json=False)
+def _rank_bundle(entry):
+    """Order local bundles by document version first, package version second."""
+    return (
+        _parse_semver(entry.get("documentVersion") or ""),
+        _parse_semver(entry.get("version") or ""),
+    )
 
+
+def cmd_check(name=None, as_json=False, deep=False, local_only=False):
+    """Compare local vs remote versions, and with deep=True their content too.
+
+    With local_only=True, report local package and document versions without
+    contacting the remote at all.
+    """
     remote_by_name = {}
-    for b in cached.get("bundles", []):
-        bname = b.get("name", "")
-        if bname:
-            existing = remote_by_name.get(bname)
-            if existing is None or _parse_semver(b.get("version", "")) > _parse_semver(existing.get("version", "")):
-                remote_by_name[bname] = b
+    if not local_only:
+        cached = _load_cached_index()
+        if not cached or _index_age_seconds(cached) > DEFAULT_MAX_AGE:
+            cached = cmd_index(max_age=DEFAULT_MAX_AGE, as_json=False)
+
+        for b in cached.get("bundles", []):
+            bname = b.get("name", "")
+            if bname:
+                existing = remote_by_name.get(bname)
+                if existing is None or _parse_semver(b.get("version", "")) > _parse_semver(existing.get("version", "")):
+                    remote_by_name[bname] = b
 
     local_versions = _build_local_versions()
 
@@ -510,7 +558,9 @@ def cmd_check(name=None, as_json=False, deep=False):
         local_ver = local["version"] if local else None
         remote_ver = remote.get("version") if remote else None
 
-        if local_ver and remote_ver:
+        if local_only:
+            status = "local"
+        elif local_ver and remote_ver:
             lv = _parse_semver(local_ver)
             rv = _parse_semver(remote_ver)
             if lv == rv:
@@ -526,14 +576,27 @@ def cmd_check(name=None, as_json=False, deep=False):
         else:
             status = "unknown"
 
+        local_doc_ver = local.get("documentVersion") if local else None
+
         entry = {
             "name": doc_name,
             "localVersion": local_ver,
+            "localDocumentVersion": local_doc_ver,
             "remoteVersion": remote_ver,
             "status": status,
             "localPath": local["path"] if local else None,
             "remoteSlug": remote.get("slug") if remote else None,
         }
+
+        # The remote index publishes package versions only, so every verdict
+        # above is package-level. Where the local package and document versions
+        # disagree, that verdict can invert — say so rather than let it be read
+        # as a statement about content.
+        if local_doc_ver and local_ver and local_doc_ver != local_ver:
+            entry["versionDivergence"] = (
+                f"package {local_ver} carries document {local_doc_ver}"
+                + ("" if local_only else "; remote comparison is package-level only")
+            )
 
         # Version equality says nothing about content: a bundle republished
         # without a version bump still reads as up to date. Only --deep can
@@ -564,8 +627,13 @@ def cmd_check(name=None, as_json=False, deep=False):
             "local-newer": "  → LOCAL NEWER",
             "local-only": "  → LOCAL ONLY",
             "remote-only": "  ← REMOTE ONLY",
+            "local": "  ! PACKAGE/DOCUMENT VERSION DIVERGE" if r.get("versionDivergence") else "",
         }.get(r["status"], "")
-        print(f"  {r['name']:40s} local: {lv:8s} remote: {rv:8s}{indicator}")
+        doc_v = r.get("localDocumentVersion")
+        local_col = f"{lv}" if not doc_v or doc_v == lv else f"{lv} (doc {doc_v})"
+        print(f"  {r['name']:40s} local: {local_col:20s} remote: {rv:8s}{indicator}")
+        if r.get("versionDivergence"):
+            print(f"      ! {r['versionDivergence']}")
         for doc in r.get("differingDocuments", []):
             print(f"      differs: {doc}")
         if r.get("contentCheckError"):
@@ -983,6 +1051,11 @@ def main():
                              "same-version-content-differs where they diverge. "
                              "Downloads each matching bundle, so scope it with "
                              "a NAME rather than running it over the library")
+    parser.add_argument("--local", action="store_true",
+                        help="With --check: report local package and entry-point "
+                             "document versions side by side without contacting "
+                             "the remote. Use to spot bundles whose package "
+                             "version disagrees with the content inside")
     parser.add_argument("--attribution", action="store_true",
                         help="With --link: emit the closing report attribution "
                              "line with every framework hyperlinked")
@@ -1012,7 +1085,8 @@ def main():
         cmd_check_embedded(args.check_embedded, max_age=args.max_age,
                            as_json=args.json)
     elif args.check is not None:
-        cmd_check(name=args.check or None, as_json=args.json, deep=args.deep)
+        cmd_check(name=args.check or None, as_json=args.json, deep=args.deep,
+                  local_only=args.local)
     elif args.pull:
         cmd_pull(args.pull, as_json=args.json)
     elif args.push:

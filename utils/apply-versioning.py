@@ -100,12 +100,21 @@ def get_dependency_names(data, kind):
     return deps
 
 
-def apply_versioning(data, schema_version, version_index, today, bump=None, set_version=None):
+def apply_versioning(data, schema_version, version_index, today, bump=None, set_version=None,
+                     refresh_deps=False):
     """Apply versioning fields to a document dict. Returns list of changes."""
     changes = []
     kind = detect_kind(data)
 
-    if not data.get("schemaVersion"):
+    # --refresh-deps on its own is a surgical repair of dependency constraints
+    # after a dependency's version moved. The document's own content has not
+    # changed, so its version, schemaVersion and updatedAt are left alone —
+    # touching them would make every bundle carrying it stale for no reason.
+    deps_only = refresh_deps and not bump and not set_version
+
+    if deps_only:
+        pass
+    elif not data.get("schemaVersion"):
         data["schemaVersion"] = schema_version
         changes.append(f"added schemaVersion={schema_version}")
     elif data["schemaVersion"] != schema_version:
@@ -135,7 +144,7 @@ def apply_versioning(data, schema_version, version_index, today, bump=None, set_
         else:
             data["updatedAt"] = today
             changes.append(f"updated updatedAt={today}")
-    else:
+    elif not deps_only:
         new_version = normalize_version(old_version)
         if old_version != new_version:
             data["version"] = new_version
@@ -149,7 +158,13 @@ def apply_versioning(data, schema_version, version_index, today, bump=None, set_
         }
         new_dvs = []
         for name in dep_names:
-            if bump or set_version:
+            # When --refresh-deps names specific dependencies, leave every other
+            # constraint exactly as recorded. A dependency bump should not drag
+            # unrelated constraints along with it.
+            in_scope = refresh_deps is True or (
+                isinstance(refresh_deps, (list, tuple, set)) and name in refresh_deps
+            )
+            if bump or set_version or in_scope:
                 dep_version = resolve_dependency_version(name, version_index)
                 if dep_version:
                     vr = f"^{dep_version}"
@@ -157,6 +172,19 @@ def apply_versioning(data, schema_version, version_index, today, bump=None, set_
                     old_vr = existing_dvs.get(name, "")
                     if old_vr != vr:
                         changes.append(f"refreshed dependencyVersion {name} {old_vr or '(new)'} → {vr}")
+                elif existing_dvs.get(name):
+                    # Keep what is already recorded. A name that cannot be
+                    # resolved usually means the index did not cover it — run
+                    # with --all or --dir — and silently dropping the constraint
+                    # loses information the document was carrying.
+                    new_dvs.append({
+                        "documentName": name,
+                        "versionRange": existing_dvs[name],
+                    })
+                    changes.append(
+                        f"WARNING: no version found for dependency {name!r}; "
+                        f"kept existing constraint {existing_dvs[name]}"
+                    )
                 else:
                     changes.append(f"WARNING: no version found for dependency {name!r}")
             elif name in existing_dvs and existing_dvs[name]:
@@ -164,6 +192,11 @@ def apply_versioning(data, schema_version, version_index, today, bump=None, set_
                     "documentName": name,
                     "versionRange": existing_dvs[name],
                 })
+            elif deps_only:
+                # Out of scope for this refresh and nothing recorded to keep.
+                # Filling the gap here would be an unrelated change riding along
+                # with a targeted constraint repair.
+                continue
             else:
                 dep_version = resolve_dependency_version(name, version_index)
                 if dep_version:
@@ -182,7 +215,7 @@ def apply_versioning(data, schema_version, version_index, today, bump=None, set_
                 if not any(c.startswith(("added dependency", "refreshed dependency")) for c in changes):
                     changes.append("updated dependencyVersions")
 
-    if not bump and not set_version and data.get("updatedAt"):
+    if not bump and not set_version and not deps_only and data.get("updatedAt"):
         data["updatedAt"] = today
         changes.append(f"updated updatedAt={today}")
 
@@ -347,8 +380,26 @@ def main():
         "--ahead-of-copies", action="store_true",
         help="Bump version to be ahead of all copies across practices/, baselines/, deps/"
     )
+    parser.add_argument(
+        "--refresh-deps", nargs="*", metavar="NAME",
+        help="Re-resolve dependencyVersions against current on-disk versions without "
+             "touching this document's own version, schemaVersion or updatedAt. Use "
+             "after a dependency's major bump, where the dependent's content is "
+             "unchanged but its recorded constraint no longer matches what is "
+             "published. Name one or more dependencies to limit the refresh to those; "
+             "with no names, every dependency is refreshed"
+    )
 
     args = parser.parse_args()
+
+    # nargs="*" gives None when the flag is absent, [] when given bare, and a
+    # list of names when scoped. Collapse that into False / True / set-of-names.
+    if args.refresh_deps is None:
+        refresh_deps_scope = False
+    elif args.refresh_deps:
+        refresh_deps_scope = set(args.refresh_deps)
+    else:
+        refresh_deps_scope = True
 
     if args.show and (args.fix or args.bump or args.set_version):
         parser.error("--show is incompatible with --fix, --bump, and --set-version")
@@ -443,7 +494,8 @@ def main():
                 effective_set_version = ahead_version
 
         changes = apply_versioning(data, schema_version, version_index, today,
-                                   bump=args.bump, set_version=effective_set_version)
+                                   bump=args.bump, set_version=effective_set_version,
+                                   refresh_deps=refresh_deps_scope)
 
         if changes:
             total_changes += len(changes)
