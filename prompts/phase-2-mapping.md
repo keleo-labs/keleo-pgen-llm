@@ -1514,7 +1514,10 @@ For EACH pattern from Phase 1 (including lifecycle):
 ```
 Pattern Name: [from Phase 1]
 Description: [single sentence from Phase 1]
-Narrative Type Name: [choose from baseline narrative types based on pattern nature]
+Narrative Type Name: [choose from baseline narrative types based on pattern nature — copy the
+  name exactly and in full from the effective context, since a shortened form such as "Essay"
+  for "Essay Narrative" is a dangling reference. REQUIRED whenever any view below carries
+  narrative contexts, because each context's element name resolves inside this type.]
 Narrative: [from Phase 1 lifecycle/workflow description — include ONLY when Phase 1 provides
   substantive rationale for the lifecycle model, why these phases exist in this order, or the
   transformation story the pattern represents. This is the pattern's own narrative (distinct
