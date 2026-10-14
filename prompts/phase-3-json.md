@@ -828,64 +828,85 @@ Add patterns array:
   }
   ```
 
-#### 3.11.5 Pattern Groups
+#### 3.11.5 Pattern Orchestrations
 
-If the mapping guide defines pattern groups (Step 8.5), add a `patternGroups` array. PatternGroups organize patterns into navigational categories — most useful when a practice has 3+ patterns or a method will compose 10+.
+**Do NOT emit `patternGroups`.** The construct is deprecated as of schema 2.21.0 and is
+not used in new work. It remains valid and still merges, so documents that already
+declare it are left alone — but do not add it to a practice, and do not adopt a
+baseline's canonical group names even where a baseline still declares them. A pure
+classification does not need authoring: the merge stamps `sourcePracticeName` on every
+pattern, so a consumer can group for display without the document carrying the grouping.
+
+Where the mapping guide says how patterns relate **in time** (Step 8.5), emit a
+`patternOrchestrations` array instead. A pattern coordinates work within one aspect; an
+orchestration says which pattern applies when, and on what terms.
 
 ```json
-"patternGroups": [
+"patternOrchestrations": [
   {
-    "name": "Core Lifecycles",
-    "description": "Primary adoption and maturity journeys for each practice area",
-    "seq": 0,
-    "entries": [
-      { "patternName": "Platform Adoption Lifecycle", "seq": 0 },
-      { "patternName": "Team Formation Journey", "seq": 1 },
-      { "patternName": "Value Realization Cycle", "seq": 2 }
-    ],
-    "narratives": [
+    "name": "Adoption Endeavour",
+    "description": "How the adoption patterns layer across the life of an engagement",
+    "narrativeTypeName": "<exact NarrativeType.name from the baseline>",
+    "stages": [
       {
-        "name": "Navigating Core Lifecycles",
-        "description": "How the primary lifecycles relate and when to use each",
-        "narrativeTypeName": "Essay",
-        "narrativeContexts": [
-          {
-            "seq": 1,
-            "narrativeElementName": "Introduction",
-            "context": "Each practice area follows a distinct lifecycle reflecting its primary concern."
-          },
-          {
-            "seq": 2,
-            "narrativeElementName": "Body",
-            "context": "Platform adoption drives technical maturity, team formation builds organizational capability, and value realization tracks business outcomes."
-          },
-          {
-            "seq": 3,
-            "narrativeElementName": "Conclusion",
-            "context": "Start with platform adoption as the foundation, then layer team and value lifecycles as the organization matures."
-          }
-        ],
-        "citationNames": ["..."]
+        "patternName": "Platform Adoption Lifecycle",
+        "seq": 0,
+        "relationship": "sequential",
+        "exitCriteria": {
+          "name": "Platform is serving its first workloads",
+          "description": "The adoption lifecycle is complete when the platform carries real traffic.",
+          "given": ["The platform is deployed"],
+          "when": ["The first production workload is cut over"],
+          "then": ["The platform serves it without manual intervention"]
+        }
+      },
+      {
+        "patternName": "Team Formation Journey",
+        "seq": 0,
+        "relationship": "concurrent",
+        "relativeTo": { "patternName": "Platform Adoption Lifecycle" },
+        "recurrence": "once"
+      },
+      {
+        "patternName": "Value Realization Cycle",
+        "seq": 1,
+        "relationship": "nested",
+        "relativeTo": {
+          "patternName": "Platform Adoption Lifecycle",
+          "viewNames": ["Operate", "Scale"]
+        },
+        "recurrence": "perView"
+      },
+      {
+        "patternName": "Incident Response Lifecycle",
+        "seq": 2,
+        "relationship": "onDemand",
+        "trigger": {
+          "name": "A severity-one incident is declared",
+          "description": "What causes the response pattern to be entered.",
+          "given": ["The platform is in service"],
+          "when": ["Monitoring or a user reports a severity-one failure"],
+          "then": ["The response lifecycle is entered regardless of the current stage"]
+        }
       }
-    ],
-    "tags": {
-      "lifecycleTags": ["Adoption"]
-    }
+    ]
   }
 ]
 ```
 
 **CRITICAL:**
 
-- When adopting baseline-defined groups, use the **exact baseline group name** — this is the merge key for cross-practice composition
-- Only include groups that have patterns assigned — do NOT emit empty baseline groups in extension practices (the baseline already defines them)
-- `patternName` must exactly match a defined `Pattern.name`
-- `seq` on entries provides sort order within the group (0-based)
-- `seq` on the group provides sort order among groups (0-based); alphabetical when absent
-- A pattern should appear in at most one group
-- Ungrouped patterns remain valid — they render in a default section
-- **Narratives:** Include when the mapping guide provides group-level rationale — why these patterns belong together, how they relate, how to navigate between them. Narratives help users understand the group's purpose. Omit if the grouping is self-explanatory.
-- Cross-practice groups merge by canonical name during method composition (entries merge by `patternName`, overlay seq wins)
+- `stages` is REQUIRED and needs at least one entry
+- `patternName` must exactly match a defined `Pattern.name` in scope
+- `relationship` is REQUIRED on every stage and is **always stated explicitly** — there is no default, because how a pattern layers into an endeavour is a modelling decision a reader should never have to infer from silence
+- `relativeTo` is REQUIRED for `concurrent` and `nested`, and names the host pattern; add `viewNames` to scope the stage to particular views of that host
+- `trigger` is REQUIRED for `onDemand`. That stage has no fixed position — it is entered on recognition, which is what separates a planned phase from a pattern run because circumstances called for it
+- `recurrence` is meaningful only with `concurrent` or `nested`. `perView` restarts the stage for each host view in scope; `once` runs it across the whole span
+- `seq` must be unique among `sequential` stages. For other relationships it is only the anchor point for presentation and may be shared
+- `entryCriteria` is a `Background` — alpha states and work product levels, expressed as everywhere else. `exitCriteria` and `trigger` are `Test` objects, so each needs `name` and `description` alongside its Given/When/Then
+- An orchestration is authored by one owner and does **not** merge across practices by name, unlike a group. Do not emit one that sequences another practice's patterns
+- Do not invent an order the source material does not state. Independent patterns need no orchestration, and patterns named in none remain valid
+- If any stage carries `narrativeContexts`, the orchestration MUST declare `narrativeTypeName` — the same rule, for the same reason, as a pattern and its views
 
 #### 3.11.7 Outcomes
 

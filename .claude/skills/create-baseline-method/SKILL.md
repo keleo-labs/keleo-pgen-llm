@@ -42,8 +42,8 @@ Baselines are foundational — they typically have no upstream practice dependen
 This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).
 
 **Key Distinction:**
-- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces, canonical patternGroups)
-- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns (adopting baseline patternGroups)
+- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
+- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns, and the orchestrations that sequence them
 
 ### Alpha Instances in Baselines
 
@@ -476,8 +476,6 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
 
 12. **Define Assets** (icons, diagrams, templates)
 
-13. **Define Canonical PatternGroups** (3-5 template categories with empty entries for extension practices to adopt)
-
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
 **Phase 2 Validation:**
@@ -586,7 +584,6 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
    - **narratives** - With narrative contexts
    - **citations** - Using Citation Standard
    - **outcomes** - Universal value propositions with measureDescription (1-3)
-   - **patternGroups** - Canonical categories with empty entries (extension practices populate)
    - **assets** - Icons, diagrams, templates
 
 5. **Validate Cross-References**:
@@ -729,7 +726,8 @@ Validates that baseline JSON has correct shape, required top-level sections, and
 - When: Phase 3 produces the JSON
 - Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
 - And: These elements belong in extension practices, not baselines
-- And: patternGroups ARE allowed but with empty entries arrays (canonical categories for extensions to adopt)
+- And: The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0
+- And: No patternOrchestrations are authored either, since a baseline defines no patterns to sequence
 
 ### Scenario: Focus count within range (@rule:structural-204)
 - Given: A baseline defines focus areas

@@ -130,6 +130,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 - "Generate the COMPLETE practice JSON. You MUST include ALL element arrays: alphas, workProducts, activities, patterns, personas, personaGroups, citations, outcomes, assets, and narratives."
 - "Only use competency names that exist in the baseline/effective-context. Do NOT invent new competency names."
 - "Preserve the existing version from the source JSON — do NOT set version to 1.0.0."
+- "If the source JSON declares `patternGroups`, copy it across verbatim. The construct is deprecated and new documents do not get one, so the mapping guide will not describe it — but a remap is not a migration, and dropping a group silently breaks every reference to its canonical name. Do not add one to a document that lacks it."
 
 **Post-Phase-3 Completeness Gate (MANDATORY):**
 After each Phase 3 subagent completes, verify element completeness against the backup:
@@ -159,7 +160,7 @@ The mapping guide has clear section headers. Assign sections to parallel subagen
 |----------|----------|---------------|
 | A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
 | B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
-| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternGroups` (entries, narratives) | Mapping guide §Work Products, §Patterns, §Pattern Groups |
+| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternOrchestrations` (stages, relationships) | Mapping guide §Work Products, §Patterns, §Orchestrations |
 | D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |
 
 **Step 3: Launch parallel subagents**
@@ -169,7 +170,7 @@ Each subagent receives:
 - The schema (`deps/language.schema.json`) — relevant `$defs` only
 - The effective context for cross-reference names (alpha names, activity space names, etc.)
 - Instruction to output ONLY its assigned section(s) as a standalone JSON object
-- **Subagent C (patternGroups):** Must load the baseline's `patternGroups` and adopt existing baseline group names. Novel groups require justification. Use exact baseline group names — they are the merge key for cross-practice composition.
+- **Subagent C (patternGroups):** Copy any `patternGroups` from the source JSON across verbatim and author no new ones — the construct is deprecated, and a remap preserves rather than migrates. Where the mapping guide describes `patternOrchestrations`, emit those: every stage needs an explicit `relationship`, with `relativeTo` for concurrent and nested stages and a `trigger` for onDemand ones.
 
 Example subagent output for Subagent A:
 ```json

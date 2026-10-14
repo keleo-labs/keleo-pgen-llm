@@ -38,7 +38,7 @@ Understand the mapping guide structure:
 - **Persona Mappings** -> `personas` and `personaGroups` arrays
 - **Activity Mappings** -> `activities` array
 - **Pattern Mappings** -> `patterns` array (lifecycle orchestrations)
-- **Pattern Group Mappings** -> `patternGroups` array (if present)
+- **Orchestration Mappings** -> `patternOrchestrations` array (if present). Do NOT emit `patternGroups` — deprecated as of schema 2.21.0
 - **Outcome Mappings** -> `outcomes` array
 - **Reference Content Mappings** -> `references` array (if present)
 - **Citation Mappings** -> `citations` array
@@ -295,12 +295,14 @@ Translate each alpha from the mapping guide.
 - **State compression:** Non-final views include ONLY alpha states that CHANGE from previous view. FINAL view MUST include ALL alphas as complete end-state snapshot.
 - `PatternView.seq` is REQUIRED (0 for prerequisites, 1+ for main phases)
 
-### 4.11 Pattern Groups (if present in mapping guide)
+### 4.11 Pattern Orchestrations (if present in mapping guide)
 
-- Use exact baseline group name as merge key
-- Only emit groups with patterns assigned (not empty baseline groups)
-- `patternName` must match a defined Pattern.name exactly
-- Include narratives when mapping guide provides group-level rationale
+- **Do NOT emit `patternGroups`** — deprecated as of schema 2.21.0, including baseline group names
+- `stages` is REQUIRED, at least one, each naming a `Pattern.name` that exists in scope
+- `relationship` is REQUIRED on every stage and always explicit: `sequential`, `concurrent`, `nested`, `onDemand`
+- `relativeTo` REQUIRED for `concurrent`/`nested`; `trigger` REQUIRED for `onDemand`
+- `seq` unique among `sequential` stages; elsewhere it is only the presentation anchor
+- An orchestration does not merge across practices — do not sequence another practice's patterns
 
 ### 4.12 Outcomes
 

@@ -560,51 +560,30 @@ Total: [X assets]
 [Asset sections as described above]
 ```
 
-### Step 10.5: Define Canonical PatternGroups
+### Step 10.5: Do Not Define Canonical PatternGroups
 
-**Identify 3-5 navigational categories that extension practices will use to organise their patterns.**
+**Skip this step. `patternGroups` is deprecated** as of schema 2.21.0 and is not used in
+new work. Baselines previously defined canonical groups with empty entries as templates
+for extension practices to merge into; that is exactly the form being retired, and it is
+the one with the longest reach — every extension adopting a group name inherits it from
+here.
 
-Baselines define patternGroups as **template categories with empty entries**. Extension practices adopt these groups by defining patternGroups with the same canonical name and populating entries with their patterns. During method composition, groups with matching names merge (see semantics/execution-and-patterns.md §9.3).
+A new baseline defines no `patternGroups` at all. Existing baselines that declare them
+keep them; this is a decision about what to author next, not a migration.
 
-**Grouping Strategies** (choose the most natural fit for the domain):
+Nothing replaces it at the baseline layer, and nothing needs to. Grouping patterns for
+navigation was only ever a display concern: the merge stamps `sourcePracticeName` on
+every pattern, so a consumer can group by source, concern or name without the baseline
+publishing a vocabulary for it. Publishing one also forced a choice on every downstream
+practice before anyone knew what patterns they would have.
 
-- **By lifecycle archetype** — Core Lifecycles, Optimisation Cycles, Maturity Progressions
-- **By concern area** — Technical Patterns, Governance Patterns, Operational Patterns
-- **By engagement phase** — Getting Started, Ongoing Execution, Scaling & Optimisation
+Where patterns genuinely relate **in time** — one precedes another, one runs inside or
+alongside another, one is entered on recognition — that is a `PatternOrchestration`, and
+it belongs to whoever owns the ordering. Baselines define no patterns, so they author no
+orchestrations either. Extension practices do, per Step 8.5 of the extension mapping
+prompt.
 
-**PatternGroup Structure:**
-
-```markdown
-### PatternGroup: [Category Name]
-- **Description**: [What patterns in this group share — the coordination intent]
-- **Seq**: [0-based ordering among groups]
-- **Entries**: [] (empty — extension practices populate)
-- **Narrative**: [optional — explain the category's purpose and when practitioners should look here]
-  - Narrative Type: [e.g., "Practice Intent"]
-  - Element Mapping:
-    - [Element]: [How this group category maps]
-```
-
-**Naming Guidance:**
-
-- **Good**: "Core Lifecycles", "Maturity Progressions", "Governance & Compliance"
-- **Bad**: "Platform Patterns", "Technology Patterns" (restates focus or alpha names)
-
-**Quality Checks:**
-- ✓ 3-5 groups defined (enough to cover expected extension patterns)
-- ✓ Group names describe coordination intent, not source practice
-- ✓ All entries arrays are empty (baselines define categories, not contents)
-- ✓ Seq values assigned for ordering
-
-**Output Format:**
-
-```markdown
-## PatternGroups
-
-Total: [X canonical groups]
-
-[PatternGroup sections as described above]
-```
+**Output Format:** none. Emit no PatternGroups section in the mapping guide.
 
 ### Step 10.7: Map Baseline Outcomes
 
@@ -724,12 +703,6 @@ Total: [X outcomes]
 
 ---
 
-## PatternGroups
-
-[Complete PatternGroups section from Step 10.5]
-
----
-
 ## Outcomes
 
 [Complete Outcomes section from Step 10.7]
@@ -743,7 +716,6 @@ Total: [X outcomes]
 - **ActivitySpaces**: [X]
 - **Competencies**: [X]
 - **NarrativeTypes**: [X]
-- **PatternGroups**: [X] (canonical categories)
 - **Outcomes**: [X]
 - **Narratives**: [X]
 - **Citations**: [X]

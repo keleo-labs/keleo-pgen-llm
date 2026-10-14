@@ -486,15 +486,24 @@ Pattern Views:
   View 2: ...
 ```
 
-### Pattern Groups (If Applicable)
+### Pattern Orchestrations (If Applicable)
 
-**Read** `references/semantics/execution-and-patterns.md` SS9.3 for guidance.
+**Do not map `patternGroups`** -- deprecated as of schema 2.21.0 and not authored in new
+work, including by adopting a baseline's canonical group names. Existing declarations are
+left alone; this is about what to write next, not a migration.
 
-When to create: 3+ patterns in practice, or 10+ patterns across method. Single-pattern practices generally do NOT need groups.
+Where patterns relate in time, map a `patternOrchestration` instead. See
+`prompts/phase-2-mapping.md` Step 8.5 for the structure and the relationship table.
 
-1. **Check baseline for existing patternGroups** -- baselines define canonical groups as templates
-2. **Assign patterns to baseline groups** (preferred)
-3. **Novel groups only when justified** -- document why no baseline group fits
+When to create: 2+ patterns AND the source says how they relate -- one precedes another,
+one repeats inside the phases of another, one is entered only on recognition. Independent
+patterns need no orchestration, and inventing an order the source does not state is worse
+than leaving them unrelated.
+
+1. **Name the sequenced whole** -- the endeavour these patterns make together
+2. **Order the stages**, each with an explicit `relationship`: `sequential`, `concurrent`,
+   `nested` or `onDemand`. There is no default
+3. **Add `relativeTo`** for concurrent and nested, **`trigger`** for onDemand
 
 ## Step 7: Define Outcomes
 
@@ -725,7 +734,7 @@ Both `**Alpha: Name**` (bold) and `#### Alpha: Name` (heading level 3-5) are acc
 ### Pattern Mappings
 [From Step 6]
 
-### Pattern Groups (if applicable)
+### Orchestrations (if applicable)
 [From Step 6]
 
 ### Outcome Mappings
