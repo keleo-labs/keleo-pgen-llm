@@ -238,11 +238,19 @@ def main():
     citations = data.get("citations", [])
     has_problems = False
 
+    # Under --replace-only nothing but the named URLs can change, so testing
+    # the rest buys nothing and costs a HEAD and a GET apiece — minutes, on a
+    # document citing a host that is unreachable rather than merely slow.
+    def worth_testing(url):
+        return not (args.fix and args.replace_only) or url in replacements
+
     # --- Citation URL checks ---
     cit_results = []
     for i, cit in enumerate(citations):
         url = cit.get("url")
         if not url or not url.startswith("http"):
+            continue
+        if not worth_testing(url):
             continue
         verdict, status, error = test_url(url, timeout=args.timeout)
         cit_results.append({
@@ -266,6 +274,8 @@ def main():
     if not args.no_references:
         ref_uris = collect_reference_uris(data)
         for entry in ref_uris:
+            if not worth_testing(entry["uri"]):
+                continue
             verdict, status, error = test_url(entry["uri"], timeout=args.timeout)
             result = {
                 "path": entry["path"],
