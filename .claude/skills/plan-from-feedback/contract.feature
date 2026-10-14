@@ -13,11 +13,37 @@ Feature: Plan from Feedback — keleo-pgen-llm
 
   Scenario: Open row published to its owning project
     Given a register row has Status "New" and no Issue URL
-    And its content is about practice generation
+    And its fix lands in a skill, prompt or utility
     When the publish step runs
     Then a sanitised issue is created on keleo-labs/keleo-pgen-llm
     And the issue body opens with the register row number
     And the Issue URL and Issue State are written to columns U and V
+
+  Scenario: Practice content is never published
+    Given a register row reports a defect in a practice, method or baseline document
+    When the publish step runs
+    Then no issue is created on any tracker
+    And Issue State is set to "Not Published"
+    And the row is worked from the register
+
+  Scenario: Practice defect caused by the generator
+    Given a register row reports a defect in a practice document
+    And the cause is a prompt or utility that would repeat it
+    When the publish step runs
+    Then an issue is published about the generator only
+    And the practice fix stays in the register
+    And the published issue does not name the practice that revealed it
+
+  Scenario: Routing asks what must change, not where it was seen
+    Given a register row names a practice as its document
+    And its fix lands in a utility
+    When the owning project is determined
+    Then it is published as a keleo-pgen-llm issue
+
+  Scenario: Content routing is refused mechanically
+    Given a caller attempts to file practice content on a tracker
+    When forge-issues.py is invoked for it
+    Then it refuses with the reason rather than creating an issue
 
   Scenario: Row owned by another project
     Given a register row describes a defect in the bundle repository API

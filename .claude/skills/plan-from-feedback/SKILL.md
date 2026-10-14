@@ -1,6 +1,6 @@
 ---
 name: plan-from-feedback
-description: Publish register issues to project trackers, then triage and resolve keleo-pgen-llm issues — practice/method content, skills, prompts and utilities
+description: Publish register issues to project trackers, then resolve keleo-pgen-llm issues — skills, prompts and utilities from the public tracker, practice content from the register
 triggerPatterns:
   - "plan.*feedback"
   - "feedback.*plan"
@@ -22,6 +22,30 @@ sanitised.
 **This project also publishes for everyone.** It alone reads the register, so Step 1 of
 the foundation workflow runs here and routes rows to whichever project owns them. The
 other four projects only read their own trackers.
+
+## Two queues, and the line between them
+
+This project has an unusual split, and getting it wrong leaks.
+
+**The tracker holds issues about the project** — its skills, prompts and utilities.
+That is public code, and an issue about it is safe to publish.
+
+**The register holds issues about generated content** — practices, methods, baselines.
+Those are **not public**. They get no issue, not even a sanitised one, because the
+subject of a practice is itself what is being withheld. They are worked from the
+register and marked Issue State `Not Published`.
+
+The question is never "which document was this seen in?" but **"what has to change?"**
+
+| The fix lands in | Queue | Published |
+|---|---|---|
+| A prompt, a skill, a utility | tracker | yes |
+| A practice, method or baseline JSON | register | **no** |
+| Both | tracker for the generator half only | partly |
+
+A row reporting a defect in a practice that was *caused* by a prompt produces one
+published issue about the prompt and one unpublished register fix for the document.
+Say nothing in the public issue about which practice revealed it.
 
 The reciprocal skill is `/report-issue`, which files rows into the register with full
 unredacted detail. Reporters should not self-censor — that detail is what makes triage
@@ -58,8 +82,8 @@ upfront** — read the relevant section when a trigger fires:
 
 | Level | Scope | When |
 |---|---|---|
-| **L1** | Practice, method and baseline JSON | The issue is about content in a specific document — wrong states, missing work products, bad checklists, drift from the mapping guide |
-| **L2** | Skills, prompts, `utils/` | The issue reveals a generation problem that would recur in the next practice |
+| **L1** | Practice, method and baseline JSON | The issue is about content in a specific document — wrong states, missing work products, bad checklists, drift from the mapping guide. **Register-only; never published.** |
+| **L2** | Skills, prompts, `utils/` | The issue reveals a generation problem that would recur in the next practice. **This is what the public tracker is for.** |
 | **L3** | Escalate to keleo-language | The issue reveals a gap in the Practice Language itself. **File it there; do not edit the schema from here.** |
 
 Most issues are L1 only. Some are L1 + L2 — fix the document and the generator that

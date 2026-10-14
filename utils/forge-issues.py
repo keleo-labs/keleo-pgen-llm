@@ -41,7 +41,17 @@ SANITISER = Path(__file__).resolve().parent / "issue-sanitiser.py"
 # Where each project's issues live, and whether its tracker is world-readable.
 # `public` drives the sanitisation requirement, not the forge — an internal
 # GitLab project takes full detail.
+#
+# `practice-content` is the exception that has no tracker at all. The generated
+# practices, methods and baselines are not public, so a defect in one is not
+# published anywhere — not even in sanitised form, because the existence and
+# subject of a practice is itself the thing being withheld. Those rows stay in
+# the register and are worked from it.
 PROJECTS = {
+    "practice-content": {"forge": None, "repo": None, "public": False,
+                         "publishable": False,
+                         "note": "Practice, method and baseline content is not public. "
+                                 "Work these from the register; do not file an issue."},
     "keleo-pgen-llm":   {"forge": "github", "repo": "keleo-labs/keleo-pgen-llm",  "public": True},
     "keleo-language":   {"forge": "github", "repo": "keleo-labs/keleo-language",  "public": True},
     "keleo-studio":     {"forge": "github", "repo": "keleo-labs/keleo-studio",    "public": True},
@@ -68,7 +78,13 @@ def resolve_project(name):
         print(f"Error: unknown project '{name}'. Known: {', '.join(sorted(PROJECTS))}",
               file=sys.stderr)
         sys.exit(2)
-    return PROJECTS[name]
+    project = PROJECTS[name]
+    if project.get("publishable") is False:
+        # Refused here rather than at --create, so --list and --search cannot
+        # imply a tracker exists for content that is not published at all.
+        print(f"Error: '{name}' has no tracker.\n  {project['note']}", file=sys.stderr)
+        sys.exit(2)
+    return project
 
 
 _AUTH_CHECKED = {}
