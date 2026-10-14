@@ -900,10 +900,11 @@ Build the `outcomes` array from the mapping guide's Outcome Mappings section. Ea
         "alphaName": "Alpha Name",
         "metricName": "metric-name",
         "workProductName": "Work Product Name",
-        "recognizedAtStateName": "State Name",
+        "recognizedAtStateName": "Recognition State",
         "forecastWeights": [
           { "stateName": "Earlier State", "weight": 0.3 },
-          { "stateName": "Later State", "weight": 1.0 }
+          { "stateName": "Recognition State", "weight": 1.0 },
+          { "stateName": "State After Recognition", "weight": 1.0 }
         ]
       }
     ],
@@ -936,9 +937,13 @@ Build the `outcomes` array from the mapping guide's Outcome Mappings section. Ea
 - Use `metricContributions` when the outcome tracks a numerical aggregate (revenue, count, capacity) through the alpha evidence chain
 - Use `objectiveContributions` when the outcome tracks lifecycle phase completion (readiness, maturity, compliance) through pattern views
 - Weights represent the probability or proportion of the outcome value recognized at each state/view — earlier states get lower weights, the recognition state gets 1.0
-- For sales-type pipelines: map weights to conversion probability (e.g., Identified=0.05, Qualified=0.25, Validated=0.5, Committed=0.8, Won=1.0)
-- For maturity-type outcomes: map weights to cumulative progress (e.g., initial=0.1, developing=0.3, established=0.6, optimized=0.85, transformational=1.0)
+- **The curve climbs to 1.0 and then holds.** Weights are non-decreasing across the progression, the recognised entry carries 1.0, and every state or view **after** it also carries 1.0. Once a metric is fully recognized it does not become less recognized because the alpha matured further.
+- **The recognised point is not always the last state.** Where the alpha or pattern continues past the point of full recognition — `Won` followed by `Renewing`, `Measured` followed by `Scaled` — do not keep climbing toward a later 1.0. Recognize at the state where the value is actually realized and plateau from there. Setting `recognizedAtStateName` one step before the entry carrying 1.0 is the most common way this goes wrong.
+- For sales-type pipelines: map weights to conversion probability (e.g., Identified=0.05, Qualified=0.25, Validated=0.5, Committed=0.8, Won=1.0, Renewing=1.0 — recognized at `Won`)
+- For maturity-type outcomes: map weights to cumulative progress (e.g., initial=0.1, developing=0.3, established=0.6, optimized=0.85, transformational=1.0 — recognized at `transformational`)
 - Include a weight entry for every state/view where partial recognition is meaningful — states not listed have implicit weight 0
+
+`assess-practice.py` enforces all of this (`check_forecast_monotonicity`). A curve that dips, or a recognised entry below 1.0, is reported there.
 
 **Lifecycle pattern outcome bias:** If the practice has at least one lifecycle pattern, at least one outcome SHOULD use `objectiveContributions` tied to the main lifecycle pattern (broadest alpha coverage). Set `patternName` to the pattern name, `recognizedAtPatternViewName` to the final view, and assign monotonically increasing `forecastWeights` across all views. This is the most natural way to track practice adoption maturity.
 

@@ -1649,6 +1649,10 @@ Each Outcome optionally includes:
   - `recognizedAtPatternViewName`: the pattern view at which the objective is fully achieved
   - `forecastWeights`: array of `{patternViewName, weight}` mapping each view to cumulative progress (0-1)
 
+**Shape of a forecast curve (both contribution kinds):** weights are non-decreasing across the progression, the recognised entry carries 1.0, and every entry after it also carries 1.0. The curve climbs and then plateaus; it never dips.
+
+Where the alpha or pattern continues past the point the value is realized — `Won` then `Renewing`, `Measured` then `Scaled` — recognize at the state where it is realized and hold 1.0 through the rest. Do not reserve 1.0 for the final state and set the recognised point one step below it: that is the most common way this goes wrong, and `assess-practice.py` reports it.
+
 For initial generation, `measureDescription` alone is acceptable — contributions are optional but recommended when the practice defines clear metric chains or lifecycle patterns.
 
 **Lifecycle pattern outcome (STRONGLY RECOMMENDED):** If the practice defines at least one lifecycle pattern (Step 8), at least one outcome SHOULD use `objectiveContributions` tied to the **main lifecycle pattern**. This connects value delivery to lifecycle progression — the most natural way to measure practice adoption maturity.
@@ -2287,6 +2291,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] MetricContribution recognizedAtStateName references valid state on named alpha
 - [ ] ObjectiveContribution patternName references valid pattern from Step 8
 - [ ] ObjectiveContribution recognizedAtPatternViewName references valid pattern view within the named pattern
+- [ ] Every forecast curve is non-decreasing, carries 1.0 at the recognised entry, and holds 1.0 for every entry after it
 - [ ] At least one outcome has objectiveContributions tied to the main lifecycle pattern (if practice has lifecycle patterns)
 - [ ] Method-level outcomes (if method) describe cross-cutting value
 - [ ] Gherkin structures (background, test, examples) used where verification logic adds value
