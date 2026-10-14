@@ -71,9 +71,11 @@ Practice and method content issues route to keleo-pgen-llm under `component:cont
 
 ---
 
-## Sanitisation (Step 1)
+## Sanitisation and drafting (Step 1)
 
-Read `sanitisation.md` before drafting anything for a public tracker.
+Read `sanitisation.md` before drafting anything for a public tracker, and `drafting.md`
+before drafting for any tracker. Sanitisation decides what may be said; drafting decides
+how well it is said. An issue can be perfectly safe and still useless.
 
 The short version: a published issue is indexed and stays reachable by SHA after
 deletion, so this is a one-way door. Draft the issue yourself, then let
@@ -93,9 +95,11 @@ For each register row with Status `New` and no Issue URL:
 1. **Determine the owning project** from the row's content, not its Document Name. A row
    about schema semantics belongs to keleo-language even when it was observed in a
    practice.
-2. **Draft a title and body.** The title states the defect; the body opens with
-   `Register row: N` and gives the public-safe statement. Say what is wrong and what is
-   expected. Do not paste the description — it is written for an internal reader.
+2. **Draft a title and body** — read `drafting.md`. Write the issue from the defect, do
+   not redact the row's description into one. Some rows were generated rather than
+   written and arrive full of AI tells; transforming them word by word keeps the tells
+   and loses the meaning. The body opens with `Register row: N`, then says what is
+   wrong, why it matters, and what is expected.
 3. **Check it** — `issue-sanitiser.py --check <draft>`.
 4. **Search for a near-duplicate** — `forge-issues.py --search "<title>"`. Searches open
    *and* closed, because a defect filed again after closure belongs on the original
