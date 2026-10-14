@@ -18,25 +18,83 @@ from pathlib import Path
 GWS = shutil.which("gws") or "/opt/homebrew/bin/gws"
 
 
+# discover-dependencies.py reports documents that live inside a package as
+# "bundles/<name>.keleo::documents/<doc>.json". Resolving that form here means
+# every consumer of a resolved path can open it, rather than each one learning
+# to read archives separately.
+PACKAGE_SEPARATOR = "::"
+
+
+def split_package_path(file_path):
+    """Split "package.keleo::member/path.json" into (archive, member).
+
+    Returns (file_path, None) for an ordinary filesystem path.
+    """
+    text = str(file_path)
+    if PACKAGE_SEPARATOR not in text:
+        return text, None
+    archive, _, member = text.partition(PACKAGE_SEPARATOR)
+    return archive, member or None
+
+
+def read_package_member(archive_path, member_path):
+    """Read one member out of a .keleo archive as text.
+
+    Returns (text, None) on success or (None, error_string) on failure. A bare
+    document filename is accepted as well as a full member path, provided it
+    matches exactly one member.
+    """
+    try:
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            names = zf.namelist()
+            if member_path not in names:
+                leaf = member_path.rsplit("/", 1)[-1]
+                matches = [n for n in names if n.rsplit("/", 1)[-1] == leaf]
+                if len(matches) != 1:
+                    detail = "not found" if not matches else f"matches {len(matches)} members"
+                    return None, f"Member '{member_path}' {detail} in {archive_path}"
+                member_path = matches[0]
+            return zf.read(member_path).decode("utf-8"), None
+    except FileNotFoundError:
+        return None, f"File not found: {archive_path}"
+    except zipfile.BadZipFile:
+        return None, f"Invalid ZIP archive: {archive_path}"
+
+
+def read_document_text(file_path):
+    """Read a document as text from a path or a "package::member" reference.
+
+    Returns (text, None) on success or (None, error_string) on failure.
+    """
+    archive, member = split_package_path(file_path)
+    if member is None:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read(), None
+        except FileNotFoundError:
+            return None, f"File not found: {file_path}"
+    return read_package_member(archive, member)
+
+
 def load_json(file_path, exit_on_error=True):
-    """Load and parse a JSON file.
+    """Load and parse a JSON file, or a document inside a .keleo package.
 
     Args:
-        file_path: Path to JSON file (str or Path).
+        file_path: Path to JSON file, or "package.keleo::member.json" (str or Path).
         exit_on_error: If True, print error JSON and sys.exit(1) on failure.
                        If False, raise the underlying exception.
 
     Returns:
         Parsed JSON as dict/list.
     """
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
+    text, err = read_document_text(file_path)
+    if err:
         if exit_on_error:
-            print(json.dumps({"error": f"File not found: {file_path}"}))
+            print(json.dumps({"error": err}))
             sys.exit(1)
-        raise
+        raise FileNotFoundError(err)
+    try:
+        return json.loads(text)
     except json.JSONDecodeError as e:
         if exit_on_error:
             print(json.dumps({"error": f"Invalid JSON in {file_path}: {e}"}))
@@ -44,13 +102,36 @@ def load_json(file_path, exit_on_error=True):
         raise
 
 
+def version_sort_key(version_str):
+    """Parse a semver-ish string into a comparable tuple. Unparsable sorts lowest.
+
+    Tolerant by design: documents carry shortened forms ("1.0") and the odd
+    prerelease suffix, and a version that cannot be read should lose a
+    "which is newest" comparison rather than crash it.
+    """
+    if not version_str:
+        return (-1,)
+    parts = []
+    for chunk in str(version_str).split("-")[0].split("."):
+        try:
+            parts.append(int(chunk))
+        except ValueError:
+            return (-1,)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
 def load_json_pair(file_path):
-    """Load JSON returning (data, error_string) tuple. Never exits."""
+    """Load JSON returning (data, error_string) tuple. Never exits.
+
+    Accepts a filesystem path or a "package.keleo::member.json" reference.
+    """
+    text, err = read_document_text(file_path)
+    if err:
+        return None, err
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f), None
-    except FileNotFoundError:
-        return None, f"File not found: {file_path}"
+        return json.loads(text), None
     except json.JSONDecodeError as e:
         return None, f"Invalid JSON in {file_path}: {e}"
 

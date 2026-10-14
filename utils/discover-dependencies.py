@@ -36,7 +36,13 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import load_json_pair, detect_kind, load_json_from_keleo, get_project_root
+from _shared import (
+    load_json_pair,
+    detect_kind,
+    load_json_from_keleo,
+    get_project_root,
+    version_sort_key,
+)
 
 DEFAULT_SEARCH_DIRS = ["baselines", "practices", "deps", "bundles"]
 REMOTE_INDEX_PATH = "bundles/.remote-index.json"
@@ -221,12 +227,39 @@ def _dedupe_same_file(entries):
     return deduped
 
 
+def _annotate_versions(entries):
+    """Fill in each candidate's document version and mark the newest.
+
+    Called only when a name is ambiguous. Candidates for one name are most often
+    the same document carried at several versions, where the caller's real
+    question is "which is current?" — answering it here means consumers are not
+    left opening each candidate to compare by hand.
+
+    Reading versions for every indexed document on every run would roughly
+    triple index build time, so this stays on the ambiguous path.
+    """
+    for entry in entries:
+        if "version" in entry:
+            continue
+        data, err = load_resolved_json(entry)
+        entry["version"] = "" if err or not isinstance(data, dict) else (data.get("version") or "")
+
+    best = max((version_sort_key(e.get("version")) for e in entries), default=(-1,))
+    for entry in entries:
+        entry["newest"] = best > (-1,) and version_sort_key(entry.get("version")) == best
+    return entries
+
+
 def resolve_name(name, index, prefer_filesystem=False):
     """Resolve a single name against the index.
 
     If prefer_filesystem is True and multiple candidates exist, prefer
     non-keleo (filesystem) entries over keleo-sourced entries.
     Remote-only entries return status "remote" instead of "found".
+
+    Ambiguous results carry a version on every candidate and a "newest" flag on
+    the highest, so a caller choosing between versions of one document does not
+    have to open them all.
     """
     entries = index.get(name, [])
     if not entries:
@@ -244,8 +277,16 @@ def resolve_name(name, index, prefer_filesystem=False):
             if len(fs_entries) == 1:
                 return {"name": name, "status": "found", **fs_entries[0]}
             if fs_entries:
-                return {"name": name, "status": "ambiguous", "candidates": fs_entries}
-        return {"name": name, "status": "ambiguous", "candidates": local_entries}
+                return {
+                    "name": name,
+                    "status": "ambiguous",
+                    "candidates": _annotate_versions(fs_entries),
+                }
+        return {
+            "name": name,
+            "status": "ambiguous",
+            "candidates": _annotate_versions(local_entries),
+        }
 
     if remote_entries:
         return {"name": name, "status": "remote", **remote_entries[0]}
