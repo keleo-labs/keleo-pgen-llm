@@ -96,6 +96,8 @@ Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` C
 ```
 Source Docs → Phase 1: Analysis → Phase 2: Mapping → Phase 3: JSON + Packaging
                (~30-50K words)     (~40-60K words)    (schema-valid .keleo)
+                     ↓                   ↓                    ↓
+                   gate                gate                 gate
 ```
 
 1. **Analysis** — Four-perspective analysis (Business, Technology, People, Process) of methodology structure
@@ -109,9 +111,35 @@ A delineation gate between phases 1 and 2 determines whether the methodology map
 ```
 Source Docs → Phase 1: Analysis → Phase 1.5: Distillation → Phase 2: Mapping → Phase 3: JSON
                (~30-50K words)     (~15-25K words)           (~40-60K words)    (schema-valid)
+                     ↓                     ↓                        ↓                ↓
+                   gate                  gate                     gate             gate
 ```
 
 The additional **Distillation** phase identifies focus areas, distills 8–15 foundational alphas, generalizes activity spaces, and defines competencies and narrative types.
+
+### Why the pipeline has gates
+
+The pipeline is a loop wrapped around a probabilistic model, and a model cannot grade its own output. Producing fluent text that corresponds to nothing in the source is not a bug in these systems — it is how they work — so every phase ends with a check the generating agent does not get to make. Frank Coyle sets out the general argument in [Why agentic systems need ontologies](https://www.youtube.com/watch?v=Sir59K8ZDPU); the Practice Language is the ontology this pipeline checks against.
+
+Each gate has three parts:
+
+```
+producing agent(s) → mechanical validation → verification gate → user review gate → next phase
+```
+
+**Mechanical validation** checks structure, counts and cross-references — the things a script can settle. **Verification** checks meaning: agents reread the source material and establish that the output traces back to it, that citations support what they are attached to, and that nothing was invented between phases. Confirmed errors block the phase; warnings flow into the **user review gate**, where a person decides.
+
+Nothing is packaged or uploaded before those pass. The `.keleo` archive is the side effect, and it is withheld until the document is sound — a practice that fails validation never becomes a bundle anyone can consume.
+
+| Stage | Verifiers |
+|-------|-----------|
+| 1 — Analysis | `source-fidelity`, `source-coverage`, `citation-integrity` |
+| 1.5 — Distillation (baseline only) | `distillation-fidelity`, `focus-coherence` |
+| 2 — Mapping | `source-fidelity`, `alpha-semantics`, `coverage`, `naming-consistency` |
+| 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
+| Reports — single gate | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style` |
+
+The protocol and the per-phase agent briefs live in [`.claude/skills/verification-foundation/`](.claude/skills/verification-foundation/). Findings are consolidated by `utils/verification-gate.py`. The gate costs real tokens — roughly 12 verifier agents for a single practice, 30 for a four-practice method — so `VERIFY-FOUNDATION.md` §11 sets the sampling, concurrency and effort controls that keep it proportionate.
 
 ### Output Packaging
 
@@ -129,7 +157,7 @@ keleo-pgen-llm/
 ├── baselines/                # Baseline practice outputs (per-baseline subdirectories)
 ├── bundles/                  # Packaged .keleo output
 ├── reports/                  # Generated reports (git-ignored)
-├── utils/                    # 50+ Python utility scripts (validation, packaging, transforms)
+├── utils/                    # ~80 Python utility scripts (validation, packaging, transforms)
 └── CLAUDE.md                 # Full technical documentation
 ```
 
@@ -180,3 +208,11 @@ python3 utils/studio-client.py --upload bundles/<name>.keleo
 - **`.claude/skills/*/SKILL.md`** — Individual skill implementation details
 - **`references/`** — Domain framework, semantic guidance, assessment rubrics
 - **`prompts/`** — Phase-specific prompt templates
+- **[keleo-language](https://github.com/keleo-labs/keleo-language)** — The Practice Language schema and semantics, including the constraint model this pipeline validates against
+
+### References
+
+- Coyle, F. (n.d.). *Why agentic systems need ontologies* [Video]. https://www.youtube.com/watch?v=Sir59K8ZDPU
+- Gruber, T. R. (1993). A translation approach to portable ontology specifications. *Knowledge Acquisition, 5*(2), 199–220. https://doi.org/10.1006/knac.1993.1008
+- Garcez, A. d'Avila, & Lamb, L. C. (2023). Neurosymbolic AI: the 3rd wave. *Artificial Intelligence Review, 56*, 12387–12406. https://doi.org/10.1007/s10462-023-10448-w
+- Agrawal, G., Kumarage, T., Alghamdi, Z., & Liu, H. (2024). Can knowledge graphs reduce hallucinations in LLMs? A survey. *NAACL 2024*, 3947–3960. https://aclanthology.org/2024.naacl-long.219/
