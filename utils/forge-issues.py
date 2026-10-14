@@ -28,6 +28,7 @@ Usage:
 import argparse
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -107,7 +108,11 @@ def _cli(project):
 
     host = project.get("host", "github.com" if tool == "gh" else "gitlab.com")
     if _AUTH_CHECKED.get(host) is None:
-        probe = _run([path, "auth", "status"] + (["--hostname", host] if tool == "gh" else []))
+        # Scope the probe to the host for both forges. Unscoped, `glab auth
+        # status` reports every configured instance and exits non-zero if any
+        # one of them fails, so a stale token for an instance this project
+        # never touches reads as "not authenticated" for the one it does.
+        probe = _run([path, "auth", "status", "--hostname", host], env=_env(project))
         combined = (probe.stdout or "") + (probe.stderr or "")
         _AUTH_CHECKED[host] = probe.returncode == 0 and "not logged" not in combined.lower()
     if not _AUTH_CHECKED[host]:
@@ -117,6 +122,43 @@ def _cli(project):
               f"  run: {hint}", file=sys.stderr)
         sys.exit(2)
     return path
+
+
+def _env(project):
+    """Environment for a forge call, pinning glab to the project's instance.
+
+    glab resolves its instance from the git remote, GITLAB_HOST or config, in
+    that order — none of which describe the project being addressed here. Left
+    alone it targets gitlab.com and returns 404 for an internal project that
+    exists and is readable, which looks like a missing repository rather than a
+    call aimed at the wrong server.
+    """
+    if project["forge"] != "gitlab":
+        return None
+    env = dict(os.environ)
+    env["GITLAB_HOST"] = project.get("host", "gitlab.com")
+    return env
+
+
+def _body_flag(project):
+    """The flag each CLI uses to read an issue body from a file.
+
+    gh takes --body-file everywhere. glab takes --description-file when
+    creating and --message when commenting, and rejects --body-file outright,
+    so the flag cannot be shared.
+    """
+    return "--body-file" if project["forge"] == "github" else "--description-file"
+
+
+def _comment_args(project, body_file):
+    """Arguments carrying a comment body, per CLI.
+
+    gh reads it from a file. glab's note/comment takes only inline --message,
+    so the file is read here rather than handed over as a path.
+    """
+    if project["forge"] == "github":
+        return ["--body-file", str(body_file)]
+    return ["--message", Path(body_file).read_text(encoding="utf-8")]
 
 
 def _run(cmd, env=None):
@@ -132,14 +174,14 @@ def list_issues(project, state="open"):
     cli = _cli(project)
     if project["forge"] == "github":
         out = _run([cli, "issue", "list", "--repo", project["repo"], "--state", state,
-                    "--limit", "200", "--json", "number,title,state,url"])
+                    "--limit", "200", "--json", "number,title,state,url"], env=_env(project))
         if out.returncode != 0:
             print(f"Error: {out.stderr.strip()}", file=sys.stderr)
             sys.exit(2)
         return json.loads(out.stdout or "[]")
 
     out = _run([cli, "issue", "list", "--repo", project["repo"], "--output", "json",
-                *(["--all"] if state == "all" else ["--closed"] if state == "closed" else [])])
+                *(["--all"] if state == "all" else ["--closed"] if state == "closed" else [])], env=_env(project))
     if out.returncode != 0:
         print(f"Error: {out.stderr.strip()}", file=sys.stderr)
         sys.exit(2)
@@ -207,10 +249,10 @@ def create_issue(project, title, body_file, labels, dry_run):
 
     cli = _cli(project)
     cmd = [cli, "issue", "create", "--repo", project["repo"],
-           "--title", title, "--body-file", str(body_file)]
+           "--title", title, _body_flag(project), str(body_file)]
     for label in labels or []:
         cmd += ["--label", label]
-    out = _run(cmd)
+    out = _run(cmd, env=_env(project))
     if out.returncode != 0:
         print(f"Error: {out.stderr.strip()}", file=sys.stderr)
         sys.exit(2)
@@ -232,7 +274,7 @@ def comment_issue(project, number, body_file, dry_run):
         return 0
     cli = _cli(project)
     out = _run([cli, "issue", "comment", str(number), "--repo", project["repo"],
-                "--body-file", str(body_file)])
+                *_comment_args(project, body_file)], env=_env(project))
     if out.returncode != 0:
         print(f"Error: {out.stderr.strip()}", file=sys.stderr)
         sys.exit(2)
@@ -250,7 +292,7 @@ def close_issue(project, number, body_file, dry_run):
                           "issue": number}, indent=2))
         return 0
     cli = _cli(project)
-    out = _run([cli, "issue", "close", str(number), "--repo", project["repo"]])
+    out = _run([cli, "issue", "close", str(number), "--repo", project["repo"]], env=_env(project))
     if out.returncode != 0:
         print(f"Error: {out.stderr.strip()}", file=sys.stderr)
         sys.exit(2)
