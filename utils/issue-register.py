@@ -106,12 +106,20 @@ INPUT_COLUMNS = [
     ("status", "Status"),
 ]
 
+# Resolution zone Q-V. U and V carry the link to the forge issue a row was
+# published as, so the sheet and the tracker can be reconciled in either
+# direction; "Not Published" records a row deliberately held back rather than
+# one merely not reached yet.
 RESOLUTION_COLUMNS = [
     ("resolutionSummary", "Resolution Summary"),
     ("practiceMethodChanges", "Practice/Method Changes"),
     ("pgenChanges", "keleo-pgen-llm changes"),
     ("languageChanges", "keleo-language changes"),
+    ("issueUrl", "Issue URL"),
+    ("issueState", "Issue State"),
 ]
+
+VALID_ISSUE_STATES = ["Open", "Closed", "Not Published"]
 
 ALL_COLUMNS = INPUT_COLUMNS + RESOLUTION_COLUMNS
 
@@ -398,6 +406,14 @@ def validate_resolutions(resolutions, table):
 
         if not entry.get("resolutionSummary"):
             errors.append(f"{label}: 'resolutionSummary' is required")
+
+        issue_state = entry.get("issueState")
+        if issue_state and issue_state not in VALID_ISSUE_STATES:
+            errors.append(
+                f"{label}: issueState '{issue_state}' is not one of "
+                f"{', '.join(VALID_ISSUE_STATES)}")
+        if entry.get("issueUrl") and not str(entry["issueUrl"]).startswith("http"):
+            errors.append(f"{label}: issueUrl must be a URL")
 
         unknown = set(entry) - {"row", "status"} - {k for k, _ in RESOLUTION_COLUMNS}
         if unknown:
