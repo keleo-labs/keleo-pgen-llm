@@ -1779,6 +1779,7 @@ For each reference, document in the mapping guide:
 - [ ] Links to large documents include `pages` pointing to the specific template/example/artifact location
 - [ ] Every `alphaName` maps to a defined alpha (baseline or practice)
 - [ ] Every `stateName` maps to a valid state on the referenced alpha
+- [ ] Every `evidenceBy` entry carries a `name` and a `description` — `WorkProductInstance` is `allOf[PracticeElement, …]`, so the two symbolic links alone do not conform
 - [ ] Every `evidenceBy` entry's `workProductName` maps to a defined work product
 - [ ] Every `evidenceBy` entry's `levelOfDetailName` maps to a valid LOD on the referenced work product
 - [ ] Reference names are unique
