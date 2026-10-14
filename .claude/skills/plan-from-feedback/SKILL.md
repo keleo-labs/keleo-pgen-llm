@@ -1,41 +1,69 @@
 ---
 name: plan-from-feedback
-description: Read a feedback/issue register, triage issues, plan and execute fixes across practice/method, skill/utility, and schema/semantics layers
+description: Publish register issues to project trackers, then resolve keleo-pgen-llm issues — skills, prompts and utilities from the public tracker, practice content from the register
 triggerPatterns:
   - "plan.*feedback"
   - "feedback.*plan"
   - "issue.*register"
   - "triage.*issues"
   - "process.*feedback"
+  - "publish.*issues"
 ---
 
-# Plan from Feedback Skill
+# Plan from Feedback — keleo-pgen-llm
 
-Read an issue register (Google Sheet with structured table), triage each item, and plan/execute fixes at up to three levels: direct practice/method fixes, skill/utility improvements (keleo-pgen-llm), and schema/semantics improvements (keleo-language). Write resolution status and change details back to the register.
+Read `.claude/skills/feedback-foundation/FEEDBACK-FOUNDATION.md` for the workflow,
+routing, sanitisation, commit linking and closing rules. This file declares only what
+is specific to keleo-pgen-llm.
 
-The reciprocal skill is `/report-issue`, which files new rows into the same register (input columns A–P, Status New). This skill owns the resolution columns (Q–T).
+**Routing:** `keleo-labs/keleo-pgen-llm` — **public**, so everything published is
+sanitised.
 
-## Workflow Overview
+**This project also publishes for everyone.** It alone reads the register, so Step 1 of
+the foundation workflow runs here and routes rows to whichever project owns them. The
+other four projects only read their own trackers.
 
-**Step 0: Configuration** → Load or prompt for issue register URL; detect table structure
-**Step 1: Read Issues** → Fetch register, ensure table schema is current, identify actionable items
-**Step 2: Plan** → Triage each issue, determine resolution approach
-**Step 3: Execute** → Make changes at appropriate level(s)
-**Step 4: Update Register** → Write back status, rationale, and change details
+## Two queues, and the line between them
+
+This project has an unusual split, and getting it wrong leaks.
+
+**The tracker holds issues about the project** — its skills, prompts and utilities.
+That is public code, and an issue about it is safe to publish.
+
+**The register holds issues about generated content** — practices, methods, baselines.
+Those are **not public**. They get no issue, not even a sanitised one, because the
+subject of a practice is itself what is being withheld. They are worked from the
+register and marked Issue State `Not Published`.
+
+The question is never "which document was this seen in?" but **"what has to change?"**
+
+| The fix lands in | Queue | Published |
+|---|---|---|
+| A prompt, a skill, a utility | tracker | yes |
+| A practice, method or baseline JSON | register | **no** |
+| Both | tracker for the generator half only | partly |
+
+A row reporting a defect in a practice that was *caused* by a prompt produces one
+published issue about the prompt and one unpublished register fix for the document.
+Say nothing in the public issue about which practice revealed it.
+
+The reciprocal skill is `/report-issue`, which files rows into the register with full
+unredacted detail. Reporters should not self-censor — that detail is what makes triage
+possible, and publication strips it later.
 
 ---
 
 ## Supporting Standards
 
-`.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+`.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards. **Do not read it
+upfront** — read the relevant section when a trigger fires:
 
 | If you find yourself... | Stop and read |
 |---|---|
-| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 — these are prohibited; use reusable utils instead |
-| Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
-| Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
+| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 — prohibited; use reusable utils |
+| Creating or extending a utility script | §7.4 — Utils Self-Extension Protocol |
 | Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
-| Noticing a defect no register row covers while triaging | §13 — fix it in run, or file it with `/report-issue` |
+| Noticing a defect no issue covers | §13 — fix it in run, or file it on the owning project |
 
 ---
 
@@ -43,425 +71,87 @@ The reciprocal skill is `/report-issue`, which files new rows into the same regi
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Yes | Reads and writes the Google Sheets issue register; downloads bundles from Google Drive |
-| `.claude/user-config.json` | Yes | Stores spreadsheet ID and optional remote bundle repository credentials (git-ignored, per-user) |
-| Remote bundle repository | Optional | Downloads `.keleo` bundles when referenced documents aren't available locally |
-| Playwright MCP | Optional | Falls back to browser-based content extraction when `WebFetch` fails on source URLs |
-
-The `gws` CLI is essential because the issue register lives in Google Sheets — without it, this skill cannot read or update issues. Remote bundle access is only needed when an issue references a document not found in `practices/`, `baselines/`, `deps/`, or `bundles/`.
+| `gh` | Yes | GitHub issues for the three public projects |
+| `glab` | For cross-project | Internal GitLab issues for keleo-studio-gas and keleo-userskillz |
+| `gws` CLI | Yes | Reads and writes the register; only this project needs it |
+| `.claude/user-config.json` | Yes | Register spreadsheet id and optional bundle repository credentials |
 
 ---
 
-## Step 0: Configuration
+## Change levels
 
-### Issue Register URL
-
-The issue register URL is stored per-user in `.claude/user-config.json` (git-ignored). This file is **never committed** — each user maintains their own.
-
-**On first use:**
-
-1. Check if `.claude/user-config.json` exists and contains `issueRegisterUrl`
-2. If not, ask the user for the issue register URL using AskUserQuestion
-3. Extract the spreadsheet ID from the URL (the segment between `/d/` and `/edit` or end)
-4. Save to `.claude/user-config.json`:
-
-```json
-{
-  "issueRegisterUrl": "<full URL>",
-  "issueRegisterSpreadsheetId": "<extracted ID>"
-}
-```
-
-**On subsequent uses:**
-
-1. Read `.claude/user-config.json`
-2. Use the stored `issueRegisterSpreadsheetId`
-3. If the user provides a different URL, update the config
-
-### Keleo Studio GAS Configuration (Lazy)
-
-The keleo-studio-gas connection is configured **only when needed** — when a bundle referenced in an issue cannot be found locally (see Bundle Resolution below). Do not prompt for these on first use.
-
-When remote bundle access is needed and the config is missing, run:
-
-```bash
-python3 utils/studio-client.py --configure
-```
-
-This prompts for the deployment URL and API token, saves them to `.claude/user-config.json`, and tests the connection. Token expiry is handled automatically — `studio-client.py` detects 401 errors and guides the user to refresh their token.
-
-### Detect Table Structure
-
-After obtaining the spreadsheet ID, fetch the spreadsheet metadata to detect the table:
-
-```bash
-gws sheets spreadsheets get --params '{"spreadsheetId": "<ID>", "includeGridData": false}' \
-  | jq '.sheets[0].tables'
-```
-
-Store the table metadata (name, ID, column count, row count) in memory for use in subsequent steps. The register uses a Google Sheets structured table — all reads and writes must respect table boundaries and column definitions.
-
----
-
-## Step 1: Read Issues
-
-### Fetch the Register
-
-Read the register through `utils/issue-register.py`, which wraps the gws CLI and returns rows keyed by column with their 1-based sheet row numbers:
-
-```bash
-python3 utils/issue-register.py --list --status New --json
-```
-
-Drop `--status New` to see every row, or use `--schema` to inspect the table structure (columns, dropdown values, row count). The same utility is used by `/report-issue` to append new rows.
-
-### Register Table Schema
-
-The register is a structured Google Sheets table with two column zones — **input columns** populated by the feedback form, and **resolution columns** populated by this skill.
-
-**Input columns (form-populated):**
-
-| Index | Column | Field |
+| Level | Scope | When |
 |---|---|---|
-| 0 | A | Timestamp |
-| 1 | B | Email |
-| 2 | C | Type (Issue, Enhancement, Question) |
-| 3 | D | Summary |
-| 4 | E | Description |
-| 5 | F | Page |
-| 6 | G | Document Name |
-| 7 | H | Document Version |
-| 8 | I | Document Kind |
-| 9 | J | Bundle |
-| 10 | K | Navigator Mode |
-| 11 | L | Selected Element |
-| 12 | M | Element Type |
-| 13 | N | Secondary Element |
-| 14 | O | Secondary Type |
-| 15 | P | Status |
+| **L1** | Practice, method and baseline JSON | The issue is about content in a specific document — wrong states, missing work products, bad checklists, drift from the mapping guide. **Register-only; never published.** |
+| **L2** | Skills, prompts, `utils/` | The issue reveals a generation problem that would recur in the next practice. **This is what the public tracker is for.** |
+| **L3** | Escalate to keleo-language | The issue reveals a gap in the Practice Language itself. **File it there; do not edit the schema from here.** |
 
-**Resolution columns (skill-populated):**
+Most issues are L1 only. Some are L1 + L2 — fix the document and the generator that
+produced it. Few are all three. Choose the minimum set.
 
-| Index | Column | Field |
-|---|---|---|
-| 16 | Q | Resolution Summary |
-| 17 | R | Practice/Method Changes |
-| 18 | S | keleo-pgen-llm Changes |
-| 19 | T | keleo-language Changes |
+**L1 changes are delegated, never hand-edited.** Invoke `/update-method` with the file
+path, the specific fixes, and the baseline. It runs assessment, backs up, applies the
+fix with the right utility, validates, rebundles, and generates a ChangeRequest for
+downstream propagation. Editing practice JSON directly skips all of that.
 
-### Ensure Table Schema Is Current
+| Fix nature | Skill |
+|---|---|
+| Wrong states, bad checklists, missing elements, structural drift | `/update-method` |
+| Curated reference content, templates, exemplars | `/update-method` (Mode 3) |
+| A practice should exist but does not | `/generate-method` |
+| A new foundational framework is needed | `/create-baseline-method` |
 
-On each run, verify the table includes the resolution columns. If the table's `endColumnIndex` is 16 (only input columns), extend it using `gws sheets spreadsheets batchUpdate`:
-
-1. **Extend table range** to `endColumnIndex: 20` and add resolution column definitions (indices 16-19: Resolution Summary, Practice/Method Changes, keleo-pgen-llm Changes, keleo-language Changes)
-2. **Update Status dropdown** (column index 15) to include all six values: New, Planned, In Progress, Resolved, Closed, Declined
-
-Both can be combined into a single `batchUpdate` with two `updateTable` requests.
-
-**Idempotency:** If the table already has 20 columns and the Status dropdown already has all values, skip the schema update. Check by inspecting the table metadata from Step 0.
-
-### Identify Actionable Items
-
-Rows with Status **"New"** are the items to triage (`--list --status New`). Skip rows with any other status — they have already been processed or are in progress. Rows filed by `/report-issue` arrive with Status New and empty resolution columns, exactly like form submissions.
-
-Present the actionable items to the user as a summary table before planning.
+Group issues by document: several issues against one practice become a single
+invocation with a combined brief.
 
 ---
 
-## Step 2: Plan (MANDATORY — Use EnterPlanMode)
-
-**MANDATORY:** Before making any changes, enter plan mode to triage each issue.
-
-### Triage Each Issue
-
-For each New issue, determine:
-
-1. **Is this actionable and in scope?** Does the issue describe a real problem or improvement to practice/method content or generation? If it's a keleo-studio UI enhancement, **omit it** (see "Omitting Out-of-Scope Issues"). If it's a duplicate, cannot reproduce, or unclear, mark as Declined.
-
-2. **What level(s) of change are needed?**
-
-   | Level | Scope | When to use |
-   |---|---|---|
-   | **L1: Practice/Method** | Fix the specific practice or method JSON that was reported | The issue is about content in a specific document (wrong states, missing work products, bad checklists, etc.) |
-   | **L2: Skill/Utility** | Improve keleo-pgen-llm skills, prompts, or utilities | The issue reveals a systemic generation problem that would recur in future practices |
-   | **L3: Schema/Semantics** | Improve keleo-language schema, semantics, or specifications | The issue reveals a gap in the Practice Language itself |
-
-   Most issues need only L1. Some need L1 + L2. Few need all three. Choose the minimum set.
-
-3. **What is the resolution approach?**
-
-   - **Fix**: Directly resolve the reported problem
-   - **Improve**: Enhance beyond what was asked (e.g., issue reports a symptom, you fix the root cause)
-   - **Decline**: The reported behaviour is intentional, or the change would be harmful
-
-### Plan Structure
-
-For each issue, document in the plan:
-
-```
-Issue #<row>: <Summary>
-  Type: <Issue|Enhancement|Question>
-  Document: <Document Name> (<Document Kind> v<Version>)
-  Element: <Selected Element> (<Element Type>)
-  
-  Assessment: <1-2 sentence analysis>
-  Resolution: <Fix|Improve|Decline>
-  Levels: <L1|L2|L3 or combination>
-  
-  L1 Actions: <what to change in the practice/method>
-  L2 Actions: <what to change in skills/utilities> (if applicable)
-  L3 Actions: <what to change in schema/semantics> (if applicable)
-```
-
-### Bundle Resolution
-
-Use the Document Name and Document Kind from the register to locate source files. Resolution follows a three-tier strategy — local first, local bundles second, remote download third.
-
-**Tiers 1-2 — Local resolution:**
+## Locating the change
 
 ```bash
 python3 utils/discover-dependencies.py --resolve "<Document Name>"
 ```
 
-This searches `practices/`, `baselines/`, `deps/`, and `bundles/*.keleo` automatically. If found, use the returned path. For bundle hits, extract with `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/`.
+Searches `practices/`, `baselines/`, `deps/` and `bundles/*.keleo`. An ambiguous result
+carries a version on every candidate with the highest flagged `newest` — where the
+candidates are one document at several versions, take the newest and say which.
 
-**Tier 3 — Remote download from keleo-studio-gas:**
+A resolved path may be a `bundles/<name>.keleo::documents/<doc>.json` reference; pass it
+through unchanged, since the utilities read package members directly.
 
-If `discover-dependencies.py` returns `"status": "not_found"`, attempt remote download using `studio-client.py`:
-
-```bash
-python3 utils/studio-client.py --pull "<Document Name>"
-```
-
-This handles authentication, download URL resolution, and bundle verification automatically. Config (`keleoStudioGasUrl`, `keleoStudioGasToken`) is read from `.claude/user-config.json`. If not configured, run `python3 utils/studio-client.py --configure` first. If the token has expired, the utility reports this and guides the user to refresh it.
-
-After a successful pull, re-run `discover-dependencies.py --resolve` — the downloaded bundle will now be found locally. Extract with `unzip -o bundles/<slug>.keleo -d /tmp/keleo-extract/` for direct file access.
-
-**If remote download also fails:** Inform the user and set the issue status to **Planned** with a note explaining the document could not be located.
-
-### Resolution Dependencies
-
-If multiple issues affect the same document, group them and plan a single update pass. Note dependencies between issues in the plan.
+Not found locally: `python3 utils/studio-client.py --pull "<Document Name>"`, then
+re-resolve. Still missing: comment on the issue saying the document could not be
+located, and leave it open.
 
 ---
 
-## Step 3: Execute
+## Validating the change
 
-Work through the plan, one issue at a time (or grouped by document when multiple issues share one).
-
-**Delegation principle:** This skill orchestrates triage and planning. For actual fix execution, delegate to the appropriate specialized skill rather than editing practice/method JSON directly. Each skill handles its own assessment, backup, validation, rebundling, change requests, and downstream impact reporting.
-
-### L1: Practice/Method Changes — Delegate to Skills
-
-**Do not manually edit practice/method/baseline JSON.** Instead, invoke the appropriate skill based on the nature of the fix:
-
-| Fix Nature | Skill to Invoke | When |
-|---|---|---|
-| Fix existing content (wrong states, bad checklists, missing elements, structural issues) | `/update-method` | Most L1 issues — fix, remap, or reanalyze existing documents |
-| Add/update curated reference content | `/update-method` (Mode 3) | Issues requesting exemplar content, templates, or reference links |
-| Generate a new practice from source materials | `/generate-method` | Rare — when the issue reveals a practice should exist but doesn't |
-| Generate a new baseline framework | `/create-baseline-method` | Rare — when a new foundational framework is needed |
-
-**Invocation approach:**
-
-1. **Group issues by document.** Multiple issues affecting the same document become a single skill invocation. Combine the fix requirements into one clear brief.
-
-2. **Invoke the skill via the Skill tool** with a prompt that includes:
-   - The document file path (resolved during Bundle Resolution in Step 2)
-   - The specific fixes needed (from the plan)
-   - The baseline path (for extension practices)
-   - Any constraints or scope boundaries from the plan
-
-3. **Let the skill handle the full lifecycle.** `/update-method` will:
-   - Run assessment to determine update mode (auto-fix, remap, full-reanalysis)
-   - Backup before overwriting
-   - Apply fixes with proper utilities
-   - Validate and re-assess
-   - Rebundle into `.keleo`
-   - Generate ChangeRequests for downstream propagation
-   - Present Downstream Impact Report
-
-4. **Record the skill's output** — capture what changed (file paths, nature of change, version bumps, any downstream impact) for the register update in Step 4.
-
-**Example — fixing checklist quality issues in a practice:**
-
-```
-Invoke /update-method:
-  File: practices/aws-well-architected/aws-well-architected.json
-  Baseline: deps/platform-adoption-kernel.json
-  Fixes needed:
-    - Issue #5: Rewrite checklist names on Reliability alpha (truncated, echo descriptions)
-    - Issue #8: Add missing activity for Operational Excellence alpha
-    - Issue #12: Fix pattern view completeness for Security lifecycle
+```bash
+python3 utils/assess-practice.py <file>.json --baseline <baseline>.json \
+  --schema deps/language.schema.json [--parent <dep>.json ...]
+python3 utils/eval-skill-output.py practices/<name>/ --baseline <baseline>.json \
+  --schema deps/language.schema.json --summary
 ```
 
-The update-method skill will assess, determine auto-fix vs remap, and execute the full workflow.
+`error_pass_rate` must be 1.0. Warnings are advisory.
 
-### L2: Skill/Utility Changes (keleo-pgen-llm)
+Where a defect class might recur elsewhere, check before closing:
 
-- Identify the specific skill, prompt, or utility file to improve
-- Make the change
-- Verify it doesn't break existing functionality
-- Record what changed
+```bash
+python3 utils/scan-corpus.py --category <category>
+```
 
-### L3: Schema/Semantics Changes (keleo-language)
-
-- Identify the specific schema, semantics, or specification file to improve
-- Make the change in the `keleo-language` checkout, which CLAUDE.md expects at
-  `../../keleo-language/` relative to this repo. The `deps/` and `references/`
-  symlinks resolve there, so `readlink deps/language.schema.json` gives the
-  real path if the checkout lives somewhere else.
-- If schema changes: validate existing practices still pass
-- Record what changed
-
-### Declining an Issue
-
-If an issue is declined:
-- Set Status to "Declined"
-- Write a clear rationale in the Resolution Summary explaining why
-- No changes needed in R/S/T columns (leave empty or write "N/A")
-
-### Omitting Out-of-Scope Issues
-
-Issues that are **keleo-studio UI enhancements** (rendering, navigation, layout, or interaction changes that don't affect practice/method content or generation) are outside pgen-llm scope. **Omit them entirely** — do not set Status, do not write resolution columns, leave the register row unchanged for studio-side triage. Do not decline studio enhancements from pgen-llm.
+**Always rebundle after changing any document** — `utils/audit-bundle-freshness.py
+--rebuild --fix`. A bundle carrying a stale copy reintroduces the defect downstream.
 
 ---
 
-## Step 4: Update Register
+## Project notes
 
-After executing changes for each issue, write back to the spreadsheet within the table structure.
-
-### Status Values
-
-| Status | Meaning |
-|---|---|
-| **New** | Incoming — awaiting triage (initial state from form) |
-| **Planned** | Approved and queued for action (e.g., document not available locally) |
-| **In Progress** | Active work underway (set during Step 3 execution) |
-| **Resolved** | Fix completed and ready |
-| **Closed** | Verified and deployed |
-| **Declined** | Will not be actioned (with rationale) |
-
-### Writing Resolution Data
-
-For each processed row, update columns P–T using the Sheets values API. The table structure ensures banding and formatting are maintained automatically.
-
-```bash
-gws sheets spreadsheets values update \
-  --params '{"spreadsheetId": "<ID>", "range": "Sheet1!P<ROW>:T<ROW>", "valueInputOption": "USER_ENTERED"}' \
-  --json '{"values": [["<Status>", "<Resolution Summary>", "<Practice/Method Changes>", "<keleo-pgen-llm Changes>", "<keleo-language Changes>"]]}'
-```
-
-**Column content guidelines:**
-
-- **P (Status)**: One of the six status values above. Must match a dropdown value.
-- **Q (Resolution Summary)**: 1-3 sentences explaining the assessment and resolution approach. Include rationale for declined items.
-- **R (Practice/Method Changes)**: Brief description of L1 changes. File paths and nature of change. "N/A" if no L1 changes.
-- **S (keleo-pgen-llm Changes)**: Brief description of L2 changes. File paths and nature of change. "N/A" if no L2 changes.
-- **T (keleo-language Changes)**: Brief description of L3 changes. File paths and nature of change. "N/A" if no L3 changes.
-
-### Batch Updates
-
-When processing multiple issues, update the register after each issue is resolved (not all at once). This provides incremental progress visibility in the spreadsheet.
-
-### Table Integrity
-
-- **Never write outside the table range.** All writes target cells within the table's column and row boundaries.
-- **New rows** added by the form automatically extend the table. No action needed from this skill.
-- **Status values** must match the dropdown validation. Writing an invalid status will produce a validation error in the sheet.
-
----
-
-## Issue Type Handling
-
-### Issue
-
-A reported problem with existing content. Most common type. Typical resolutions:
-
-- Fix incorrect states, checklists, or work products (L1)
-- Fix pattern views that have repeated or meaningless states (L1)
-- Remove single-alpha patterns that add no value (L1)
-- Restructure work products to better serve their purpose (L1)
-
-### Enhancement
-
-A request for improvement or new capability. May span multiple levels:
-
-- Add a missing element to a practice/method (L1)
-- Add diagram generation capabilities (L2 — skill/utility improvement)
-- Add new schema constructs (L3 — rare)
-
-### Question
-
-A query about why something works a certain way. Resolution is usually:
-
-- Answer in the Resolution Summary (no code changes)
-- Set Status to Resolved or Declined depending on whether a change resulted
-- If the question reveals a real issue, treat as Issue
-
----
-
-## Context Loading
-
-When working on L1 changes, load the practice context:
-
-```bash
-python3 utils/resolve-context.py --transitive <practice-or-method>.json
-```
-
-This resolves baseline dependencies and produces `_effective-context.json` for the full picture.
-
-When the practice files were downloaded from keleo-studio-gas or are only available inside a `.keleo` bundle:
-
-```bash
-# Extract the bundle
-unzip -o bundles/<name>.keleo -d /tmp/keleo-extract/
-
-# Read the manifest to understand document layout
-cat /tmp/keleo-extract/manifest.json | jq '.documents'
-
-# Copy the document you need to edit into the working directory
-cp /tmp/keleo-extract/documents/<doc>.json practices/<name>/<doc>.json
-```
-
-After making L1 changes to a document that came from a remote bundle, rebundle and optionally re-upload:
-
-```bash
-python3 utils/studio-client.py --push bundles/<updated>.keleo
-```
-
-The skill does NOT auto-upload — inform the user and let them decide whether to push.
-
-### Querying Document Details Remotely
-
-If you need to inspect a specific document without downloading the full bundle, download and inspect locally:
-
-```bash
-python3 utils/studio-client.py --pull "<Document Name>"
-python3 utils/inspect-keleo.py bundles/<slug>.keleo
-```
-
-For detailed document inspection after download, use `extract-reference-names.py` or `practice-summary.py` on the extracted JSON.
-
----
-
-## Error Handling
-
-- **Document not found locally**: Attempt `python3 utils/studio-client.py --pull "<name>"`. If remote also fails, set Status to "Planned" with Resolution Summary explaining the document could not be located.
-- **keleo-studio-gas token expired (401/auth error)**: `studio-client.py` detects this automatically. Guide the user to run `python3 utils/studio-client.py --configure` to refresh the token.
-- **keleo-studio-gas unreachable**: Fall back to setting Status to "Planned". Note the connection issue in the Resolution Summary.
-- **Validation fails after change**: Revert the change, investigate the validation error, and fix properly. Do not suppress validation errors.
-- **Google Sheet write fails**: Report the intended status update to the user in the conversation so they can update manually.
-- **Table schema update fails**: Fall back to plain cell-range writes for data, and inform the user that the table structure may need manual adjustment.
-- **Ambiguous issue**: Ask the user for clarification using AskUserQuestion. Set Status to "New" until clarified.
-
----
-
-## Post-Completion
-
-After processing all actionable items:
-
-1. Present a summary of all issues processed, their resolutions, and the status updates written
-2. Note any issues that were set to Planned (awaiting action) or where clarification was needed
-3. If L2 or L3 changes were made, remind the user these may need separate commits in their respective repos
-4. File any defect you noticed while triaging that no register row covers (SKILL-STANDARD §13). Fixing it in this run and resolving it against the row you were working is fine — a row is only needed for what you leave standing. Draft them with `issue-register.py --add-draft` as you go, then invoke `report-issue` in mid-execution mode and report the row numbers alongside the resolutions.
+- Practice, baseline and bundle output is git-ignored. A content fix shows up in the
+  repository only as a rebundled `.keleo`, so the issue comment is the durable record of
+  what changed.
+- `deps/` and `references/` are symlinks into keleo-language. A change that appears to
+  be in `utils/validate-*.py` is an L3 change in another repository — file it there.
+- The register's Document Name is a canonical document name, not a filename or slug.
