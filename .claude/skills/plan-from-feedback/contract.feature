@@ -1,162 +1,135 @@
-Feature: Plan from Feedback
+Feature: Plan from Feedback — keleo-pgen-llm
   As a practice engineer
-  I want to triage and resolve issues from a feedback register
-  So that practice quality improves incrementally and resolution status is tracked
+  I want register issues published to the project that owns them, and this project's
+  issues triaged and resolved from its tracker
+  So that defects are visible to their maintainers and every change traces to an issue
 
   Background:
-    Given a Google Sheet issue register exists with structured table columns A-T
-    And the register URL is stored in .claude/user-config.json
-    And the table schema includes both input columns (A-P) and resolution columns (Q-T)
+    Given a Google Sheet register holds reports with full internal detail in columns A-V
+    And keleo-labs/keleo-pgen-llm is a public GitHub repository with issues enabled
+    And the feedback foundation defines the workflow, routing and sanitisation rules
 
-  # --- Configuration ---
+  # --- Publishing (this project only) ---
 
-  Scenario: First-time configuration
-    Given .claude/user-config.json does not contain issueRegisterUrl
-    When the skill is invoked
-    Then the user is prompted for the issue register URL
-    And the spreadsheet ID is extracted and saved to user-config.json
+  Scenario: Open row published to its owning project
+    Given a register row has Status "New" and no Issue URL
+    And its content is about practice generation
+    When the publish step runs
+    Then a sanitised issue is created on keleo-labs/keleo-pgen-llm
+    And the issue body opens with the register row number
+    And the Issue URL and Issue State are written to columns U and V
 
-  Scenario: Table schema extension
-    Given the register table has only 16 columns (input only)
-    When the skill reads the register
-    Then the table is extended to 20 columns with resolution column definitions
-    And the Status dropdown is updated to include all six status values
+  Scenario: Row owned by another project
+    Given a register row describes a defect in the bundle repository API
+    When the publish step runs
+    Then the issue is created on the internal GitLab project that owns it
+    And no attempt is made to resolve it from here
 
-  Scenario: Table schema already current
-    Given the register table already has 20 columns
-    When the skill reads the register
-    Then no schema update is performed
+  Scenario: Row content determines the owner, not its Document Name
+    Given a register row names a practice as its document
+    And its content describes a gap in the Practice Language itself
+    When the owning project is determined
+    Then the issue is routed to keleo-language
 
-  # --- Triage Decision: Scope ---
+  Scenario: Draft carrying internal detail is blocked
+    Given a drafted issue body names a customer, a practice or an internal URL
+    When it is checked before creation
+    Then creation is refused with the offending terms named
+    And the draft is rewritten rather than the denylist weakened
 
-  Scenario: In-scope practice content issue
-    Given an issue with Type "Issue" and Document Kind "practice"
-    And the issue describes incorrect states, bad checklists, or missing elements
-    When the issue is triaged
-    Then it is assessed as actionable
-    And resolution level L1 (Practice/Method) is assigned
+  Scenario: Internal tracker skips sanitisation
+    Given the owning project's tracker is on internal GitLab
+    When the issue is created
+    Then the full detail is carried without redaction
+
+  Scenario: Nothing publishable survives sanitisation
+    Given a register row cannot be stated safely in general terms
+    When the publish step runs
+    Then no issue is created
+    And Issue State is set to "Not Published" with a reason recorded
+
+  Scenario: Near-duplicate draws a comment
+    Given an issue already exists whose title closely matches the draft
+    When the publish step runs
+    Then a comment naming the new register row is added to the existing issue
+    And no second issue is created
+
+  Scenario: First publication run is approved by a person
+    Given no issues have been published before
+    When the publish step is ready to create issues
+    Then the drafted bodies are shown for review
+    And nothing is created until approved
+
+  # --- Working the queue ---
+
+  Scenario: Queue comes from the tracker
+    Given issues exist on keleo-labs/keleo-pgen-llm
+    When the resolution workflow begins
+    Then the queue is read from the tracker rather than the register
+
+  Scenario: Register-linked issue pulls its detail
+    Given an issue body names a register row
+    When it is triaged
+    Then the row supplies the document, element and context the issue cannot carry
+
+  Scenario: Natively-filed issue has no row
+    Given an issue was filed directly on the tracker by someone outside the team
+    When it is triaged
+    Then it is worked the same way
+    And resolution is recorded on the issue alone
+
+  # --- Levels ---
+
+  Scenario: L1 content fix is delegated
+    Given an issue reports wrong content in a practice document
+    When the fix is applied
+    Then /update-method is invoked with the file, the fixes and the baseline
+    And the practice JSON is not hand-edited
+
+  Scenario: Several issues against one document
+    Given three open issues name the same practice
+    When they are executed
+    Then they are combined into a single /update-method invocation
 
   Scenario: Systemic generation problem
-    Given an issue that reveals a pattern recurring across multiple generated practices
-    When the issue is triaged
-    Then resolution levels L1 and L2 are assigned
-    And L2 identifies the specific skill or utility to improve
+    Given an issue reveals a defect that would recur in the next practice
+    When the resolution is planned
+    Then the skill, prompt or utility that produced it is fixed as well as the document
 
-  Scenario: Schema gap
-    Given an issue that reveals a missing construct in the Practice Language
-    When the issue is triaged
-    Then resolution levels L1, L2, and L3 are assigned
-    And L3 identifies the specific schema or semantics file to change
+  Scenario: Schema gap escalates rather than being fixed
+    Given an issue reveals a gap in the Practice Language
+    When the resolution is planned
+    Then an issue is filed on keleo-language
+    And the schema is not edited from this project
 
-  Scenario: Studio UI enhancement (out of scope)
-    Given an issue describing a keleo-studio rendering, navigation, or interaction change
-    And the issue does not affect practice/method content or generation
-    When the issue is triaged
-    Then the issue is omitted entirely
-    And no status or resolution columns are written
+  # --- Closing ---
 
-  Scenario: Duplicate or unclear issue
-    Given an issue that duplicates an existing resolved issue or lacks sufficient detail
-    When the issue is triaged
-    Then the issue is declined with a clear rationale in Resolution Summary
+  Scenario: Change links to its issue
+    Given a commit resolves an issue
+    When the commit message is written
+    Then it carries "Refs" or "Closes" with the owning repository and issue number
 
-  # --- Triage Decision: Resolution Approach ---
+  Scenario: Both systems updated on close
+    Given a fix is complete and validated
+    When the issue is closed
+    Then the resolution is commented on the issue before closing
+    And the register row's Status, resolution columns and Issue State are updated
 
-  Scenario: Direct fix
-    Given an actionable issue with a clear, bounded problem
-    When resolution approach is determined
-    Then "Fix" is chosen
-    And the plan specifies exact L1 actions
+  Scenario: Register write fails after the issue is closed
+    Given the issue has been closed
+    And writing the register row fails
+    Then the intended values are reported so they can be applied by hand
 
-  Scenario: Root cause improvement
-    Given an issue reporting a symptom whose root cause is broader
-    When resolution approach is determined
-    Then "Improve" is chosen
-    And the plan addresses the root cause, not just the symptom
+  # --- Validation ---
 
-  Scenario: Intentional behaviour reported as issue
-    Given an issue reporting behaviour that is by design
-    When resolution approach is determined
-    Then "Decline" is chosen
-    And the rationale explains why the behaviour is intentional
+  Scenario: Content change is validated before closing
+    Given a practice document was changed
+    When the change is verified
+    Then eval-skill-output.py reports error_pass_rate 1.0
+    And the affected bundles are rebuilt
 
-  # --- Bundle Resolution ---
-
-  Scenario: Document found locally
-    Given the reported document exists in practices/ or baselines/
-    When the document is located
-    Then the local file path is used directly
-
-  Scenario: Document found in local bundle
-    Given the reported document is not in practices/ or baselines/
-    But a .keleo bundle containing it exists in bundles/
-    When the document is located
-    Then the bundle is extracted to /tmp/keleo-extract/
-    And the document is copied to the appropriate working directory
-
-  Scenario: Document requires remote download
-    Given the reported document is not found locally or in bundles/
-    And keleo-studio-gas credentials are configured
-    When the document is located
-    Then the bundle is downloaded from keleo-studio-gas
-    And extracted and copied to the working directory
-
-  Scenario: Document not found anywhere
-    Given the reported document cannot be found locally or remotely
-    When the document is located
-    Then the issue status is set to "Planned"
-    And the Resolution Summary explains the document could not be located
-
-  # --- Execution Delegation ---
-
-  Scenario: L1 fix via update-method
-    Given an issue requiring content fixes to an existing practice
-    When the plan is executed
-    Then /update-method is invoked with the document path, baseline, and fix requirements
-    And the skill's full lifecycle runs (assess, fix, validate, rebundle)
-
-  Scenario: Multiple issues on same document
-    Given three issues all affecting the same practice document
-    When the plan is executed
-    Then all three are grouped into a single /update-method invocation
-    And fix requirements from all issues are combined in the brief
-
-  Scenario: L2 skill/utility improvement
-    Given an issue requiring a keleo-pgen-llm skill or utility change
-    When the plan is executed
-    Then the specific file is modified directly
-    And existing functionality is verified not to break
-
-  # --- Register Updates ---
-
-  Scenario: Resolved issue written back
-    Given an issue has been successfully resolved
-    When the register is updated
-    Then Status is set to "Resolved"
-    And Resolution Summary contains 1-3 sentences
-    And Practice/Method Changes describes L1 changes with file paths
-    And keleo-pgen-llm Changes describes L2 changes or "N/A"
-    And keleo-language Changes describes L3 changes or "N/A"
-
-  Scenario: Incremental register updates
-    Given five issues are being processed
-    When each issue is resolved
-    Then the register is updated immediately after each resolution
-    And not batched until all five are complete
-
-  # --- Question handling ---
-
-  Scenario: Question with no code change
-    Given an issue with Type "Question"
-    And the answer does not require any content or code changes
-    When the issue is triaged and resolved
-    Then Resolution Summary contains the answer
-    And Status is set to "Resolved"
-    And change columns are set to "N/A"
-
-  Scenario: Question revealing a real issue
-    Given an issue with Type "Question"
-    And investigating the question reveals an actual defect
-    When the issue is triaged
-    Then it is treated as Type "Issue"
-    And resolution levels are assigned based on the defect scope
+  Scenario: Defect class checked across the corpus
+    Given a defect is found in one document
+    When the resolution is planned
+    Then scan-corpus.py establishes whether it occurs elsewhere
+    And any further instances are filed rather than silently left
