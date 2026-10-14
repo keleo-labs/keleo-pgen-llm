@@ -36,6 +36,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOCAL = PROJECT_ROOT / ".claude" / "skills"
 
 VENDORED = [
+    "feedback-foundation",
     "diagram-foundation",
     "diagram",
     "deck-foundation",
@@ -132,8 +133,15 @@ def copy_one(src: Path, dst: Path, name: str, rel: Path) -> None:
     shutil.copy2(src, dst)
 
 
-def sync(names: list[str], check: bool) -> tuple[list[str], list[str]]:
-    """Returns (changed, missing-upstream)."""
+def sync(names: list[str], check: bool, local: Path = None) -> tuple[list[str], list[str]]:
+    """Returns (changed, missing-upstream).
+
+    `local` is the destination skills directory, defaulting to this project's.
+    Passing another repository's lets one checkout vendor into its siblings,
+    which is how a shared foundation reaches projects that have no copy of this
+    script.
+    """
+    local = local or LOCAL
     changed, missing = [], []
 
     for name in names:
@@ -141,7 +149,7 @@ def sync(names: list[str], check: bool) -> tuple[list[str], list[str]]:
         if not src_root.is_dir():
             missing.append(name)
             continue
-        dst_root = LOCAL / name
+        dst_root = local / name
         preserve = PRESERVE.get(name, set())
 
         upstream_rel = set()
@@ -177,6 +185,10 @@ def main() -> int:
                         help="report drift without writing; exits 1 if any")
     parser.add_argument("--only", nargs="+", metavar="SKILL",
                         help=f"limit to named skills (default: {', '.join(VENDORED)})")
+    parser.add_argument("--target", metavar="DIR",
+                        help="vendor into another repository instead of this one, so a "
+                             "shared foundation reaches projects that have no copy of "
+                             "this script (e.g. --target ../keleo-language)")
     args = parser.parse_args()
 
     names = args.only or VENDORED
@@ -189,7 +201,16 @@ def main() -> int:
         print(f"Error: no upstream skills at {UPSTREAM}", file=sys.stderr)
         return 2
 
-    changed, missing = sync(names, args.check)
+    local = LOCAL
+    if args.target:
+        target = Path(args.target).expanduser().resolve()
+        if not target.is_dir():
+            print(f"Error: no such directory: {target}", file=sys.stderr)
+            return 2
+        local = target / ".claude" / "skills"
+        print(f"target: {local}")
+
+    changed, missing = sync(names, args.check, local)
 
     for name in missing:
         print(f"warning: {name} not found upstream at {UPSTREAM / name}",
