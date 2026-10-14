@@ -253,7 +253,7 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 
 1. **Simplified Architecture:** 3 phases instead of 8-phase pipeline
 2. **Reference-Driven:** Reads semantics.md (hub + sub-documents), schema.json, domain-framework.md explicitly
-3. **Single Validation:** One unified validation script instead of 4+ separate utilities
+3. **Layered Validation:** Schema conformance, semantic assessment, linting and verification are separate, composable utilities — `validate-practice-json.py` and `validate-baseline-json.py` for schema and integrity, `assess-practice.py` for semantic quality, `lint-practice.py` and `lint-report.py` for style, `validate-phase-output.py` and `verification-gate.py` for phase gating, plus `post-validate-method.py`, `verify-mapping-against-specs.py` and the optional `validate-json-schema.js`
 4. **Cleaner Output:** 3 files per practice instead of 8+ modules
 5. **Better for Parallelism:** Suitable for multi-agent parallel execution
 
@@ -420,7 +420,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **NarrativeTypes** | Referenced from baseline | DEFINED in baseline |
 | **Activities** | Defined in practice | NOT PRESENT |
 | **WorkProducts** | Defined in practice | NOT PRESENT |
-| **WorkProduct partOf / mapsTo** | Optional on WPs (mutually exclusive) | NOT PRESENT |
+| **WorkProduct partOf / mapsTo** | Optional on WPs (may coexist on different targets) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **Outcomes** | 1-3 per practice with measureDescription; optional metricContributions/objectiveContributions | Optional high-level value propositions (measureDescription only) |
 | **PatternGroups** | Optional (adopt baseline groups, add patterns; novel groups need justification) | Optional (define canonical groups with empty entries as templates for extensions) |
@@ -468,7 +468,7 @@ Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-
 ### Schema Rules
 - All symbolic references are exact, case-sensitive string matches
 - Minimums: ≥3 states per alpha, ≥2 LODs per work product
-- WorkProduct `mapsTo` and `partOf` are mutually exclusive (see `semantics/work-products.md` §7.4-7.5)
+- WorkProduct `mapsTo` and `partOf` may coexist but must reference **different** work products (see `semantics/work-products.md` §7.4-7.5 and §7.7)
 
 ### Versioning
 

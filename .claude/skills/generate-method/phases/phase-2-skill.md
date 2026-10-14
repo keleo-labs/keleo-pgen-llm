@@ -331,7 +331,7 @@ Narrative: [if Phase 1 provided additional context]
 
 - Use when WP is a distinct, independently trackable component of a larger deliverable
 - Scan effective context for parent WPs from dependency practices (cross-practice `partOf` discovery REQUIRED)
-- `partOf` and `mapsTo` are mutually exclusive
+- `partOf` and `mapsTo` may coexist, but must reference different work products
 - At most one parent; no self-references; no circular chains; keep hierarchies shallow
 
 ### mapsTo (Variant)
@@ -763,7 +763,7 @@ All PracticeElement names must be unique across ALL element types within the pra
 - [ ] Activity names differ from Activity Space names
 - [ ] LOD names are content-descriptive (no "Level X:" prefix, no lifecycle stages)
 - [ ] All LODs have contributesTo array (required)
-- [ ] Work product `partOf` and `mapsTo` are mutually exclusive
+- [ ] Work product `partOf` and `mapsTo`, where both present, reference different work products
 - [ ] Narrative contexts are 1-3 sentences, self-contained, no self-references
 - [ ] Citations have NO narratives property (metadata only)
 - [ ] Checklists: imperative verb phrases, positive/additive only, independently assessable, information-independent descriptions

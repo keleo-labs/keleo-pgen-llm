@@ -1080,7 +1080,7 @@ Levels of Detail: [MUST match parent exactly — same names, same sequence]
 ```
 
 **Rules:**
-- `mapsTo` and `partOf` are **mutually exclusive** — never set both on the same work product
+- `mapsTo` and `partOf` **may coexist** on the same work product, but must reference **different** work products
 - Optional (0..1) — at most one parent
 - Value is a symbolic link: exact match to a WorkProduct.name
 - No self-references, no circular chains (including mixed `partOf`/`mapsTo` chains)

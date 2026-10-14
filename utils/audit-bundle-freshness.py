@@ -41,27 +41,13 @@ from _shared import (  # noqa: E402
     increment_version,
     load_all_from_keleo,
     load_json_pair,
+    version_sort_key as parse_version,
 )
 
 SOURCE_DIRS = ["deps", "baselines", "practices"]
 # practiceBaseline before practice before method, so bundles stay topological
 # and package-keleo's entry-point rule (method, else last) resolves correctly.
 KIND_ORDER = {"practiceBaseline": 0, "practice": 1, "method": 2}
-
-
-def parse_version(version_str):
-    """Parse a semver-ish string into a comparable tuple. Unparsable sorts lowest."""
-    if not version_str:
-        return (-1,)
-    parts = []
-    for chunk in str(version_str).split("-")[0].split("."):
-        try:
-            parts.append(int(chunk))
-        except ValueError:
-            return (-1,)
-    while len(parts) < 3:
-        parts.append(0)
-    return tuple(parts)
 
 
 def build_source_index(root):

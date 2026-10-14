@@ -177,7 +177,17 @@ python3 utils/discover-dependencies.py --resolve "<Document Name>"
   ```bash
   python3 utils/extract-reference-names.py <path> --metadata
   ```
-- **Ambiguous** — multiple candidates; ask the user which document they meant via AskUserQuestion
+  The path may be a `bundles/<name>.keleo::documents/<doc>.json` reference when the document
+  lives inside a package. Pass it through unchanged — the utilities read package members
+  directly.
+- **Ambiguous** — check whether the candidates are the *same* document at several versions
+  or genuinely different documents. Each candidate carries a `version`, and the highest is
+  flagged `"newest": true`.
+  - **Same document name throughout** — take the candidate marked `newest` without asking,
+    and say which version and which bundle you chose. Filing against a superseded version
+    wastes triage time and invites a wrong "already fixed" closure. Re-check that the issue
+    still exists in that version before drafting.
+  - **Genuinely different documents** — ask the user which they meant via AskUserQuestion.
 - **Not found** — try `python3 utils/studio-client.py --pull "<Document Name>"` and re-resolve. If it still can't be found, record the document name as the user gave it and leave version and kind blank rather than inventing them.
 
 Use the document's canonical `name` from the JSON, not a slug or filename — `/plan-from-feedback` resolves rows by that name.

@@ -2155,6 +2155,168 @@ def check_outcomes(data, kind, baseline_data=None):
     return issues
 
 
+def _ordered_weights(entries, key_field, order_by_name):
+    """Sort forecastWeight entries into declared progression order.
+
+    Entries whose target is unknown keep their array position at the end, so an
+    unresolvable reference does not masquerade as a monotonicity failure — that
+    is check_outcomes' job to report.
+    """
+    known, unknown = [], []
+    for idx, e in enumerate(entries):
+        name = e.get(key_field, "")
+        if name in order_by_name:
+            known.append((order_by_name[name], idx, e))
+        else:
+            unknown.append(e)
+    known.sort(key=lambda t: (t[0], t[1]))
+    return [e for _, _, e in known], unknown
+
+
+def check_forecast_monotonicity(data, kind, baseline_data=None):
+    """Check forecastWeight curves rise monotonically toward the recognised point.
+
+    A curve that reaches a value and then drops back cannot be a forecast, and a
+    weight of 1.0 anywhere but the recognised entry claims full confidence before
+    the evidence supports it. Both are fully determined by the data, so they are
+    caught here rather than left to a verification agent.
+    """
+    issues = []
+    if kind == "practiceBaseline":
+        return issues
+
+    sources = [data]
+    if kind == "method":
+        sources = data.get("practices", [data])
+
+    # State progression order, keyed by alpha then state. Baseline first so a
+    # practice redeclaring an alpha wins.
+    state_order = {}
+    for doc in ([baseline_data] if baseline_data else []) + [data] + (
+        sources if sources != [data] else []
+    ):
+        for a in doc.get("alphas", []):
+            aname = a.get("name")
+            if not aname:
+                continue
+            order = {}
+            for idx, s in enumerate(a.get("states", [])):
+                sname = s.get("name")
+                if sname:
+                    order[sname] = s.get("seq", idx)
+            if order:
+                state_order[aname] = order
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+
+        view_order = {}
+        for p in source.get("patterns", []):
+            pname = p.get("name")
+            if not pname:
+                continue
+            view_order[pname] = {
+                v.get("name"): v.get("seq", idx)
+                for idx, v in enumerate(p.get("patternViews", []))
+                if v.get("name")
+            }
+
+        for o_idx, o in enumerate(source.get("outcomes", [])):
+            oname = o.get("name", f"<index {o_idx}>")
+            opath = f"{pfx}outcomes[{o_idx}]"
+
+            contributions = [
+                (
+                    f"{opath}.metricContributions[{i}]",
+                    mc,
+                    "stateName",
+                    state_order.get(mc.get("alphaName", ""), {}),
+                    mc.get("recognizedAtStateName", ""),
+                    f"alpha '{mc.get('alphaName', '?')}'",
+                )
+                for i, mc in enumerate(o.get("metricContributions", []))
+            ] + [
+                (
+                    f"{opath}.objectiveContributions[{i}]",
+                    oc,
+                    "patternViewName",
+                    view_order.get(oc.get("patternName", ""), {}),
+                    oc.get("recognizedAtPatternViewName", ""),
+                    f"pattern '{oc.get('patternName', '?')}'",
+                )
+                for i, oc in enumerate(o.get("objectiveContributions", []))
+            ]
+
+            for cpath, contrib, key_field, order_by_name, recognized, target in contributions:
+                weights = contrib.get("forecastWeights", [])
+                if not weights:
+                    continue
+
+                ordered, unknown = _ordered_weights(weights, key_field, order_by_name)
+
+                prev_name, prev_weight = None, None
+                for e in ordered:
+                    name = e.get(key_field, "")
+                    weight = e.get("weight")
+                    if not isinstance(weight, (int, float)):
+                        continue
+                    if prev_weight is not None and weight < prev_weight:
+                        issues.append({
+                            "severity": "error",
+                            "category": "outcome-forecast",
+                            "path": f"{cpath}.forecastWeights",
+                            "message": (
+                                f"Outcome '{oname}' forecast weights decrease on {target}: "
+                                f"'{prev_name}' {prev_weight} then '{name}' {weight} — "
+                                f"a forecast cannot lose confidence as it progresses"
+                            ),
+                            "autoFixable": False,
+                        })
+                    prev_name, prev_weight = name, weight
+
+                if not recognized or recognized not in order_by_name:
+                    continue
+                recognized_at = order_by_name[recognized]
+
+                # Only weights *before* the recognised point are suspect. Entries
+                # after it legitimately hold 1.0 — once recognised, the metric stays
+                # fully recognised.
+                for e in ordered:
+                    name = e.get(key_field, "")
+                    if order_by_name.get(name, recognized_at) >= recognized_at:
+                        continue
+                    if e.get("weight") == 1.0:
+                        issues.append({
+                            "severity": "warning",
+                            "category": "outcome-forecast",
+                            "path": f"{cpath}.forecastWeights",
+                            "message": (
+                                f"Outcome '{oname}' gives '{name}' full weight 1.0 before the "
+                                f"recognised point '{recognized}' — full confidence is claimed "
+                                f"earlier than the evidence supports"
+                            ),
+                            "autoFixable": False,
+                        })
+
+                for e in ordered:
+                    if e.get(key_field, "") == recognized and e.get("weight") not in (1.0, None):
+                        issues.append({
+                            "severity": "warning",
+                            "category": "outcome-forecast",
+                            "path": f"{cpath}.forecastWeights",
+                            "message": (
+                                f"Outcome '{oname}' recognises at '{recognized}' but weights it "
+                                f"{e.get('weight')} — the recognised point should carry 1.0, so "
+                                f"either the weight or the recognised point is wrong"
+                            ),
+                            "autoFixable": False,
+                        })
+
+    return issues
+
+
 def check_evidence_coverage(data, kind, baseline_alpha_names=None):
     """Check that alpha states are covered by at least one LOD contributesTo.
 
@@ -4495,6 +4657,7 @@ def main():
 
     all_issues.extend(check_references(data, kind, baseline_data))
     all_issues.extend(check_outcomes(data, kind, baseline_data))
+    all_issues.extend(check_forecast_monotonicity(data, kind, baseline_data))
 
     if kind == "practiceBaseline" and args.parent:
         parent_merged = None

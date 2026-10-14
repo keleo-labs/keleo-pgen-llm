@@ -114,8 +114,23 @@ Feature: Report Issue
     Then Document Name is the canonical name from the JSON
     And Document Version and Document Kind are read from the document metadata
 
-  Scenario: Document name is ambiguous
+  Scenario: Document lives inside a .keleo package
+    Given the reported document resolves to a "bundles/<name>.keleo::documents/<doc>.json" path
+    When document context is enriched
+    Then the resolved path is passed to the metadata command unchanged
+    And Document Version and Document Kind are read from the packaged document
+
+  Scenario: Candidates are one document at several versions
     Given the document name resolves to multiple candidates
+    And every candidate carries the same document name
+    When document context is enriched
+    Then the candidate flagged as newest is chosen without asking the user
+    And the chosen version and bundle are reported
+    And the issue is re-checked against that version before drafting
+
+  Scenario: Candidates are genuinely different documents
+    Given the document name resolves to multiple candidates
+    And the candidates are different documents rather than versions of one
     When document context is enriched
     Then the user is asked which document they meant
 
