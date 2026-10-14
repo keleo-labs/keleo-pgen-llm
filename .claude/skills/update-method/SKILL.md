@@ -694,7 +694,7 @@ python3 utils/discover-dependencies.py --consumers "Practice Name"
 - Embedded method: `package-keleo.py --from-embedded <method>.json --baseline <baseline>.json -o bundles/<name>.keleo --verify`
 - Standalone practice: resolve deps first (`discover-dependencies.py --resolve-from <practice>.json --transitive`), then `package-keleo.py --documents <baseline>.json [<deps>...] <practice>.json -o bundles/<name>.keleo --verify`
 
-**Scenario 10/11 key rules**: `mapsTo` and `partOf` are mutually exclusive. `mapsTo` requires identical LOD names. `mapsTo` variant names omit parent type.
+**Scenario 10/11 key rules**: `mapsTo` and `partOf` may coexist but must reference different work products. `mapsTo` requires identical LOD names. `mapsTo` variant names omit parent type.
 
 ---
 

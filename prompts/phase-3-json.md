@@ -492,8 +492,8 @@ Add workProducts array:
     "expectedMetrics": [  // Optional — declare metric names that instances may carry. Include when outcomes reference this work product via metricContributions
       { "name": "metric-name", "description": "What this metric measures", "unit": "USD" }
     ],
-    "partOf": "Parent Work Product Name",  // Optional — containment relationship (mutually exclusive with mapsTo; see semantics/work-products.md §7.5)
-    "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (mutually exclusive with partOf). LODs MUST match target exactly. See semantics/work-products.md §7.6
+    "partOf": "Parent Work Product Name",  // Optional — containment relationship (may coexist with mapsTo on a different target; see semantics/work-products.md §7.5, §7.7)
+    "mapsTo": "Parent Work Product Name",  // Optional — variant mapping (may coexist with partOf on a different target). LODs MUST match target exactly. See semantics/work-products.md §7.6, §7.7
     "levelsOfDetail": [
       {
         "name": "Level Name",  // NO "Level X:" prefix
@@ -540,7 +540,7 @@ Add workProducts array:
 - checklist items are objects, NOT strings
 - contributesTo is REQUIRED on every LOD
 - `partOf` is optional — include when the mapping guide identifies a containment relationship. The value must exactly match a WorkProduct.name (same practice, dependency, or baseline)
-- `mapsTo` is optional — include when the mapping guide identifies a variant relationship (IS-A). The value must exactly match a WorkProduct.name. `mapsTo` and `partOf` are **mutually exclusive** — never set both on the same work product
+- `mapsTo` is optional — include when the mapping guide identifies a variant relationship (IS-A). The value must exactly match a WorkProduct.name. `mapsTo` and `partOf` **may coexist** on the same work product, but must reference **different** work products (see semantics/work-products.md §7.7)
 - **`mapsTo` work products**: LODs MUST exactly match the target work product (same LOD names, same sequence). The variant has domain-specific checklists but shares the parent's LOD structure. On merge, variants are added to the parent's `variants` array.
 - **`mapsTo` naming convention**: Variant work product names MUST NOT repeat the parent type name — `mapsTo` reads as "is a type of", so including the type is redundant (e.g., "Cloud Architecture" not "Cloud Architecture Document" when mapping to "Architecture")
 - **`expectedMetrics` consistency**: When an outcome's `metricContributions` references a `metricName`, the work product whose instances will carry that metric SHOULD declare it in `expectedMetrics`. This validates the metric chain: Outcome → MetricContribution → alpha → evidenceBy → WorkProductInstance → metrics. The `metricName` values must match exactly.
@@ -1419,7 +1419,7 @@ Names must be imperative verb phrases (actions to take), not past-participle con
 ### 14b. Work Product `partOf` and `mapsTo`
 ❌ Wrong: `"partOf": "Same Work Product Name"` (self-reference)
 ❌ Wrong: Circular chain (A partOf B, B partOf A)
-❌ Wrong: Work product with both `partOf` and `mapsTo` (mutually exclusive)
+❌ Wrong: Work product with `partOf` and `mapsTo` referencing the **same** work product (must be different targets)
 ❌ Wrong: `mapsTo` variant with different LOD names than parent (LODs must match exactly)
 ❌ Wrong: `"mapsTo": "Same Work Product Name"` (self-reference)
 ✅ Right: `"partOf": "Parent Work Product Name"` — optional string referencing another WorkProduct.name in the same practice, a dependency, or the baseline. Use for containment (component within a larger deliverable), not for "contributes evidence to" relationships.
@@ -1479,7 +1479,7 @@ Names must be imperative verb phrases (actions to take), not past-participle con
 ### Prohibited Patterns
 - NO floating alphas (all new alphas have `contributesTo` or `mapsTo`)
 - NO `contributesTo` AND `mapsTo` referencing the same target alpha (must be different targets)
-- NO `partOf` AND `mapsTo` on same work product (mutually exclusive)
+- NO `partOf` AND `mapsTo` referencing the same work product (must be different targets)
 - NO `mapsTo` work product with LOD names/sequences that differ from the target
 - NO markdown in JSON strings
 - NO practice metadata in descriptions

@@ -225,7 +225,7 @@ Translate each alpha from the mapping guide.
 - LOD names describe **document fidelity/depth** (what the artifact looks like), NOT concern lifecycle. Use `references/workproduct-assessment-rubric.csv` as the naming lens.
 - NO "Level X:" prefixes on LOD names
 - `contributesTo` is REQUIRED on every LOD
-- `partOf` and `mapsTo` are mutually exclusive — never both on same WP
+- `partOf` and `mapsTo` may coexist on a WP, but must reference different work products
 - `mapsTo` WPs: LODs MUST exactly match target (same names, same sequence)
 - `expectedMetrics`: declare when outcomes reference this WP via `metricContributions`
 
