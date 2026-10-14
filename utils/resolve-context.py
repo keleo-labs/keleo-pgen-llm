@@ -31,6 +31,11 @@ Merge hierarchy (higher tiers override lower on name conflicts):
     Tier 2: Practices (input order)
     Tier 3: Methods (highest precedence)
 
+Where the same document name arrives more than once — typically a method bundle
+embedding an older copy of a practice also supplied standalone — the highest
+version wins, regardless of input order, and the collision is reported under
+`nameCollisions` and as a warning.
+
 Exit codes:
     0 - Success
     1 - Error (missing files, invalid JSON, etc.)
@@ -51,6 +56,7 @@ from utils._shared import (
     load_json,
     merge_by_name,
     merge_pattern_groups,
+    version_sort_key,
     MERGEABLE_ARRAYS,
 )
 
@@ -82,28 +88,64 @@ def classify_documents(documents):
     """Sort documents into three tiers: baselines, practices, methods.
 
     For methods with embedded practices, extracts them into the practice tier.
-    Returns dict with 'baselines', 'practices', 'methods' keys,
-    each a list of (name, data) tuples.
+    Returns dict with 'baselines', 'practices', 'methods' keys, each a list of
+    (name, data) tuples, plus 'collisions' describing any name resolved by
+    version.
+
+    A name can arrive more than once — most often a method embedding an older
+    copy of a practice that is also supplied standalone. Settling that by input
+    order means the resolved context depends on the order of the command line,
+    and a bundle resolved on its own silently yields whatever copy it embeds.
+    The highest version wins instead, and the collision is reported so the
+    caller can see a choice was made.
     """
-    tiers = {"baselines": [], "practices": [], "methods": []}
-    seen_names = set()
+    tiers = {"baselines": [], "practices": [], "methods": [], "collisions": []}
 
+    # Flatten to candidates first: a method's embedded practices have to compete
+    # with standalone ones that may appear later in the input.
+    candidates = []
     for name, data in documents:
-        if name in seen_names:
-            continue
-        seen_names.add(name)
-
         kind = detect_kind(data)
+        if kind not in ("practiceBaseline", "practice", "method"):
+            continue
+        candidates.append((name, data, kind))
+        if kind == "method":
+            for practice in data.get("practices", []):
+                p_name = practice.get("name", "")
+                if p_name:
+                    candidates.append((p_name, practice, "practice"))
+
+    chosen = {}       # name -> (data, kind, version)
+    order = []        # names in first-seen order, so output ordering is stable
+    versions = {}     # name -> list of versions seen, for the collision report
+
+    for name, data, kind in candidates:
+        version = data.get("version", "")
+        versions.setdefault(name, []).append(version or "(none)")
+        if name not in chosen:
+            chosen[name] = (data, kind, version)
+            order.append(name)
+            continue
+        _, _, incumbent = chosen[name]
+        if version_sort_key(version) > version_sort_key(incumbent):
+            chosen[name] = (data, kind, version)
+
+    for name in order:
+        data, kind, version = chosen[name]
+        # The same document at the same version in two bundles is ordinary and
+        # harmless. Only a genuine version difference changes what is resolved.
+        distinct = sorted(set(versions[name]), key=version_sort_key)
+        if len(distinct) > 1:
+            tiers["collisions"].append({
+                "documentName": name,
+                "versionsSeen": distinct,
+                "selected": version or "(none)",
+            })
         if kind == "practiceBaseline":
             tiers["baselines"].append((name, data))
         elif kind == "practice":
             tiers["practices"].append((name, data))
         elif kind == "method":
-            for practice in data.get("practices", []):
-                p_name = practice.get("name", "")
-                if p_name and p_name not in seen_names:
-                    seen_names.add(p_name)
-                    tiers["practices"].append((p_name, practice))
             tiers["methods"].append((name, data))
 
     return tiers
@@ -377,7 +419,7 @@ def build_provenance(effective, merge_order, tiers):
             if shared:
                 multi_source_elements[key] = shared
 
-    return {
+    provenance = {
         "mergeOrder": merge_order,
         "tiers": {
             "baselines": [name for name, _ in tiers["baselines"]],
@@ -387,6 +429,9 @@ def build_provenance(effective, merge_order, tiers):
         "elementSources": element_sources,
         "multiSourceElements": multi_source_elements,
     }
+    if tiers.get("collisions"):
+        provenance["nameCollisions"] = tiers["collisions"]
+    return provenance
 
 
 def resolve_context(file_paths, transitive=False, search_dirs=None):
@@ -510,6 +555,15 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
     }
 
     warnings = []
+    collisions = tiers.get("collisions", [])
+    if collisions:
+        report["nameCollisions"] = collisions
+        for c in collisions:
+            warnings.append(
+                f"'{c['documentName']}' was supplied at more than one version "
+                f"({', '.join(c['versionsSeen'])}); resolved to {c['selected']}. "
+                "A bundle embedding an older copy of a document is the usual cause."
+            )
     if unresolved_members:
         report["unresolvedMethodPractices"] = unresolved_members
         detail = ", ".join(
@@ -744,6 +798,8 @@ def main():
                 "methods": [name for name, _ in tiers["methods"]],
             },
         }
+        if tiers.get("collisions"):
+            check_report["nameCollisions"] = tiers["collisions"]
         if args.by_name:
             check_report["resolvedPaths"] = file_paths
         print(json.dumps(check_report, indent=2))

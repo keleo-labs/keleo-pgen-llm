@@ -1,0 +1,22 @@
+{
+  "kind": "practice",
+  "name": "Version Collision Probe",
+  "description": "Fixture: the newer copy of a document that also exists at an older version. resolve-context.py should select this one regardless of the order the two are passed in.",
+  "version": "1.1.0",
+  "authors": ["Fixture"],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-02-01T00:00:00Z",
+  "baselinePracticeName": "Probe Baseline",
+  "alphas": [
+    {
+      "name": "Probe Alpha",
+      "description": "Marker alpha. Its description names the version it came from, so the resolved copy is identifiable.",
+      "contributesTo": "Probe Root",
+      "states": [
+        {"name": "New First", "description": "Present only in the v1.1.0 copy."},
+        {"name": "New Second", "description": "Present only in the v1.1.0 copy."},
+        {"name": "New Third", "description": "Present only in the v1.1.0 copy."}
+      ]
+    }
+  ]
+}
