@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 """Test citation URLs and reference URIs; fix or remove broken ones.
 
-Checks every citation with a `url` field and every reference link URI
-using HTTP HEAD requests. URLs returning 4xx/5xx are flagged as broken.
-In --fix mode, broken URLs are removed from the citation (the citation
-itself is preserved unless --remove-citations is also passed, which
-removes the entire citation and all citationNames references to it).
+Checks every citation with a `url` field and every reference link URI,
+HEAD first and GET when HEAD fails. Each URL gets one of three verdicts:
+
+    ok        the publisher served it
+    broken    the publisher said it is gone (404 or 410)
+    unknown   the check could not establish anything
+
+The third verdict is the point. Publishers refuse HEAD, answer 403 to
+unfamiliar user agents, and sit behind CDNs unreachable from some networks,
+and none of that means a document has gone. Only `broken` is ever acted on:
+`--fix` removes those URLs, `--remove-citations` removes those citations.
+An `unknown` is reported and left alone, because deleting an authoritative
+citation on the strength of a request the publisher simply did not like is a
+worse outcome than leaving a stale URL in place.
+
+`--replace old=new` applies to any citation or reference carrying `old`,
+whatever its verdict — naming a URL is an explicit instruction, and the
+common case is swapping a route that fails for one that works. A supplied
+replacement is applied unless it is itself definitively gone, and a
+replacement is never a reason to fall through to deleting the URL.
 
 Additionally, --check-missing detects citations whose `source` field
 suggests a public URL should exist (blogs, press releases, documentation)
@@ -43,19 +58,60 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json
 
 
+# A plain library user agent, matching extract-html-text.py and
+# resolve-doc-anchors.py. Documentation CDNs answer 403 both to unrecognised
+# product strings like the "PracticeValidator/1.0" this used to send and to
+# spoofed browser ones, but accept this.
+USER_AGENT = f"Python-urllib/{sys.version_info.major}.{sys.version_info.minor}"
+
+# Verdicts. "unknown" is the important one: the check could not establish
+# anything, which is not the same as establishing the URL is broken.
+OK, BROKEN, UNKNOWN = "ok", "broken", "unknown"
+
+
+def _request(url, method, timeout):
+    req = urllib.request.Request(url, method=method)
+    req.add_header("User-Agent", USER_AGENT)
+    req.add_header("Accept", "text/html,application/xhtml+xml,*/*")
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
 def test_url(url, timeout=10):
-    """Test a URL. Returns (ok, status_code, error_message)."""
+    """Test a URL. Returns (verdict, status_code, error_message).
+
+    HEAD first, then GET when HEAD fails. Plenty of publishers serve a
+    document happily over GET while refusing or mishandling HEAD, and a
+    citation checker that removes content on the strength of a HEAD is
+    removing authoritative sources over a request nobody else makes.
+
+    A host that cannot be reached at all returns UNKNOWN rather than BROKEN.
+    Unreachable from here is not the same as gone, and the difference decides
+    whether a citation gets deleted.
+    """
     if not url or not url.startswith("http"):
-        return True, None, None
-    try:
-        req = urllib.request.Request(url, method="HEAD")
-        req.add_header("User-Agent", "PracticeValidator/1.0")
-        resp = urllib.request.urlopen(req, timeout=timeout)
-        return True, resp.status, None
-    except urllib.error.HTTPError as e:
-        return False, e.code, str(e)
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        return False, None, str(e)
+        return OK, None, None
+
+    last_code, last_error = None, None
+    for method in ("HEAD", "GET"):
+        try:
+            resp = _request(url, method, timeout)
+            resp.close()
+            return OK, resp.status, None
+        except urllib.error.HTTPError as e:
+            last_code, last_error = e.code, str(e)
+            # 404 and 410 are the publisher stating the document is gone, and
+            # no method change will alter that. Anything else — 403, 405, 429,
+            # 5xx — may just be this request, so fall through to GET.
+            if e.code in (404, 410):
+                return BROKEN, e.code, str(e)
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last_code, last_error = None, str(e)
+
+    if last_code is not None:
+        # An HTTP status that is not a definite "gone". The document may well
+        # be there; we were refused. Do not call that broken.
+        return UNKNOWN, last_code, last_error
+    return UNKNOWN, None, last_error
 
 
 def remove_citation_references(data, citation_name):
@@ -154,7 +210,12 @@ def main():
                         help="Remove entire citations with broken URLs (not just the URL field)")
     parser.add_argument("--replace", action="append", default=[],
                         metavar="OLD=NEW",
-                        help="Replace a broken URL with a new one (repeatable)")
+                        help="Replace a URL with a new one, whatever its verdict "
+                             "(repeatable)")
+    parser.add_argument("--replace-only", action="store_true",
+                        help="With --fix: apply only the --replace swaps and leave "
+                             "every other broken URL alone. Use when fixing one "
+                             "citation should not quietly strip others.")
     parser.add_argument("--timeout", type=int, default=10,
                         help="HTTP request timeout in seconds (default: 10)")
     parser.add_argument("--check-missing", action="store_true",
@@ -177,44 +238,59 @@ def main():
     citations = data.get("citations", [])
     has_problems = False
 
+    # Under --replace-only nothing but the named URLs can change, so testing
+    # the rest buys nothing and costs a HEAD and a GET apiece — minutes, on a
+    # document citing a host that is unreachable rather than merely slow.
+    def worth_testing(url):
+        return not (args.fix and args.replace_only) or url in replacements
+
     # --- Citation URL checks ---
     cit_results = []
     for i, cit in enumerate(citations):
         url = cit.get("url")
         if not url or not url.startswith("http"):
             continue
-        ok, status, error = test_url(url, timeout=args.timeout)
+        if not worth_testing(url):
+            continue
+        verdict, status, error = test_url(url, timeout=args.timeout)
         cit_results.append({
             "index": i,
             "name": cit.get("name", f"citations[{i}]"),
             "url": url,
-            "ok": ok,
+            "verdict": verdict,
+            "ok": verdict == OK,
             "status": status,
             "error": error,
         })
 
-    cit_broken = [r for r in cit_results if not r["ok"]]
-    cit_working = [r for r in cit_results if r["ok"]]
+    cit_broken = [r for r in cit_results if r["verdict"] == BROKEN]
+    cit_unknown = [r for r in cit_results if r["verdict"] == UNKNOWN]
+    cit_working = [r for r in cit_results if r["verdict"] == OK]
 
     # --- Reference URI checks ---
     ref_results = []
     ref_broken = []
+    ref_unknown = []
     if not args.no_references:
         ref_uris = collect_reference_uris(data)
         for entry in ref_uris:
-            ok, status, error = test_url(entry["uri"], timeout=args.timeout)
+            if not worth_testing(entry["uri"]):
+                continue
+            verdict, status, error = test_url(entry["uri"], timeout=args.timeout)
             result = {
                 "path": entry["path"],
                 "ref_name": entry["ref_name"],
                 "uri": entry["uri"],
-                "ok": ok,
+                "verdict": verdict,
+                "ok": verdict == OK,
                 "status": status,
                 "error": error,
                 "obj": entry["obj"],
                 "field": entry["field"],
             }
             ref_results.append(result)
-        ref_broken = [r for r in ref_results if not r["ok"]]
+        ref_broken = [r for r in ref_results if r["verdict"] == BROKEN]
+        ref_unknown = [r for r in ref_results if r["verdict"] == UNKNOWN]
 
     # --- Missing URL checks ---
     missing_urls = []
@@ -228,15 +304,17 @@ def main():
                 "tested": len(cit_results),
                 "working": len(cit_working),
                 "broken": len(cit_broken),
+                "unknown": len(cit_unknown),
                 "details": cit_results,
             },
         }
         if not args.no_references:
-            ref_working = [r for r in ref_results if r["ok"]]
+            ref_working = [r for r in ref_results if r["verdict"] == OK]
             output["references"] = {
                 "tested": len(ref_results),
                 "working": len(ref_working),
                 "broken": len(ref_broken),
+                "unknown": len(ref_unknown),
                 "details": [{k: v for k, v in r.items() if k not in ("obj", "field")}
                             for r in ref_results],
             }
@@ -250,7 +328,8 @@ def main():
     # --- Text output ---
     if not args.json:
         if cit_results:
-            print(f"Citation URLs: {len(cit_working)} OK, {len(cit_broken)} broken (of {len(cit_results)} tested)\n")
+            print(f"Citation URLs: {len(cit_working)} OK, {len(cit_broken)} broken, "
+                  f"{len(cit_unknown)} unverifiable (of {len(cit_results)} tested)\n")
             if cit_working:
                 for r in cit_working:
                     print(f"  [  OK] {r['name']}")
@@ -263,15 +342,24 @@ def main():
                     print(f"         {r['url']}")
                     if r["error"]:
                         print(f"         {r['error']}")
+            if cit_unknown:
+                print()
+                for r in cit_unknown:
+                    status_str = f" ({r['status']})" if r['status'] else ""
+                    print(f"  [ ?  ] {r['name']}{status_str} — could not verify")
+                    print(f"         {r['url']}")
+                    if r["error"]:
+                        print(f"         {r['error']}")
         elif not citations:
             print("No citations found.")
         else:
             print("No citation URLs to test.")
 
         if not args.no_references:
-            ref_working = [r for r in ref_results if r["ok"]]
+            ref_working = [r for r in ref_results if r["verdict"] == OK]
             if ref_results:
-                print(f"\nReference URIs: {len(ref_working)} OK, {len(ref_broken)} broken (of {len(ref_results)} tested)\n")
+                print(f"\nReference URIs: {len(ref_working)} OK, {len(ref_broken)} broken, "
+                      f"{len(ref_unknown)} unverifiable (of {len(ref_results)} tested)\n")
                 if ref_working:
                     for r in ref_working:
                         print(f"  [  OK] {r['ref_name']}")
@@ -281,6 +369,14 @@ def main():
                     for r in ref_broken:
                         status_str = f" ({r['status']})" if r['status'] else ""
                         print(f"  [FAIL] {r['ref_name']}{status_str}")
+                        print(f"         {r['path']}: {r['uri']}")
+                        if r["error"]:
+                            print(f"         {r['error']}")
+                if ref_unknown:
+                    print()
+                    for r in ref_unknown:
+                        status_str = f" ({r['status']})" if r['status'] else ""
+                        print(f"  [ ?  ] {r['ref_name']}{status_str} — could not verify")
                         print(f"         {r['path']}: {r['uri']}")
                         if r["error"]:
                             print(f"         {r['error']}")
@@ -294,37 +390,56 @@ def main():
                 print(f"         source: {m['source']}")
 
     if not args.fix:
+        if cit_unknown or ref_unknown:
+            print("\nUnverifiable URLs were not judged broken and nothing will be "
+                  "removed for them. Check one in a browser before acting on it.")
         if cit_broken or ref_broken or missing_urls:
             hints = []
             if cit_broken or ref_broken:
                 hints.append("--fix to remove broken URLs")
             if cit_broken:
                 hints.append("--fix --remove-citations to remove entire citations")
-            print(f"\nRun with {', or '.join(hints)}.")
+            if hints:
+                print(f"\nRun with {', or '.join(hints)}. "
+                      "This applies only to the URLs reported broken above.")
+            sys.exit(1)
+        if cit_unknown or ref_unknown:
             sys.exit(1)
         return
 
     # --- Apply fixes ---
     fixes_applied = 0
     citations_removed = []
+    replaced_urls = set()
 
-    # Fix broken citation URLs
-    for r in cit_broken:
+    # Replacements first, and over every citation rather than only the ones
+    # judged broken. Naming a URL on --replace is an explicit instruction; the
+    # commonest case is swapping a route that resolves here for one that
+    # resolves everywhere, and that URL never appears in the broken list.
+    for cit in citations:
+        url = cit.get("url")
+        if not url or url not in replacements:
+            continue
+        new_url = replacements[url]
+        verdict, _status, new_error = test_url(new_url, timeout=args.timeout)
+        if verdict == BROKEN:
+            if not args.json:
+                print(f"\n  Replacement URL is gone for "
+                      f"'{cit.get('name', '?')}': {new_url} ({new_error})")
+            continue
+        cit["url"] = new_url
+        replaced_urls.add(url)
+        fixes_applied += 1
+        if not args.json:
+            note = "" if verdict == OK else " (could not verify, applied as given)"
+            print(f"\n  Replaced URL for '{cit.get('name', '?')}': {new_url}{note}")
+
+    # Then whatever is still broken and was not replaced. A replacement the
+    # caller supplied is never a reason to delete the URL instead.
+    for r in [] if args.replace_only else cit_broken:
+        if r["url"] in replaced_urls or r["url"] in replacements:
+            continue
         cit = citations[r["index"]]
-        url = r["url"]
-
-        if url in replacements:
-            new_url = replacements[url]
-            new_ok, new_status, new_error = test_url(new_url, timeout=args.timeout)
-            if new_ok:
-                cit["url"] = new_url
-                fixes_applied += 1
-                if not args.json:
-                    print(f"\n  Replaced URL for '{r['name']}': {new_url}")
-                continue
-            else:
-                if not args.json:
-                    print(f"\n  Replacement URL also broken for '{r['name']}': {new_url} ({new_error})")
 
         if args.remove_citations:
             citations_removed.append(r)
@@ -350,22 +465,29 @@ def main():
             for r in citations_removed:
                 print(f"\n  Removed citation '{r['name']}' and {refs_removed} references")
 
-    # Fix broken reference URIs
+    # Reference URIs: replacements over every URI, for the same reason as
+    # citations, then report whatever is still broken.
     ref_fixes = 0
-    for r in ref_broken:
+    for r in ref_results:
         uri = r["uri"]
-        if uri in replacements:
-            new_uri = replacements[uri]
-            new_ok, _, new_error = test_url(new_uri, timeout=args.timeout)
-            if new_ok:
-                r["obj"][r["field"]] = new_uri
-                ref_fixes += 1
-                if not args.json:
-                    print(f"\n  Replaced URI for '{r['ref_name']}': {new_uri}")
-                continue
-            else:
-                if not args.json:
-                    print(f"\n  Replacement URI also broken for '{r['ref_name']}': {new_uri} ({new_error})")
+        if uri not in replacements:
+            continue
+        new_uri = replacements[uri]
+        verdict, _status, new_error = test_url(new_uri, timeout=args.timeout)
+        if verdict == BROKEN:
+            if not args.json:
+                print(f"\n  Replacement URI is gone for '{r['ref_name']}': "
+                      f"{new_uri} ({new_error})")
+            continue
+        r["obj"][r["field"]] = new_uri
+        ref_fixes += 1
+        if not args.json:
+            note = "" if verdict == OK else " (could not verify, applied as given)"
+            print(f"\n  Replaced URI for '{r['ref_name']}': {new_uri}{note}")
+
+    for r in ref_broken:
+        if r["uri"] in replacements:
+            continue
         if not args.json:
             print(f"\n  [SKIP] Cannot auto-fix reference URI '{r['ref_name']}' — use --replace")
 

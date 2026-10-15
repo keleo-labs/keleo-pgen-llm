@@ -423,7 +423,8 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **WorkProduct partOf / mapsTo** | Optional on WPs (may coexist on different targets) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **Outcomes** | 1-3 per practice with measureDescription; optional metricContributions/objectiveContributions | Optional high-level value propositions (measureDescription only) |
-| **PatternGroups** | Optional (adopt baseline groups, add patterns; novel groups need justification) | Optional (define canonical groups with empty entries as templates for extensions) |
+| **PatternGroups** | **Deprecated — do not author.** Existing declarations stay | **Deprecated — do not author.** Existing declarations stay |
+| **PatternOrchestrations** | Optional (sequence this practice's own patterns; stages declare an explicit relationship) | NOT PRESENT (a baseline defines no patterns to sequence) |
 | **Activity ledBy** | Optional (single Persona.name accountable for leading) | Optional (on ActivitySpace) |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
@@ -469,6 +470,26 @@ Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-
 - All symbolic references are exact, case-sensitive string matches
 - Minimums: ≥3 states per alpha, ≥2 LODs per work product
 - WorkProduct `mapsTo` and `partOf` may coexist but must reference **different** work products (see `semantics/work-products.md` §7.4-7.5 and §7.7)
+
+### Pattern Grouping Is Retired
+
+`patternGroups` is deprecated as of schema 2.21.0. **Do not author it** — not in a
+practice, not in a baseline, and not by adopting a baseline's canonical group names.
+It remains valid and still merges, so the ~73 documents that already declare it keep
+it unchanged; `/update-method` copies an existing declaration across rather than
+dropping it. This is a decision about new work, not a migration.
+
+The construct answered two questions at once. Where it only classified patterns for
+navigation, nothing replaces it: the merge stamps `sourcePracticeName` on every pattern,
+so a consumer can group at display time without the document carrying the grouping.
+Where the order of entries meant *then* — or one pattern ran inside or alongside another
+— that was always sequencing, and the construct for it is `patternOrchestration`.
+
+Look for that case when mapping a practice with more than one pattern. An orchestration
+names its stages in order, and each stage declares an explicit `relationship`
+(`sequential`, `concurrent`, `nested`, `onDemand`) with entry and exit criteria. Unlike
+a group it does not merge by name across practices — one owner owns the ordering. Do not
+invent an order the source material does not state; independent patterns need none.
 
 ### Versioning
 

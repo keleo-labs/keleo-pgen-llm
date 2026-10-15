@@ -3865,6 +3865,45 @@ def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
         return None, "Validator script not found"
 
 
+def validator_findings(schema_report, existing):
+    """Promote validate-practice-json findings into the assessment issue list.
+
+    The validator carries rules this script does not duplicate — narrative
+    contexts resolving against a declared narrative type, deprecated
+    constructs, version constraints. They were being summarised as a single
+    "schema validation failed with N errors" line, and its warnings were
+    dropped entirely, so nothing the validator warned about could reach
+    scan-corpus. A rule nobody can run across the corpus is a rule that only
+    catches the document someone happens to be looking at.
+
+    Each finding keeps the validator's own category and path, so existing
+    --category filters select them the same way they select local checks.
+    """
+    seen = {(i.get("category"), i.get("path"), i.get("message")) for i in existing}
+    promoted = []
+    for severity in ("error", "warning"):
+        for finding in schema_report.get(f"{severity}s", []) or []:
+            if not isinstance(finding, dict):
+                continue
+            message = finding.get("issue") or finding.get("message") or ""
+            if not message:
+                continue
+            key = (finding.get("category", "schema"), finding.get("path", ""), message)
+            if key in seen:
+                continue
+            seen.add(key)
+            promoted.append({
+                "severity": finding.get("severity", severity),
+                "category": finding.get("category", "schema"),
+                "path": finding.get("path", ""),
+                "message": message,
+                "suggestion": finding.get("suggestion"),
+                "source": "validate-practice-json",
+                "autoFixable": False,
+            })
+    return promoted
+
+
 def detect_dependencies(data):
     deps = data.get("baselinePracticeNames", [])
     if not deps:
@@ -4688,15 +4727,8 @@ def main():
                 "message": f"Schema validation skipped: {schema_err}",
                 "autoFixable": False,
             })
-        elif schema_report and not schema_report.get("valid", True):
-            error_count = schema_report.get("error_count", 0) or schema_report.get("summary", {}).get("error_count", 0)
-            all_issues.append({
-                "severity": "error",
-                "category": "schema",
-                "path": "schema-validation",
-                "message": f"Schema validation failed with {error_count} error(s)",
-                "autoFixable": False,
-            })
+        elif schema_report:
+            all_issues.extend(validator_findings(schema_report, all_issues))
 
     if args.errors_only:
         all_issues = [i for i in all_issues if i["severity"] == "error"]

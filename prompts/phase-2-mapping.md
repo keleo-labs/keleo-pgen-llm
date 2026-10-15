@@ -1514,7 +1514,10 @@ For EACH pattern from Phase 1 (including lifecycle):
 ```
 Pattern Name: [from Phase 1]
 Description: [single sentence from Phase 1]
-Narrative Type Name: [choose from baseline narrative types based on pattern nature]
+Narrative Type Name: [choose from baseline narrative types based on pattern nature — copy the
+  name exactly and in full from the effective context, since a shortened form such as "Essay"
+  for "Essay Narrative" is a dangling reference. REQUIRED whenever any view below carries
+  narrative contexts, because each context's element name resolves inside this type.]
 Narrative: [from Phase 1 lifecycle/workflow description — include ONLY when Phase 1 provides
   substantive rationale for the lifecycle model, why these phases exist in this order, or the
   transformation story the pattern represents. This is the pattern's own narrative (distinct
@@ -1552,75 +1555,74 @@ Pattern Views: [map Phase 1 views]
 - Omit alphas with identical state across consecutive views
 - Use seq: 0 for prerequisite/preparation phases
 
-### Step 8.5: Map Pattern Groups (If Applicable)
+### Step 8.5: Relate the Patterns to Each Other (If Applicable)
 
-**When to create PatternGroups** (see semantics/execution-and-patterns.md §9.3):
-- Practice contributes 3+ patterns
-- Method will compose 10+ patterns from multiple practices
-- Single-pattern practices generally do NOT need groups
+**Do not map `patternGroups`. The construct is deprecated** as of schema 2.21.0 and is
+not used in new work. It remains valid, and documents that already declare it are left
+alone — this is a decision about what to author next, not a migration. Do not add a
+group to a practice, and do not adopt a baseline's canonical group names even where a
+baseline still declares them.
 
-**Step 8.5a: Load Baseline PatternGroups**
+Grouping answered two different questions at once, and only one of them was ever worth a
+construct.
 
-Before creating any groups, check the baseline practice for existing `patternGroups`. Baselines define canonical groups with empty entries as navigational templates. List the available baseline groups:
+**Where it only answered "which patterns are alike?"** — a navigational bucket — drop it.
+The merge already stamps `sourcePracticeName` on every pattern, and a consumer can sort
+on name, concern or source at display time. A classification that exists only to be
+displayed does not need to be authored.
 
+**Where it answered "which pattern applies when?"** — where the order of entries meant
+*then*, or one pattern ran inside or alongside another — that was always an
+orchestration, and should be mapped as one.
+
+**When to map a PatternOrchestration:**
+- The practice defines 2+ patterns and the source material says something about how they
+  relate in time: one precedes another, one repeats inside the phases of another, one is
+  entered only when circumstances call for it
+- NOT when the patterns are simply several independent lifecycles the practice happens to
+  own. Independent patterns need no orchestration, and inventing an order the source does
+  not state is worse than leaving them unrelated
+- An orchestration is authored by one owner, because no one else owns its ordering. Unlike
+  a group, it does not merge across practices by name
+
+**Orchestration Structure:**
 ```
-Baseline PatternGroups:
-  - [Group Name]: [baseline description]
-  - [Group Name]: [baseline description]
-  ...
-```
-
-If the baseline defines no patternGroups, proceed to Step 8.5b.
-
-**Step 8.5b: Assign Patterns to Baseline Groups**
-
-For each pattern defined in Step 8, assign it to the best-fitting baseline group. The baseline author has identified the coordination categories most useful to consumers — prefer these over inventing new ones.
-
-```
-Pattern Group Assignments:
-  [Baseline Group Name]:
-    - Pattern Name: [exact pattern name]
-      Seq: [0-based sort order within group]
-    - Pattern Name: [another pattern name]
-      Seq: [1]
-  [Baseline Group Name]:
-    - Pattern Name: [exact pattern name]
-      Seq: [0]
-```
-
-**Step 8.5c: Novel Groups (Only When Justified)**
-
-If a pattern represents a coordination concern genuinely absent from all baseline groups, propose a novel group. Document the rationale — why no baseline group fits.
-
-Grouping strategies for novel groups — group by coordination intent that cuts across practices, NOT by source practice (redundant with `sourcePracticeName`):
-- **By lifecycle archetype** (most common): core lifecycles, optimisation cycles, maturity progressions
-- **By concern area**: technical vs governance vs operational patterns
-- **By engagement phase**: getting started vs ongoing execution vs scaling
-
-**Novel Pattern Group Structure:**
-```
-Novel Pattern Group Name: [descriptive category — e.g., "Governance & Compliance"]
-Rationale: [why no baseline group fits this coordination concern]
-Description: [single sentence explaining what patterns in this group have in common]
-Seq: [optional — 0-based presentation order among groups]
-Narrative: [optional — include when the source material provides rationale for why
-  these patterns belong together, how they relate to each other, or how practitioners
-  should navigate between them. Use Essay or Report Narrative type. The narrative
-  should help users understand the group's purpose and when to use each pattern
-  within it. Omit if the grouping is self-explanatory from the name and description.]
-Entries:
-  - Pattern Name: [exact pattern name]
-    Seq: [0-based sort order within group]
+Orchestration Name: [what the sequenced whole is — e.g., "Adoption Endeavour"]
+Description: [single sentence: the shape of the endeavour these patterns make together]
+Narrative Type Name: [optional — a NarrativeType in scope, copied exactly and in full.
+  REQUIRED if any stage below carries narrative contexts, for the same reason it is on a
+  pattern: each context resolves against an element of this type.]
+Stages:
+  - Pattern Name: [exact Pattern.name in scope]
+    Seq: [position for sequential stages, unique among them; for every other
+      relationship the point this stage is anchored to for presentation]
+    Relationship: [sequential | concurrent | nested | onDemand — ALWAYS stated explicitly;
+      there is no default, because how a pattern layers into an endeavour is a modelling
+      decision a reader should never infer from silence]
+    Relative To: [REQUIRED for concurrent and nested — the host Pattern.name, optionally
+      scoped to specific view names of that host]
+    Recurrence: [once | perView — only meaningful with concurrent or nested. 'perView' is
+      what makes a sprint pattern restart within every phase of a milestone plan rather
+      than running once across all of them]
+    Trigger: [REQUIRED for onDemand — Given/When/Then for what the team recognises that
+      causes this stage to be entered. This is the difference between a phase that was
+      planned and a pattern run because circumstances called for it]
+    Entry Criteria: [optional — alpha states and work product levels that must hold first]
+    Exit Criteria: [optional — Given/When/Then for what is observably true when complete]
 ```
 
-**Naming guidance:**
-- **Good**: "Core Lifecycles", "Maturity Progressions", "Governance & Compliance"
-- **Bad**: "Plant Biology Patterns" (restates source practice name)
+**Choosing the relationship** — this is the judgement the construct exists for, so take it
+from the source material rather than defaulting everything to `sequential`:
 
-**Cross-practice merging:**
-Baseline-defined groups are the canonical merge targets. When multiple practices adopt the same baseline group name, their entries merge into a single group during method composition (entries merge by `patternName`, overlay seq takes precedence). Novel groups also merge by canonical name if multiple practices share one, but prefer baseline groups as the shared vocabulary.
+| The source says | Relationship |
+|---|---|
+| This follows that, once the preceding work is done | `sequential` |
+| These run as parallel tracks at the same level | `concurrent` |
+| This runs inside that one, bounded by it | `nested` |
+| This happens when we notice X, not at a fixed point | `onDemand` |
 
-**A pattern should appear in at most one group.** Ungrouped patterns remain valid.
+A practice with one pattern needs no orchestration. Patterns not named in any
+orchestration remain valid.
 
 ### Step 8.7: Map Outcomes
 
@@ -1648,6 +1650,10 @@ Each Outcome optionally includes:
   - `patternName`: the pattern whose views are used to measure progress (REQUIRED — scopes all view references)
   - `recognizedAtPatternViewName`: the pattern view at which the objective is fully achieved
   - `forecastWeights`: array of `{patternViewName, weight}` mapping each view to cumulative progress (0-1)
+
+**Shape of a forecast curve (both contribution kinds):** weights are non-decreasing across the progression, the recognised entry carries 1.0, and every entry after it also carries 1.0. The curve climbs and then plateaus; it never dips.
+
+Where the alpha or pattern continues past the point the value is realized — `Won` then `Renewing`, `Measured` then `Scaled` — recognize at the state where it is realized and hold 1.0 through the rest. Do not reserve 1.0 for the final state and set the recognised point one step below it: that is the most common way this goes wrong, and `assess-practice.py` reports it.
 
 For initial generation, `measureDescription` alone is acceptable — contributions are optional but recommended when the practice defines clear metric chains or lifecycle patterns.
 
@@ -1775,6 +1781,7 @@ For each reference, document in the mapping guide:
 - [ ] Links to large documents include `pages` pointing to the specific template/example/artifact location
 - [ ] Every `alphaName` maps to a defined alpha (baseline or practice)
 - [ ] Every `stateName` maps to a valid state on the referenced alpha
+- [ ] Every `evidenceBy` entry carries a `name` and a `description` — `WorkProductInstance` is `allOf[PracticeElement, …]`, so the two symbolic links alone do not conform
 - [ ] Every `evidenceBy` entry's `workProductName` maps to a defined work product
 - [ ] Every `evidenceBy` entry's `levelOfDetailName` maps to a valid LOD on the referenced work product
 - [ ] Reference names are unique
@@ -2287,6 +2294,7 @@ Create a markdown file: `practices/<practice-name>/02-mapping-guide.md`
 - [ ] MetricContribution recognizedAtStateName references valid state on named alpha
 - [ ] ObjectiveContribution patternName references valid pattern from Step 8
 - [ ] ObjectiveContribution recognizedAtPatternViewName references valid pattern view within the named pattern
+- [ ] Every forecast curve is non-decreasing, carries 1.0 at the recognised entry, and holds 1.0 for every entry after it
 - [ ] At least one outcome has objectiveContributions tied to the main lifecycle pattern (if practice has lifecycle patterns)
 - [ ] Method-level outcomes (if method) describe cross-cutting value
 - [ ] Gherkin structures (background, test, examples) used where verification logic adds value
