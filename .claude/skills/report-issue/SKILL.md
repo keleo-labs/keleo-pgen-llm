@@ -54,7 +54,7 @@ In this mode:
 | Step | Behaviour |
 |---|---|
 | 0 — Configuration | Unchanged. If the register or `issueReporterEmail` is unconfigured, ask once via AskUserQuestion exactly as a first direct run would. |
-| 1 — Capture | **Skip.** The drafts are already written. Do not re-elicit, and do not reword what the calling skill observed. |
+| 1 — Capture | **Skip.** The drafts are already written, to the same structure, by a caller that held context you no longer have (`SKILL-STANDARD.md` §13.4). Do not re-elicit, and do not reword what the calling skill observed — you would be rewriting an orientation you cannot verify. |
 | 2 — Enrich | Run **only** for drafts missing `documentVersion`, `documentKind`, or `elementType`. Resolve them mechanically; leave blank what cannot be resolved. Never ask the user to disambiguate — pick nothing rather than guessing, and say so in the report. |
 | 3 — Check | Unchanged. Validate and duplicate-check in full. |
 | 4 — Append | **Append without a confirmation round.** The calling run is the authorisation. |
@@ -81,6 +81,8 @@ Do not emit any other commentary in this mode. The calling skill owns the conver
 ---
 
 ## Supporting Standards
+
+**How a row is written is governed by `.claude/skills/feedback-foundation/drafting.md`** — the same file that governs the issues published from these rows. Read it before Step 1, along with `examples.md` beside it on your first run. This skill does not restate the structure; it declares only what is specific to capture.
 
 `.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
 
@@ -140,8 +142,44 @@ The user may report one issue or several in a single message. Treat each distinc
 | Field | Guidance |
 |---|---|
 | **Type** | `Issue` (something is wrong), `Enhancement` (something should be added or improved), `Question` (why does it work this way?) |
-| **Summary** | A specific title under 120 characters. "Pattern views repeat the same alpha state" — not "pattern problem". |
-| **Description** | What was observed, where, and what was expected instead. Enough that a triager can act without going back to the reporter. |
+| **Summary** | A specific title under 120 characters, stating the defect or the gap rather than the area it lives in. "Pattern views repeat the same alpha state" — not "pattern problem". |
+| **Description** | The five moves from `drafting.md`. See below. |
+
+### Writing the description
+
+Follow the five moves in `.claude/skills/feedback-foundation/drafting.md` — where this
+sits, what happens or what you cannot do today, why it matters, what would close it, and
+the detail. A row written that way publishes cleanly later; a row that opens on an
+element name has to be rescued by whoever publishes it.
+
+Two things are specific to the register.
+
+**Keep everything.** A row is internal, so it carries what publication cannot: the
+practice and element names, the products, the engagement that prompted the report, what
+the reporter was doing. Put that in move 5, not move 1 — the orientation paragraph gets
+rewritten at publication and the identifying detail gets dropped, so mixing them means
+both have to be untangled.
+
+**Orient for a triager, not for a stranger.** They know the Practice Language and the
+toolchain; they do not know this practice, this element, or why anyone depends on it.
+One sentence saying what the element is for and who reads it is usually enough, and is
+the sentence most reports leave out.
+
+A missing-content report needs this most. "The Win Themes persona has no narrative"
+states a fact that only means something to someone who already knows what Win Themes is
+for and what a narrative does on a persona.
+
+### Issues and enhancements read differently
+
+An enhancement has no "what is wrong", and asking for one produces a row that invents a
+defect to justify a request. Move 2 becomes what you cannot do today, stated as a gap
+rather than as a proposal; move 3 becomes what the change is worth, which is the whole
+case; move 4 becomes the shape of an acceptable answer plus the questions triage should
+settle.
+
+**Do not pre-judge the resolution.** Record the observation, the consequence, and what
+an acceptable answer looks like. Triage chooses the mechanism. A row that arrives as a
+finished design narrows the options before anyone has weighed them.
 
 ### Classification
 
@@ -159,7 +197,9 @@ Ask only for what's materially missing. Use AskUserQuestion when the type is gen
 
 If the user is reporting something they just observed in your own output (a report, a generated practice), capture what the register needs: which document, which element, what's wrong.
 
-**Do not editorialise.** Record the user's observation and expectation. Triage decides the resolution; do not pre-judge it in the description.
+**Write the orientation yourself where you can.** Users report the symptom, because they are looking at it — the context is what they already hold in their head and therefore the part they leave out. If this session has the document open, you can read what the element is for and why it matters and write move 1 from the document rather than asking. Only ask when the purpose is genuinely unclear from the source, and ask for the consequence rather than for context in the abstract: "what were you trying to do when this got in the way?" produces a usable move 3; "can you give me some context?" does not.
+
+**Do not pad.** The structure is there to make a row readable, not long. If the user reports a typo in a description, the row is one sentence and still passes — the moves collapse. Inventing a paragraph of significance for a trivial defect wastes the triager's time more reliably than terseness does.
 
 ---
 
@@ -234,7 +274,7 @@ Each call validates the draft before writing, so a missing field surfaces immedi
   {
     "type": "Issue",
     "summary": "Pattern views repeat the same alpha state",
-    "description": "Every pattern view in the annual rhythm shows Ecosystem Discover at Published, so the lifecycle shows no progression. Each view should show the state that view actually advances the alpha to.",
+    "description": "The annual operating rhythm is the pattern a partner team works through over a year. Each view is one stage of it, and the alpha states a view carries are how a reader tells what that stage moves forward.\n\nEvery view in the pattern shows Ecosystem Discover at Published. The alpha is therefore in the same state at the end of the year as at the start, and the pattern shows no progression at all.\n\nSomeone planning against the rhythm cannot tell which stage advances what, which is the one thing the pattern exists to tell them. It reads as deliberate rather than as an error, so it does not prompt a second look.\n\nExpected: each view carries the state that view actually advances the alpha to.\n\nDetail: all six views are affected in EcoTech Sales Foundations 1.0.2. The same shape appears in two other methods generated from the same mapping guide, so the cause is likely to be upstream of this document. Observed while reviewing the Q3 partner planning material.",
     "documentName": "EcoTech Sales Foundations",
     "documentVersion": "1.0.2",
     "documentKind": "method",

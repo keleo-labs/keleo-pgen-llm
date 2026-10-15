@@ -359,7 +359,7 @@ Record each defect **at the point of discovery**, not from memory at the end of 
 ```bash
 python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<slug>-<timestamp>.json \
   --type Issue --summary "<title under 120 chars>" \
-  --description "<what was observed, where, and what was expected instead>" \
+  --description "<the five moves — see below>" \
   --document "<Canonical Document Name>" --document-version <version> --document-kind <kind> \
   --element "<Exact Element Name>" --element-type <type>
 ```
@@ -368,9 +368,16 @@ The utility creates the file on first call, validates each draft as it is added,
 declines to add the same summary against the same document twice — so one defect seen in
 three sections yields one row.
 
-Write the description for a triager who was not in this session: what the document says,
-what the practice implied it should say, and what you did instead. Do not pre-judge the
-resolution; triage owns that.
+Write the description to the five moves in
+`.claude/skills/feedback-foundation/drafting.md`: what the element is and what depends on
+it, what the document actually says, the consequence, what would close it, and the
+detail. You hold context nobody downstream will have — you have just read the document,
+and the triager reads only the row. The first move is the one to get right, because a row
+that opens on an element name is unreadable to anyone who does not already know that
+element.
+
+Say what you did instead, in the detail move — the accommodation tells a triager how much
+the defect cost. Do not pre-judge the resolution; triage owns that.
 
 ### 13.5 Filing
 
