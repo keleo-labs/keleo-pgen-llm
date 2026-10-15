@@ -35,7 +35,8 @@ Those are **not public**. They get no issue, not even a sanitised one, because t
 subject of a practice is itself what is being withheld. They are worked from the
 register and marked Issue State `Not Published`.
 
-The question is never "which document was this seen in?" but **"what has to change?"**
+The question is never "which document was this seen in?" but **"what has to change?"**,
+and the test is mechanical: **does the fix land in a file `git ls-files` returns?**
 
 | The fix lands in | Queue | Published |
 |---|---|---|
@@ -43,9 +44,22 @@ The question is never "which document was this seen in?" but **"what has to chan
 | A practice, method or baseline JSON | register | **no** |
 | Both | tracker for the generator half only | partly |
 
+`practices/`, `baselines/` and `bundles/` are git-ignored output, so a fix confined to
+them leaves no diff for a reader of the issue to review. Run the test rather than
+judging by subject matter — `.gitignore` carries an exception for the definitive
+`baselines/platform-adoption-essentials/platform-adoption-essentials.json`, and a
+defect in that one is publishable like any other source file.
+
 A row reporting a defect in a practice that was *caused* by a prompt produces one
 published issue about the prompt and one unpublished register fix for the document.
 Say nothing in the public issue about which practice revealed it.
+
+**Close an issue once its tracked-file half is done**, even where content work remains:
+a public issue with nothing left to show in the repository is a reminder in the wrong
+place, and the content work belongs on its register row. On the way out, say what
+consumers maintaining their own practices need in order to decide whether to amend
+them — the names, the shapes, the tool. Their documents are theirs; the issue does not
+track that work or wait on it.
 
 The reciprocal skill is `/report-issue`, which files rows into the register with full
 unredacted detail. Reporters should not self-censor — that detail is what makes triage

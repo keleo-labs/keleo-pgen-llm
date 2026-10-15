@@ -7,7 +7,7 @@
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 Common workflow, rules, and conventions shared by every project's
 `plan-from-feedback` skill. **Load lazily** — read only the section you need at the
@@ -82,6 +82,24 @@ rather than letting a caller route one by mistake.
 The question to ask of a row is not "which document was this seen in?" but "what has to
 change?" A row observed in a practice whose fix is in a prompt or a utility is a
 keleo-pgen-llm issue and is published. A row whose fix is in the practice JSON is not.
+
+**The operational test is whether the fix lands in a tracked file.** A tracker issue is
+about the quality of the project's own source — what `git ls-files` returns. Generated
+practices, methods and baselines are git-ignored output, so a fix confined to them
+leaves no repository diff and has nothing for a reader of the issue to review, merge or
+verify. Run the test rather than judging by subject matter: the exception in
+`.gitignore` for the definitive Platform Adoption Essentials means one baseline *is*
+tracked, and a defect in that one is publishable like any other source file.
+
+This also decides when to **close** an issue rather than carry it. Where the tracked-file
+half of an issue is done and only content work remains, close it — a public issue with
+nothing left to show in the repository is a reminder in the wrong place, and the content
+work belongs on its register row.
+
+Say so on the way out. An issue may note that **consumers maintaining their own
+practices may need to amend them**, and should give them what they need to decide —
+the names, the shapes, the tool. It does not track that work or wait on it. Their
+documents are theirs.
 
 ---
 
