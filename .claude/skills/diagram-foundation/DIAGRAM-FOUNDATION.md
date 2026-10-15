@@ -7,7 +7,7 @@
 > `~/.claude/skills/…`. If the two diverge otherwise, the global copy is
 > upstream. Re-copy with `python3 utils/vendor-skills.py`.
 
-Version: 1.2.0
+Version: 1.3.0
 
 Shared diagram engine. A spec goes in; an SVG for a markdown report or native
 Google Slides shapes for a deck comes out. Not a skill — a foundation, like
@@ -88,8 +88,8 @@ Body text and muted grey match the deck theme's `--rh-black` and
 ### Palettes
 
 Only the colour family varies; geometry, type scale and spacing are fixed, and
-the spec never carries colour. `PALETTES` in `scripts/diagram.py` holds the
-two, and `use_palette(name)` switches between them:
+the spec never carries individual colours. `PALETTES` in `scripts/diagram.py`
+holds the two, and `use_palette(name)` switches between them:
 
 | Palette | Accent | Used by |
 |---|---|---|
@@ -100,6 +100,20 @@ A diagram in a report belongs to the document and reads in the navigator
 family. The same spec rendered onto a branded slide belongs to the deck, so
 the deck build swaps the palette before laying anything out. Pass
 `--palette navigator` to opt a deck out.
+
+**A figure not in the default palette declares it in its own spec.** Set
+`"palette": "redhat"` at the top of a JSON spec, or as a frontmatter key in a
+`.mmd` one, and the renderer honours it unless `--palette` overrides on the
+command line. This is what makes a figure reproducible from the spec stored
+beside it: `render-diagram.py --dir assets/` then redraws each figure the way
+it was published, even where one folder holds figures in both families.
+
+Without the declaration a branded figure silently returns to navigator blue
+the next time anyone re-renders the folder, and the difference surfaces only
+when a reader compares the new document with the one they already have. The
+spec is meant to be the whole statement of what the figure looks like; a
+palette held only in the command that happened to produce it is not part of
+that statement.
 
 `use_palette` mutates `THEME` and `EMPHASIS` **in place**. The backends bind
 them at import (`from diagram import THEME`), so rebinding would leave them
