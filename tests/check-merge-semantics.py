@@ -129,6 +129,55 @@ def checks(effective, report):
         platform.get("specificity") if platform else None,
     )
 
+    # merge.md §4.2 / §7.4 — the layer that introduced an element owns what it IS.
+    yield (
+        "a redeclaration does not rewrite the description it inherits",
+        platform and platform.get("description", "").startswith(
+            "The platform on which the organisation"),
+        (platform or {}).get("description"),
+    )
+
+    # merge.md §7.3 — a concrete focus beats the unresolved sentinel, and
+    # §4.3 keeps the first substantive value against a later concrete one.
+    yield (
+        "focus name keeps the first concrete value",
+        platform and platform.get("focusName") == "Solution",
+        (platform or {}).get("focusName"),
+    )
+
+    # merge.md §5.3 — rows key on the target: a relationship to the same alpha
+    # is replaced by the overlay, and one the overlay never mentions survives.
+    relations = sorted((r.get("relationship"), r.get("alphaName"))
+                       for r in (platform or {}).get("relatesTo", []))
+    yield (
+        "a relationship to the same alpha is replaced, others are kept",
+        relations == [("maintained by", "Operational Automation"),
+                      ("runs on", "Multi-Cluster Federation")],
+        relations,
+    )
+
+    # merge.md §6.10 — assets replace whole rather than merging field by field.
+    asset = named(effective.get("assets"), "Platform Icon")
+    yield (
+        "a redefined asset replaces the earlier definition entirely",
+        asset and asset.get("url") and "path" not in asset,
+        {k: v for k, v in (asset or {}).items() if not k.startswith("_")},
+    )
+
+    # merge.md §5.6 / §6.7 — primitive arrays union rather than replace.
+    group = named(effective.get("personaGroups"), "Platform Team")
+    members = sorted((group or {}).get("personaNames", []))
+    yield (
+        "persona group membership unions across practices",
+        members == ["Platform Engineer", "Site Reliability Engineer"],
+        members,
+    )
+    yield (
+        "a redeclared persona group keeps the first description",
+        group and group.get("description") == "Who runs the platform.",
+        (group or {}).get("description"),
+    )
+
     # Bookkeeping must not reach consumers.
     leaked = json.dumps(effective)
     yield (

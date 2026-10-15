@@ -8,12 +8,25 @@
   "updatedAt": "2026-01-01T00:00:00Z",
   "baselinePracticeName": "Merge Constructs Baseline",
   "practiceDependencyNames": ["IDP Delivery"],
+  "assets": [
+    { "name": "Platform Icon", "type": "icon", "format": "image", "url": "https://example.invalid/edge-platform.svg" }
+  ],
+  "personas": [
+    { "name": "Site Reliability Engineer", "description": "Keeps remote sites running." }
+  ],
+  "personaGroups": [
+    { "name": "Platform Team", "description": "Overlay description, discarded.", "personaNames": ["Site Reliability Engineer"] }
+  ],
   "alphas": [
     {
       "name": "Platform",
       "description": "Redeclaration ignored — the baseline owns the definition.",
       "specificityName": "OpenShift",
       "specificity": ["Authored", "Chain"],
+      "focusName": "Endeavor",
+      "relatesTo": [
+        { "relationship": "runs on", "alphaName": "Multi-Cluster Federation", "direction": "outgoing" }
+      ],
       "states": [
         {
           "name": "Operational",

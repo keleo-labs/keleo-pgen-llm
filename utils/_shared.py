@@ -173,6 +173,98 @@ MERGEABLE_ARRAYS = [
 # modelled, so the overlay replaces the whole object.
 ATOMIC_OBJECT_KEYS = {"loopsBackTo"}
 
+# The overlay never changes these (merge.md §4.1, §4.2). `name` is identity, so
+# changing it would make the merge key a lie. `description` says what an element
+# IS, which the layer that introduced it owns; later layers enrich how it is
+# verified and used.
+_BASE_OWNED_KEYS = {"name", "description"}
+
+# Section 7.3's sentinel for "focus not yet resolved". Treated as vacant during
+# merge so a real focus from either side wins over it, rather than the sentinel
+# winning on first-writer grounds and freezing the element in a catch-all lane.
+IMPLICIT_FOCUS = "Implicit focus"
+
+# Composite keys for the object arrays that are not keyed by `name`
+# (merge.md §5.2–§5.5). Each maps a property to the fields identifying one row.
+_COMPOSITE_KEYS = {
+    "contributesTo": ("alphaName", "stateName"),
+    "contributesToStates": ("alphaName", "stateName"),
+    "alphaStates": ("alphaName", "stateName"),
+    "background": None,          # an object, not an array — recursed instead
+    "relatesTo": ("alphaName",),
+    "worksOn": ("workProductName", "levelOfDetailName"),
+    "workProductLevels": ("workProductName", "levelOfDetailName"),
+    "evidencedBy": ("workProductName", "levelOfDetailName"),
+    "recommendedCompetencyLevels": ("competencyName", "competencyLevelName"),
+    "competencies": ("competencyName", "competencyLevelName"),
+    "narrativeContexts": ("narrativeElementName", "seq"),
+}
+
+# Keyed arrays whose matching rows are replaced by the overlay rather than
+# merged field by field. Only type-level `relatesTo` (merge.md §5.3): a row
+# says what the relationship to that target IS, so merging two of them would
+# keep the earlier verb and the later everything-else, describing a
+# relationship neither author declared.
+_COMPOSITE_REPLACE = {"relatesTo"}
+
+
+def _is_vacant(value):
+    """Vacant in the sense of merge.md §4.3 — nothing substantive was said.
+
+    False and 0 are substantive. Only absence, null and an empty or
+    whitespace-only string count as a gap for an overlay to fill.
+    """
+    if value is None:
+        return True
+    return isinstance(value, str) and not value.strip()
+
+
+def _composite_key(item, fields):
+    return tuple(item.get(f) for f in fields)
+
+
+def _is_keyed_object_list(value, fields):
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(i, dict) for i in value)
+        and any(any(f in i for f in fields) for i in value)
+    )
+
+
+def _merge_keyed_list(base_list, overlay_list, fields, overlay_source=None,
+                      tracking=None, replace=False):
+    """Union two object arrays on a composite key (merge.md §5.2–§5.5)."""
+    merged = OrderedDict()
+    for item in (base_list or []):
+        merged[_composite_key(item, fields)] = copy.deepcopy(item)
+    for item in (overlay_list or []):
+        key = _composite_key(item, fields)
+        if key not in merged or replace:
+            merged[key] = copy.deepcopy(item)
+        else:
+            merged[key] = merge_element(merged[key], item, overlay_source, tracking)
+    return list(merged.values())
+
+
+def _merge_primitive_list(base_list, overlay_list):
+    """Concatenate and deduplicate (merge.md §5.6).
+
+    Objects without a usable key deduplicate on their serialisation, which is
+    the spec's own fallback. Order is base first, so the layer that introduced
+    a value keeps its position.
+    """
+    merged = []
+    seen = set()
+    for item in list(base_list or []) + list(overlay_list or []):
+        fingerprint = json.dumps(item, sort_keys=True) if isinstance(item, (dict, list)) \
+            else (type(item).__name__, item)
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        merged.append(copy.deepcopy(item))
+    return merged
+
 # Annotations this module writes for the post-merge passes in resolve-context.py.
 # Stripped from the output once those passes have consumed them.
 TRACKING_KEYS = ("_layers", "_suppressedByLayers", "_specificityContributions")
@@ -242,27 +334,55 @@ def _track_subtree(node, source, tracking):
 
 
 def merge_element(base, overlay, overlay_source=None, tracking=None):
-    """Recursive record merge of two practice element records (merge.md §4.1, §5.1).
+    """Recursive record merge of two practice element records (merge.md §4).
 
-    Named-object arrays merge by name so that a redeclaration adds to what it
-    inherits rather than replacing it; nested objects recurse; everything else
-    is last-writer-wins, which is this resolver's long-standing scalar rule.
+    Who owns a value is the whole question, and the answer is the same for
+    almost everything: the layer that said something substantive first. An
+    extension enriches what it inherits rather than restating it, so a later
+    layer fills gaps and adds array entries but does not overwrite.
+
+    Four exceptions, each for a stated reason:
+
+    - `name` and `description` are never touched (§4.1, §4.2) — identity, and
+      what the element IS.
+    - `focusName` prefers a concrete value from either side (§7.3), because the
+      unresolved sentinel is not a real answer for first-writer-wins to protect.
+    - `loopsBackTo` is replaced whole (§6.5) — see ATOMIC_OBJECT_KEYS.
+    - Arrays union rather than choosing a winner at all (§5).
     """
     result = copy.deepcopy(base)
     for key, overlay_value in overlay.items():
-        if key in _MERGE_OWNED_KEYS:
+        if key in _MERGE_OWNED_KEYS or key in _BASE_OWNED_KEYS:
             continue
         base_value = result.get(key)
+
         if key in ATOMIC_OBJECT_KEYS:
             result[key] = copy.deepcopy(overlay_value)
+        elif key == "focusName":
+            base_concrete = not (_is_vacant(base_value) or base_value == IMPLICIT_FOCUS)
+            overlay_concrete = not (_is_vacant(overlay_value)
+                                    or overlay_value == IMPLICIT_FOCUS)
+            if overlay_concrete and not base_concrete:
+                result[key] = overlay_value
+            elif not base_concrete and key not in result:
+                result[key] = copy.deepcopy(overlay_value)
         elif _is_named_object_list(base_value) and _is_named_object_list(overlay_value):
             result[key] = merge_by_name(
                 base_value, overlay_value, None, overlay_source,
                 tracking=tracking, stamp_contributors=False,
             )
+        elif key in _COMPOSITE_KEYS and _COMPOSITE_KEYS[key] \
+                and _is_keyed_object_list(base_value, _COMPOSITE_KEYS[key]) \
+                and _is_keyed_object_list(overlay_value, _COMPOSITE_KEYS[key]):
+            result[key] = _merge_keyed_list(
+                base_value, overlay_value, _COMPOSITE_KEYS[key],
+                overlay_source, tracking, replace=key in _COMPOSITE_REPLACE,
+            )
+        elif isinstance(base_value, list) and isinstance(overlay_value, list):
+            result[key] = _merge_primitive_list(base_value, overlay_value)
         elif isinstance(base_value, dict) and isinstance(overlay_value, dict):
             result[key] = merge_element(base_value, overlay_value, overlay_source, tracking)
-        else:
+        elif _is_vacant(base_value):
             result[key] = copy.deepcopy(overlay_value)
     return result
 
@@ -325,6 +445,33 @@ def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None
                     _stamp_contributor(entry, overlay_source)
                 _track_subtree(entry, overlay_source, tracking)
                 merged[item["name"]] = entry
+    return list(merged.values())
+
+
+def merge_assets(base_list, overlay_list, base_source=None, overlay_source=None):
+    """Merge assets by name with atomic replacement (merge.md §6.10).
+
+    Assets are the one element type that replaces whole rather than merging
+    field by field. A later definition is a different file, and field-level
+    merging would leave the earlier definition's `path` sitting beside the new
+    one's `url` — a reference to two things at once.
+    """
+    merged = OrderedDict()
+    for item in (base_list or []):
+        if "name" in item:
+            entry = copy.deepcopy(item)
+            if base_source is not None and "_contributingPracticeName" not in entry:
+                _stamp_contributor(entry, base_source)
+            merged[item["name"]] = entry
+    for item in (overlay_list or []):
+        if "name" not in item:
+            continue
+        prior = merged.get(item["name"], {}).get("_contributingPracticeNames") or []
+        entry = copy.deepcopy(item)
+        if prior:
+            entry["_contributingPracticeNames"] = list(prior)
+        _stamp_contributor(entry, overlay_source)
+        merged[item["name"]] = entry
     return list(merged.values())
 
 
@@ -539,6 +686,76 @@ def _visit_elements(container, fn, path=""):
                 _visit_elements(item, fn, item_path)
             else:
                 _visit_elements(item, fn, path)
+
+
+def _index_descriptions(node, index, path=""):
+    """Collect name-path → description for every element and part in a document."""
+    if isinstance(node, dict):
+        for key, value in node.items():
+            _index_descriptions(value, index, f"{path}/{key}" if path else key)
+    elif isinstance(node, list):
+        for item in node:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            if not isinstance(name, str) or not name:
+                _index_descriptions(item, index, path)
+                continue
+            item_path = f"{path}/{name}"
+            description = item.get("description")
+            if isinstance(description, str) and description.strip():
+                index.setdefault(item_path, description)
+            _index_descriptions(item, index, item_path)
+
+
+def finalize_baseline_descriptions(effective, baseline_documents):
+    """Re-stamp baseline-defined descriptions, merge.md §7.4.
+
+    The last pass, and deliberately so: it guarantees that nothing an earlier
+    step did — cloning an element into a parent's `variants`, aggregating
+    components, filling a gap — can leave extension-layer prose on an element
+    the baseline defines. §4.2 already keeps the base description during merge;
+    this is the enforcement that does not depend on every path having been
+    careful.
+
+    Baselines are applied in the order given, earliest winning, which is the
+    same precedence the merge itself uses.
+    """
+    index = {}
+    for _name, document in baseline_documents:
+        for key in MERGEABLE_ARRAYS:
+            if key in document:
+                _index_descriptions({key: document[key]}, index)
+
+    if not index:
+        return 0
+
+    restamped = 0
+
+    def apply(node, path=""):
+        nonlocal restamped
+        if isinstance(node, dict):
+            for key, value in node.items():
+                apply(value, f"{path}/{key}" if path else key)
+        elif isinstance(node, list):
+            for item in node:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name")
+                if not isinstance(name, str) or not name:
+                    apply(item, path)
+                    continue
+                item_path = f"{path}/{name}"
+                original = index.get(item_path)
+                if original is not None and item.get("description") != original:
+                    item["description"] = original
+                    restamped += 1
+                apply(item, item_path)
+
+    for key in MERGEABLE_ARRAYS:
+        if key in effective:
+            apply({key: effective[key]})
+    return restamped
 
 
 def finalize_specificity(effective, layer_order):
