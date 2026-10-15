@@ -15,7 +15,8 @@
       "description": "The platform on which the organisation's services run.",
       "focusName": "Solution",
       "relatesTo": [
-        { "relationship": "supports", "alphaName": "Multi-Cluster Federation", "direction": "outgoing" }
+        { "relationship": "supports", "alphaName": "Multi-Cluster Federation", "direction": "outgoing" },
+        { "relationship": "maintained by", "alphaName": "Operational Automation", "direction": "incoming" }
       ],
       "states": [
         {
@@ -59,6 +60,19 @@
         { "name": "Unconsidered", "seq": 1, "description": "Federation has not been assessed.", "checklist": [{ "name": "Scope recorded", "seq": 1, "description": "The federation question is on the record." }] },
         { "name": "Designed", "seq": 2, "description": "A federation topology is agreed.", "checklist": [{ "name": "Topology agreed", "seq": 1, "description": "The topology has sign-off." }] },
         { "name": "Federated", "seq": 3, "description": "Clusters operate as one estate.", "checklist": [{ "name": "Estate operating", "seq": 1, "description": "Workloads move across clusters." }] }
+      ]
+    },
+    {
+      "name": "Operational Automation",
+      "description": "The automation that keeps the platform running without hands on it.",
+      "focusName": "Solution",
+      "relatesTo": [
+        { "relationship": "maintains", "alphaName": "Platform", "direction": "outgoing" }
+      ],
+      "states": [
+        { "name": "Manual", "seq": 1, "description": "Operations are performed by hand.", "checklist": [{ "name": "Runbooks written", "seq": 1, "description": "The steps exist in writing." }] },
+        { "name": "Scripted", "seq": 2, "description": "Common operations are scripted.", "checklist": [{ "name": "Scripts in version control", "seq": 1, "description": "Automation is reviewable." }] },
+        { "name": "Autonomous", "seq": 3, "description": "The platform self-heals.", "checklist": [{ "name": "Remediation runs unattended", "seq": 1, "description": "No human is paged for known faults." }] }
       ]
     }
   ],

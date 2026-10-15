@@ -51,11 +51,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (
     detect_kind,
+    finalize_baseline_descriptions,
     finalize_specificity,
     finalize_suppression,
     finalize_variants,
     load_all_from_keleo,
     load_json,
+    merge_assets,
     merge_by_name,
     merge_pattern_groups,
     merge_pattern_orchestrations,
@@ -361,6 +363,10 @@ def merge_tier(accumulated, entries, tracking=None):
                     accumulated[key] = merge_pattern_orchestrations(
                         acc_items, items, acc_source, source_name
                     )
+                elif key == "assets":
+                    accumulated[key] = merge_assets(
+                        acc_items, items, acc_source, source_name
+                    )
                 else:
                     accumulated[key] = merge_by_name(
                         acc_items, items, acc_source, source_name, tracking=tracking
@@ -534,6 +540,12 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
         finalize_specificity(effective, merge_order)
     if tracking["suppression"]:
         suppression = finalize_suppression(effective, merge_order)
+
+    # Last, so no earlier pass can leave extension prose on a baseline element
+    # (merge.md §7.4). Runs after suppression so a removed element is not
+    # re-described on its way out.
+    restamped = finalize_baseline_descriptions(effective, tiers["baselines"])
+
     strip_merge_tracking(effective)
 
     aliases = collect_aliases(all_docs)
@@ -594,6 +606,7 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
             "personaCount": len(effective.get("personas", [])),
             "outcomeCount": len(effective.get("outcomes", [])),
             "aliasCount": len(aliases),
+            "descriptionsRestamped": restamped,
         },
     }
 
