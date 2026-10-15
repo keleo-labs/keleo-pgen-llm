@@ -6,7 +6,7 @@ compatibility: >-
   /opt/homebrew/bin/npx (Node.js 18+), which fetches mermaid-cli on demand.
   The native layouts need Python only.
 metadata:
-  version: "1.0.1"
+  version: "1.1.0"
 ---
 
 # Diagram
@@ -129,5 +129,12 @@ the deck.
 ## Palette
 
 `--palette navigator` (default, for reports and documents) or `--palette
-redhat` (decks). Only the colour family changes; the spec never carries a
-colour. A deck build swaps it automatically.
+redhat` (decks). Only the colour family changes; the spec never carries
+individual colours. A deck build swaps it automatically.
+
+**A figure not in the default palette says so in its spec** — `"palette":
+"redhat"` at the top of a JSON spec, or as a frontmatter key in a `.mmd` one.
+The spec is the artifact, so it has to carry everything needed to redraw the
+figure. A palette held only in the command that happened to produce it is
+lost the moment someone re-renders the folder, and what they get back is a
+figure that no longer matches the one already published.

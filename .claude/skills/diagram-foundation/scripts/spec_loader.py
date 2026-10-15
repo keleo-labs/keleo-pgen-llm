@@ -190,3 +190,36 @@ def load(path, fit_ratio=None):
 def is_spec(path):
     """Does this path look like a diagram spec?"""
     return Path(path).suffix.lower() in (".json", ".mmd")
+
+
+def declared_palette(path):
+    """The palette a spec asks for, or None.
+
+    Read without building the scene, because the palette has to be applied
+    before layout: `use_palette` mutates the theme the backends bound at
+    import. A spec that does not say keeps the caller's choice.
+
+    This is what makes a figure reproducible from the spec stored beside it.
+    Without it, re-rendering a branded diagram silently returns it to the
+    default palette, and the difference only shows up when someone compares
+    the new figure with the one already published.
+    """
+    path = Path(path)
+    try:
+        body = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    if path.suffix.lower() == ".mmd":
+        try:
+            meta, _source = parse_mmd(body, path.name)
+        except SpecError:
+            return None
+        return meta.get("palette") or None
+
+    try:
+        spec = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    palette = spec.get("palette") if isinstance(spec, dict) else None
+    return palette or None

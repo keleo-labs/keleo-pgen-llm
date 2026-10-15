@@ -46,6 +46,15 @@ Neither is drawn. The title becomes the SVG's <title>, the description its
 report sits under a heading that already names it, so rendering the title
 inside the image would print the same line twice.
 
+  palette    optional  navigator (default) | redhat
+
+Declare the palette on any figure not drawn in the default colours — a deck
+figure, or a report following brand. The spec is then the whole statement of
+what the figure looks like, and re-rendering it reproduces what was published.
+Leave it out and a branded diagram quietly returns to navigator blue the next
+time anyone runs the renderer over the folder. --palette on the command line
+overrides it; .mmd specs take the same key in their frontmatter.
+
 Shared node fields (flow nodes, stack tiers, timeline phases, hub centre and
 satellites all accept these):
 
@@ -221,8 +230,30 @@ def prepare(path, fit_ratio):
         return None, f"{path}: could not lay out ({exc})"
 
 
-def render_file(spec_path, out_path, fit_ratio=None):
+def apply_palette(spec_path, override):
+    """Settle the palette for one spec and apply it. Returns (name, error).
+
+    An explicit --palette wins, because the caller is asking for a specific
+    rendering. Otherwise the spec's own declaration decides, so re-rendering
+    reproduces the figure stored beside it. Silence means the default.
+
+    Applied before anything is laid out: `use_palette` mutates THEME in place
+    and the backends bound it at import, so a later switch would not reach
+    them.
+    """
+    name = override or spec_loader.declared_palette(spec_path) or "navigator"
+    try:
+        use_palette(name)
+    except ValueError as exc:
+        return name, f"{spec_path}: {exc}"
+    return name, None
+
+
+def render_file(spec_path, out_path, fit_ratio=None, palette=None):
     """Render one spec file to SVG. Returns (ok, message)."""
+    _name, palette_error = apply_palette(spec_path, palette)
+    if palette_error:
+        return False, palette_error
     diagram, error = prepare(spec_path, fit_ratio)
     if error:
         return False, error
@@ -248,8 +279,9 @@ def main():
     parser.add_argument("--dir", dest="directory",
                         help="Render every *.json and *.mmd spec in a directory "
                              "alongside itself")
-    parser.add_argument("--palette", choices=sorted(PALETTES), default="navigator",
-                        help="Colour family (default: navigator)")
+    parser.add_argument("--palette", choices=sorted(PALETTES), default=None,
+                        help="Colour family, overriding what the spec declares "
+                             "(default: the spec's own 'palette', else navigator)")
     parser.add_argument("--stdout", action="store_true", help="Write output to stdout")
     parser.add_argument("--emit", choices=["svg", "slides"], default="svg",
                         help="Output form (default: svg)")
@@ -268,10 +300,6 @@ def main():
         print(SPEC_HELP)
         return 0
 
-    # Before anything is laid out: use_palette mutates THEME in place and the
-    # backends bound it at import, so a later switch would not reach them.
-    use_palette(args.palette)
-
     if args.directory:
         specs = sorted(p for p in Path(args.directory).iterdir()
                        if spec_loader.is_spec(p))
@@ -281,7 +309,10 @@ def main():
             return 1
         failures = 0
         for spec_path in specs:
-            ok, message = render_file(spec_path, spec_path.with_suffix(".svg"), args.fit)
+            # Per spec, not once for the directory: a report's assets folder
+            # can hold figures rendered in different palettes.
+            ok, message = render_file(spec_path, spec_path.with_suffix(".svg"),
+                                      args.fit, args.palette)
             print(("rendered " if ok else "FAILED   ") + message,
                   file=sys.stdout if ok else sys.stderr)
             failures += 0 if ok else 1
@@ -289,6 +320,11 @@ def main():
 
     if not args.spec:
         parser.error("provide a spec file, --dir, or --spec-help")
+
+    palette_name, palette_error = apply_palette(args.spec, args.palette)
+    if palette_error:
+        print(palette_error, file=sys.stderr)
+        return 1
 
     if args.emit == "slides":
         if not args.page_id or not args.box:
@@ -333,7 +369,7 @@ def main():
         return 0
 
     out_path = Path(args.output) if args.output else Path(args.spec).with_suffix(".svg")
-    ok, message = render_file(Path(args.spec), out_path, args.fit)
+    ok, message = render_file(Path(args.spec), out_path, args.fit, palette_name)
     print(("rendered " if ok else "FAILED   ") + message,
           file=sys.stdout if ok else sys.stderr)
     return 0 if ok else 1
