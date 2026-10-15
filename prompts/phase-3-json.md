@@ -320,7 +320,7 @@ Add practice-level or method-level narratives:
   {
     "name": "Practice Intent",
     "description": "Narrative describing practice objectives",
-    "narrativeTypeName": "STAR",
+    "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
     "narrativeContexts": [
       {
         "seq": 1,
@@ -424,7 +424,7 @@ Add alphas array:
       {
         "name": "Context and Rationale",
         "description": "Why this alpha matters",
-        "narrativeTypeName": "Essay",
+        "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
         "narrativeContexts": [...],
         "citationNames": [...]
       }
@@ -714,7 +714,7 @@ Add activities array:
       {
         "name": "How to Perform",
         "description": "Technique guidance",
-        "narrativeTypeName": "Technique",
+        "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
         "narrativeContexts": [...],
         "citationNames": [...]
       }
@@ -811,7 +811,7 @@ Add patterns array:
 - Use `alphaStates` NOT `alphas`
 - PatternView.seq is REQUIRED
 - **A pattern whose views carry `narrativeContexts` MUST declare `narrativeTypeName` on the pattern itself.** Each context's `narrativeElementName` resolves to an element *inside* that type, so with no type named there is nothing to resolve against and the context cannot be interpreted. The two are only meaningful together: emit both, or neither. Note the pattern's own `narratives[]` entry carries its own `narrativeTypeName` — that one does not satisfy this, because it scopes the narrative, not the views.
-- **`narrativeTypeName` must be an exact, case-sensitive `NarrativeType.name` from the baseline.** Do not shorten it. `Essay` is not `Essay Narrative`, and `Hero's Journey` is not `The Hero's Journey`; a near-miss is a dangling reference, not a close enough match. Read the names out of the effective context rather than recalling them.
+- **`narrativeTypeName` must be an exact, case-sensitive `NarrativeType.name` from the baseline.** Do not shorten it. `Essay` is not `Essay Narrative`, and `Hero's Journey` is not `The Hero's Journey`; a near-miss is a dangling reference, not a close enough match. Read the names out of the effective context rather than recalling them — the short forms are real names in other baselines, so a half-remembered one looks right and resolves against nothing. Every narrative type placeholder in the examples above is a placeholder for this reason.
 - NO `workProducts` property on PatternView — use `workProductLevels` (array of `{workProductName, levelOfDetailName}`) to declare work product LOD objectives per phase
 - activities are string names, not objects
 - **Each alpha MUST target at most 1 state per patternView** — if a phase advances an alpha through multiple states, split into sub-views using `Phase: Sub-step` naming (e.g., "Enable: Train", "Enable: Certify"). Each sub-view gets its own seq, activities, and narrative context.
