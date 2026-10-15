@@ -82,6 +82,55 @@ def apply_map(content, entries):
     return pattern.sub(_sub, content), counts
 
 
+def apply_map_to_properties(data, entries, properties):
+    """Rename exact-match values of named JSON properties. Returns counts.
+
+    Textual replacement is right for a markdown guide and wrong for a JSON
+    document: a symbolic reference is a whole value, and rewriting every
+    mention of the string also rewrites the prose that happens to discuss it.
+    `"STAR"` names a narrative type in `narrativeTypeName` and is an ordinary
+    word in a description.
+
+    `properties` entries are either a bare property name, matched anywhere in
+    the document, or `array.field`, matched only on objects directly inside
+    that array — which is how the defining element is renamed alongside the
+    references to it.
+    """
+    counts = {e["from"]: 0 for e in entries}
+    lookup = {e["from"]: e["to"] for e in entries}
+    plain = {p for p in properties if "." not in p}
+    scoped = {}
+    for p in properties:
+        if "." in p:
+            array, _, field = p.partition(".")
+            scoped.setdefault(array, set()).add(field)
+
+    def rename(value):
+        if isinstance(value, str) and value in lookup and lookup[value] != value:
+            counts[value] += 1
+            return lookup[value]
+        return value
+
+    def walk(node, array_context=None):
+        if isinstance(node, dict):
+            for key, value in list(node.items()):
+                if key in plain:
+                    node[key] = rename(value)
+                elif array_context and key in scoped.get(array_context, ()):
+                    node[key] = rename(value)
+                walk(value, array_context)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item, array_context)
+
+    if isinstance(data, dict):
+        for key, value in data.items():
+            walk(value, key if key in scoped else None)
+    else:
+        walk(data)
+    return counts
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Reconcile predicted cross-practice references in phase outputs"
@@ -98,6 +147,14 @@ def main():
         help="Exit 1 if any 'from' name still appears (post-fix gate)",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text")
+    parser.add_argument(
+        "--property", dest="properties", action="append", metavar="NAME",
+        help="Rename exact-match values of this JSON property rather than every "
+             "textual occurrence. Repeatable. Use 'array.field' to scope to "
+             "objects directly inside a top-level array, which is how a defining "
+             "element is renamed alongside the references to it. Required for "
+             "JSON documents where the name is also an ordinary word",
+    )
 
     args = parser.parse_args()
 
@@ -118,11 +175,21 @@ def main():
             results.append({"file": path, "error": str(exc)})
             continue
 
-        updated, counts = apply_map(original, entries)
+        if args.properties:
+            try:
+                data = json.loads(original)
+            except json.JSONDecodeError as exc:
+                results.append({"file": path, "error": f"--property needs JSON: {exc}"})
+                continue
+            counts = apply_map_to_properties(data, entries, args.properties)
+            updated = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        else:
+            updated, counts = apply_map(original, entries)
+
         hits = {k: v for k, v in counts.items() if v}
         total_hits += sum(hits.values())
 
-        if args.fix and updated != original:
+        if args.fix and sum(hits.values()):
             with open(path, "w", encoding="utf-8") as f:
                 f.write(updated)
 
