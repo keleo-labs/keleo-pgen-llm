@@ -305,6 +305,7 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 - `references/domain-framework.md` - Modern enterprise architecture perspectives combining Open Agile, SAFe, Gartner CEA, Zachman, TOGAF
 - `references/semantics.md` - Hub document indexing semantic guidance sub-documents in `references/semantics/`
 - `references/workproduct-assessment-rubric.csv` - 5-level maturity rubric (Level 0: Non-Existent → Level 4: Comprehensive/Automated)
+- `references/orchestration-strategy.md` - Authoring gate for `patternOrchestrations`: inventory, then extend / embed / author new. Read at Phase 2 Step 8.5
 
 ### Dependencies (`deps/`)
 
@@ -424,7 +425,7 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **Outcomes** | 1-3 per practice with measureDescription; optional metricContributions/objectiveContributions | Optional high-level value propositions (measureDescription only) |
 | **PatternGroups** | **Deprecated — do not author.** Existing declarations stay | **Deprecated — do not author.** Existing declarations stay |
-| **PatternOrchestrations** | Optional (sequence this practice's own patterns; stages declare an explicit relationship) | NOT PRESENT (a baseline defines no patterns to sequence) |
+| **PatternOrchestrations** | Optional (stages declare an explicit relationship and name exactly one of a pattern or another orchestration) | Optional shells only (`stages: []`) — a baseline defines no patterns to sequence |
 | **Activity ledBy** | Optional (single Persona.name accountable for leading) | Optional (on ActivitySpace) |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
@@ -487,9 +488,36 @@ Where the order of entries meant *then* — or one pattern ran inside or alongsi
 
 Look for that case when mapping a practice with more than one pattern. An orchestration
 names its stages in order, and each stage declares an explicit `relationship`
-(`sequential`, `concurrent`, `nested`, `onDemand`) with entry and exit criteria. Unlike
-a group it does not merge by name across practices — one owner owns the ordering. Do not
+(`sequential`, `concurrent`, `nested`, `onDemand`) with entry and exit criteria. Do not
 invent an order the source material does not state; independent patterns need none.
+
+### Orchestrations Accumulate Rather Than Multiply
+
+An orchestration is meant to be reused, not reinvented per practice. Three routes, taken
+in order, and a new one is authored only when the first two do not reach:
+
+- **Extend by name.** Where an orchestration in scope already describes the shape and
+  what a practice adds serves the purpose its description states, the practice
+  redeclares the name and contributes stages. A baseline may publish a shell with
+  `stages: []` for exactly this.
+- **Embed.** A stage names **either** a `patternName` **or** an `orchestrationName`.
+  Naming an orchestration places that whole sub-endeavour — a programme embedding a
+  project. Embed rather than nest when the sub-endeavour has its own owner, completes on
+  its own terms, and is reusable by more than one host.
+- **Author new.** Only when nothing in scope describes the shape, with a description
+  saying what makes it distinct.
+
+**Extension is additive, and enforced.** An overlay contributes stages; it may not
+restate an inherited stage to move it, nor insert a `sequential` stage below the
+inherited sequence. The merge gives the first writer the placement properties, and
+`validate-practice.py` rejects the restatement. Wanting to reorder what you inherited
+means you have a different endeavour — author a new orchestration and name it.
+
+Both kinds of reference resolve across the baseline chain and declared dependencies, so
+a stage may place another document's pattern directly. That validates and warns:
+embedding the orchestration that owns it keeps the ordering with its author. The full
+framework is `references/semantics/execution-and-patterns.md` §9.5.4–9.5.6, with the
+authoring procedure in `references/orchestration-strategy.md`.
 
 ### Versioning
 

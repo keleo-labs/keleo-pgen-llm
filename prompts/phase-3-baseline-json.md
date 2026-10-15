@@ -595,12 +595,32 @@ empty array. Existing baselines that declare it keep it; nothing is being migrat
 
 Nothing replaces it at this layer. Grouping patterns was a display concern, and the merge
 already stamps `sourcePracticeName` on every pattern, so a consumer can group without the
-baseline publishing a vocabulary. Patterns that relate in time are a `PatternOrchestration`,
-authored by whoever owns the ordering — and baselines define no patterns, so they author
-no orchestrations either.
+baseline publishing a vocabulary.
+
+**Orchestration shells are a different matter.** Patterns that relate in time are a
+`PatternOrchestration`. A baseline defines no patterns, so it sequences none — but where
+Phase 2 Step 10.6a identified a shape the domain recognises, emit the shell: the name, the
+description, and an **empty** `stages` array. Extension practices contribute the stages.
+
+```json
+"patternOrchestrations": [
+  {
+    "kind": "patternOrchestration",
+    "name": "Adoption Endeavour",
+    "description": "The shape every adoption in this domain follows, from first contact through to steady-state operation.",
+    "stages": []
+  }
+]
+```
+
+A stage naming a `patternName` in a baseline is a validation error — the reference cannot
+resolve, because the baseline has no patterns. Omit the `patternOrchestrations` key
+entirely when Phase 2 identified no shell; most baselines publish none.
 
 **Quality Check:**
 - ✓ No `patternGroups` key in the baseline JSON
+- ✓ Any `patternOrchestrations` entry has `stages: []` and a description that says what
+  endeavour it is for
 
 ### Step 11: Build PracticeElementAliases Array (if applicable)
 

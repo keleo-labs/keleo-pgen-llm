@@ -186,7 +186,7 @@ Every Phase 1 concern must appear in this table. The map makes the N-concerns-to
    - `references/semantics/practice-elements.md` — Orthogonal Tagging Taxonomy (§5.1), Checklists and Dynamic State-Gating (§5.2), Gherkin-Inspired Test Model (§5.3)
    - `references/semantics/alphas.md` — Alpha-State Trajectory (§6), Defining Core Alphas and Baseline Isolation (§6.1)
    - `references/semantics/work-products.md` — Work Product Elements (§7)
-   - `references/semantics/execution-and-patterns.md` — Execution Boundaries (§8), Gherkin on Activities (§8.1.1), Lifecycle Orchestration and Patterns (§9)
+   - `references/semantics/execution-and-patterns.md` — Execution Boundaries (§8), Gherkin on Activities (§8.1.1), Lifecycle Orchestration and Patterns (§9), Embedding an Orchestration (§9.5.4), Baseline-Published Shells (§9.5.5), Choosing the Level (§9.5.6)
    - `references/semantics/narrative-and-assets.md` — Narrative Management (§10)
 
 ### Step 2: Map Metadata (For Each Practice)
@@ -1582,8 +1582,39 @@ orchestration, and should be mapped as one.
 - NOT when the patterns are simply several independent lifecycles the practice happens to
   own. Independent patterns need no orchestration, and inventing an order the source does
   not state is worse than leaving them unrelated
-- An orchestration is authored by one owner, because no one else owns its ordering. Unlike
-  a group, it does not merge across practices by name
+
+**Then decide whether to author one at all.** An orchestration may already exist that
+this practice should extend or be embedded in. **Read
+`references/orchestration-strategy.md`** for the procedure and
+`references/semantics/execution-and-patterns.md` §9.5.4–9.5.6 for the reasoning behind
+it. In brief:
+
+1. **Inventory first.** Run `utils/resolve-context.py --transitive`, then
+   `utils/practice-summary.py <context> --show patternOrchestrations`. Record what you
+   found in the mapping guide. Answering "nothing exists" from memory is how a corpus
+   ends up with one orchestration per practice, each describing a shape two others
+   already described.
+2. **Take the first route that fits:**
+
+| Check | Route |
+|---|---|
+| An orchestration in scope already describes this shape, and what this practice adds serves the purpose its description states | **Extend by name** — redeclare the name, contribute only your own stages |
+| This practice's patterns form a self-contained sub-endeavour of a shape in scope | **Author your own**, placed as a stage of the host via `Orchestration Name` |
+| Nothing in scope describes this shape | **Author new**, and say in the description what makes it distinct |
+
+**Extension is additive.** A redeclared orchestration contributes stages. It must not
+restate an inherited stage to move it, and a `sequential` stage it adds appends after the
+inherited sequence rather than inserting into it — both are validation errors. Place
+contributions `concurrent`, `nested` or `onDemand` against the inherited stages; none of
+those disturbs an order you do not own. Wanting to reorder means you have a different
+endeavour: author a new orchestration instead.
+
+**Embedding.** A stage names **either** a pattern **or** another orchestration, never
+both. Naming an orchestration places that whole sub-endeavour — a programme embedding a
+project. Embed rather than nest when the sub-endeavour has its own owner, completes on
+its own terms, and is reusable by more than one host; all three, or it is a nested
+pattern stage. Prefer embedding over placing another document's pattern directly, which
+validates but warns.
 
 **Orchestration Structure:**
 ```
@@ -1594,13 +1625,16 @@ Narrative Type Name: [optional — a NarrativeType in scope, copied exactly and 
   pattern: each context resolves against an element of this type.]
 Stages:
   - Pattern Name: [exact Pattern.name in scope]
+    OR Orchestration Name: [exact PatternOrchestration.name in scope, to place a whole
+      sub-endeavour at this point. Exactly one of these two per stage, never both]
     Seq: [position for sequential stages, unique among them; for every other
       relationship the point this stage is anchored to for presentation]
     Relationship: [sequential | concurrent | nested | onDemand — ALWAYS stated explicitly;
       there is no default, because how a pattern layers into an endeavour is a modelling
       decision a reader should never infer from silence]
-    Relative To: [REQUIRED for concurrent and nested — the host Pattern.name, optionally
-      scoped to specific view names of that host]
+    Relative To: [REQUIRED for concurrent and nested — the host Pattern.name or
+      PatternOrchestration.name, exactly one. A pattern host may be scoped to specific
+      view names; an orchestration host may not, having stages rather than views]
     Recurrence: [once | perView — only meaningful with concurrent or nested. 'perView' is
       what makes a sprint pattern restart within every phase of a milestone plan rather
       than running once across all of them]

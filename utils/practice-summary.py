@@ -3,7 +3,8 @@
 
 Produces everything a Phase 2/3 subagent needs to know about a practice as JSON:
 metadata, alphas (with types, targets, states), patterns (with view names),
-patternGroups, outcomes, work products, activities, personas, and schema
+patternGroups, patternOrchestrations, outcomes, work products, activities,
+personas, and schema
 feature coverage flags.
 
 `--show` switches to a detail view instead, printing the underlying text —
@@ -118,6 +119,52 @@ def summarize_pattern(pattern):
     }
 
 
+def summarize_orchestration(orch):
+    """Summarize a single pattern orchestration.
+
+    Stages carry what the authoring gate needs: what is placed, how, and against
+    what. Embedded orchestrations are marked so a reader can see the nesting
+    without opening the document. See semantics/execution-and-patterns.md 9.5.
+    """
+    stages = sorted(orch.get("stages", []), key=lambda s: s.get("seq", 0))
+    return {
+        "name": orch.get("name"),
+        "description": orch.get("description", ""),
+        "narrativeTypeName": orch.get("narrativeTypeName"),
+        "sourcePracticeName": orch.get("sourcePracticeName"),
+        "stageCount": len(stages),
+        "stages": [
+            {
+                "seq": s.get("seq"),
+                "target": s.get("orchestrationName") or s.get("patternName"),
+                "targetKind": "orchestration" if s.get("orchestrationName") else "pattern",
+                "relationship": s.get("relationship"),
+                "host": (s.get("relativeTo") or {}).get("orchestrationName")
+                        or (s.get("relativeTo") or {}).get("patternName"),
+                "hostViewNames": (s.get("relativeTo") or {}).get("viewNames", []),
+                "recurrence": s.get("recurrence"),
+                "hasTrigger": bool(s.get("trigger")),
+                "hasEntryCriteria": bool(s.get("entryCriteria")),
+                "hasExitCriteria": bool(s.get("exitCriteria")),
+            }
+            for s in stages
+        ],
+    }
+
+
+def format_stage(stage):
+    """One-line rendering of a stage: what is placed, how, and against what."""
+    marker = "⊂ " if stage["targetKind"] == "orchestration" else ""
+    line = f"{marker}{stage['target']} ({stage['relationship']}"
+    if stage.get("host"):
+        line += f" → {stage['host']}"
+        if stage.get("hostViewNames"):
+            line += f"[{', '.join(stage['hostViewNames'])}]"
+    if stage.get("recurrence") and stage["recurrence"] != "once":
+        line += f", {stage['recurrence']}"
+    return line + ")"
+
+
 def summarize_outcome(outcome):
     """Summarize a single outcome."""
     result = {
@@ -205,6 +252,8 @@ def schema_feature_coverage(data):
         "outcomeCount": len(data.get("outcomes", [])),
         "patternGroups": len(data.get("patternGroups", [])) > 0,
         "patternGroupCount": len(data.get("patternGroups", [])),
+        "patternOrchestrations": len(data.get("patternOrchestrations", [])) > 0,
+        "patternOrchestrationCount": len(data.get("patternOrchestrations", [])),
         "checklistPriority": priority_count > 0,
         "checklistPriorityPct": round(priority_count / total_checklists * 100, 1) if total_checklists else 0,
         "references": len(data.get("references", [])) > 0,
@@ -242,6 +291,9 @@ def summarize_practice(data, baseline_data=None):
             "patterns": [e.get("patternName") for e in entries if e.get("patternName")],
         })
     summary["patternGroups"] = pg_summary
+    summary["patternOrchestrations"] = [
+        summarize_orchestration(o) for o in data.get("patternOrchestrations", [])
+    ]
 
     summary["outcomes"] = [summarize_outcome(o) for o in data.get("outcomes", [])]
     summary["workProducts"] = [summarize_work_product(wp) for wp in data.get("workProducts", [])]
@@ -299,6 +351,15 @@ def print_human_readable(summary):
             print(f"  {pg['name']}: {pg['patterns']}")
         print()
 
+    if s.get("patternOrchestrations"):
+        print(f"Pattern Orchestrations ({len(s['patternOrchestrations'])}):")
+        for orch in s["patternOrchestrations"]:
+            owner = f" [{orch['sourcePracticeName']}]" if orch.get("sourcePracticeName") else ""
+            print(f"  {orch['name']}{owner} — {orch['stageCount']} stage(s)")
+            for stage in orch["stages"]:
+                print(f"    {stage['seq']}. {format_stage(stage)}")
+        print()
+
     if s["outcomes"]:
         print(f"Outcomes ({len(s['outcomes'])}):")
         for o in s["outcomes"]:
@@ -331,6 +392,7 @@ def print_human_readable(summary):
     print("Feature Coverage:")
     print(f"  outcomes: {'✓' if fc['outcomes'] else '✗'} ({fc['outcomeCount']})")
     print(f"  patternGroups: {'✓' if fc['patternGroups'] else '✗'} ({fc['patternGroupCount']})")
+    print(f"  patternOrchestrations: {'✓' if fc['patternOrchestrations'] else '✗'} ({fc['patternOrchestrationCount']})")
     print(f"  checklistPriority: {'✓' if fc['checklistPriority'] else '✗'} ({fc['checklistPriorityPct']}%)")
     print(f"  references: {'✓' if fc['references'] else '✗'} ({fc['referenceCount']})")
     print(f"  dependencyVersions: {'✓' if fc['dependencyVersions'] else '✗'}")
@@ -347,6 +409,7 @@ def print_human_readable(summary):
 DETAIL_KEYS = [
     "personas", "personaGroups", "alphas", "workProducts",
     "activities", "outcomes", "narratives", "citations",
+    "patternOrchestrations",
 ]
 
 
@@ -391,6 +454,21 @@ def print_detail(data, keys, needle):
                 for field in ("author", "date", "source", "url", "pages"):
                     if item.get(field):
                         print(f"    {field}: {item[field]}")
+
+            if key == "patternOrchestrations":
+                # The authoring gate needs the criteria and triggers, not only the
+                # shape -- they are what says whether a contribution fits.
+                if item.get("narrativeTypeName"):
+                    print(f"    narrativeType: {item['narrativeTypeName']}")
+                if item.get("sourcePracticeName"):
+                    print(f"    owner: {item['sourcePracticeName']}")
+                for stage in summarize_orchestration(item)["stages"]:
+                    print(f"    {stage['seq']}. {format_stage(stage)}")
+                    for field, label in (("hasEntryCriteria", "entry"),
+                                         ("hasExitCriteria", "exit"),
+                                         ("hasTrigger", "trigger")):
+                        if stage.get(field):
+                            print(f"         {label} criteria declared")
 
             if item.get("competencies"):
                 comps = ", ".join(

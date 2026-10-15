@@ -523,16 +523,15 @@ def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_sour
 def _stage_key(stage):
     """Composite key for an orchestration stage (merge.md §6.15a).
 
-    Keyed on placement, not on pattern name alone: one pattern may legitimately
-    appear twice in an orchestration — nested inside a plan and also available
-    on demand — and keying on the name would collapse the two into one.
+    `target::relationship::host`, where target and host are each a pattern or an
+    orchestration. Keyed on placement, not on the target alone: one pattern may
+    legitimately appear twice in an orchestration — nested inside a plan and also
+    available on demand — and keying on the name would collapse the two into one.
     """
     relative = stage.get("relativeTo") or {}
-    return "::".join([
-        stage.get("patternName", ""),
-        stage.get("relationship", ""),
-        relative.get("patternName", ""),
-    ])
+    target = stage.get("orchestrationName") or stage.get("patternName", "")
+    host = relative.get("orchestrationName") or relative.get("patternName", "")
+    return "::".join([target, stage.get("relationship", ""), host])
 
 
 def _merge_narrative_contexts(base_list, overlay_list):
@@ -550,21 +549,28 @@ def _merge_narrative_contexts(base_list, overlay_list):
     return list(merged.values())
 
 
+# Placement properties, first-writer-wins as of schema 3.1.0 (merge.md §6.15a).
+_STAGE_PLACEMENT = ("seq", "relationship", "recurrence", "relativeTo", "trigger")
+
+
 def _merge_stage(base, overlay):
-    """Merge two orchestration stages sharing a composite key (merge.md §6.15a)."""
+    """Merge two orchestration stages sharing a composite key (merge.md §6.15a).
+
+    Extension by name is additive: an overlay contributes stages, and where it
+    restates one already present the original author's placement and criteria
+    stand. Before 3.1.0 the overlay won the placement properties as scalars,
+    which let a late practice silently re-place a stage it did not own.
+    """
     combined = copy.deepcopy(base)
     for key, value in overlay.items():
-        if key in ("entryCriteria", "exitCriteria"):
-            # Placement criteria are first-writer-wins: the author who put the
-            # stage here owns the terms on which it is entered and left.
+        if key in ("entryCriteria", "exitCriteria") or key in _STAGE_PLACEMENT:
+            # The author who put the stage here owns where it sits and the terms
+            # on which it is entered and left.
             if not combined.get(key):
                 combined[key] = copy.deepcopy(value)
         elif key == "narrativeContexts":
             combined[key] = _merge_narrative_contexts(combined.get(key), value)
         else:
-            # seq, relationship, recurrence, relativeTo, trigger: each describes
-            # placement rather than content, and a stage merged halfway would
-            # describe a shape neither author intended.
             combined[key] = copy.deepcopy(value)
     return combined
 
@@ -573,10 +579,11 @@ def merge_pattern_orchestrations(base_list, overlay_list, base_source=None,
                                  overlay_source=None):
     """Merge PatternOrchestration lists per merge.md §6.15a.
 
-    Orchestrations merge by canonical name so a practice can refine one it
-    inherits — unlike a PatternGroup, which merges by name as a way of
-    collecting contributions from many authors. Two unrelated practices naming
-    an orchestration the same thing is a collision, not a contribution.
+    Orchestrations merge by canonical name, which is how a baseline publishes an
+    endeavour shape with no stages and extension practices contribute theirs.
+    What an overlay contributes is stages: where it restates one already present,
+    the first writer's placement stands, because the ordering of a stage belongs
+    to whoever wrote it.
     """
     merged = OrderedDict()
     for item in (base_list or []):

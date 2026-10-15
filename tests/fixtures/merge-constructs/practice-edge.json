@@ -56,9 +56,10 @@
       "name": "Platform Endeavour",
       "description": "Refinement of the inherited orchestration.",
       "stages": [
-        { "patternName": "Platform Bootstrap", "seq": 1, "relationship": "sequential", "entryCriteria": "Overridden — first writer keeps it.", "exitCriteria": "A cluster serves traffic." },
+        { "patternName": "Platform Bootstrap", "seq": 7, "relationship": "sequential", "entryCriteria": "Overridden — first writer keeps it.", "exitCriteria": "A cluster serves traffic." },
         { "patternName": "Site Rollout", "seq": 2, "relationship": "nested", "recurrence": "perView", "relativeTo": { "patternName": "Steady State" } },
-        { "patternName": "Site Rollout", "seq": 3, "relationship": "onDemand", "trigger": { "name": "New site signed", "description": "A site contract completes.", "when": ["A new site contract completes"] } }
+        { "patternName": "Site Rollout", "seq": 3, "relationship": "onDemand", "trigger": { "name": "New site signed", "description": "A site contract completes.", "when": ["A new site contract completes"] } },
+        { "orchestrationName": "Rollout Endeavour", "seq": 4, "relationship": "nested", "relativeTo": { "patternName": "Steady State" } }
       ]
     }
   ]

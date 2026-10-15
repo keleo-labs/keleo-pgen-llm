@@ -578,12 +578,36 @@ publishing a vocabulary for it. Publishing one also forced a choice on every dow
 practice before anyone knew what patterns they would have.
 
 Where patterns genuinely relate **in time** — one precedes another, one runs inside or
-alongside another, one is entered on recognition — that is a `PatternOrchestration`, and
-it belongs to whoever owns the ordering. Baselines define no patterns, so they author no
-orchestrations either. Extension practices do, per Step 8.5 of the extension mapping
-prompt.
+alongside another, one is entered on recognition — that is a `PatternOrchestration`, which
+extension practices author per Step 8.5 of the extension mapping prompt.
 
 **Output Format:** none. Emit no PatternGroups section in the mapping guide.
+
+### Step 10.6a: Publish Orchestration Shells (optional)
+
+A baseline defines no patterns, so it sequences none. It may still publish the *shape* an
+endeavour takes in this domain, as a `PatternOrchestration` with **no stages**. Extension
+practices then contribute their stages to that name rather than each inventing a shape of
+their own — the mechanism canonical pattern groups used, applied to a construct that
+carries sequencing and criteria rather than classification alone. See
+`references/semantics/execution-and-patterns.md` §9.5.5.
+
+**Publish a shell only where the domain genuinely has a recognised shape.** The test is
+whether you can write a description that will still be true after three unrelated
+practices have contributed to it. A shell is a commitment every downstream practice
+inherits, and one published speculatively forces a choice on authors before anyone knows
+what patterns they will have — which is precisely what went wrong with canonical groups.
+Most baselines should publish none.
+
+**Output Format (per shell, zero or more):**
+```
+Orchestration Shell Name: [the endeavour this domain recognises]
+Description: [one or two sentences stating what endeavour it is for. This is the contract
+  extension practices read before contributing, so it must say what belongs and what does
+  not]
+Narrative Type Name: [optional — a NarrativeType defined in this baseline]
+Stages: none. A baseline publishes the name and the shape; practices contribute stages.
+```
 
 ### Step 10.7: Map Baseline Outcomes
 
