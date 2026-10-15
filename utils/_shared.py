@@ -163,8 +163,108 @@ MERGEABLE_ARRAYS = [
     "narrativeTypes", "narratives", "citations", "assets",
     "workProducts", "patterns", "personas", "personaGroups",
     "alphaInstances", "workProductInstances",
-    "patternGroups", "outcomes", "acknowledgements", "references",
+    "patternGroups", "patternOrchestrations", "outcomes",
+    "acknowledgements", "references",
 ]
+
+# Object-valued properties that merge as scalars rather than recursing. A loop
+# edge is one statement about the shape of a cycle (merge.md §6.5); half of one
+# author's loop spliced onto half of another's describes a cycle neither of them
+# modelled, so the overlay replaces the whole object.
+ATOMIC_OBJECT_KEYS = {"loopsBackTo"}
+
+# Annotations this module writes for the post-merge passes in resolve-context.py.
+# Stripped from the output once those passes have consumed them.
+TRACKING_KEYS = ("_layers", "_suppressedByLayers", "_specificityContributions")
+
+# Annotations the merge owns. An overlay never overwrites them — they are
+# accumulated by the merge itself, and a document that happens to carry them
+# (an effective context fed back in, say) must not reset the accumulation.
+_MERGE_OWNED_KEYS = set(TRACKING_KEYS) | {
+    "_contributingPracticeName", "_contributingPracticeNames",
+}
+
+
+def _is_named_object_list(value):
+    """True when `value` is a non-empty list whose every item is a named object."""
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(i, dict) and isinstance(i.get("name"), str) and i["name"] for i in value)
+    )
+
+
+def _track_layer(entry, item, source, tracking):
+    """Record which layer declared `item`, and what it declared about it.
+
+    Only runs when a composition actually uses `specificityName` or `suppressed`
+    — see `scan_tracking_needs`. Every part type extends PracticeElement, so
+    tracking unconditionally would stamp provenance onto every checklist item in
+    the corpus to serve two constructs almost nothing uses yet.
+    """
+    if not tracking or source is None:
+        return
+    if tracking.get("suppression"):
+        layers = entry.get("_layers") or []
+        if source not in layers:
+            entry["_layers"] = layers + [source]
+        if item.get("suppressed") is True:
+            suppressors = entry.get("_suppressedByLayers") or []
+            if source not in suppressors:
+                entry["_suppressedByLayers"] = suppressors + [source]
+    if tracking.get("specificity"):
+        name = item.get("specificityName")
+        if isinstance(name, str) and name.strip():
+            contributions = entry.get("_specificityContributions") or []
+            pair = {"layer": source, "specificityName": name.strip()}
+            if pair not in contributions:
+                entry["_specificityContributions"] = contributions + [pair]
+
+
+def _track_subtree(node, source, tracking):
+    """Stamp layer tracking on a newly introduced element and all of its parts.
+
+    An element arriving for the first time is deep-copied rather than merged,
+    so nothing walks its states, checklists or views. Without this they would
+    carry no record of who declared them, and a later suppression of one of
+    those parts would have no originator to compare precedence against.
+    """
+    if not tracking or source is None:
+        return
+    if isinstance(node, dict):
+        if isinstance(node.get("name"), str) and node["name"]:
+            _track_layer(node, node, source, tracking)
+        for value in node.values():
+            _track_subtree(value, source, tracking)
+    elif isinstance(node, list):
+        for item in node:
+            _track_subtree(item, source, tracking)
+
+
+def merge_element(base, overlay, overlay_source=None, tracking=None):
+    """Recursive record merge of two practice element records (merge.md §4.1, §5.1).
+
+    Named-object arrays merge by name so that a redeclaration adds to what it
+    inherits rather than replacing it; nested objects recurse; everything else
+    is last-writer-wins, which is this resolver's long-standing scalar rule.
+    """
+    result = copy.deepcopy(base)
+    for key, overlay_value in overlay.items():
+        if key in _MERGE_OWNED_KEYS:
+            continue
+        base_value = result.get(key)
+        if key in ATOMIC_OBJECT_KEYS:
+            result[key] = copy.deepcopy(overlay_value)
+        elif _is_named_object_list(base_value) and _is_named_object_list(overlay_value):
+            result[key] = merge_by_name(
+                base_value, overlay_value, None, overlay_source,
+                tracking=tracking, stamp_contributors=False,
+            )
+        elif isinstance(base_value, dict) and isinstance(overlay_value, dict):
+            result[key] = merge_element(base_value, overlay_value, overlay_source, tracking)
+        else:
+            result[key] = copy.deepcopy(overlay_value)
+    return result
 
 
 def _stamp_contributor(entry, source):
@@ -185,34 +285,45 @@ def _stamp_contributor(entry, source):
     entry["_contributingPracticeNames"] = contributors
 
 
-def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None):
+def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None,
+                  tracking=None, stamp_contributors=True):
     """Merge two lists of objects by 'name' key. Overlay overrides base.
 
-    When source names are provided, stamps _contributingPracticeName (last
-    writer) and _contributingPracticeNames (all contributors, in merge order)
-    on each element for provenance tracking.
+    Same-named records merge recursively (merge.md §5.1) so that a practice
+    redeclaring an inherited element adds to its states, checklists and views
+    rather than replacing them wholesale.
+
+    When source names are provided and `stamp_contributors` is set, stamps
+    _contributingPracticeName (last writer) and _contributingPracticeNames (all
+    contributors, in merge order) on each element. Nested parts are merged with
+    it unset — provenance belongs on the element, not on every checklist item.
     """
     merged = OrderedDict()
     for item in (base_list or []):
         if "name" in item:
             entry = copy.deepcopy(item)
-            if base_source is not None and "_contributingPracticeName" not in entry:
+            if stamp_contributors and base_source is not None \
+                    and "_contributingPracticeName" not in entry:
                 _stamp_contributor(entry, base_source)
+            # No layer tracking here: base items are already-accumulated
+            # elements carrying the record of who actually declared them.
+            # Re-stamping with the previous layer's name would credit a
+            # declaration to a document that never made one.
             merged[item["name"]] = entry
     for item in (overlay_list or []):
         if "name" in item:
             if item["name"] in merged:
                 existing = merged[item["name"]]
-                combined = copy.deepcopy(existing)
-                prior = existing.get("_contributingPracticeNames") or []
-                combined.update(copy.deepcopy(item))
-                if prior:
-                    combined["_contributingPracticeNames"] = list(prior)
-                _stamp_contributor(combined, overlay_source)
+                combined = merge_element(existing, item, overlay_source, tracking)
+                if stamp_contributors:
+                    _stamp_contributor(combined, overlay_source)
+                _track_layer(combined, item, overlay_source, tracking)
                 merged[item["name"]] = combined
             else:
                 entry = copy.deepcopy(item)
-                _stamp_contributor(entry, overlay_source)
+                if stamp_contributors:
+                    _stamp_contributor(entry, overlay_source)
+                _track_subtree(entry, overlay_source, tracking)
                 merged[item["name"]] = entry
     return list(merged.values())
 
@@ -262,6 +373,136 @@ def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_sour
     return list(merged.values())
 
 
+def _stage_key(stage):
+    """Composite key for an orchestration stage (merge.md §6.15a).
+
+    Keyed on placement, not on pattern name alone: one pattern may legitimately
+    appear twice in an orchestration — nested inside a plan and also available
+    on demand — and keying on the name would collapse the two into one.
+    """
+    relative = stage.get("relativeTo") or {}
+    return "::".join([
+        stage.get("patternName", ""),
+        stage.get("relationship", ""),
+        relative.get("patternName", ""),
+    ])
+
+
+def _merge_narrative_contexts(base_list, overlay_list):
+    """Merge narrativeContexts by the composite key narrativeElementName::seq."""
+    merged = OrderedDict()
+    for entry in (base_list or []):
+        merged[f"{entry.get('narrativeElementName', '')}::{entry.get('seq', '')}"] = \
+            copy.deepcopy(entry)
+    for entry in (overlay_list or []):
+        key = f"{entry.get('narrativeElementName', '')}::{entry.get('seq', '')}"
+        if key in merged:
+            merged[key] = merge_element(merged[key], entry)
+        else:
+            merged[key] = copy.deepcopy(entry)
+    return list(merged.values())
+
+
+def _merge_stage(base, overlay):
+    """Merge two orchestration stages sharing a composite key (merge.md §6.15a)."""
+    combined = copy.deepcopy(base)
+    for key, value in overlay.items():
+        if key in ("entryCriteria", "exitCriteria"):
+            # Placement criteria are first-writer-wins: the author who put the
+            # stage here owns the terms on which it is entered and left.
+            if not combined.get(key):
+                combined[key] = copy.deepcopy(value)
+        elif key == "narrativeContexts":
+            combined[key] = _merge_narrative_contexts(combined.get(key), value)
+        else:
+            # seq, relationship, recurrence, relativeTo, trigger: each describes
+            # placement rather than content, and a stage merged halfway would
+            # describe a shape neither author intended.
+            combined[key] = copy.deepcopy(value)
+    return combined
+
+
+def merge_pattern_orchestrations(base_list, overlay_list, base_source=None,
+                                 overlay_source=None):
+    """Merge PatternOrchestration lists per merge.md §6.15a.
+
+    Orchestrations merge by canonical name so a practice can refine one it
+    inherits — unlike a PatternGroup, which merges by name as a way of
+    collecting contributions from many authors. Two unrelated practices naming
+    an orchestration the same thing is a collision, not a contribution.
+    """
+    merged = OrderedDict()
+    for item in (base_list or []):
+        if "name" in item:
+            entry = copy.deepcopy(item)
+            if base_source is not None and "_contributingPracticeName" not in entry:
+                _stamp_contributor(entry, base_source)
+            merged[item["name"]] = entry
+    for item in (overlay_list or []):
+        if "name" not in item:
+            continue
+        if item["name"] not in merged:
+            entry = copy.deepcopy(item)
+            _stamp_contributor(entry, overlay_source)
+            merged[item["name"]] = entry
+            continue
+
+        existing = merged[item["name"]]
+        stages = OrderedDict()
+        for stage in existing.get("stages", []):
+            stages[_stage_key(stage)] = copy.deepcopy(stage)
+        for stage in (item.get("stages") or []):
+            key = _stage_key(stage)
+            stages[key] = _merge_stage(stages[key], stage) if key in stages \
+                else copy.deepcopy(stage)
+
+        overlay_copy = {k: v for k, v in item.items()
+                        if k not in ("stages", "narrativeTypeName")}
+        combined = merge_element(existing, overlay_copy, overlay_source)
+        if not combined.get("narrativeTypeName") and item.get("narrativeTypeName"):
+            combined["narrativeTypeName"] = item["narrativeTypeName"]
+        # seq is unique only among sequential stages, so this is not a total
+        # order; a stable sort leaves stages that share a seq in merge order.
+        combined["stages"] = sorted(stages.values(), key=lambda s: s.get("seq", 0))
+        _stamp_contributor(combined, overlay_source)
+        merged[item["name"]] = combined
+    return list(merged.values())
+
+
+def scan_tracking_needs(documents):
+    """Report which post-merge passes a composition actually needs.
+
+    `specificityName` and `suppressed` sit on PracticeElement, so they reach
+    every element and every part of one. Tracking them unconditionally would
+    stamp provenance onto every checklist item in the corpus to serve two
+    constructs no loaded document may use, so the merge asks first.
+
+    `documents` is an iterable of (name, data) pairs.
+    """
+    needs = {"specificity": False, "suppression": False}
+
+    def walk(node):
+        if needs["specificity"] and needs["suppression"]:
+            return
+        if isinstance(node, dict):
+            name = node.get("specificityName")
+            if isinstance(name, str) and name.strip():
+                needs["specificity"] = True
+            if node.get("suppressed") is True:
+                needs["suppression"] = True
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    for _name, data in documents:
+        walk(data)
+        if needs["specificity"] and needs["suppression"]:
+            break
+    return needs
+
+
 def finalize_variants(effective):
     """Post-merge variant aggregation per merge.md §7.2a (alphas) and §7.2b (work products).
 
@@ -282,6 +523,185 @@ def finalize_variants(effective):
                 variants = target.setdefault("variants", [])
                 if not any(v.get("name") == item["name"] for v in variants):
                     variants.append(copy.deepcopy(item))
+
+
+def _visit_elements(container, fn, path=""):
+    """Call `fn(element, path)` for every object inside the merged element tree."""
+    if isinstance(container, dict):
+        for key, value in container.items():
+            _visit_elements(value, fn, f"{path}/{key}" if path else key)
+    elif isinstance(container, list):
+        for item in container:
+            if isinstance(item, dict):
+                name = item.get("name", "")
+                item_path = f"{path}/{name}" if name else path
+                fn(item, item_path)
+                _visit_elements(item, fn, item_path)
+            else:
+                _visit_elements(item, fn, path)
+
+
+def finalize_specificity(effective, layer_order):
+    """Specificity chain accumulation, merge.md §7.2e.
+
+    Writes the accumulated `specificity` chain most specific first — reverse
+    dependency order, so a layer's own contribution precedes those of the
+    layers it depends on. `layer_order` is the composition's deterministic
+    dependency order, which already carries the topological-then-name tie-break
+    that keeps the chain independent of the order documents were loaded in.
+
+    An authored `specificity` is discarded rather than merged: the chain
+    depends on which practices are loaded, and a source document cannot know
+    that.
+    """
+    position = {name: i for i, name in enumerate(layer_order)}
+    fallback = len(layer_order)
+
+    def apply(element, _path):
+        contributions = element.pop("_specificityContributions", None)
+        element.pop("specificity", None)
+        if not contributions:
+            return
+        ordered = sorted(
+            contributions,
+            key=lambda c: -position.get(c["layer"], fallback),
+        )
+        chain = []
+        for contribution in ordered:
+            value = contribution["specificityName"]
+            if value not in chain:
+                chain.append(value)
+        if chain:
+            element["specificity"] = chain
+
+    for key in MERGEABLE_ARRAYS:
+        if key in effective:
+            _visit_elements({key: effective[key]}, apply)
+
+
+def finalize_suppression(effective, layer_order):
+    """Suppression resolution, merge.md §7.2f.
+
+    Removes elements carrying `suppressed: true`. Runs after every layer has
+    overlaid, so a suppression declared in a dependent practice reaches an
+    element contributed by the practice it depends on.
+
+    A layer that redeclares the element without suppressing it requires it; the
+    layer that introduced the element does not, or suppressing anything
+    inherited would be impossible. Precedence then decides, earliest layer
+    winning, and the outcome is recorded rather than applied silently.
+
+    References into a removed element are reported, not repaired: per
+    composition.md §4.9.2 they are an error in the composed result, and
+    suppressing an element means checking what pointed at it.
+
+    Returns a report dict with `removed`, `overridden` and `danglingReferences`.
+    """
+    position = {name: i for i, name in enumerate(layer_order)}
+    fallback = len(layer_order)
+    removed = []
+    overridden = []
+
+    def rank(layer):
+        return position.get(layer, fallback)
+
+    def decide(element, path):
+        """Return True when the element should be dropped from the composition."""
+        suppressors = element.get("_suppressedByLayers") or []
+        if not suppressors:
+            return False
+        layers = element.get("_layers") or []
+        requirers = [l for l in layers[1:] if l not in suppressors]
+        winning_suppressor = min(suppressors, key=rank)
+        record = {
+            "path": path,
+            "name": element.get("name", ""),
+            "suppressedBy": winning_suppressor,
+        }
+        if not requirers:
+            removed.append(record)
+            return True
+        winning_requirer = min(requirers, key=rank)
+        if rank(winning_requirer) < rank(winning_suppressor):
+            element.pop("suppressed", None)
+            element["_suppressionResolution"] = {
+                "outcome": "kept",
+                "requiredBy": winning_requirer,
+                "suppressedBy": winning_suppressor,
+            }
+            overridden.append({**record, "requiredBy": winning_requirer})
+            return False
+        record["overrodeRequirementFrom"] = winning_requirer
+        removed.append(record)
+        return True
+
+    def prune(container, path=""):
+        if isinstance(container, dict):
+            for key, value in container.items():
+                prune(value, f"{path}/{key}" if path else key)
+        elif isinstance(container, list):
+            kept = []
+            for item in container:
+                if isinstance(item, dict):
+                    name = item.get("name", "")
+                    item_path = f"{path}/{name}" if name else path
+                    if decide(item, item_path):
+                        continue
+                    prune(item, item_path)
+                kept.append(item)
+            container[:] = kept
+
+    for key in MERGEABLE_ARRAYS:
+        if key in effective:
+            prune(effective[key], key)
+
+    dangling = _find_dangling_references(effective, removed)
+    return {"removed": removed, "overridden": overridden, "danglingReferences": dangling}
+
+
+def _find_dangling_references(effective, removed):
+    """Report symbolic references left pointing at a suppressed element."""
+    targets = {entry["name"] for entry in removed if entry.get("name")}
+    if not targets:
+        return []
+    findings = []
+
+    def scan(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "name":
+                    continue
+                if isinstance(value, str) and value in targets:
+                    findings.append({"path": path, "property": key, "target": value})
+                else:
+                    scan(value, f"{path}/{key}" if path else key)
+        elif isinstance(node, list):
+            for item in node:
+                if isinstance(item, str) and item in targets:
+                    findings.append({"path": path, "property": "", "target": item})
+                else:
+                    name = item.get("name") if isinstance(item, dict) else None
+                    scan(item, f"{path}/{name}" if name else path)
+
+    for key in MERGEABLE_ARRAYS:
+        if key in effective:
+            scan(effective[key], key)
+    return findings
+
+
+def strip_merge_tracking(effective):
+    """Remove the bookkeeping annotations the merge passes leave behind."""
+    def clear(node):
+        if isinstance(node, dict):
+            for key in TRACKING_KEYS:
+                node.pop(key, None)
+            for value in node.values():
+                clear(value)
+        elif isinstance(node, list):
+            for item in node:
+                clear(item)
+
+    clear(effective)
 
 
 def load_json_from_keleo(keleo_path, document_name=None, document_type=None):

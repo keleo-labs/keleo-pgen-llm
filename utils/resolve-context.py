@@ -51,11 +51,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (
     detect_kind,
+    finalize_specificity,
+    finalize_suppression,
     finalize_variants,
     load_all_from_keleo,
     load_json,
     merge_by_name,
     merge_pattern_groups,
+    merge_pattern_orchestrations,
+    scan_tracking_needs,
+    strip_merge_tracking,
     version_sort_key,
     MERGEABLE_ARRAYS,
 )
@@ -151,28 +156,55 @@ def classify_documents(documents):
     return tiers
 
 
-def topo_sort_baselines(baselines):
-    """Topologically sort baselines by baselinePracticeNames (root-first, leaf-last)."""
-    by_name = {name: data for name, data in baselines}
+def _topo_sort(entries, dependency_names):
+    """Topologically sort (name, data) entries root-first, leaf-last.
+
+    Entries that no dependency relates are visited in name order, so layers
+    that are incomparable in the dependency graph still come out in a fixed
+    sequence. Merge precedence and the specificity chain both read this order,
+    and either would otherwise depend on which path the documents arrived by.
+    """
+    by_name = {name: data for name, data in entries}
     sorted_names = []
     resolved = set()
+    visiting = set()
 
     def resolve(name):
-        if name in resolved or name not in by_name:
+        if name in resolved or name in visiting or name not in by_name:
             return
-        data = by_name[name]
-        for dep_name in data.get("baselinePracticeNames", []):
+        visiting.add(name)
+        for dep_name in sorted(dependency_names(by_name[name])):
             resolve(dep_name)
-        singular = data.get("baselinePracticeName")
-        if singular and singular not in resolved and singular in by_name:
-            resolve(singular)
+        visiting.discard(name)
         resolved.add(name)
         sorted_names.append(name)
 
-    for name, _ in baselines:
+    for name in sorted(by_name):
         resolve(name)
 
     return [(name, by_name[name]) for name in sorted_names]
+
+
+def topo_sort_baselines(baselines):
+    """Topologically sort baselines by baselinePracticeNames (root-first, leaf-last)."""
+    def dependencies(data):
+        names = list(data.get("baselinePracticeNames", []))
+        singular = data.get("baselinePracticeName")
+        if singular and singular not in names:
+            names.append(singular)
+        return names
+
+    return _topo_sort(baselines, dependencies)
+
+
+def topo_sort_practices(practices):
+    """Topologically sort practices by practiceDependencyNames (dependencies first).
+
+    A practice must overlay after everything it depends on, or it cannot refine
+    what it inherits. Resolution order previously stood in for this, which made
+    the merge depend on how the practices were discovered.
+    """
+    return _topo_sort(practices, lambda data: list(data.get("practiceDependencyNames", [])))
 
 
 def _load_discover_module():
@@ -313,7 +345,7 @@ def collect_practice_baselines(practices, baselines, dd, index):
     return result
 
 
-def merge_tier(accumulated, entries):
+def merge_tier(accumulated, entries, tracking=None):
     """Merge a list of (name, data) entries onto accumulated using annotated merge."""
     for source_name, data in entries:
         for key in MERGEABLE_ARRAYS:
@@ -325,9 +357,13 @@ def merge_tier(accumulated, entries):
                     accumulated[key] = merge_pattern_groups(
                         acc_items, items, acc_source, source_name
                     )
+                elif key == "patternOrchestrations":
+                    accumulated[key] = merge_pattern_orchestrations(
+                        acc_items, items, acc_source, source_name
+                    )
                 else:
                     accumulated[key] = merge_by_name(
-                        acc_items, items, acc_source, source_name
+                        acc_items, items, acc_source, source_name, tracking=tracking
                     )
         accumulated["_merge_source"] = source_name
     return accumulated
@@ -472,27 +508,34 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
 
     if tiers["baselines"]:
         tiers["baselines"] = topo_sort_baselines(tiers["baselines"])
+    if tiers["practices"]:
+        tiers["practices"] = topo_sort_practices(tiers["practices"])
+
+    all_docs = tiers["baselines"] + tiers["practices"] + tiers["methods"]
+    tracking = scan_tracking_needs(all_docs)
 
     effective = {}
     merge_order = []
 
-    if tiers["baselines"]:
-        effective = merge_tier(effective, tiers["baselines"])
-        merge_order.extend(name for name, _ in tiers["baselines"])
-
-    if tiers["practices"]:
-        effective = merge_tier(effective, tiers["practices"])
-        merge_order.extend(name for name, _ in tiers["practices"])
-
-    if tiers["methods"]:
-        effective = merge_tier(effective, tiers["methods"])
-        merge_order.extend(name for name, _ in tiers["methods"])
+    for tier_key in ("baselines", "practices", "methods"):
+        if tiers[tier_key]:
+            effective = merge_tier(effective, tiers[tier_key], tracking)
+            merge_order.extend(name for name, _ in tiers[tier_key])
 
     effective.pop("_merge_source", None)
 
     finalize_variants(effective)
 
-    all_docs = tiers["baselines"] + tiers["practices"] + tiers["methods"]
+    # merge_order is the composition's dependency order, which is what both
+    # post-merge passes read: the specificity chain is its reverse, and
+    # suppression precedence is the order itself (merge.md §7.2e, §7.2f).
+    suppression = None
+    if tracking["specificity"]:
+        finalize_specificity(effective, merge_order)
+    if tracking["suppression"]:
+        suppression = finalize_suppression(effective, merge_order)
+    strip_merge_tracking(effective)
+
     aliases = collect_aliases(all_docs)
     effective = apply_alias_context(effective, aliases)
     if aliases:
@@ -555,6 +598,31 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
     }
 
     warnings = []
+    if suppression and (suppression["removed"] or suppression["overridden"]):
+        report["suppression"] = suppression
+        if suppression["removed"]:
+            names = ", ".join(
+                f"{e['path']} (suppressed by {e['suppressedBy']})"
+                for e in suppression["removed"]
+            )
+            warnings.append(f"Elements removed by suppression: {names}.")
+        for entry in suppression["overridden"]:
+            warnings.append(
+                f"'{entry['path']}' stayed in the composition: {entry['requiredBy']} "
+                f"requires it and outranks {entry['suppressedBy']} by declaration "
+                "precedence."
+            )
+        if suppression["danglingReferences"]:
+            detail = ", ".join(
+                f"{d['path']}.{d['property']} → {d['target']}" if d["property"]
+                else f"{d['path']} → {d['target']}"
+                for d in suppression["danglingReferences"]
+            )
+            warnings.append(
+                "References left pointing at a suppressed element: "
+                f"{detail}. Suppressing an element means checking what pointed at it."
+            )
+
     collisions = tiers.get("collisions", [])
     if collisions:
         report["nameCollisions"] = collisions
@@ -599,6 +667,7 @@ OUTPUT_SCHEMA = {
         "assets": "array — asset definitions",
         "workProducts": "array — practice work products with levels of detail",
         "patterns": "array — practice lifecycle patterns",
+        "patternOrchestrations": "array — orchestrations sequencing whole patterns; stages merged by patternName::relationship::relativeTo.patternName and sorted by seq",
         "personas": "array — personas (name, description, aliases[], competencies[])",
         "personaGroups": "array — persona groups (name, description, personaNames[])",
         "workProductInstances": "array — curated work product instances",
@@ -619,6 +688,10 @@ OUTPUT_SCHEMA = {
                                       "Read this, not the scalar, when deciding practiceDependencyNames: an element "
                                       "declared by two practices keeps only the last in the scalar.",
         "_domainAlias": "string on elements with aliases — the domain-specific name",
+        "specificity": "array on redeclared elements — the accumulated specificity chain, most specific "
+                       "first. Merge output, recomputed per composition; an authored value is discarded.",
+        "_suppressionResolution": "object on an element whose suppression was overridden — "
+                                  "{outcome, requiredBy, suppressedBy}, naming the document that won.",
     },
 }
 
