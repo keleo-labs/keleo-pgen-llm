@@ -129,6 +129,92 @@ def assess(path, schema, resolve=True):
         return None, False
 
 
+def _counts_by_category(issues):
+    counts = {}
+    for issue in issues:
+        category = issue.get("category", "?")
+        counts[category] = counts.get(category, 0) + 1
+    return counts
+
+
+def compare_scans(before_path, results, summary):
+    """Compare this scan against an earlier --json report.
+
+    The question a change to the generator or the resolver has to answer is
+    not "how many findings are there" but "did I introduce any". Comparing by
+    document and category answers it: a total that happens to match can still
+    hide one defect traded for another.
+    """
+    try:
+        with open(before_path, encoding="utf-8") as fh:
+            before = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        return {"error": f"could not read {before_path}: {exc}", "regressed": True}
+
+    old = {r["file"]: r for r in before.get("results", [])}
+    new = {r["file"]: r for r in results}
+
+    changed, gained, resolved = [], [], []
+    for name in sorted(set(old) | set(new)):
+        old_counts = _counts_by_category(old.get(name, {}).get("issues", []))
+        new_counts = _counts_by_category(new.get(name, {}).get("issues", []))
+        if old_counts == new_counts:
+            continue
+        entry = {
+            "file": name,
+            "old": sum(old_counts.values()),
+            "new": sum(new_counts.values()),
+            "categories": {
+                category: {"old": old_counts.get(category, 0),
+                           "new": new_counts.get(category, 0)}
+                for category in sorted(set(old_counts) | set(new_counts))
+                if old_counts.get(category, 0) != new_counts.get(category, 0)
+            },
+        }
+        changed.append(entry)
+        (gained if entry["new"] > entry["old"] else resolved).append(name)
+
+    # Documents only one side scanned are reported rather than counted as a
+    # regression: the usual cause is a different --dir, not a new defect.
+    only_before = sorted(set(old) - set(new))
+    only_after = sorted(set(new) - set(old))
+
+    return {
+        "before": before.get("summary", {}),
+        "after": summary,
+        "changed": changed,
+        "documentsThatGained": gained,
+        "documentsThatImproved": resolved,
+        "onlyInBefore": only_before,
+        "onlyInAfter": only_after,
+        "regressed": bool(gained),
+    }
+
+
+def print_comparison(delta):
+    if delta.get("error"):
+        print(delta["error"], file=sys.stderr)
+        return
+    before, after = delta["before"], delta["after"]
+    print(f"before: {before.get('totalFindings', '?')} finding(s) over "
+          f"{before.get('documentsWithFindings', '?')} document(s)")
+    print(f"after:  {after.get('totalFindings', '?')} finding(s) over "
+          f"{after.get('documentsWithFindings', '?')} document(s)")
+    if not delta["changed"]:
+        print("\nno document changed, in any category")
+        return
+    print()
+    for entry in delta["changed"]:
+        marker = "WORSE" if entry["new"] > entry["old"] else "better"
+        print(f"  [{marker}] {entry['file']}: {entry['old']} → {entry['new']}")
+        for category, counts in entry["categories"].items():
+            print(f"      {category}: {counts['old']} → {counts['new']}")
+    for name in delta["onlyInBefore"]:
+        print(f"  [absent] {name} was scanned before and not now")
+    for name in delta["onlyInAfter"]:
+        print(f"  [new]    {name} was not scanned before")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Scan every authored document for an issue category",
@@ -152,6 +238,11 @@ def main():
                              "baseline could not be fully resolved. Expect false positives: "
                              "every reference into an unloaded baseline reads as dangling")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--compare", metavar="BEFORE.json",
+                        help="Compare this scan against an earlier --json report and "
+                             "report only what changed. Exits 1 if any document gained "
+                             "findings, so a change can be shown not to have regressed "
+                             "the corpus")
     args = parser.parse_args()
 
     root = get_project_root()
@@ -199,6 +290,14 @@ def main():
         "unreadable": unreadable,
         "crossRefSuppressedFor": incomplete_context,
     }
+
+    if args.compare:
+        delta = compare_scans(args.compare, results, summary)
+        if args.json:
+            print(json.dumps(delta, indent=2))
+        else:
+            print_comparison(delta)
+        sys.exit(1 if delta["regressed"] else 0)
 
     if args.json:
         print(json.dumps({"summary": summary, "results": results}, indent=2))
