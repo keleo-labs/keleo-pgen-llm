@@ -371,12 +371,23 @@ Total: [X competencies]
    - Note explicit frameworks mentioned (STAR, Agile ceremonies, etc.)
 
 2. **Identify 3-5 Narrative Types**
-   
-   **Universal Frameworks (always consider):**
-   - **STAR**: Situation, Task, Action, Result (tactical)
-   - **Hero's Journey**: Ordinary World, Call to Adventure, Ordeal, Return (transformation)
-   - **Three-Act / StoryBrand**: Hero+Problem, Guide+Plan, Call to Action+Success (solution positioning)
-   - **Micro-Narratives (ABT)**: And (context), But (conflict), Therefore (resolution) (daily updates)
+
+   **Universal Frameworks (always consider). Use the name exactly as written —
+   it is the canonical name, and a baseline that invents a spelling of it
+   strands every practice that carries a narrative across from another
+   baseline:**
+   - **`The STAR Format`**: Situation, Task, Action, Result (tactical)
+   - **`The Hero's Journey`**: The Ordinary World, The Call to Adventure, The Ordeal, The Return (transformation)
+   - **`The Three-Act Structure & StoryBrand`**: Act I: The Hero and the Problem, Act II: The Guide and the Plan, Act III: Call to Action and Success (solution positioning)
+   - **`Micro-Narratives (ABT)`**: And (context), But (conflict), Therefore (resolution) (daily updates)
+   - **`Essay Narrative`**: Introduction, Defining Key Concepts, Presenting Evidence, Conclusion (explanatory)
+
+   `references/narrative-type-canonical-names.json` is the authority, and
+   records which near-identical names are deliberately *not* the same type.
+   A framework your domain genuinely decomposes differently is a new type
+   with a new name, not a respelling of one of these — say so in its
+   description, because a reader comparing two baselines cannot otherwise
+   tell a considered variant from a careless one.
    
    **Domain-Specific Frameworks (if source suggests):**
    - Example: Partner Ecosystem Journey (Discovery, Alignment, Collaboration, Maturity)

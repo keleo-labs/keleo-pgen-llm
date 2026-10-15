@@ -1,0 +1,63 @@
+[
+  {
+    "from": "The STAR Format",
+    "to": "The STAR Format",
+    "kind": "narrativeType",
+    "note": "Identity pin. Canonical: 4 baselines carry it. Protects the long form from the shorter renames below."
+  },
+  {
+    "from": "STAR Format",
+    "to": "The STAR Format",
+    "kind": "narrativeType",
+    "note": "Same four elements (Situation, Task, Action, Result)."
+  },
+  {
+    "from": "STAR",
+    "to": "The STAR Format",
+    "kind": "narrativeType",
+    "note": "Same four elements."
+  },
+  {
+    "from": "Micro-Narratives (ABT)",
+    "to": "Micro-Narratives (ABT)",
+    "kind": "narrativeType",
+    "note": "Identity pin. Canonical: 3 baselines carry it."
+  },
+  {
+    "from": "ABT Micro-Narratives",
+    "to": "Micro-Narratives (ABT)",
+    "kind": "narrativeType",
+    "note": "Same three elements (And, But, Therefore)."
+  },
+  {
+    "from": "The Three-Act Structure & StoryBrand",
+    "to": "The Three-Act Structure & StoryBrand",
+    "kind": "narrativeType",
+    "note": "Identity pin. Canonical: carried by the Platform Adoption kernel."
+  },
+  {
+    "from": "The Three-Act Structure and StoryBrand",
+    "to": "The Three-Act Structure & StoryBrand",
+    "kind": "narrativeType",
+    "note": "Same three elements. A spelling difference, nothing more."
+  },
+
+  {
+    "from": "Essay",
+    "to": "Essay",
+    "kind": "narrativeType",
+    "note": "NOT a spelling of 'Essay Narrative'. Three elements (Introduction, Body, Conclusion) against four (Introduction, Defining Key Concepts, Presenting Evidence, Conclusion). Folding them needs a mapping for Body, which has no counterpart — a modelling decision, not a rename. 463 references across 20 documents would move with it."
+  },
+  {
+    "from": "Hero's Journey",
+    "to": "Hero's Journey",
+    "kind": "narrativeType",
+    "note": "NOT a spelling of 'The Hero's Journey'. Five elements against four: Challenges & Trials and Transformation have no single counterpart in The Ordeal. Renaming alone would leave every narrativeElementName dangling."
+  },
+  {
+    "from": "Three-Act Structure",
+    "to": "Three-Act Structure",
+    "kind": "narrativeType",
+    "note": "NOT a spelling of 'The Three-Act Structure & StoryBrand'. Four unprefixed elements against three 'Act I/II/III' ones, splitting the third act in two. Same framework, different decomposition."
+  }
+]
