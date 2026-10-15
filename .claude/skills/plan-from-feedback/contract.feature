@@ -19,6 +19,25 @@ Feature: Plan from Feedback — keleo-pgen-llm
     And the issue body opens with the register row number
     And the Issue URL and Issue State are written to columns U and V
 
+  Scenario: Published issue orients a reader who does not know the component
+    Given a register row whose description opens on a filename or an element name
+    When the issue is drafted
+    Then the body opens by saying what the component is and what job it does
+    And every term of art it uses is introduced in plain words or deferred to the detail
+    And the paths, symbols and specification references appear below the plain English
+
+  Scenario: Orientation is rewritten rather than redacted
+    Given a register row that orients its reader by naming the practice
+    When the issue is drafted for a public tracker
+    Then the opening paragraph is written fresh from the component's role
+    And it is not produced by removing the practice name from the row's opening
+
+  Scenario: Enhancement published with its value, not its design
+    Given a register row of type Enhancement
+    When the issue is drafted
+    Then the body states what cannot be done today and what the change is worth
+    And open design questions are handed to triage rather than settled in the body
+
   Scenario: Practice content is never published
     Given a register row reports a defect in a practice, method or baseline document
     When the publish step runs

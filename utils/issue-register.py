@@ -142,6 +142,11 @@ VALID_ELEMENT_TYPES = [
 SUMMARY_MAX = 120
 DUPLICATE_THRESHOLD = 0.72
 
+# A description shorter than this cannot carry the orientation a triager needs on top
+# of the defect itself — see feedback-foundation/drafting.md. Advisory only: a genuine
+# one-line defect is allowed to be one line.
+DESCRIPTION_MIN = 180
+
 
 # --- gws plumbing ---
 
@@ -272,8 +277,13 @@ def validate_drafts(drafts, default_email=None):
             warnings.append(f"{label}: summary is {len(summary)} chars (over {SUMMARY_MAX}); "
                             "move detail into description")
 
-        if not (draft.get("description") or "").strip():
+        description = (draft.get("description") or "").strip()
+        if not description:
             errors.append(f"{label}: description is required")
+        elif len(description) < DESCRIPTION_MIN:
+            warnings.append(f"{label}: description is {len(description)} chars; check it says what "
+                            "the element is for and why the defect matters, not only what is wrong "
+                            "(feedback-foundation/drafting.md)")
 
         if not (draft.get("email") or default_email or "").strip():
             errors.append(f"{label}: email is required (set it on the issue, pass --email, "
