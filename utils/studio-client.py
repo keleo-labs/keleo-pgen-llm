@@ -602,7 +602,8 @@ def cmd_check(name=None, as_json=False, deep=False, local_only=False):
         # without a version bump still reads as up to date. Only --deep can
         # tell the difference, and only where both sides exist.
         if deep and status == "up-to-date":
-            comparison = _compare_bundle_content(doc_name, local["path"])
+            comparison = _compare_bundle_content(
+                doc_name, local["path"], slug=remote.get("slug"))
             if comparison["error"]:
                 entry["contentCheckError"] = comparison["error"]
             elif not comparison["match"]:
@@ -762,16 +763,21 @@ def cmd_check_embedded(doc_name, max_age=DEFAULT_MAX_AGE, as_json=False):
     return results
 
 
-def _fetch_bundle(name, output_path, quiet=False):
+def _fetch_bundle(name, output_path, quiet=False, slug=None):
     """Download a remote .keleo bundle to output_path.
 
     Returns (path, None) on success or (None, reason) on failure. Unlike
     cmd_pull this never exits, so callers that treat a download failure as
     non-fatal (--deep) can carry on with the remaining bundles.
+
+    Pass `slug` wherever the caller already knows which published package it
+    means. Display names repeat across versions, so addressing by name asks
+    the service to choose, and it may not choose the one the caller picked.
     """
     url, token = _get_credentials()
 
-    data, err = _api_get(url, token, "download", {"name": name})
+    data, err = _api_get(url, token, "download",
+                         {"slug": slug} if slug else {"name": name})
     if err == "auth_expired":
         _handle_auth_error()
     if err:
@@ -842,16 +848,23 @@ def _document_hashes(keleo_path):
     return hashes
 
 
-def _compare_bundle_content(name, local_path):
+def _compare_bundle_content(name, local_path, slug=None):
     """Compare local and remote bundle document content.
 
     Returns a dict with 'match' (bool or None if undetermined), the differing
     document names, and any error encountered.
+
+    The caller has already chosen which remote package it means — the highest
+    version among those sharing a display name — so it passes that package's
+    slug. Downloading by display name instead would let the service return a
+    different one, and the comparison would then report a difference between
+    two archives the output never names.
     """
     # The gws CLI refuses an --output path outside its working directory, so
     # the scratch dir has to live under cwd rather than the system temp dir.
     with tempfile.TemporaryDirectory(dir=Path.cwd(), prefix=".keleo-deep-") as tmpdir:
-        remote_path, err = _fetch_bundle(name, Path(tmpdir) / "remote.keleo")
+        remote_path, err = _fetch_bundle(name, Path(tmpdir) / "remote.keleo",
+                                         slug=slug)
         if err:
             return {"match": None, "error": err}
 
@@ -869,12 +882,34 @@ def _compare_bundle_content(name, local_path):
     return {"match": not differing, "differingDocuments": differing, "error": None}
 
 
+def _newest_slug_for(name):
+    """The slug of the highest-versioned cached package with this display name.
+
+    None where the index has not been fetched or carries no such name, in
+    which case the caller falls back to asking by name and the service
+    chooses.
+    """
+    cached = _load_cached_index()
+    best = None
+    for bundle in (cached or {}).get("bundles", []):
+        if bundle.get("name") != name or not bundle.get("slug"):
+            continue
+        if best is None or _parse_semver(bundle.get("version", "")) > \
+                _parse_semver(best.get("version", "")):
+            best = bundle
+    return best.get("slug") if best else None
+
+
 def cmd_pull(name, as_json=False):
     """Download a .keleo bundle from remote into bundles/."""
     slug = _slugify(name)
     output_path = get_project_root() / "bundles" / f"{slug}.keleo"
 
-    output_path, err = _fetch_bundle(name, output_path)
+    # Same ambiguity as the deep comparison: several packages can share a
+    # display name, so pull the one the index would have reported rather than
+    # whichever the service picks.
+    output_path, err = _fetch_bundle(name, output_path,
+                                     slug=_newest_slug_for(name))
     if err:
         print(f"Error: {err}", file=sys.stderr)
         sys.exit(1)
