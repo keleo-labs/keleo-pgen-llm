@@ -326,8 +326,39 @@ def discover_files(directory):
             continue
         if name in ("grading.json", "benchmark.json", "timing.json"):
             continue
+        if _is_proposal_document(f):
+            continue
         files["json_files"].append(str(f))
     return files
+
+
+# A change request and a change set are Practice Language documents, and
+# /update-method writes one into the practice directory it just updated. They
+# are proposals about a practice rather than practices, so grading them against
+# the phase 3 assertions reports a document nobody authored as failing to be
+# something it never claimed to be.
+#
+# Neither carries a `kind`, so they are recognised by their required properties
+# — `changeId` with `operations`, `changeSetId` with `changeRequests`. Matching
+# on the filename instead would miss one written under any other name, and
+# detect_kind reads an unrecognised document as a baseline.
+PROPOSAL_SIGNATURES = (
+    ("changeId", "operations"),
+    ("changeSetId", "changeRequests"),
+)
+
+
+def _is_proposal_document(path):
+    """Is this a change request or change set rather than a practice?"""
+    try:
+        data = load_json(path, exit_on_error=False)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    if data.get("kind") in ("changeRequest", "changeSet"):
+        return True
+    return any(all(key in data for key in sig) for sig in PROPOSAL_SIGNATURES)
 
 
 def auto_discover_baseline(json_files):

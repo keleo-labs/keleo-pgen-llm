@@ -1996,11 +1996,23 @@ def check_outcomes(data, kind, baseline_data=None):
         aname = a.get("name")
         if aname:
             all_alpha_states[aname] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+    # Work products and patterns an outcome may reference come from the whole
+    # effective context, not just this document. `baseline_data` already carries
+    # the merged baseline and declared dependencies by the time this runs.
+    inherited_wp_names = {wp.get("name") for wp in (baseline_data or {}).get("workProducts", []) if wp.get("name")}
+
+    own_pattern_names = set()
     all_pattern_names = set()
     pattern_views_by_pattern = {}
+    for p in (baseline_data or {}).get("patterns", []):
+        pname = p.get("name", "")
+        if pname:
+            all_pattern_names.add(pname)
+            pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
     for p in data.get("patterns", []):
         pname = p.get("name", "")
         if pname:
+            own_pattern_names.add(pname)
             all_pattern_names.add(pname)
             pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
 
@@ -2016,6 +2028,7 @@ def check_outcomes(data, kind, baseline_data=None):
             for p in source.get("patterns", []):
                 pname = p.get("name", "")
                 if pname:
+                    own_pattern_names.add(pname)
                     all_pattern_names.add(pname)
                     pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
 
@@ -2064,6 +2077,7 @@ def check_outcomes(data, kind, baseline_data=None):
                 })
 
             all_wp_names = {wp.get("name") for wp in source.get("workProducts", []) if wp.get("name")}
+            all_wp_names |= inherited_wp_names
             wp_metrics = {}
             for wp in source.get("workProducts", []):
                 wpn = wp.get("name", "")
@@ -2143,7 +2157,9 @@ def check_outcomes(data, kind, baseline_data=None):
                             "autoFixable": False,
                         })
 
-        if all_pattern_names and not has_objective:
+        # Keyed on this document's own patterns: a practice is not expected to
+        # recognise an outcome against a pattern someone else declared.
+        if own_pattern_names and not has_objective:
             issues.append({
                 "severity": "warning",
                 "category": "outcomes",
@@ -3834,7 +3850,15 @@ def check_citation_missing_urls(citations):
     return issues
 
 
-def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
+def run_schema_validation(file_path, schema_path, kind, baseline_path=None,
+                          dependency_paths=None):
+    """Run the schema and integrity validator over one document.
+
+    `dependency_paths` are the practices this document builds on. The validator
+    takes them as trailing positional arguments, and without them every
+    reference into a dependency reads as dangling — which is how this script
+    came to report errors the validator itself does not.
+    """
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
         if baseline_path:
@@ -3847,6 +3871,7 @@ def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
             "python3", "utils/validate-practice-json.py",
             str(file_path), str(baseline_path), str(schema_path),
         ]
+        cmd.extend(str(p) for p in (dependency_paths or []))
 
     try:
         result = subprocess.run(
@@ -4428,7 +4453,12 @@ def _auto_resolve_deps(data, kind, file_path, existing_parents):
 
     Uses discover-dependencies.py's index to resolve baselinePracticeName and
     practiceDependencyNames to filesystem paths, preferring non-keleo sources.
-    Returns (baseline_path_or_None, updated_parent_list).
+    Returns (baseline_path_or_None, updated_parent_list, unresolved).
+
+    `unresolved` names the declared dependencies that could not be pinned to a
+    single file — most often because two copies of the same document sit on
+    disk. Resolution staying silent about those is what makes the resulting
+    dangling-reference errors look real.
     """
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -4458,14 +4488,21 @@ def _auto_resolve_deps(data, kind, file_path, existing_parents):
                 baseline_path = path
 
     parents = list(existing_parents or [])
+    already_given = set(parents)
+    unresolved = []
     for dep_name in data.get("practiceDependencyNames", []):
         result = resolve_name(dep_name, index, prefer_filesystem=True)
         if result["status"] == "found":
             path = result["path"]
             if "::" not in path and path not in parents:
                 parents.append(path)
+            continue
+        # An explicitly passed --parent may already cover this dependency, and
+        # the caller's path is the answer either way.
+        if not already_given:
+            unresolved.append((dep_name, result["status"]))
 
-    return baseline_path, parents
+    return baseline_path, parents, unresolved
 
 
 def main():
@@ -4510,13 +4547,28 @@ def main():
     kind = data.get("kind", "practice")
     name = data.get("name", "<unnamed>")
 
+    unresolved_deps = []
     if kind != "practiceBaseline":
-        resolved_baseline, resolved_parents = _auto_resolve_deps(data, kind, file_path, args.parent)
+        resolved_baseline, resolved_parents, unresolved_deps = _auto_resolve_deps(
+            data, kind, file_path, args.parent)
         if not args.baseline:
             args.baseline = resolved_baseline
         args.parent = resolved_parents
 
     all_issues = []
+
+    for dep_name, status in unresolved_deps:
+        all_issues.append({
+            "severity": "warning",
+            "category": "parent",
+            "path": "practiceDependencyNames",
+            "message": (
+                f"Declared dependency '{dep_name}' could not be resolved ({status}); "
+                f"references into it will report as dangling"
+            ),
+            "suggestion": "Pass the file with --parent",
+            "autoFixable": False,
+        })
 
     counts = count_elements(data, kind)
 
@@ -4607,11 +4659,12 @@ def main():
         bl_pg_names = {pg["name"] for pg in baseline_data.get("personaGroups", []) if pg.get("name")}
         bl_act_names = {a["name"] for a in baseline_data.get("activities", []) if a.get("name")}
         bl_cit_names = {c["name"] for c in baseline_data.get("citations", []) if c.get("name")}
+        bl_pattern_names = {p["name"] for p in baseline_data.get("patterns", []) if p.get("name")}
 
         def _merge_elements(source):
             nonlocal bl_alpha_set, bl_nt_set, bl_comp_names, bl_asp_names
             nonlocal bl_wp_names, bl_persona_names, bl_pg_names, bl_act_names, bl_cit_names
-            nonlocal bl_focus_names
+            nonlocal bl_focus_names, bl_pattern_names
             for focus in source.get("focuses", []):
                 if focus.get("name") and focus["name"] not in bl_focus_names:
                     baseline_data.setdefault("focuses", []).append(focus)
@@ -4652,6 +4705,10 @@ def main():
                 if cit.get("name") and cit["name"] not in bl_cit_names:
                     baseline_data.setdefault("citations", []).append(cit)
                     bl_cit_names.add(cit["name"])
+            for pat in source.get("patterns", []):
+                if pat.get("name") and pat["name"] not in bl_pattern_names:
+                    baseline_data.setdefault("patterns", []).append(pat)
+                    bl_pattern_names.add(pat["name"])
 
         for parent_path in args.parent:
             parent_data, perr = load_json_pair(Path(parent_path))
@@ -4718,6 +4775,7 @@ def main():
         schema_report, schema_err = run_schema_validation(
             file_path, schema_path, kind,
             baseline_path=Path(args.baseline) if args.baseline else None,
+            dependency_paths=args.parent,
         )
         if schema_err:
             all_issues.append({
