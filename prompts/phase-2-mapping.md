@@ -1496,6 +1496,7 @@ For EACH practice, evaluate pattern requirements:
 - Choose narrative type:
   - STAR, Hero's Journey, Three-Act (for user journeys)
   - SDLC, PDCA, Build-Measure-Learn, Design-Build-Run-Optimize, Crawl-Walk-Run (for architectural lifecycles)
+- **Does the lifecycle repeat?** If the source describes a cycle, an iteration, a cadence, or a closing phase that feeds the opening one, declare `loopsBackTo` on the closing view rather than flattening it into a one-way sequence. PDCA and Build-Measure-Learn above *are* cycles; choosing one without a loop edge contradicts the source. See **Cyclical Patterns** in `references/pattern-completeness.md`. Do not invent a loop the source does not describe.
 - Define 3-5 views showing coordinated progression
 
 **3. Pattern quality check:**
@@ -1547,6 +1548,13 @@ Pattern Views: [map Phase 1 views]
       - Seq: [1, 2, 3...]
         Narrative Element Name: [element from chosen NarrativeType]
         Context: [1-2 sentences phase-specific context]
+    Loops Back To: [ONLY on the view where a cycle closes — omit entirely otherwise]
+      Pattern View Name: [an earlier view of this same pattern]
+      Description: [what going round again achieves]
+      Condition: [when the loop is taken rather than exited]
+        Given: [the state of the world that keeps the cycle running]
+        When: [the trigger that closes this pass]
+        Then: [the team re-enters the named view]
   View 2: ...
 ```
 

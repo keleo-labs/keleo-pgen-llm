@@ -12,6 +12,40 @@ A pattern MUST show the complete state progression of every alpha it carries. Wh
 
 Common anti-pattern: Patterns only include alpha states explicitly mentioned in source content, resulting in sparse/incomplete pattern matrices with missing cells.
 
+## Cyclical Patterns
+
+A lifecycle that recurs is declared, not flattened. `semantics/execution-and-patterns.md` §9.2a gives `PatternView.loopsBackTo` for this: an edge from the view where the cycle closes back to the view it returns to.
+
+```json
+{
+  "name": "Adapt",
+  "seq": 4,
+  "alphaStates": [ ],
+  "loopsBackTo": {
+    "patternViewName": "Plan",
+    "description": "Each increment re-plans from what the last one proved.",
+    "condition": {
+      "name": "More increments remain",
+      "given": ["the release objective is not yet met"],
+      "when": ["the increment review completes"],
+      "then": ["the team re-enters planning for the next increment"]
+    }
+  }
+}
+```
+
+**Ask the question whenever the source answers it.** Declare a loop when the source describes the lifecycle as a cycle, an iteration, a cadence, a sprint, or a closing phase that feeds the opening one — including when the pattern's own name says so. Several of the narrative types available for patterns (PDCA, Build-Measure-Learn) *are* cycles, and choosing one of those without a loop edge says the opposite of what the source said. Do not invent a loop the source does not describe: a pattern that runs once needs none.
+
+**What the loop does and does not change:**
+
+- **The work repeats; the maturity does not reset.** A re-entered view's `alphaStates` are the **minimum that must hold on that pass**, not a return to that state. Re-entering "Plan" at `Platform → Identified` does not mean the platform stopped being Available.
+- **Progress never drops.** On re-entering an earlier view the achieved forecast is the highest weight reached on any pass, not the weight of the view being worked.
+- **The final view is still the terminal objective.** A cycle is how the endeavour reaches it; `loopsBackTo.condition` states when the loop is taken rather than exited.
+- **Pruning is suspended inside a loop.** The Sequential View Pruning rule would empty a re-entered view out, hiding what the iteration actually works on. Inside a loop, show what the iteration works on even where the state is unchanged.
+- **It is a temporal edge, not a structural one.** A looping pattern still may not declare a cycle in `background.alphaStates`: a prerequisite cycle is unsatisfiable however many times the work goes round (§9.2a.3).
+
+**Without the edge, the loop reads as a defect.** An alpha returning to an earlier state is flagged as a regression by `check-pattern-prerequisites.py`, and a prerequisite met on the previous lap reads as an inversion. Declaring the loop is what makes those `cyclical` instead — the ordering is then explained by the document rather than by a reader's charity.
+
 ## Four-Pass Pattern Construction
 
 ### Pass 1: Source-Driven Pattern Structure
