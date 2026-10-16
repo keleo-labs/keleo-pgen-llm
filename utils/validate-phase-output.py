@@ -1080,6 +1080,15 @@ def main():
         help="Print a single-line verdict instead of the full JSON check list",
     )
     parser.add_argument(
+        "--check",
+        action="append",
+        metavar="NAME",
+        help=(
+            "Report only these checks; repeatable, prefix match. Without it a "
+            "single check's findings have to be dug out of the full list."
+        ),
+    )
+    parser.add_argument(
         "--against-json",
         metavar="FILE",
         help=(
@@ -1161,6 +1170,10 @@ def main():
                 ),
                 "findings": drift,
             })
+
+    if args.check:
+        wanted = tuple(args.check)
+        checks = [c for c in checks if c["check"].startswith(wanted)]
 
     for c in checks:
         if "pass" in c:
