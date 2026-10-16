@@ -797,8 +797,9 @@ Add patterns array:
         "loopsBackTo": {  // Optional — ONLY on the view where a cycle closes
           "patternViewName": "Earlier view of THIS pattern",
           "description": "What going round again achieves",
-          "condition": {
+          "condition": {  // A Test — BOTH name and description are required
             "name": "More increments remain",
+            "description": "When the loop is taken rather than exited",
             "given": ["the objective is not yet met"],
             "when": ["this pass completes"],
             "then": ["the team re-enters the named view"]

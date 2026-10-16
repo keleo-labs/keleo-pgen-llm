@@ -26,6 +26,7 @@ A lifecycle that recurs is declared, not flattened. `semantics/execution-and-pat
     "description": "Each increment re-plans from what the last one proved.",
     "condition": {
       "name": "More increments remain",
+      "description": "The loop is taken while the release objective is unmet, and exited once it is.",
       "given": ["the release objective is not yet met"],
       "when": ["the increment review completes"],
       "then": ["the team re-enters planning for the next increment"]
@@ -33,6 +34,8 @@ A lifecycle that recurs is declared, not flattened. `semantics/execution-and-pat
   }
 }
 ```
+
+`condition` is a `Test`, so `name` **and** `description` are both required on it. The example in §9.2a omits `description` and will not validate as written.
 
 **Ask the question whenever the source answers it.** Declare a loop when the source describes the lifecycle as a cycle, an iteration, a cadence, a sprint, or a closing phase that feeds the opening one — including when the pattern's own name says so. Several of the narrative types available for patterns (PDCA, Build-Measure-Learn) *are* cycles, and choosing one of those without a loop edge says the opposite of what the source said. Do not invent a loop the source does not describe: a pattern that runs once needs none.
 
