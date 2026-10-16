@@ -133,6 +133,28 @@ A lifecycle that recurs is declared, not flattened. `semantics/execution-and-pat
 | 4    | Optimizing     | Optimized      | [same]              | Automated          |
 ```
 
+### Pass 5: Prerequisite Consistency (REQUIRED)
+
+Alphas are mapped in Step 4 and patterns in Step 8, and nothing between the two checks them against each other. A state may declare `background.alphaStates` — cross-concern conditions that must hold before it is reached — and a pattern view may then assert that state several views before the pattern gets anywhere near them.
+
+**For each alpha state placed in a view**, read that state's `background.alphaStates` and confirm the pattern reaches each prerequisite at that view or an earlier one. Three things count as reaching it:
+
+- the prerequisite state is declared at that view or earlier
+- a **later** state of the same alpha is, since passing it implies the earlier one
+- the prerequisite sits inside a `loopsBackTo` span with the asserting view, so it was met on an earlier lap
+
+The first view is exempt: it states the conditions holding before the pattern begins, so its prerequisites were met outside it.
+
+**Where a prerequisite is not reached in time, resolve down this ladder and record the choice in the mapping guide.** The order matters: the cheap resolutions are at the top and the expensive one is at the bottom, and an alpha change is expensive because it reaches every document that depends on that alpha.
+
+1. **Declare a loop.** If the source describes the lifecycle as recurring, the prerequisite is met on the previous lap. See Cyclical Patterns above.
+2. **Move the state to a later view.** The commonest case: the pattern claimed the state too early.
+3. **Bring the prerequisite alpha's progression earlier.** The dependency is real and the supporting alpha was placed too late.
+4. **Weaken the prerequisite.** Check what the source actually requires. A prerequisite naming a *late* state of another alpha where the source supports an early one is an over-claim, and over-claiming is common — across the corpus, more than half of unmet prerequisites name a late or final state of their alpha.
+5. **Change the alpha.** Only when its state array is genuinely in the wrong order, or its states turn out to be variants rather than stages. Size the blast radius with `check-downstream-impact.py` before doing it, and treat it as its own change rather than a detail of this one.
+
+`check-pattern-prerequisites.py` reports what remains, and names which of these cases it thinks each finding is.
+
 ## Pattern Completeness Matrix
 
 **BAD (Sparse Pattern - Missing Cells):**
@@ -168,6 +190,7 @@ A lifecycle that recurs is declared, not flattened. `semantics/execution-and-pat
    - If 3+ states in any view, subdivide pattern into finer views
    - Identify late-appearing alphas with advanced states
    - Backfill earlier views with progressive states for late alphas
+5b. **Prerequisite consistency (Pass 5):** walk each placed state's `background.alphaStates` against the view order and resolve any shortfall down the ladder
 6. **Validate completeness:**
    - Every alpha the pattern carries appears in its first view AND its final view
    - Alphas the pattern never advances appear in none of its views
@@ -195,6 +218,10 @@ A lifecycle that recurs is declared, not flattened. `semantics/execution-and-pat
   - [ ] If 3+ states detected, pattern views subdivided into finer granularity
   - [ ] All alphas appearing in pattern are present from View 0 OR have clear justification
   - [ ] No alphas suddenly appear in late views with advanced states (backfill complete)
+- [ ] **Prerequisite consistency (Pass 5):**
+  - [ ] Every placed state's `background.alphaStates` are reached at that view or earlier
+  - [ ] A recurring lifecycle declares `loopsBackTo` rather than relying on the reader
+  - [ ] Any shortfall resolved down the ladder, with the choice recorded in the guide
 
 ## Worked Example: Team Topology Evolution Journey
 

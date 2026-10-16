@@ -1563,6 +1563,8 @@ Pattern Views: [map Phase 1 views]
 - Omit alphas with identical state across consecutive views
 - Use seq: 0 for prerequisite/preparation phases
 
+**Prerequisite Consistency (REQUIRED):** before moving on, walk each state you placed in a view against the `background.alphaStates` you gave it in Step 4, and confirm the pattern reaches those prerequisites at that view or earlier. Where it does not, resolve down the ladder in **Pass 5** of `references/pattern-completeness.md` — declare a loop, move the state later, bring the prerequisite forward, weaken an over-claimed prerequisite — and record which you chose and why. Changing the alpha is the last resort, not the first.
+
 ### Step 8.5: Relate the Patterns to Each Other (If Applicable)
 
 **Do not map `patternGroups`. The construct is deprecated** as of schema 2.21.0 and is

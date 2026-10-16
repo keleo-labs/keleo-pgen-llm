@@ -613,54 +613,7 @@ def extract_pattern_views(content):
         pattern_section = content[marker.start():]
 
     views = []
-
-    def _pairs(block):
-        """Extract (alpha, state) pairs from a view body.
-
-        Two conventions are in use. The verbose one lists each pair on its own
-        pair of lines; the compact one puts them on a single semicolon-separated
-        "Alpha States:" line using an arrow. Supporting only the verbose form
-        yields zero pairs for compact guides, which then report every view as
-        missing every alpha.
-        """
-        found = [
-            (a.strip(), s.strip())
-            for a, s in re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
-        ]
-        if found:
-            return found
-
-        # Keyed-brace form, bare or JSON-quoted keys, on one line or many:
-        #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
-        #   - alphaStates: [{"alphaName": "Platform", "stateName": "Ready"}]
-        keyed = re.findall(
-            r"\{\s*\"?alphaName\"?\s*:\s*\"?([^,{}\"]+?)\"?\s*,"
-            r"\s*\"?stateName\"?\s*:\s*\"?([^{}\"]+?)\"?\s*\}",
-            block, re.IGNORECASE,
-        )
-        if keyed:
-            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
-
-        # The label may carry a qualifier ("Alpha States (changed only):") and
-        # may be written as prose or as the schema's camelCase property name.
-        line = re.search(
-            r"(?:Alpha States?|alphaStates)\s*(?:\([^)]*\))?\s*:\s*(.+)", block
-        )
-        if not line:
-            return []
-        raw = line.group(1)
-
-        # Brace-tuple form: [{Alpha Name, State Name}, {Alpha Name, State Name}]
-        braced = re.findall(r"\{\s*([^,{}]+?)\s*,\s*([^{}]+?)\s*\}", raw)
-        if braced:
-            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in braced]
-
-        # Arrow form: Alpha → State; Alpha → State
-        for entry in raw.split(";"):
-            parts = re.split(r"\s*(?:→|->|=>)\s*", entry.strip(), maxsplit=1)
-            if len(parts) == 2 and parts[0] and parts[1]:
-                found.append((parts[0].strip().strip("`"), parts[1].strip().strip("`")))
-        return found
+    _pairs = extract_alpha_state_pairs
 
     # Format 1: **View: Name** (seq: N)
     view_splits = re.split(r"\*\*View:\s*", pattern_section)
@@ -733,6 +686,186 @@ def _heading_blocks(content):
                 end = later.start()
                 break
         yield depth, m.group(2).strip(), content[m.end():end]
+
+
+def extract_alpha_state_pairs(block):
+    """Extract (alpha, state) pairs from a block of guide prose.
+
+    Several conventions are in use, and a parser that knows only one returns
+    nothing for the others — which reads as a guide declaring no states rather
+    than as a parser miss. The verbose form lists each pair over two lines; the
+    compact one puts them on a single "Alpha States:" line with arrows or
+    commas; and the schema-shaped one writes keyed braces.
+
+    Shared by pattern views and by state Background blocks, which use the same
+    conventions for the same thing.
+    """
+    found = [
+        (a.strip(), s.strip())
+        for a, s in re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
+    ]
+    # Same-line variant: "Alpha Name: X, State Name: Y"
+    found += [
+        (a.strip(), s.strip())
+        for a, s in re.findall(r"Alpha Name:\s*([^,\n]+?)\s*,\s*State Name:\s*(.+)", block)
+    ]
+    if found:
+        return found
+
+    # Keyed-brace form, bare or JSON-quoted keys, on one line or many:
+    #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
+    #   - alphaStates: [{"alphaName": "Platform", "stateName": "Ready"}]
+    keyed = re.findall(
+        r"\{\s*\"?alphaName\"?\s*:\s*\"?([^,{}\"]+?)\"?\s*,"
+        r"\s*\"?stateName\"?\s*:\s*\"?([^{}\"]+?)\"?\s*\}",
+        block, re.IGNORECASE,
+    )
+    if keyed:
+        return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
+
+    # The label may carry a qualifier ("Alpha States (changed only):") and
+    # may be written as prose or as the schema's camelCase property name.
+    line = re.search(
+        r"(?:Alpha States?|alphaStates)\s*(?:\([^)]*\))?\s*:\s*(.+)", block
+    )
+    if not line:
+        return []
+    raw = line.group(1)
+
+    # Brace-tuple form: [{Alpha Name, State Name}, {Alpha Name, State Name}]
+    braced = re.findall(r"\{\s*([^,{}]+?)\s*,\s*([^{}]+?)\s*\}", raw)
+    if braced:
+        return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in braced]
+
+    # Arrow form: Alpha → State; Alpha → State
+    for entry in raw.split(";"):
+        parts = re.split(r"\s*(?:→|->|=>)\s*", entry.strip(), maxsplit=1)
+        if len(parts) == 2 and parts[0] and parts[1]:
+            found.append((parts[0].strip().strip("`"), parts[1].strip().strip("`")))
+    return found
+
+
+def _background_block(body):
+    """The text of a state's Background block, or "".
+
+    Taken by indentation rather than by looking for the next bullet: the block
+    nests `Given:` and `Alpha States:` beneath itself, so a terminator matching
+    any following list item ends it on its own first child and the alpha states
+    are never seen.
+    """
+    match = re.search(r"^(\s*)-?\s*\*{0,2}Background\*{0,2}\s*:(.*)$",
+                      body, re.MULTILINE)
+    if not match:
+        return ""
+    indent = len(match.group(1))
+    collected = [match.group(2)]
+    for line in body[match.end():].splitlines():
+        if not line.strip():
+            collected.append(line)
+            continue
+        if len(line) - len(line.lstrip()) <= indent:
+            break
+        collected.append(line)
+    return "\n".join(collected)
+
+
+def extract_state_prerequisites(content):
+    """{(alpha, state): [(alpha, state), ...]} from each state's Background block.
+
+    A state's `background.alphaStates` are the cross-concern conditions that
+    must hold before it is reached. They are authored in the alpha step and the
+    views in the pattern step, and until Pass 5 nothing compared the two — so a
+    view could assert a state several views before the pattern went anywhere
+    near its prerequisites, and the guide would pass.
+    """
+    prereqs = {}
+    anchors = list(ALPHA_ANCHOR_RE.finditer(content))
+    for i, match in enumerate(anchors):
+        alpha = _clean_alpha_name(match.group("h") or match.group("b") or "")
+        if not alpha:
+            continue
+        end = anchors[i + 1].start() if i + 1 < len(anchors) else len(content)
+        block = content[match.end():end]
+
+        states = list(STATE_RE.finditer(block))
+        for j, state_match in enumerate(states):
+            state = state_match.group(1).strip()
+            state_end = states[j + 1].start() if j + 1 < len(states) else len(block)
+            background = _background_block(block[state_match.end():state_end])
+            if not background:
+                continue
+            pairs = extract_alpha_state_pairs(background)
+            if pairs:
+                prereqs[(alpha, state)] = pairs
+    return prereqs
+
+
+def validate_prerequisite_order(content):
+    """Pass 5 — a view may not assert a state the pattern reaches later.
+
+    The same rule `check-pattern-prerequisites.py` applies to generated JSON,
+    applied to the mapping guide instead, so the ordering is settled before
+    Phase 3 spends tokens rendering it. The guide cannot see the effective
+    context, so only prerequisites naming alphas the guide itself declares are
+    judged; the rest wait for the JSON.
+    """
+    checks = []
+    prereqs = extract_state_prerequisites(content)
+    if not prereqs:
+        return checks
+
+    alphas = extract_alphas_and_states(content)
+    failures = []
+    for pattern_name, body in iter_pattern_sections(content):
+        views = extract_pattern_views(body)
+        if len(views) < 2:
+            continue
+        views.sort(key=lambda v: v["seq"])
+
+        # Earliest view declaring each (alpha, state), plus the implication
+        # that a later state of an alpha means the earlier ones were passed.
+        reached = {}
+        for idx, view in enumerate(views):
+            for pair in view["alpha_states"]:
+                reached.setdefault(pair, idx)
+
+        def earliest(alpha, state):
+            order = alphas.get(alpha, [])
+            if state not in order:
+                return reached.get((alpha, state))
+            hits = [reached[(alpha, s)] for s in order[order.index(state):]
+                    if (alpha, s) in reached]
+            return min(hits) if hits else None
+
+        for idx, view in enumerate(views):
+            if idx == 0:
+                continue  # entry view: conditions met before the pattern begins
+            for alpha, state in view["alpha_states"]:
+                for req_alpha, req_state in prereqs.get((alpha, state), []):
+                    if req_alpha not in alphas:
+                        continue  # inherited; resolvable only against the JSON
+                    at = earliest(req_alpha, req_state)
+                    if at is None or at > idx:
+                        failures.append(
+                            f"{pattern_name or 'pattern'} view {view['seq']} "
+                            f"({view['name']}) asserts {alpha}.{state}, which "
+                            f"requires {req_alpha}.{req_state} — "
+                            + (f"reached only at view {views[at]['seq']}"
+                               if at is not None else "never reached")
+                        )
+
+    checks.append({
+        "check": "pattern_prerequisite_order",
+        "description": (
+            "Each view reaches the prerequisites of the states it asserts "
+            "(pattern-completeness.md Pass 5)"
+        ),
+        "expected": 0,
+        "actual": len(failures),
+        "failures": failures[:20],
+        "pass": not failures,
+    })
+    return checks
 
 
 def iter_pattern_sections(content):
@@ -1202,6 +1335,7 @@ def main():
 
     if args.validate_patterns and args.phase == 2:
         checks.extend(validate_pattern_views(content))
+        checks.extend(validate_prerequisite_order(content))
 
     if args.source_manifest:
         combined = "\n".join(
