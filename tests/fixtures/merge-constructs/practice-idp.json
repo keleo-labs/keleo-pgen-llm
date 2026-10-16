@@ -46,6 +46,13 @@
         { "patternName": "Platform Bootstrap", "seq": 1, "relationship": "sequential", "entryCriteria": "Funding approved." },
         { "patternName": "Steady State", "seq": 2, "relationship": "sequential" }
       ]
+    },
+    {
+      "name": "Rollout Endeavour",
+      "description": "A sub-endeavour owned here and embeddable by a host that reaches for it.",
+      "stages": [
+        { "patternName": "Site Rollout", "seq": 1, "relationship": "sequential" }
+      ]
     }
   ]
 }

@@ -61,7 +61,7 @@
         "The JSON does NOT contain activities, workProducts, or patterns arrays with content",
         "These elements belong in extension practices, not baselines",
         "The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0",
-        "No patternOrchestrations are authored either, since a baseline defines no patterns to sequence"
+        "Any patternOrchestrations entry is a shell with an empty stages array, since a baseline defines no patterns to sequence"
       ],
       "line": 724,
       "assess_categories": [

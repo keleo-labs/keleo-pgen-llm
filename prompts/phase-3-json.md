@@ -888,23 +888,38 @@ orchestration says which pattern applies when, and on what terms.
           "when": ["Monitoring or a user reports a severity-one failure"],
           "then": ["The response lifecycle is entered regardless of the current stage"]
         }
+      },
+      {
+        "orchestrationName": "Project Endeavour",
+        "seq": 3,
+        "relationship": "nested",
+        "relativeTo": { "patternName": "Platform Adoption Lifecycle" },
+        "recurrence": "perView"
       }
     ]
   }
 ]
 ```
 
+The last stage **embeds** another orchestration rather than naming a pattern. That places
+the whole sub-endeavour — a programme embedding a project — and keeps the ordering with
+whoever authored it, so a later change there reaches this document without it being
+edited.
+
 **CRITICAL:**
 
-- `stages` is REQUIRED and needs at least one entry
-- `patternName` must exactly match a defined `Pattern.name` in scope
-- `relationship` is REQUIRED on every stage and is **always stated explicitly** — there is no default, because how a pattern layers into an endeavour is a modelling decision a reader should never have to infer from silence
-- `relativeTo` is REQUIRED for `concurrent` and `nested`, and names the host pattern; add `viewNames` to scope the stage to particular views of that host
+- `stages` is REQUIRED. It may be empty **only** in a baseline-published shell; an extension practice's orchestration needs at least one stage
+- Each stage declares **exactly one** of `patternName` or `orchestrationName`, never both and never neither
+- `patternName` must exactly match a `Pattern.name` in scope; `orchestrationName` must match a `PatternOrchestration.name` in scope. Both resolve across the baseline chain and declared dependencies, as every other symbolic link does
+- Embedding must not form a cycle: an orchestration cannot embed itself directly or through a chain
+- `relationship` is REQUIRED on every stage and is **always stated explicitly** — there is no default, because how a stage layers into an endeavour is a modelling decision a reader should never have to infer from silence
+- `relativeTo` is REQUIRED for `concurrent` and `nested`, and names exactly one of a host pattern or a host orchestration; add `viewNames` to scope the stage to particular views of a **pattern** host. `viewNames` against an orchestration host is an error — an orchestration has stages, not views
 - `trigger` is REQUIRED for `onDemand`. That stage has no fixed position — it is entered on recognition, which is what separates a planned phase from a pattern run because circumstances called for it
-- `recurrence` is meaningful only with `concurrent` or `nested`. `perView` restarts the stage for each host view in scope; `once` runs it across the whole span
+- `recurrence` is meaningful only with `concurrent` or `nested`, and `perView` only against a **pattern** host. `perView` restarts the stage for each host view in scope; `once` runs it across the whole span
 - `seq` must be unique among `sequential` stages. For other relationships it is only the anchor point for presentation and may be shared
 - `entryCriteria` is a `Background` — alpha states and work product levels, expressed as everywhere else. `exitCriteria` and `trigger` are `Test` objects, so each needs `name` and `description` alongside its Given/When/Then
-- An orchestration is authored by one owner and does **not** merge across practices by name, unlike a group. Do not emit one that sequences another practice's patterns
+- **A redeclared orchestration is additive.** Where the mapping guide extends an orchestration in scope, emit only the stages this practice contributes. Do **not** restate an inherited stage with a different `seq`, `relationship`, `relativeTo`, `trigger` or `recurrence`, and do not give an added `sequential` stage a `seq` at or below the highest inherited sequential `seq` — both are validation errors. Place contributions `concurrent`, `nested` or `onDemand` against the inherited stages
+- Prefer embedding over placing another document's pattern directly. The latter validates but warns, and the warning names the orchestration to embed instead
 - Do not invent an order the source material does not state. Independent patterns need no orchestration, and patterns named in none remain valid
 - If any stage carries `narrativeContexts`, the orchestration MUST declare `narrativeTypeName` — the same rule, for the same reason, as a pattern and its views
 

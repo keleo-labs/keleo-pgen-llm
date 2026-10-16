@@ -103,7 +103,10 @@ def checks(effective, report):
     # merge.md §6.15a — orchestration merging.
     orchestration = named(effective.get("patternOrchestrations"), "Platform Endeavour")
     stages = (orchestration or {}).get("stages", [])
-    placements = [(s["patternName"], s["relationship"]) for s in stages]
+    placements = [
+        (s.get("orchestrationName") or s.get("patternName"), s["relationship"])
+        for s in stages
+    ]
     yield (
         "one pattern placed twice survives as two stages",
         placements == [
@@ -111,15 +114,32 @@ def checks(effective, report):
             ("Steady State", "sequential"),
             ("Site Rollout", "nested"),
             ("Site Rollout", "onDemand"),
+            ("Rollout Endeavour", "nested"),
         ],
         placements,
     )
-    bootstrap = stages[0] if stages else {}
+    bootstrap = next((s for s in stages
+                      if s.get("patternName") == "Platform Bootstrap"), {})
     yield (
         "stage entry criteria are first-writer-wins",
         bootstrap.get("entryCriteria") == "Funding approved."
         and bootstrap.get("exitCriteria") == "A cluster serves traffic.",
         {k: bootstrap.get(k) for k in ("entryCriteria", "exitCriteria")},
+    )
+    # merge.md §6.15a — placement is first-writer-wins as of schema 3.1.0, so an
+    # overlay restating an inherited stage cannot move it.
+    yield (
+        "an overlay cannot re-place a stage it inherited",
+        bootstrap.get("seq") == 1,
+        {"seq": bootstrap.get("seq"), "overlay asked for": 7},
+    )
+    embedded = next((s for s in stages
+                     if s.get("orchestrationName") == "Rollout Endeavour"), None)
+    yield (
+        "an embedded orchestration survives the merge as a stage",
+        embedded is not None
+        and embedded.get("relativeTo", {}).get("patternName") == "Steady State",
+        embedded,
     )
 
     # merge.md §7.2e — an authored chain is discarded, not merged.

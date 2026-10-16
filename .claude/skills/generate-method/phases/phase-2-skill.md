@@ -66,8 +66,9 @@ Read references **at the step where they are needed**, not upfront. Each step be
 | 4 | `references/semantics/alphas.md` SS6.1-6.2, SS6.6 | Alpha-state semantics, relatesTo directionality, references/instances |
 | 5 | `references/semantics/work-products.md` SS7.4-7.5 | partOf vs mapsTo on work products, LOD structure |
 | 5b | `references/workproduct-assessment-rubric.csv` | 5-level maturity scale for LOD naming |
-| 6 | `references/semantics/execution-and-patterns.md` SS8-9 | Activities, activity spaces, patterns, outcomes |
+| 6 | `references/semantics/execution-and-patterns.md` SS8-9 | Activities, activity spaces, patterns, outcomes; orchestration embedding and the extend/embed/author-new framework (SS9.5.4-9.5.6) |
 | 7 | `references/pattern-completeness.md` | Four-pass pattern construction algorithm |
+| 7b | `references/orchestration-strategy.md` | Authoring gate for orchestrations — read at Step 8.5, only with 2+ patterns |
 | 8 | `references/semantics/narrative-and-assets.md` SS10-11 | Narrative format, self-containment rules, citations, assets |
 
 ## General Redeclaration Principle
@@ -500,10 +501,29 @@ one repeats inside the phases of another, one is entered only on recognition. In
 patterns need no orchestration, and inventing an order the source does not state is worse
 than leaving them unrelated.
 
-1. **Name the sequenced whole** -- the endeavour these patterns make together
-2. **Order the stages**, each with an explicit `relationship`: `sequential`, `concurrent`,
+**Before authoring one, check whether one already exists.** Read
+`references/orchestration-strategy.md` (procedure) and
+`references/semantics/execution-and-patterns.md` §9.5.4-9.5.6 (reasoning).
+
+1. **Inventory** -- `utils/resolve-context.py --transitive`, then
+   `utils/practice-summary.py <context> --show patternOrchestrations`. Record the result
+   in the mapping guide
+2. **Take the first route that fits** -- extend an orchestration in scope by name when
+   what you add serves the purpose its description states; author your own and have it
+   embedded when your patterns form a self-contained sub-endeavour; author new only when
+   nothing in scope describes the shape
+3. **Name the sequenced whole** -- the endeavour these patterns make together
+4. **Place the stages**, each with an explicit `relationship`: `sequential`, `concurrent`,
    `nested` or `onDemand`. There is no default
-3. **Add `relativeTo`** for concurrent and nested, **`trigger`** for onDemand
+5. **Add `relativeTo`** for concurrent and nested, **`trigger`** for onDemand
+
+A stage names exactly one of a Pattern or a PatternOrchestration. Naming an orchestration
+embeds that whole sub-endeavour -- a programme embedding a project -- and is the right
+choice when it has its own owner, its own completion, and more than one plausible host.
+
+**Extension is additive.** A redeclared orchestration adds stages; restating an inherited
+stage or inserting a sequential one mid-order are validation errors. Wanting to reorder
+means it is a different endeavour, so author a new one.
 
 ## Step 7: Define Outcomes
 

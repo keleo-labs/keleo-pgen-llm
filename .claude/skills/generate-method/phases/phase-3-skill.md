@@ -298,11 +298,13 @@ Translate each alpha from the mapping guide.
 ### 4.11 Pattern Orchestrations (if present in mapping guide)
 
 - **Do NOT emit `patternGroups`** — deprecated as of schema 2.21.0, including baseline group names
-- `stages` is REQUIRED, at least one, each naming a `Pattern.name` that exists in scope
+- `stages` is REQUIRED, at least one (empty only in a baseline shell). Each stage declares **exactly one** of `patternName` or `orchestrationName`
+- Both resolve across the baseline chain and declared dependencies. `orchestrationName` embeds a whole sub-endeavour — a programme embedding a project — and must not form a cycle
 - `relationship` is REQUIRED on every stage and always explicit: `sequential`, `concurrent`, `nested`, `onDemand`
-- `relativeTo` REQUIRED for `concurrent`/`nested`; `trigger` REQUIRED for `onDemand`
+- `relativeTo` REQUIRED for `concurrent`/`nested`, naming exactly one of a host pattern or host orchestration; `trigger` REQUIRED for `onDemand`. `viewNames` and `recurrence: perView` apply only to a pattern host
 - `seq` unique among `sequential` stages; elsewhere it is only the presentation anchor
-- An orchestration does not merge across practices — do not sequence another practice's patterns
+- **Extending an orchestration in scope is additive**: emit only this practice's stages. Restating an inherited stage, or adding a `sequential` stage at or below the highest inherited sequential `seq`, is a validation error
+- Prefer `orchestrationName` over placing another document's pattern directly — the latter warns and names the orchestration to embed
 
 ### 4.12 Outcomes
 

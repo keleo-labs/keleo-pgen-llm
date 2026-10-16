@@ -64,12 +64,18 @@ def should_skip_file(path):
     return False
 
 
-def scan_directory(directory):
+def scan_directory(directory, duplicates=None):
     """Return a dict mapping ``name`` -> ``(Path, version, kind)`` for
     every eligible practice/method JSON in *directory*.
+
+    This tool compares directories, never within one, so two files in a single
+    directory holding the same document under different names used to collapse
+    into whichever sorted last — leaving the other to drift unnoticed. Pass
+    ``duplicates`` to collect ``name -> [Path, ...]`` for the collisions.
     """
     directory = Path(directory)
     index = {}
+    seen = {}
     if not directory.is_dir():
         return index
     for f in sorted(directory.glob("*.json")):
@@ -82,7 +88,18 @@ def scan_directory(directory):
         version = data.get("version", "")
         kind = detect_kind(data)
         if name:
+            seen.setdefault(name, []).append((f, version))
             index[name] = (f, version, kind)
+    if duplicates is not None:
+        for name, entries in seen.items():
+            if len(entries) > 1:
+                duplicates.append({
+                    "directory": str(directory),
+                    "name": name,
+                    "files": [
+                        {"file": p.name, "version": v or "(none)"} for p, v in entries
+                    ],
+                })
     return index
 
 
@@ -93,8 +110,9 @@ def scan_directory(directory):
 def sync_practices(source_dir, fix=False):
     """Compare source practices against all other ``practices/*/`` directories.
 
-    Returns a list of result dicts, one per target directory, each containing
-    a list of per-practice action records.
+    Returns ``(results, duplicates)`` — one result dict per target directory,
+    each with a list of per-practice action records, plus any directory found
+    holding one document under two filenames.
     """
     source_dir = Path(source_dir).resolve()
     practices_root = source_dir.parent  # e.g. <repo>/practices
@@ -103,7 +121,8 @@ def sync_practices(source_dir, fix=False):
         print(json.dumps({"error": f"Parent directory does not exist: {practices_root}"}))
         sys.exit(1)
 
-    source_index = scan_directory(source_dir)
+    duplicates = []
+    source_index = scan_directory(source_dir, duplicates)
     if not source_index:
         print(json.dumps({"error": f"No eligible practice JSON files found in {source_dir}"}))
         sys.exit(1)
@@ -116,7 +135,7 @@ def sync_practices(source_dir, fix=False):
         if target_dir.resolve() == source_dir:
             continue
 
-        target_index = scan_directory(target_dir)
+        target_index = scan_directory(target_dir, duplicates)
         if not target_index:
             continue
 
@@ -185,12 +204,29 @@ def sync_practices(source_dir, fix=False):
 
         results.append(dir_result)
 
-    return results
+    return results, duplicates
 
 
 # ---------------------------------------------------------------------------
 # Display
 # ---------------------------------------------------------------------------
+
+def print_duplicates(duplicates):
+    """Report a directory holding one document under two filenames.
+
+    Syncing cannot fix this — it compares directories, and both copies live in
+    the same one. Whichever filename sorts last wins the comparison, so the
+    other drifts silently until something selects it by name.
+    """
+    if not duplicates:
+        return
+    print("Duplicate documents within a directory:\n")
+    for d in duplicates:
+        files = ", ".join(f"{e['file']} ({e['version']})" for e in d["files"])
+        print(f"  ⚠ {d['directory']}/")
+        print(f"    '{d['name']}' is declared by {len(d['files'])} files: {files}")
+    print("\n  Remove the superseded file; sync cannot reconcile two copies in one directory.\n")
+
 
 def print_results(results, source_dir, fix):
     """Print human-readable sync results."""
@@ -291,12 +327,13 @@ def main():
         print(json.dumps({"error": f"Source directory does not exist: {source_dir}"}))
         sys.exit(1)
 
-    results = sync_practices(source_dir, fix=args.fix)
+    results, duplicates = sync_practices(source_dir, fix=args.fix)
 
     if args.json:
-        json.dump(results, sys.stdout, indent=2)
+        json.dump({"results": results, "duplicates": duplicates}, sys.stdout, indent=2)
         print()
     else:
+        print_duplicates(duplicates)
         print_results(results, source_dir, fix=args.fix)
 
     # Rebuild bundles if requested and changes were applied

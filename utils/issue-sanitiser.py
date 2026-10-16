@@ -246,9 +246,12 @@ def scan_identities(text):
     return [f if isinstance(f, dict) else {"match": str(f)} for f in findings], None
 
 
-# A fenced block, then an inline code span. Fences first so a backtick inside
-# one is not read as opening a span.
-_CODE_REGIONS = re.compile(r'```.*?```|~~~.*?~~~|`[^`\n]+`', re.S)
+# A fenced block, then a double-backtick span, then a single one. Longest
+# delimiter first, so a backtick inside a span is not read as opening another.
+# The double form is how markdown quotes a token that itself contains a
+# backtick, and reading it as two single spans leaves the token between them
+# looking like prose.
+_CODE_REGIONS = re.compile(r'```.*?```|~~~.*?~~~|``.+?``|`[^`\n]+`', re.S)
 
 
 def code_spans(text):
@@ -257,16 +260,25 @@ def code_spans(text):
 
 
 def in_code(text, token, spans):
-    """Does every occurrence of `token` sit inside a code region?
+    """Does every occurrence of `token` as a mention sit inside a code region?
 
     The question is every occurrence rather than any, because a token quoted
     as code in one sentence and used as a mention in the next is still a
     mention.
+
+    Only occurrences carrying the at-sign count. The sigil is what makes a
+    token a mention, and the bare word is often an ordinary English one — a
+    draft writing `@rule:` in a code span and "rule" in a sentence was failing
+    this test on the noun, which hands the gate a veto over any draft whose
+    code token happens to be a word.
     """
     if not token:
         return False
+    bare = token.lstrip('@')
+    if not bare:
+        return False
     found = False
-    for m in re.finditer(r'@?' + re.escape(token), text):
+    for m in re.finditer(r'@' + re.escape(bare), text):
         found = True
         if not any(start <= m.start() and m.end() <= end for start, end in spans):
             return False

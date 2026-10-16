@@ -1996,11 +1996,23 @@ def check_outcomes(data, kind, baseline_data=None):
         aname = a.get("name")
         if aname:
             all_alpha_states[aname] = {s.get("name") for s in a.get("states", []) if s.get("name")}
+    # Work products and patterns an outcome may reference come from the whole
+    # effective context, not just this document. `baseline_data` already carries
+    # the merged baseline and declared dependencies by the time this runs.
+    inherited_wp_names = {wp.get("name") for wp in (baseline_data or {}).get("workProducts", []) if wp.get("name")}
+
+    own_pattern_names = set()
     all_pattern_names = set()
     pattern_views_by_pattern = {}
+    for p in (baseline_data or {}).get("patterns", []):
+        pname = p.get("name", "")
+        if pname:
+            all_pattern_names.add(pname)
+            pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
     for p in data.get("patterns", []):
         pname = p.get("name", "")
         if pname:
+            own_pattern_names.add(pname)
             all_pattern_names.add(pname)
             pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
 
@@ -2016,6 +2028,7 @@ def check_outcomes(data, kind, baseline_data=None):
             for p in source.get("patterns", []):
                 pname = p.get("name", "")
                 if pname:
+                    own_pattern_names.add(pname)
                     all_pattern_names.add(pname)
                     pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
 
@@ -2064,6 +2077,7 @@ def check_outcomes(data, kind, baseline_data=None):
                 })
 
             all_wp_names = {wp.get("name") for wp in source.get("workProducts", []) if wp.get("name")}
+            all_wp_names |= inherited_wp_names
             wp_metrics = {}
             for wp in source.get("workProducts", []):
                 wpn = wp.get("name", "")
@@ -2143,7 +2157,9 @@ def check_outcomes(data, kind, baseline_data=None):
                             "autoFixable": False,
                         })
 
-        if all_pattern_names and not has_objective:
+        # Keyed on this document's own patterns: a practice is not expected to
+        # recognise an outcome against a pattern someone else declared.
+        if own_pattern_names and not has_objective:
             issues.append({
                 "severity": "warning",
                 "category": "outcomes",
@@ -2171,6 +2187,93 @@ def _ordered_weights(entries, key_field, order_by_name):
             unknown.append(e)
     known.sort(key=lambda t: (t[0], t[1]))
     return [e for _, _, e in known], unknown
+
+
+_PATTERN_PREREQ_MODULE = None
+
+
+def _pattern_prereq_module():
+    """The standalone prerequisite checker, loaded once.
+
+    The logic lives in `check-pattern-prerequisites.py` because it is also
+    useful on its own — `--matrix` prints the view grid, which no assessment
+    report wants. Importing it rather than restating it keeps one definition
+    of what an inversion is.
+    """
+    global _PATTERN_PREREQ_MODULE
+    if _PATTERN_PREREQ_MODULE is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "check_pattern_prerequisites",
+            Path(__file__).resolve().parent / "check-pattern-prerequisites.py",
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _PATTERN_PREREQ_MODULE = mod
+    return _PATTERN_PREREQ_MODULE
+
+
+def check_pattern_view_prerequisites(data, kind, baseline_data=None,
+                                     parent_documents=None):
+    """@rule:pattern-prerequisites — a view may not assert a state its own
+    later views are the first to make reachable.
+
+    A pattern view declares the alpha states that hold at that point. Those
+    states may declare prerequisites of their own, and nothing else checks the
+    two against each other: a prerequisite loop is caught by the acyclicity
+    rules, but an ordering inversion inside one view sequence is not a loop.
+
+    Prerequisites are read from the merged picture, because state redeclaration
+    is additive and a practice alone carries only part of the graph. A
+    prerequisite on an alpha the pattern never carries is reported as
+    `unreached` rather than inverted — view compression makes that ordinary.
+    """
+    if kind == "practiceBaseline":
+        return []
+    try:
+        mod = _pattern_prereq_module()
+    except Exception:
+        return []
+
+    documents = [("document", data)]
+    if baseline_data:
+        documents.append(("effective context", baseline_data))
+    documents.extend(parent_documents or [])
+    prereqs = mod.build_prerequisites(documents)
+    state_order = mod.build_state_order(documents)
+
+    issues = []
+    for source in mod.iter_documents(data):
+        pfx = "" if source is data else f"practice[{source.get('name', '?')}]."
+        for p_idx, pattern in enumerate(source.get("patterns", [])):
+            findings = mod.check_pattern(pattern, prereqs, state_order)
+            findings += mod.check_monotonicity(pattern, state_order)
+            for f in findings:
+                if f["kind"] == "unreached":
+                    continue
+                if f["kind"] == "regression":
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' moves {f['state']} backwards: {f['detail']}"
+                    )
+                else:
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' asserts {f['state']}, which requires "
+                        f"{f['prerequisite']} — {f['detail']}"
+                    )
+                issues.append({
+                    "severity": "warning",
+                    "category": "pattern-prerequisites",
+                    "path": f"{pfx}patterns[{p_idx}].patternViews",
+                    "message": message,
+                    "suggestion": (
+                        "Move the state to a later view, bring the prerequisite "
+                        "forward, or drop the prerequisite if the ordering is wrong"
+                    ),
+                    "autoFixable": False,
+                })
+    return issues
 
 
 def check_forecast_monotonicity(data, kind, baseline_data=None):
@@ -3834,7 +3937,15 @@ def check_citation_missing_urls(citations):
     return issues
 
 
-def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
+def run_schema_validation(file_path, schema_path, kind, baseline_path=None,
+                          dependency_paths=None):
+    """Run the schema and integrity validator over one document.
+
+    `dependency_paths` are the practices this document builds on. The validator
+    takes them as trailing positional arguments, and without them every
+    reference into a dependency reads as dangling — which is how this script
+    came to report errors the validator itself does not.
+    """
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
         if baseline_path:
@@ -3847,6 +3958,7 @@ def run_schema_validation(file_path, schema_path, kind, baseline_path=None):
             "python3", "utils/validate-practice-json.py",
             str(file_path), str(baseline_path), str(schema_path),
         ]
+        cmd.extend(str(p) for p in (dependency_paths or []))
 
     try:
         result = subprocess.run(
@@ -4428,7 +4540,12 @@ def _auto_resolve_deps(data, kind, file_path, existing_parents):
 
     Uses discover-dependencies.py's index to resolve baselinePracticeName and
     practiceDependencyNames to filesystem paths, preferring non-keleo sources.
-    Returns (baseline_path_or_None, updated_parent_list).
+    Returns (baseline_path_or_None, updated_parent_list, unresolved).
+
+    `unresolved` names the declared dependencies that could not be pinned to a
+    single file — most often because two copies of the same document sit on
+    disk. Resolution staying silent about those is what makes the resulting
+    dangling-reference errors look real.
     """
     import importlib.util
     spec = importlib.util.spec_from_file_location(
@@ -4458,14 +4575,21 @@ def _auto_resolve_deps(data, kind, file_path, existing_parents):
                 baseline_path = path
 
     parents = list(existing_parents or [])
+    already_given = set(parents)
+    unresolved = []
     for dep_name in data.get("practiceDependencyNames", []):
         result = resolve_name(dep_name, index, prefer_filesystem=True)
         if result["status"] == "found":
             path = result["path"]
             if "::" not in path and path not in parents:
                 parents.append(path)
+            continue
+        # An explicitly passed --parent may already cover this dependency, and
+        # the caller's path is the answer either way.
+        if not already_given:
+            unresolved.append((dep_name, result["status"]))
 
-    return baseline_path, parents
+    return baseline_path, parents, unresolved
 
 
 def main():
@@ -4510,13 +4634,28 @@ def main():
     kind = data.get("kind", "practice")
     name = data.get("name", "<unnamed>")
 
+    unresolved_deps = []
     if kind != "practiceBaseline":
-        resolved_baseline, resolved_parents = _auto_resolve_deps(data, kind, file_path, args.parent)
+        resolved_baseline, resolved_parents, unresolved_deps = _auto_resolve_deps(
+            data, kind, file_path, args.parent)
         if not args.baseline:
             args.baseline = resolved_baseline
         args.parent = resolved_parents
 
     all_issues = []
+
+    for dep_name, status in unresolved_deps:
+        all_issues.append({
+            "severity": "warning",
+            "category": "parent",
+            "path": "practiceDependencyNames",
+            "message": (
+                f"Declared dependency '{dep_name}' could not be resolved ({status}); "
+                f"references into it will report as dangling"
+            ),
+            "suggestion": "Pass the file with --parent",
+            "autoFixable": False,
+        })
 
     counts = count_elements(data, kind)
 
@@ -4596,6 +4735,12 @@ def main():
                                 existing.add(elem["name"])
                 break
 
+    # Kept unmerged as well as merged. `_merge_elements` adds an element only
+    # where its name is new, so a dependency's redeclaration of a baseline alpha
+    # is dropped — but redeclaration is additive, and a check reading state
+    # prerequisites needs the contributions that drops.
+    parent_documents = []
+
     if baseline_data and args.parent:
         bl_alpha_set = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}
@@ -4607,11 +4752,12 @@ def main():
         bl_pg_names = {pg["name"] for pg in baseline_data.get("personaGroups", []) if pg.get("name")}
         bl_act_names = {a["name"] for a in baseline_data.get("activities", []) if a.get("name")}
         bl_cit_names = {c["name"] for c in baseline_data.get("citations", []) if c.get("name")}
+        bl_pattern_names = {p["name"] for p in baseline_data.get("patterns", []) if p.get("name")}
 
         def _merge_elements(source):
             nonlocal bl_alpha_set, bl_nt_set, bl_comp_names, bl_asp_names
             nonlocal bl_wp_names, bl_persona_names, bl_pg_names, bl_act_names, bl_cit_names
-            nonlocal bl_focus_names
+            nonlocal bl_focus_names, bl_pattern_names
             for focus in source.get("focuses", []):
                 if focus.get("name") and focus["name"] not in bl_focus_names:
                     baseline_data.setdefault("focuses", []).append(focus)
@@ -4652,6 +4798,10 @@ def main():
                 if cit.get("name") and cit["name"] not in bl_cit_names:
                     baseline_data.setdefault("citations", []).append(cit)
                     bl_cit_names.add(cit["name"])
+            for pat in source.get("patterns", []):
+                if pat.get("name") and pat["name"] not in bl_pattern_names:
+                    baseline_data.setdefault("patterns", []).append(pat)
+                    bl_pattern_names.add(pat["name"])
 
         for parent_path in args.parent:
             parent_data, perr = load_json_pair(Path(parent_path))
@@ -4664,6 +4814,7 @@ def main():
                     "autoFixable": False,
                 })
                 continue
+            parent_documents.append((Path(parent_path).name, parent_data))
             _merge_elements(parent_data)
             if parent_data.get("kind") == "method":
                 for practice in parent_data.get("practices", []):
@@ -4696,6 +4847,8 @@ def main():
 
     all_issues.extend(check_references(data, kind, baseline_data))
     all_issues.extend(check_outcomes(data, kind, baseline_data))
+    all_issues.extend(check_pattern_view_prerequisites(
+        data, kind, baseline_data, parent_documents))
     all_issues.extend(check_forecast_monotonicity(data, kind, baseline_data))
 
     if kind == "practiceBaseline" and args.parent:
@@ -4718,6 +4871,7 @@ def main():
         schema_report, schema_err = run_schema_validation(
             file_path, schema_path, kind,
             baseline_path=Path(args.baseline) if args.baseline else None,
+            dependency_paths=args.parent,
         )
         if schema_err:
             all_issues.append({

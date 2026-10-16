@@ -604,10 +604,13 @@ def extract_pattern_views(content):
         )
         pattern_section = tail[:boundary.start()] if boundary else tail
     else:
-        pattern_start = content.find("- **Pattern Views:**")
-        if pattern_start < 0:
+        # The label is written as a list item in a mapping guide and as a bare
+        # bold run in an analysis report. Matching only the list form returns no
+        # views for the report, which reads as the report declaring none.
+        marker = re.search(r"^\s*(?:-\s*)?\*\*Pattern Views:?\*\*", content, re.MULTILINE)
+        if not marker:
             return []
-        pattern_section = content[pattern_start:]
+        pattern_section = content[marker.start():]
 
     views = []
 
@@ -704,6 +707,176 @@ def extract_pattern_views(content):
         views.append({"seq": view_num, "name": view_name, "alpha_states": _pairs(view_text)})
 
     return views
+
+
+_HEADING_RE = re.compile(r"^(#{2,6})\s+(.+?)\s*$", re.MULTILINE)
+#: A heading may be numbered by its section ("8.1 Deal Qualification Journey").
+_SECTION_NUMBER_RE = re.compile(r"^\d+(?:\.\d+)*\.?\s+")
+#: The marker that makes a subsection a pattern rather than a note about one:
+#: "Pattern Views" as a label introducing a list, not a mention in prose. A
+#: checklist item reading "pattern views complete" is about patterns and is not
+#: one, so a bare substring search reads validation sections as patterns.
+_PATTERN_VIEWS_MARKER_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?Pattern Views?(?:\*\*)?\s*:", re.IGNORECASE | re.MULTILINE
+)
+
+
+def _heading_blocks(content):
+    """Yield (depth, title, body) for every heading, body ending at the next
+    heading of the same or shallower depth."""
+    headings = list(_HEADING_RE.finditer(content))
+    for i, m in enumerate(headings):
+        depth = len(m.group(1))
+        end = len(content)
+        for later in headings[i + 1:]:
+            if len(later.group(1)) <= depth:
+                end = later.start()
+                break
+        yield depth, m.group(2).strip(), content[m.end():end]
+
+
+def extract_described_patterns(content):
+    """Patterns the phase output describes, as {name: [view names]}.
+
+    A subsection counts as a pattern when its body carries a "Pattern Views"
+    block. That is structural rather than a guess from the title, so a section
+    *about* patterns — an orchestration note, an overarching lifecycle summary —
+    is not mistaken for one.
+    """
+    described = {}
+    for _, title, body in _heading_blocks(content):
+        # Only the section's own prose counts. A body runs to the next heading
+        # of the same depth, so it contains its children — and without this a
+        # parent section such as "Workflows and Patterns" reads as a pattern
+        # because one of its subsections is.
+        nested = _HEADING_RE.search(body)
+        own = body[:nested.start()] if nested else body
+        if not _PATTERN_VIEWS_MARKER_RE.search(own):
+            continue
+        name = _SECTION_NUMBER_RE.sub("", title).strip().strip("*`")
+        # A guide may title the heading "Pattern: <name>"; the label is not part
+        # of the name, and dropping the whole heading for carrying it loses a
+        # real pattern.
+        name = re.sub(r"^Pattern\s*[:—–-]\s*", "", name, flags=re.IGNORECASE).strip()
+        if not name or _norm(name) in ("patterns", "pattern views", "pattern mappings"):
+            continue
+        views = [v["name"] for v in extract_pattern_views(body) if v.get("name")]
+        described[name] = views
+    return described
+
+
+def _norm(name):
+    return re.sub(r"\s+", " ", (name or "")).strip().lower()
+
+
+def _view_keys(name):
+    """The forms a view name may be written in, for comparison.
+
+    A report titles a view with a label and a gloss, and which half the JSON
+    kept varies: "Prerequisites (Initial State)" became `Prerequisites`, while
+    "Crawl (Basic Mapping)" became `Basic Mapping`. The label is sometimes a
+    prefix instead — "Plan - Account Assessment" became `Account Assessment`.
+    Every reading is accepted, so what is reported is a genuine difference in
+    the inventory rather than a difference in titling convention.
+    """
+    name = name or ""
+    keys = {_norm(name)}
+    outer = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", name)
+    if outer:
+        keys.add(_norm(outer.group(1)))
+        keys.add(_norm(outer.group(2)))
+    for key in list(keys):
+        prefixed = re.match(r"^\S[^:—–-]*\s*[:—–-]\s*(.+)$", key)
+        if prefixed:
+            keys.add(_norm(prefixed.group(1)))
+    return {k for k in keys if k}
+
+
+def compare_phase_output_with_json(content, data):
+    """Report where the phase markdown and the generated JSON disagree.
+
+    The markdown is what anyone reads to understand why a practice looks the
+    way it does; the JSON is what ships. When they part company — a pattern
+    described and never generated, a view generated and never described —
+    anything authored against the prose will not resolve, and nothing else
+    reports it.
+
+    Findings are advisory. The prose legitimately describes candidates that
+    were later rejected, so an exact match is the wrong bar; what is worth
+    knowing is that the difference exists and was not recorded.
+    """
+    described = extract_described_patterns(content)
+    sources = [data] + [p for p in data.get("practices", []) if isinstance(p, dict)]
+
+    generated = {}
+    for source in sources:
+        for pattern in source.get("patterns", []):
+            pname = pattern.get("name")
+            if pname:
+                generated[pname] = [
+                    v.get("name") for v in pattern.get("patternViews", []) if v.get("name")
+                ]
+
+    findings = []
+    gen_by_norm = {_norm(n): n for n in generated}
+    for name, views in sorted(described.items()):
+        match = gen_by_norm.get(_norm(name))
+        if match is None:
+            findings.append({
+                "kind": "pattern-not-generated",
+                "pattern": name,
+                "message": (
+                    f"Pattern '{name}' is described in the phase output but the "
+                    f"JSON declares no pattern of that name"
+                ),
+            })
+            continue
+        # No views parsed is a parser miss, not a disagreement. Reporting every
+        # generated view as undescribed would bury the cases that are real.
+        if not views:
+            continue
+        gen_keys = set().union(*(_view_keys(v) for v in generated[match])) \
+            if generated[match] else set()
+        prose_keys = set().union(*(_view_keys(v) for v in views)) if views else set()
+        for original in views:
+            if not (_view_keys(original) & gen_keys):
+                findings.append({
+                    "kind": "view-not-generated",
+                    "pattern": match,
+                    "view": original,
+                    "message": (
+                        f"Pattern '{match}' view '{original}' is described in the "
+                        f"phase output but not present in the JSON"
+                    ),
+                })
+        for gen_view in generated[match]:
+            if not (_view_keys(gen_view) & prose_keys):
+                findings.append({
+                    "kind": "view-not-described",
+                    "pattern": match,
+                    "view": gen_view,
+                    "message": (
+                        f"Pattern '{match}' view '{gen_view}' is in the JSON but "
+                        f"not described in the phase output"
+                    ),
+                })
+
+    described_by_norm = {_norm(n) for n in described}
+    # Only report an undescribed pattern where the output describes some, so a
+    # guide that covers patterns in a shape this parser does not know is not
+    # reported as describing none of them.
+    if described:
+        for name in sorted(generated):
+            if _norm(name) not in described_by_norm and _norm(name) not in _norm(content):
+                findings.append({
+                    "kind": "pattern-not-described",
+                    "pattern": name,
+                    "message": (
+                        f"Pattern '{name}' is in the JSON but the phase output "
+                        f"does not describe it"
+                    ),
+                })
+    return findings
 
 
 #: An assembled method guide concatenates per-practice guides, each keeping its
@@ -907,6 +1080,25 @@ def main():
         help="Print a single-line verdict instead of the full JSON check list",
     )
     parser.add_argument(
+        "--check",
+        action="append",
+        metavar="NAME",
+        help=(
+            "Report only these checks; repeatable, prefix match. Without it a "
+            "single check's findings have to be dug out of the full list."
+        ),
+    )
+    parser.add_argument(
+        "--against-json",
+        metavar="FILE",
+        help=(
+            "Compare the phase output's pattern and view inventory against the "
+            "generated JSON, and report where they disagree. Advisory: the prose "
+            "legitimately describes candidates that were later rejected, so what "
+            "matters is that the difference exists and was not recorded."
+        ),
+    )
+    parser.add_argument(
         "--source-manifest",
         metavar="FILE",
         help=(
@@ -952,6 +1144,36 @@ def main():
             for f in args.file if Path(f).exists()
         )
         checks.extend(validate_source_coverage(combined, args.source_manifest))
+
+    if args.against_json:
+        combined = "\n".join(
+            Path(f).read_text(encoding="utf-8", errors="replace")
+            for f in args.file if Path(f).exists()
+        )
+        try:
+            generated = json.loads(Path(args.against_json).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            checks.append({
+                "check": "json_agreement",
+                "pass": False,
+                "detail": f"Could not read {args.against_json}: {exc}",
+            })
+        else:
+            drift = compare_phase_output_with_json(combined, generated)
+            checks.append({
+                "check": "json_agreement",
+                "pass": not drift,
+                "detail": (
+                    "Phase output and generated JSON agree on the pattern inventory"
+                    if not drift
+                    else f"{len(drift)} disagreement(s) between the phase output and the JSON"
+                ),
+                "findings": drift,
+            })
+
+    if args.check:
+        wanted = tuple(args.check)
+        checks = [c for c in checks if c["check"].startswith(wanted)]
 
     for c in checks:
         if "pass" in c:

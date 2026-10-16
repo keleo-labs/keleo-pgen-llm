@@ -960,6 +960,13 @@ python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
 - When: Activity contributesTo references are checked
 - Then: At least one activity has `contributesTo` targeting the alpha state
 
+### Scenario: Pattern views reach prerequisites before they assert them (@rule:coverage-006)
+- Given: A pattern view asserts an alpha state that declares `background.alphaStates`
+- When: The views are walked in `seq` order against the merged prerequisite graph
+- Then: Each prerequisite is reached at that view or an earlier one
+- Then: A later state of the same alpha counts as reaching an earlier one
+- Then: An alpha state declared at one view does not go backwards at a later view
+
 ## Feature: Terminology Aliasing
 
 ### Scenario: One alias per element maximum (@rule:aliasing-001)

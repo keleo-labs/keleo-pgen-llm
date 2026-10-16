@@ -727,7 +727,7 @@ Validates that baseline JSON has correct shape, required top-level sections, and
 - Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
 - And: These elements belong in extension practices, not baselines
 - And: The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0
-- And: No patternOrchestrations are authored either, since a baseline defines no patterns to sequence
+- And: Any patternOrchestrations entry is a shell with an empty stages array, since a baseline defines no patterns to sequence
 
 ### Scenario: Focus count within range (@rule:structural-204)
 - Given: A baseline defines focus areas

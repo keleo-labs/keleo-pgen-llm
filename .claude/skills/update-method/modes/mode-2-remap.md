@@ -170,7 +170,7 @@ Each subagent receives:
 - The schema (`deps/language.schema.json`) — relevant `$defs` only
 - The effective context for cross-reference names (alpha names, activity space names, etc.)
 - Instruction to output ONLY its assigned section(s) as a standalone JSON object
-- **Subagent C (patternGroups):** Copy any `patternGroups` from the source JSON across verbatim and author no new ones — the construct is deprecated, and a remap preserves rather than migrates. Where the mapping guide describes `patternOrchestrations`, emit those: every stage needs an explicit `relationship`, with `relativeTo` for concurrent and nested stages and a `trigger` for onDemand ones.
+- **Subagent C (patternGroups):** Copy any `patternGroups` from the source JSON across verbatim and author no new ones — the construct is deprecated, and a remap preserves rather than migrates. Where the mapping guide describes `patternOrchestrations`, emit those: every stage needs an explicit `relationship`, with `relativeTo` for concurrent and nested stages and a `trigger` for onDemand ones. A stage names exactly one of `patternName` or `orchestrationName`; the latter embeds a whole sub-endeavour owned elsewhere. Where the orchestration extends one already in scope, emit only this practice's stages — a remap does not re-place stages the practice does not own, for the same reason it copies `patternGroups` across rather than rewriting them. If the remap seems to need the inherited stages in a different order, that is a different endeavour and belongs in a new orchestration. See `references/orchestration-strategy.md`.
 
 Example subagent output for Subagent A:
 ```json
