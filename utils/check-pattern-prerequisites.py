@@ -13,12 +13,22 @@ state contributes extra prerequisites rather than replacing them. Pass the
 practice plus its baseline and dependencies to see the merged picture, or the
 practice alone to see only what one document can prove.
 
+``--cycles`` asks a different question of the same graph. Two practices on one
+baseline can declare opposing prerequisites between the same pair of states,
+and because redeclaration is additive the contradiction exists only in the
+union — each document validates clean holding half of it. ``--on-baseline``
+sweeps every document whose baseline chain reaches the named one, so the
+conflict is found before someone declares a dependency and inherits it.
+
 Usage:
     python3 utils/check-pattern-prerequisites.py <practice>.json \\
         [<baseline>.json <dependency>.json ...] \\
         [--pattern "Name"] [--matrix] [--json]
 
-Exit status is 1 when an inversion is found, 0 otherwise.
+    python3 utils/check-pattern-prerequisites.py --cycles \\
+        --on-baseline "<Baseline Name>" [--json]
+
+Exit status is 1 when an inversion or a contradiction is found, 0 otherwise.
 """
 
 import argparse
@@ -42,7 +52,12 @@ def build_prerequisites(documents):
     """Merge state prerequisites across documents.
 
     Returns {(alphaName, stateName): {"prereqs": set[(alpha, state)],
-                                      "sources": set[str]}}
+                                      "sources": set[str],
+                                      "edgeSources": {(alpha, state): set[str]}}}
+
+    ``edgeSources`` records which document declared each prerequisite, which is
+    what makes a contradiction attributable: the edge and its opposite are in
+    different documents, and neither author can see the other's.
     """
     merged = {}
     for doc_name, data in documents:
@@ -56,7 +71,8 @@ def build_prerequisites(documents):
                     if not sname:
                         continue
                     entry = merged.setdefault(
-                        (aname, sname), {"prereqs": set(), "sources": set()}
+                        (aname, sname),
+                        {"prereqs": set(), "sources": set(), "edgeSources": {}},
                     )
                     entry["sources"].add(doc_name)
                     background = state.get("background") or {}
@@ -64,7 +80,63 @@ def build_prerequisites(documents):
                         ra, rs = req.get("alphaName"), req.get("stateName")
                         if ra and rs:
                             entry["prereqs"].add((ra, rs))
+                            entry["edgeSources"].setdefault((ra, rs), set()).add(doc_name)
     return merged
+
+
+def find_prerequisite_cycles(prereqs):
+    """Cycles in the merged prerequisite graph, with the author of each edge.
+
+    A practice redeclaring a baseline state contributes prerequisites rather
+    than replacing them, so the real graph is the union of what every document
+    declared — a graph none of them contains. Two practices can therefore state
+    opposing orderings between the same pair of states, and each validates
+    clean on its own because each holds only half of the cycle.
+
+    Returns a list of {"cycle": [...], "edges": [{"from", "to", "declaredBy"}]}.
+    """
+    found = []
+    seen_cycles = set()
+
+    def walk(node, path, on_path):
+        for nxt in sorted(prereqs.get(node, {}).get("prereqs", ())):
+            if nxt in on_path:
+                start = path.index(nxt)
+                cycle = path[start:] + [nxt]
+                key = _canonical_cycle(cycle)
+                if key in seen_cycles:
+                    continue
+                seen_cycles.add(key)
+                found.append({
+                    "cycle": [f"{a}.{s}" for a, s in cycle],
+                    "edges": [
+                        {
+                            "from": f"{cycle[i][0]}.{cycle[i][1]}",
+                            "to": f"{cycle[i + 1][0]}.{cycle[i + 1][1]}",
+                            "declaredBy": sorted(
+                                prereqs[cycle[i]]["edgeSources"].get(cycle[i + 1], ())
+                            ),
+                        }
+                        for i in range(len(cycle) - 1)
+                    ],
+                })
+                continue
+            if nxt in path:
+                continue
+            walk(nxt, path + [nxt], on_path | {nxt})
+
+    for node in sorted(prereqs):
+        walk(node, [node], {node})
+    return found
+
+
+def _canonical_cycle(cycle):
+    """A rotation-independent key, so one cycle is not reported once per member."""
+    ring = cycle[:-1]
+    if not ring:
+        return ()
+    lowest = min(range(len(ring)), key=lambda i: ring[i])
+    return tuple(ring[lowest:] + ring[:lowest])
 
 
 def build_state_order(documents):
@@ -220,11 +292,93 @@ def print_matrix(pattern, state_order):
         print(line(row))
 
 
+def _declared_baselines(data):
+    names = list(data.get("baselinePracticeNames") or [])
+    single = data.get("baselinePracticeName")
+    if single:
+        names.append(single)
+    return names
+
+
+def documents_on_baseline(baseline_name, root=None):
+    """Every authored document in the corpus whose baseline chain reaches `baseline_name`.
+
+    Transitively, because most practices sit on an intermediate baseline rather
+    than naming the root one — a sweep matching only direct declarations would
+    miss the documents most likely to disagree with each other.
+
+    Skips backups and underscore-prefixed build artifacts, matching the rule
+    `scan-corpus.py` applies: a merge is not something anyone authored, and a
+    contradiction reported against one is not actionable.
+    """
+    root = Path(root or Path(__file__).resolve().parent.parent)
+    corpus = []
+    for dirname in ("baselines", "practices", "deps"):
+        base = root / dirname
+        if not base.is_dir():
+            continue
+        patterns = ["*.json"] if base.name == "deps" else ["*.json", "*/*.json"]
+        for pattern in patterns:
+            for path in sorted(base.glob(pattern)):
+                if path.name.startswith("_") or "backup" in str(path).lower():
+                    continue
+                if path.name.endswith(".changerequest.json"):
+                    continue
+                try:
+                    data = load_json(path, exit_on_error=False)
+                except Exception:
+                    continue
+                if isinstance(data, dict):
+                    corpus.append((str(path.relative_to(root)), data))
+
+    by_name = {}
+    for _, data in corpus:
+        by_name.setdefault(data.get("name"), data)
+
+    def reaches(data, depth=0):
+        if data.get("name") == baseline_name:
+            return True
+        if depth > 8:
+            return False
+        for parent in _declared_baselines(data):
+            if parent == baseline_name:
+                return True
+            upstream = by_name.get(parent)
+            if upstream is not None and reaches(upstream, depth + 1):
+                return True
+        return False
+
+    return [(rel, data) for rel, data in corpus if reaches(data)]
+
+
+def report_cycles(cycles, as_json):
+    if as_json:
+        print(json.dumps(cycles, indent=2))
+        return 1 if cycles else 0
+    if not cycles:
+        print("No contradictory prerequisite edges found.")
+        return 0
+    print(f"{len(cycles)} contradictory prerequisite cycle(s):\n")
+    for c in cycles:
+        print("  " + " -> ".join(c["cycle"]))
+        for edge in c["edges"]:
+            authors = ", ".join(edge["declaredBy"]) or "unknown"
+            print(f"    {edge['from']} requires {edge['to']}  [{authors}]")
+        print()
+    return 1
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("documents", nargs="+",
+    ap.add_argument("documents", nargs="*",
                     help="Practice JSON first, then baseline and dependencies")
+    ap.add_argument("--cycles", action="store_true",
+                    help="Report contradictory prerequisite edges across the "
+                         "documents given, naming the document that declared each")
+    ap.add_argument("--on-baseline", metavar="NAME",
+                    help="With --cycles, sweep every corpus document building on "
+                         "this baseline instead of naming them individually")
     ap.add_argument("--pattern", action="append",
                     help="Limit to named pattern(s); repeatable")
     ap.add_argument("--matrix", action="store_true",
@@ -233,15 +387,34 @@ def main():
                     help="Emit findings as JSON")
     args = ap.parse_args()
 
-    documents = []
-    for path in args.documents:
-        data = load_json(path)
-        if data is None:
-            print(f"ERROR: could not load {path}", file=sys.stderr)
+    if args.on_baseline:
+        if not args.cycles:
+            print("ERROR: --on-baseline is only meaningful with --cycles",
+                  file=sys.stderr)
             return 2
-        documents.append((Path(path).name, data))
+        documents = documents_on_baseline(args.on_baseline)
+        if not documents:
+            print(f"ERROR: no documents build on '{args.on_baseline}'",
+                  file=sys.stderr)
+            return 2
+    else:
+        if not args.documents:
+            print("ERROR: give at least one document, or --on-baseline with --cycles",
+                  file=sys.stderr)
+            return 2
+        documents = []
+        for path in args.documents:
+            data = load_json(path)
+            if data is None:
+                print(f"ERROR: could not load {path}", file=sys.stderr)
+                return 2
+            documents.append((Path(path).name, data))
 
     prereqs = build_prerequisites(documents)
+
+    if args.cycles:
+        return report_cycles(find_prerequisite_cycles(prereqs), args.as_json)
+
     state_order = build_state_order(documents)
 
     primary = documents[0][1]
