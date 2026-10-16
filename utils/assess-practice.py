@@ -2189,6 +2189,93 @@ def _ordered_weights(entries, key_field, order_by_name):
     return [e for _, _, e in known], unknown
 
 
+_PATTERN_PREREQ_MODULE = None
+
+
+def _pattern_prereq_module():
+    """The standalone prerequisite checker, loaded once.
+
+    The logic lives in `check-pattern-prerequisites.py` because it is also
+    useful on its own — `--matrix` prints the view grid, which no assessment
+    report wants. Importing it rather than restating it keeps one definition
+    of what an inversion is.
+    """
+    global _PATTERN_PREREQ_MODULE
+    if _PATTERN_PREREQ_MODULE is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "check_pattern_prerequisites",
+            Path(__file__).resolve().parent / "check-pattern-prerequisites.py",
+        )
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _PATTERN_PREREQ_MODULE = mod
+    return _PATTERN_PREREQ_MODULE
+
+
+def check_pattern_view_prerequisites(data, kind, baseline_data=None,
+                                     parent_documents=None):
+    """@rule:pattern-prerequisites — a view may not assert a state its own
+    later views are the first to make reachable.
+
+    A pattern view declares the alpha states that hold at that point. Those
+    states may declare prerequisites of their own, and nothing else checks the
+    two against each other: a prerequisite loop is caught by the acyclicity
+    rules, but an ordering inversion inside one view sequence is not a loop.
+
+    Prerequisites are read from the merged picture, because state redeclaration
+    is additive and a practice alone carries only part of the graph. A
+    prerequisite on an alpha the pattern never carries is reported as
+    `unreached` rather than inverted — view compression makes that ordinary.
+    """
+    if kind == "practiceBaseline":
+        return []
+    try:
+        mod = _pattern_prereq_module()
+    except Exception:
+        return []
+
+    documents = [("document", data)]
+    if baseline_data:
+        documents.append(("effective context", baseline_data))
+    documents.extend(parent_documents or [])
+    prereqs = mod.build_prerequisites(documents)
+    state_order = mod.build_state_order(documents)
+
+    issues = []
+    for source in mod.iter_documents(data):
+        pfx = "" if source is data else f"practice[{source.get('name', '?')}]."
+        for p_idx, pattern in enumerate(source.get("patterns", [])):
+            findings = mod.check_pattern(pattern, prereqs, state_order)
+            findings += mod.check_monotonicity(pattern, state_order)
+            for f in findings:
+                if f["kind"] == "unreached":
+                    continue
+                if f["kind"] == "regression":
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' moves {f['state']} backwards: {f['detail']}"
+                    )
+                else:
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' asserts {f['state']}, which requires "
+                        f"{f['prerequisite']} — {f['detail']}"
+                    )
+                issues.append({
+                    "severity": "warning",
+                    "category": "pattern-prerequisites",
+                    "path": f"{pfx}patterns[{p_idx}].patternViews",
+                    "message": message,
+                    "suggestion": (
+                        "Move the state to a later view, bring the prerequisite "
+                        "forward, or drop the prerequisite if the ordering is wrong"
+                    ),
+                    "autoFixable": False,
+                })
+    return issues
+
+
 def check_forecast_monotonicity(data, kind, baseline_data=None):
     """Check forecastWeight curves rise monotonically toward the recognised point.
 
@@ -4648,6 +4735,12 @@ def main():
                                 existing.add(elem["name"])
                 break
 
+    # Kept unmerged as well as merged. `_merge_elements` adds an element only
+    # where its name is new, so a dependency's redeclaration of a baseline alpha
+    # is dropped — but redeclaration is additive, and a check reading state
+    # prerequisites needs the contributions that drops.
+    parent_documents = []
+
     if baseline_data and args.parent:
         bl_alpha_set = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}
@@ -4721,6 +4814,7 @@ def main():
                     "autoFixable": False,
                 })
                 continue
+            parent_documents.append((Path(parent_path).name, parent_data))
             _merge_elements(parent_data)
             if parent_data.get("kind") == "method":
                 for practice in parent_data.get("practices", []):
@@ -4753,6 +4847,8 @@ def main():
 
     all_issues.extend(check_references(data, kind, baseline_data))
     all_issues.extend(check_outcomes(data, kind, baseline_data))
+    all_issues.extend(check_pattern_view_prerequisites(
+        data, kind, baseline_data, parent_documents))
     all_issues.extend(check_forecast_monotonicity(data, kind, baseline_data))
 
     if kind == "practiceBaseline" and args.parent:

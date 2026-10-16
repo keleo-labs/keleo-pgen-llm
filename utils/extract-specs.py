@@ -75,6 +75,7 @@ ASSESS_CATEGORY_BRIDGE = {
     "coverage-003": ["evidence-coverage"],
     "coverage-004": ["pattern-coverage"],
     "coverage-005": ["activity-state-gap"],
+    "coverage-006": ["pattern-prerequisites"],
     "narrative-001": ["narrative-structure"],
     "narrative-002": ["narrative-placement"],
     "narrative-003": ["narrative-self-reference"],

@@ -266,4 +266,12 @@ MUTATIONS = [
         "the document declares no version or schemaVersion",
         lambda d: (d.pop("version", None), d.pop("schemaVersion", None)),
     ),
+    (
+        "qual:pattern-prerequisites", "prerequisite-after-assertion",
+        "the pattern's first view asserts a state whose prerequisite its last view reaches",
+        lambda d: _alpha(d, "Platform Onboarding")["states"][0].__setitem__(
+            "background", {"alphaStates": [
+                {"alphaName": "Onboarding Readiness", "stateName": "Enforced"},
+            ]}),
+    ),
 ]

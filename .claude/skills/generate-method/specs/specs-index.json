@@ -583,6 +583,27 @@
       "automatable": true
     },
     {
+      "id": "coverage-006",
+      "name": "Pattern views reach prerequisites before they assert them",
+      "feature": "Coverage Completeness",
+      "given": [
+        "A pattern view asserts an alpha state that declares `background.alphaStates`"
+      ],
+      "when": [
+        "The views are walked in `seq` order against the merged prerequisite graph"
+      ],
+      "then": [
+        "Each prerequisite is reached at that view or an earlier one",
+        "A later state of the same alpha counts as reaching an earlier one",
+        "An alpha state declared at one view does not go backwards at a later view"
+      ],
+      "line": 963,
+      "assess_categories": [
+        "pattern-prerequisites"
+      ],
+      "automatable": true
+    },
+    {
       "id": "aliasing-001",
       "name": "One alias per element maximum",
       "feature": "Terminology Aliasing",
@@ -595,7 +616,7 @@
       "then": [
         "Each baseline element has at most one alias"
       ],
-      "line": 965,
+      "line": 972,
       "assess_categories": [
         "alias-uniqueness"
       ],
@@ -615,7 +636,7 @@
         "Only canonical baseline names appear in structural reference fields",
         "Alias names never appear in structural reference fields"
       ],
-      "line": 970,
+      "line": 977,
       "assess_categories": [
         "alias-isolation"
       ],
@@ -634,7 +655,7 @@
       "then": [
         "The array contains between 10 and 20 keywords"
       ],
-      "line": 976,
+      "line": 983,
       "assess_categories": [
         "keyword-count"
       ],
@@ -653,7 +674,7 @@
       "then": [
         "The `kind` property is \"practice\" for single practices, \"method\" for multi-practice methods"
       ],
-      "line": 983,
+      "line": 990,
       "assess_categories": [
         "structure"
       ],
@@ -672,7 +693,7 @@
       "then": [
         "alphas, activities, workProducts, patterns, and citations arrays are present and non-empty"
       ],
-      "line": 988,
+      "line": 995,
       "assess_categories": [
         "structure"
       ],
@@ -692,7 +713,7 @@
         "Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline",
         "Every stateName resolves to a valid state on that alpha"
       ],
-      "line": 993,
+      "line": 1000,
       "assess_categories": [
         "crossref-pattern"
       ],
@@ -711,7 +732,7 @@
       "then": [
         "Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state"
       ],
-      "line": 999,
+      "line": 1006,
       "assess_categories": [
         "crossref-activity-alpha"
       ],
@@ -730,7 +751,7 @@
       "then": [
         "Every workProductName and levelOfDetailName in worksOn resolves to defined elements"
       ],
-      "line": 1004,
+      "line": 1011,
       "assess_categories": [
         "crossref-activity-wp"
       ],
@@ -750,7 +771,7 @@
         "01-analysis-report.md exists with all 8 required sections",
         "Analysis has sufficient depth (5+ numbered subsections and 3+ source references)"
       ],
-      "line": 1011,
+      "line": 1018,
       "assess_categories": [],
       "automatable": false
     },
@@ -768,7 +789,7 @@
         "02-mapping-guide.md exists with all 7 required sections",
         "At least 3 alphas, 5 activities, and 1 pattern are mapped"
       ],
-      "line": 1017,
+      "line": 1024,
       "assess_categories": [],
       "automatable": false
     },
@@ -786,19 +807,19 @@
         "validate-practice-json.py has been run with 0 schema errors",
         "assess-practice.py has been run with 0 error-severity issues"
       ],
-      "line": 1023,
+      "line": 1030,
       "assess_categories": [],
       "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 40,
+    "total_scenarios": 41,
     "total_features": 8,
-    "automatable": 33,
+    "automatable": 34,
     "manual_only": 7,
     "by_category": {
       "aliasing": 3,
-      "coverage": 5,
+      "coverage": 6,
       "fidelity": 3,
       "naming": 5,
       "narrative": 5,

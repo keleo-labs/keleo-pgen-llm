@@ -137,6 +137,7 @@ ASSESS_CATEGORY_MAP = {
     "qual:pattern-progression": ("pattern-alpha-progression", "pattern-misaligned-state"),
     "qual:pattern-shape": ("pattern-few-views", "pattern-single-alpha", "pattern-sparse-alpha"),
     "qual:pattern-views": ("pattern-view-completeness", "pattern-view-state-density"),
+    "qual:pattern-prerequisites": ("pattern-prerequisites",),
     "qual:reference-quality": ("reference-evidence", "reference-merge", "reference-anchor"),
     "qual:versioning": ("versioning",),
 }
@@ -282,6 +283,7 @@ ASSERTION_TEXTS = {
     "qual:pattern-progression": "Pattern alphas show progression, states aligned",
     "qual:pattern-shape": "Patterns have enough views and alphas",
     "qual:pattern-views": "Pattern views complete and adequately dense",
+    "qual:pattern-prerequisites": "Pattern views reach prerequisites before asserting states",
     "qual:reference-quality": "References are actionable artifacts with anchored URLs",
     "qual:versioning": "version and schemaVersion present",
 }
@@ -648,6 +650,7 @@ def eval_phase_3(json_path, baseline=None, schema=None, parents=None):
         if kind == "practiceBaseline" and assertion_id in (
             "xref:reference-integrity", "qual:reference-quality",
             "qual:pattern-progression", "qual:pattern-shape", "qual:pattern-views",
+            "qual:pattern-prerequisites",
             "rel:mapsto-lod",
         ):
             continue
