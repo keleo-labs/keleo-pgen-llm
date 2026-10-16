@@ -2247,14 +2247,36 @@ def check_pattern_view_prerequisites(data, kind, baseline_data=None,
         pfx = "" if source is data else f"practice[{source.get('name', '?')}]."
         for p_idx, pattern in enumerate(source.get("patterns", [])):
             findings = mod.check_pattern(pattern, prereqs, state_order)
+            findings += mod.check_ambiguity(pattern)
             findings += mod.check_monotonicity(pattern, state_order)
             for f in findings:
-                if f["kind"] == "unreached":
+                # `unreached` follows from ordinary view compression, and
+                # `entry` and `cyclical` describe orderings the language
+                # permits — the first view states conditions met before the
+                # pattern begins, and inside a loop an earlier state is the
+                # minimum for that pass. Reporting them would bury the
+                # orderings that are actually wrong.
+                if f["kind"] in ("unreached", "entry", "cyclical"):
                     continue
-                if f["kind"] == "regression":
+                if f["kind"] == "ambiguous":
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' is ambiguous: "
+                        f"{f['state'].rsplit('.', 1)[0]} {f['detail']}"
+                    )
+                    suggestion = (
+                        "Split the view into sequential sub-views so each "
+                        "advances the alpha by one state, or drop the repeat"
+                    )
+                elif f["kind"] == "regression":
                     message = (
                         f"Pattern '{f['pattern']}' view {f['viewSeq']} "
                         f"'{f['viewName']}' moves {f['state']} backwards: {f['detail']}"
+                    )
+                    suggestion = (
+                        "Reorder the placements to follow the alpha's states; "
+                        "if the lifecycle genuinely repeats, declare loopsBackTo "
+                        "on the closing view instead"
                     )
                 else:
                     message = (
@@ -2262,15 +2284,16 @@ def check_pattern_view_prerequisites(data, kind, baseline_data=None,
                         f"'{f['viewName']}' asserts {f['state']}, which requires "
                         f"{f['prerequisite']} — {f['detail']}"
                     )
+                    suggestion = (
+                        "Move the state to a later view, bring the prerequisite "
+                        "forward, or drop the prerequisite if the ordering is wrong"
+                    )
                 issues.append({
                     "severity": "warning",
                     "category": "pattern-prerequisites",
                     "path": f"{pfx}patterns[{p_idx}].patternViews",
                     "message": message,
-                    "suggestion": (
-                        "Move the state to a later view, bring the prerequisite "
-                        "forward, or drop the prerequisite if the ordering is wrong"
-                    ),
+                    "suggestion": suggestion,
                     "autoFixable": False,
                 })
     return issues
