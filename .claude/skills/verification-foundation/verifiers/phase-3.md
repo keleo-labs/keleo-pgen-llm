@@ -49,6 +49,17 @@ python3 utils/fix-citation-urls.py {JSON} --json --check-missing
 > `python3 utils/extract-reference-names.py {JSON} --sections ... --alpha-details`
 > rather than reading the whole JSON where you only need the inventory.
 >
+> **Seed the pattern half mechanically** before reading anything:
+>
+> ```bash
+> python3 utils/validate-phase-output.py {GUIDE} --phase 2 --against-json {JSON}
+> ```
+>
+> Its `json_agreement` findings name every pattern and view the two documents
+> disagree about. Treat each as a candidate, not a verdict — a pattern dropped by
+> an explicit decision the guide records is not drift. One the guide does not
+> account for is, and so is a view that appeared at generation time.
+>
 > **Method — diff in both directions:**
 >
 > **A. Invention — in the JSON, not derivable from the guide.** Concentrate on the
