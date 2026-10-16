@@ -11,12 +11,22 @@ since the state progression is already visible on the alpha itself).
 
 A reversed alpha is one whose state indices decrease across views — e.g., an
 alpha at an advanced state in an early view and a beginning state in a later view.
-With --fix, reversed alphas have their states reordered to follow the canonical
+With --fix --reorder-reversed, those states are reordered to follow the canonical
 progression from the alpha's state array.
+
+Reordering is opt-in because a backwards walk has several causes and reordering
+addresses only one of them. It is the right answer when a pattern placed a sound
+progression in the wrong order. It is the wrong answer when the lifecycle
+genuinely repeats, which `loopsBackTo` exists to declare; when the alpha's own
+state array is misordered, which reordering the pattern merely hides; and when
+the alpha's states are variants rather than stages, which no ordering fixes.
+`check-pattern-prerequisites.py` tells these apart — run it first and reorder
+only what it still calls a regression.
 
 Usage:
     python3 utils/fix-pattern-progression.py practice.json
     python3 utils/fix-pattern-progression.py practice.json --fix
+    python3 utils/fix-pattern-progression.py practice.json --fix --reorder-reversed
     python3 utils/fix-pattern-progression.py practice.json --fix --bump minor
 """
 
@@ -95,8 +105,23 @@ def find_reversed_ordering(pattern, state_index):
     return reversed_alphas
 
 
-def fix_pattern_progression(data, dry_run=True):
-    """Remove non-progressing alphas and fix reversed ordering. Returns list of fix descriptions."""
+def fix_pattern_progression(data, dry_run=True, actions=None):
+    """Remove non-progressing alphas and fix reversed ordering.
+
+    ``actions`` selects which of the two to apply. They are separated because
+    only one of them is always safe. Removing an alpha that never changes state
+    follows from `semantics/execution-and-patterns.md` §9.2 rule 1 and is true
+    of the document whatever the lifecycle means. Reordering a reversed alpha
+    assumes the pattern placed a sound progression in the wrong order — which
+    is one of several reasons a state can appear to go backwards, and the only
+    one reordering fixes. It is wrong for a lifecycle that genuinely repeats
+    (declare `loopsBackTo`), for an alpha whose own state array is misordered,
+    and for an alpha whose states are variants rather than stages. Run
+    `check-pattern-prerequisites.py` first: it tells those cases apart.
+
+    Returns a list of fix descriptions.
+    """
+    actions = set(actions) if actions else {"remove", "reorder"}
     fixes = []
     state_index = build_state_index(data)
     sources = [data]
@@ -118,6 +143,8 @@ def fix_pattern_progression(data, dry_run=True):
                     total_alphas.add(alpha_state.get("alphaName", ""))
 
             if len(total_alphas) < 2:
+                if "remove" not in actions:
+                    continue
                 fixes.append({
                     "action": "remove-pattern",
                     "pattern": pat_name,
@@ -129,40 +156,42 @@ def fix_pattern_progression(data, dry_run=True):
                     patterns.pop(pi)
                 continue
 
-            non_prog = find_non_progressing(pattern)
-            if not non_prog:
-                continue
+            non_prog = find_non_progressing(pattern) if "remove" in actions else {}
 
-            remaining = total_alphas - set(non_prog.keys())
+            if non_prog:
+                remaining = total_alphas - set(non_prog.keys())
 
-            if len(remaining) < 2:
-                fixes.append({
-                    "action": "remove-pattern",
-                    "pattern": pat_name,
-                    "practice": source_name,
-                    "reason": f"Only {len(remaining)} alpha(s) progress; removing degenerate pattern",
-                    "removed_alphas": list(non_prog.keys()),
-                })
+                if len(remaining) < 2:
+                    fixes.append({
+                        "action": "remove-pattern",
+                        "pattern": pat_name,
+                        "practice": source_name,
+                        "reason": f"Only {len(remaining)} alpha(s) progress; removing degenerate pattern",
+                        "removed_alphas": list(non_prog.keys()),
+                    })
+                    if not dry_run:
+                        patterns.pop(pi)
+                    continue
+
+                for alpha_name, stuck_state in non_prog.items():
+                    fixes.append({
+                        "action": "remove-alpha",
+                        "pattern": pat_name,
+                        "practice": source_name,
+                        "alpha": alpha_name,
+                        "stuck_state": stuck_state,
+                        "views_affected": len(views),
+                    })
+
                 if not dry_run:
-                    patterns.pop(pi)
+                    for view in views:
+                        view["alphaStates"] = [
+                            a for a in view.get("alphaStates", [])
+                            if a.get("alphaName", "") not in non_prog
+                        ]
+
+            if "reorder" not in actions:
                 continue
-
-            for alpha_name, stuck_state in non_prog.items():
-                fixes.append({
-                    "action": "remove-alpha",
-                    "pattern": pat_name,
-                    "practice": source_name,
-                    "alpha": alpha_name,
-                    "stuck_state": stuck_state,
-                    "views_affected": len(views),
-                })
-
-            if not dry_run:
-                for view in views:
-                    view["alphaStates"] = [
-                        a for a in view.get("alphaStates", [])
-                        if a.get("alphaName", "") not in non_prog
-                    ]
 
             reversed_alphas = find_reversed_ordering(pattern, state_index)
             for alpha_name, info in reversed_alphas.items():
@@ -202,6 +231,13 @@ def main():
     parser.add_argument("file", help="Practice or method JSON file")
     parser.add_argument("--fix", action="store_true",
                         help="Apply fixes in-place (default: dry run)")
+    parser.add_argument("--reorder-reversed", action="store_true",
+                        help="Also reorder an alpha whose states run backwards. "
+                             "Opt-in, because a backwards walk has several causes "
+                             "and reordering only fixes one of them — run "
+                             "check-pattern-prerequisites.py first to tell a "
+                             "misplaced state from a genuine loop, a misordered "
+                             "state array, or states that are really variants")
     parser.add_argument("--bump", choices=["patch", "minor", "major"],
                         default=None,
                         help="Bump version after fixing (default: no bump)")
@@ -213,7 +249,10 @@ def main():
     if data is None:
         sys.exit(1)
 
-    fixes = fix_pattern_progression(data, dry_run=not args.fix)
+    actions = {"remove"}
+    if args.reorder_reversed:
+        actions.add("reorder")
+    fixes = fix_pattern_progression(data, dry_run=not args.fix, actions=actions)
 
     if args.json:
         print(json.dumps(fixes, indent=2))

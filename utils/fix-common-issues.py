@@ -910,31 +910,33 @@ def fix_narrative_placement(data):
 
 
 def fix_pattern_completeness(data):
-    """Add carry-forward alpha states to pattern views missing practice alphas,
-    then compress by removing unchanged carry-forward states from non-final views."""
+    """Restate each pattern's own alphas in its final view, then compress.
+
+    The final view is a complete end-state snapshot of **the alphas this
+    pattern carries** — the ones whose state it actually changes. It is not a
+    roll-call of the practice.
+
+    Taking the roll-call reading is what fills closing views with alphas
+    belonging to a different pattern, at whichever state came to hand: with no
+    appearance anywhere in the pattern there is no state to carry forward, so
+    the only candidate is the alpha's first. A pattern that ends by announcing
+    three alphas at their opening states is reporting the fixer, not the
+    methodology. So an alpha the pattern never advanced is skipped here, per
+    `semantics/execution-and-patterns.md` §9.2 rule 1 and the Participation
+    Rule in `references/pattern-completeness.md`.
+    """
     fixes = []
     sources = [data]
     if "practices" in data:
         sources.extend(data.get("practices", []))
 
     for source in sources:
-        alpha_first_state = {}
-        for alpha in source.get("alphas", []):
-            aname = alpha.get("name", "")
-            states = alpha.get("states", [])
-            if aname and states:
-                alpha_first_state[aname] = states[0].get("name", "")
-
-        all_alpha_names = set(alpha_first_state.keys())
-        if len(all_alpha_names) < 2:
-            continue
-
         for pi, pattern in enumerate(source.get("patterns", [])):
             pat_name = pattern.get("name", f"pattern[{pi}]")
             views = pattern.get("patternViews", [])
             views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
 
-            # Pass 1: Add carry-forward states for truly missing alphas (final view only)
+            # Pass 1: Restate carried alphas missing from the final view
             last_state = {}
             for vi, view in enumerate(views_sorted):
                 is_final = (vi == len(views_sorted) - 1)
@@ -946,10 +948,12 @@ def fix_pattern_completeness(data):
 
                 if is_final:
                     view_alphas = {a.get("alphaName", "") for a in view.get("alphaStates", [])}
-                    missing = all_alpha_names - view_alphas
+                    # last_state holds exactly the alphas some view advanced,
+                    # which is the set the pattern carries.
+                    missing = set(last_state) - view_alphas
                     for aname in sorted(missing):
-                        carry = last_state.get(aname, alpha_first_state.get(aname, ""))
-                        if not carry:
+                        carry = last_state.get(aname, "")
+                        if not aname or not carry:
                             continue
                         view.setdefault("alphaStates", []).append({
                             "alphaName": aname,

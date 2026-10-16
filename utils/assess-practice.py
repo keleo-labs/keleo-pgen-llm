@@ -4124,7 +4124,14 @@ def check_narrative_name_uniqueness(data, kind):
 
 
 def check_pattern_alpha_coverage(data, kind):
-    """Check that patterns cover all practice alphas."""
+    """Check that the practice's patterns, taken together, cover its alphas.
+
+    Coverage is a property of the practice, not of each pattern. A pattern
+    carries the alphas whose state it changes (`semantics/execution-and-
+    patterns.md` §9.2 rule 1); asking every pattern to carry every alpha forces
+    alphas into lifecycles they have no part in, at whichever state is nearest
+    to hand, and the closing view is where they land.
+    """
     issues = []
 
     sources = [data]
@@ -4140,28 +4147,32 @@ def check_pattern_alpha_coverage(data, kind):
         if len(alpha_names) < 2:
             continue
 
-        for pi, pat in enumerate(source.get("patterns", [])):
-            pat_name = pat.get("name", f"<unnamed-{pi}>")
-            covered = set()
+        covered_anywhere = set()
+        for pat in source.get("patterns", []):
             for view in pat.get("patternViews", []):
                 for astate in view.get("alphaStates", []):
-                    covered.add(astate.get("alphaName", ""))
+                    covered_anywhere.add(astate.get("alphaName", ""))
 
-            missing = alpha_names - covered
-            if missing:
-                issues.append({
-                    "severity": "warning",
-                    "category": "pattern-coverage",
-                    "path": f"{pfx}patterns[{pat_name}]",
-                    "message": (
-                        f"Pattern '{pat_name}' covers {len(covered)}/{len(alpha_names)} "
-                        f"alphas. Missing: {sorted(missing)}"
-                    ),
-                    "autoFixable": False,
-                })
+        uncovered = alpha_names - covered_anywhere
+        if uncovered and source.get("patterns"):
+            issues.append({
+                "severity": "warning",
+                "category": "pattern-coverage",
+                "path": f"{pfx}patterns",
+                "message": (
+                    f"{len(alpha_names) - len(uncovered)}/{len(alpha_names)} alphas "
+                    f"take part in a pattern. Absent from all of them: "
+                    f"{sorted(uncovered)}"
+                ),
+                "autoFixable": False,
+            })
 
-            # Final-view completeness: all alphas must appear in the last view
-            # Non-final views use compression (unchanged states omitted)
+        for pi, pat in enumerate(source.get("patterns", [])):
+            pat_name = pat.get("name", f"<unnamed-{pi}>")
+
+            # Final-view completeness: the alphas THIS pattern advances must
+            # appear in its last view, each at the last state it reached.
+            # Non-final views use compression (unchanged states omitted).
             views_sorted = sorted(
                 pat.get("patternViews", []),
                 key=lambda v: v.get("seq", 0),
@@ -4170,11 +4181,16 @@ def check_pattern_alpha_coverage(data, kind):
                 final_view = views_sorted[-1]
                 final_seq = final_view.get("seq", "?")
                 final_name = final_view.get("name", "?")
+                carried = {
+                    astate.get("alphaName", "")
+                    for view in views_sorted
+                    for astate in view.get("alphaStates", [])
+                }
                 final_alphas = {
                     astate.get("alphaName", "")
                     for astate in final_view.get("alphaStates", [])
                 }
-                final_missing = alpha_names - final_alphas
+                final_missing = carried - final_alphas
                 if final_missing:
                     issues.append({
                         "severity": "warning",
@@ -4182,8 +4198,8 @@ def check_pattern_alpha_coverage(data, kind):
                         "path": f"{pfx}patterns[{pat_name}].patternViews[{final_seq}]",
                         "message": (
                             f"Pattern '{pat_name}' final view {final_seq} '{final_name}' "
-                            f"missing alphas (all must appear in final view): "
-                            f"{sorted(final_missing)}"
+                            f"omits alphas the pattern advances (the final view is a "
+                            f"snapshot of what it carries): {sorted(final_missing)}"
                         ),
                         "autoFixable": False,
                     })

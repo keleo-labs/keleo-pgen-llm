@@ -735,15 +735,14 @@ def _heading_blocks(content):
         yield depth, m.group(2).strip(), content[m.end():end]
 
 
-def extract_described_patterns(content):
-    """Patterns the phase output describes, as {name: [view names]}.
+def iter_pattern_sections(content):
+    """Yield (pattern name, section body) for every pattern the guide describes.
 
     A subsection counts as a pattern when its body carries a "Pattern Views"
     block. That is structural rather than a guess from the title, so a section
     *about* patterns — an orchestration note, an overarching lifecycle summary —
     is not mistaken for one.
     """
-    described = {}
     for _, title, body in _heading_blocks(content):
         # Only the section's own prose counts. A body runs to the next heading
         # of the same depth, so it contains its children — and without this a
@@ -760,9 +759,15 @@ def extract_described_patterns(content):
         name = re.sub(r"^Pattern\s*[:—–-]\s*", "", name, flags=re.IGNORECASE).strip()
         if not name or _norm(name) in ("patterns", "pattern views", "pattern mappings"):
             continue
-        views = [v["name"] for v in extract_pattern_views(body) if v.get("name")]
-        described[name] = views
-    return described
+        yield name, body
+
+
+def extract_described_patterns(content):
+    """Patterns the phase output describes, as {name: [view names]}."""
+    return {
+        name: [v["name"] for v in extract_pattern_views(body) if v.get("name")]
+        for name, body in iter_pattern_sections(content)
+    }
 
 
 def _norm(name):
@@ -913,7 +918,24 @@ def validate_pattern_views(content):
         })
         return checks
 
-    views = extract_pattern_views(content)
+    # Each pattern is judged on its own views and its own alphas. Pooling them
+    # makes every pattern's closing view the final view of all of them — two
+    # patterns ending at seq 4 both count as "final" — and demands that each
+    # carry every alpha in the guide, including alphas belonging to a different
+    # lifecycle. Guides that satisfy that demand are how closing views come to
+    # hold alphas the pattern never advanced, parked at their opening state.
+    sections = list(iter_pattern_sections(content))
+    if not sections:
+        sections = [(None, content)]
+
+    views = []
+    for pattern_name, body in sections:
+        section_views = extract_pattern_views(body)
+        if not section_views:
+            continue
+        views.extend(section_views)
+        checks.extend(_validate_one_pattern(pattern_name, section_views, alphas))
+
     if not views:
         checks.append({
             "check": "pattern_views_found",
@@ -928,91 +950,23 @@ def validate_pattern_views(content):
         "pass": len(views) >= 2,
     })
 
-    expected_alphas = set(alphas.keys())
-    # phase-2-skill.md "State Compression Rule": non-final views carry ONLY the
-    # alpha states that change from the previous view; unchanged states are
-    # implicit carry-forward. Only the final view must be a complete snapshot.
-    # Requiring every alpha in every view contradicts that rule and fails
-    # correctly-compressed guides.
-    final_seq = max(v["seq"] for v in views)
-
-    for view in views:
-        view_alphas = {a for a, _ in view["alpha_states"]}
-        is_final = view["seq"] == final_seq
-        missing = expected_alphas - view_alphas
-        extra = view_alphas - expected_alphas
-
-        if is_final:
-            checks.append({
-                "check": f"view_{view['seq']}_alpha_count",
-                "description": (
-                    f"Final view {view['seq']} ({view['name']}) is a complete "
-                    f"snapshot: {len(view_alphas)} alphas"
-                ),
-                "expected": len(expected_alphas),
-                "actual": len(view_alphas),
-                "pass": not missing,
-            })
-            if missing:
-                checks.append({
-                    "check": f"view_{view['seq']}_missing_alphas",
-                    "description": f"Final view {view['seq']} missing alphas",
-                    "missing": sorted(missing),
-                    "pass": False,
-                })
-        else:
-            # A compressed view may legitimately carry a subset, but an empty
-            # one should have been eliminated and its activities merged.
-            checks.append({
-                "check": f"view_{view['seq']}_alpha_count",
-                "description": (
-                    f"View {view['seq']} ({view['name']}): {len(view_alphas)} "
-                    f"changed alphas (compressed)"
-                ),
-                "expected": ">=1",
-                "actual": len(view_alphas),
-                "pass": len(view_alphas) >= 1,
-            })
-        if extra:
-            # Informational, not scored. A pattern view may legitimately place
-            # an *inherited* alpha (redeclared, or merely related) alongside the
-            # practice's own. This parser reads only the markdown, so it cannot
-            # see the effective context and must not call that a defect.
-            checks.append({
-                "check": f"view_{view['seq']}_alphas_not_declared_here",
-                "description": (
-                    f"View {view['seq']} names alphas not declared in this guide "
-                    f"(expected if they are inherited)"
-                ),
-                "names": sorted(extra),
-            })
-
-        for alpha_name, state_name in view["alpha_states"]:
-            if alpha_name in alphas:
-                valid_states = alphas[alpha_name]
-                if state_name not in valid_states:
-                    checks.append({
-                        "check": f"view_{view['seq']}_invalid_state",
-                        "description": f"View {view['seq']}: invalid state \"{state_name}\" for alpha \"{alpha_name}\"",
-                        "valid_states": valid_states,
-                        "pass": False,
-                    })
-
-        alpha_counts = {}
-        for a, _ in view["alpha_states"]:
-            alpha_counts[a] = alpha_counts.get(a, 0) + 1
-        for a, count in alpha_counts.items():
-            if count > 2:
-                checks.append({
-                    "check": f"view_{view['seq']}_state_density",
-                    "description": f"View {view['seq']}: alpha \"{a}\" has {count} states (max 2)",
-                    "pass": False,
-                })
-
     all_states_used = {}
     for view in views:
         for alpha_name, state_name in view["alpha_states"]:
             all_states_used.setdefault(alpha_name, set()).add(state_name)
+
+    # Practice-level coverage: an alpha should take part in some pattern, not
+    # in every pattern (references/pattern-completeness.md, Participation Rule).
+    uncovered = sorted(set(alphas) - set(all_states_used))
+    checks.append({
+        "check": "alpha_pattern_coverage",
+        "description": (
+            f"{len(alphas) - len(uncovered)}/{len(alphas)} alphas take part in "
+            f"at least one pattern"
+        ),
+        "missing": uncovered,
+        "pass": not uncovered,
+    })
 
     for alpha_name, defined_states in alphas.items():
         used = all_states_used.get(alpha_name, set())
@@ -1026,6 +980,117 @@ def validate_pattern_views(content):
             })
 
     return checks
+
+
+def _validate_one_pattern(pattern_name, views, alphas):
+    """Checks for a single pattern's views, judged against the alphas it carries."""
+    checks = []
+    label = f"{pattern_name}: " if pattern_name else ""
+    prefix = f"{_slug(pattern_name)}_" if pattern_name else ""
+    expected_alphas = set(alphas.keys())
+
+    # The alphas this pattern carries are the ones it names, not the ones the
+    # practice declares. The final view is a snapshot of those.
+    carried = {a for v in views for a, _ in v["alpha_states"]}
+    # phase-2-skill.md "State Compression Rule": non-final views carry ONLY the
+    # alpha states that change from the previous view; unchanged states are
+    # implicit carry-forward. Only the final view must be a complete snapshot.
+    # Requiring every alpha in every view contradicts that rule and fails
+    # correctly-compressed guides.
+    final_seq = max(v["seq"] for v in views)
+
+    for view in views:
+        view_alphas = {a for a, _ in view["alpha_states"]}
+        is_final = view["seq"] == final_seq
+        missing = carried - view_alphas
+        extra = view_alphas - expected_alphas
+
+        if is_final:
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alpha_count",
+                "description": (
+                    f"{label}final view {view['seq']} ({view['name']}) is a "
+                    f"complete snapshot of the {len(carried)} alphas this "
+                    f"pattern carries"
+                ),
+                "expected": len(carried),
+                "actual": len(view_alphas),
+                "pass": not missing,
+            })
+            if missing:
+                checks.append({
+                    "check": f"{prefix}view_{view['seq']}_missing_alphas",
+                    "description": (
+                        f"{label}final view {view['seq']} omits alphas this "
+                        f"pattern advances"
+                    ),
+                    "missing": sorted(missing),
+                    "pass": False,
+                })
+        else:
+            # A compressed view may legitimately carry a subset, but an empty
+            # one should have been eliminated and its activities merged.
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alpha_count",
+                "description": (
+                    f"{label}view {view['seq']} ({view['name']}): "
+                    f"{len(view_alphas)} changed alphas (compressed)"
+                ),
+                "expected": ">=1",
+                "actual": len(view_alphas),
+                "pass": len(view_alphas) >= 1,
+            })
+        if extra:
+            # Informational, not scored. A pattern view may legitimately place
+            # an *inherited* alpha (redeclared, or merely related) alongside the
+            # practice's own. This parser reads only the markdown, so it cannot
+            # see the effective context and must not call that a defect.
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alphas_not_declared_here",
+                "description": (
+                    f"{label}view {view['seq']} names alphas not declared in "
+                    f"this guide (expected if they are inherited)"
+                ),
+                "names": sorted(extra),
+            })
+
+        for alpha_name, state_name in view["alpha_states"]:
+            if alpha_name in alphas:
+                valid_states = alphas[alpha_name]
+                if state_name not in valid_states:
+                    checks.append({
+                        "check": f"{prefix}view_{view['seq']}_invalid_state",
+                        "description": (
+                            f"{label}view {view['seq']}: invalid state "
+                            f"\"{state_name}\" for alpha \"{alpha_name}\""
+                        ),
+                        "valid_states": valid_states,
+                        "pass": False,
+                    })
+
+        alpha_counts = {}
+        for a, _ in view["alpha_states"]:
+            alpha_counts[a] = alpha_counts.get(a, 0) + 1
+        for a, count in alpha_counts.items():
+            if count > 1:
+                # One alpha, one target state per view. Two make the view
+                # ambiguous about what it is asking for, and make the walk
+                # across views look as though it moves backwards.
+                checks.append({
+                    "check": f"{prefix}view_{view['seq']}_state_density",
+                    "description": (
+                        f"{label}view {view['seq']}: alpha \"{a}\" has {count} "
+                        f"states (max 1 — split into sub-views)"
+                    ),
+                    "pass": False,
+                })
+
+    return checks
+
+
+def _slug(name):
+    """A check-name fragment from a pattern title."""
+    return re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")[:40]
 
 
 def print_file_stats(paths):

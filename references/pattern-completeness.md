@@ -1,8 +1,12 @@
 # Pattern Completeness Requirements
 
-Patterns MUST show complete alpha state progressions across all PatternViews.
+A pattern MUST show the complete state progression of every alpha it carries. What it carries is the question this document answers first, because getting it wrong manufactures the defects the rest of it tries to prevent.
 
-**State Compression Rule:** In the JSON output, only include an alpha state in a PatternView when the state CHANGES from the previous view. Unchanged states are implicitly carried forward. The FINAL PatternView is the exception — it MUST include ALL alphas (even if unchanged) to provide a complete snapshot of the end state. This prevents verbose patterns where 50%+ of entries are redundant carry-forwards.
+**Participation Rule:** A pattern carries an alpha when that alpha **changes state** across the pattern's views. An alpha that holds one state throughout is background to the pattern, not a participant, and `semantics/execution-and-patterns.md` §9.2 rule 1 says to remove it from every view rather than restate it. This is decided per pattern: a practice with three patterns will have alphas that participate in one and not the others, and that is correct, not a gap.
+
+**Coverage is satisfied across the practice's patterns, not within each one.** Every practice alpha should appear in some pattern. Requiring every alpha in *every* pattern forces alphas into lifecycles they have no part in, at whatever state is nearest to hand — which is where "an alpha appearing only in the final view, at its opening state" comes from.
+
+**State Compression Rule:** In the JSON output, only include an alpha state in a PatternView when the state CHANGES from the previous view. Unchanged states are implicitly carried forward. The FINAL PatternView is the exception — it restates every alpha **the pattern carries**, each at **the last state it reached in that pattern**, so the closing view reads as a complete end-state snapshot for consumers that do not implement carry-forward. It never introduces an alpha the pattern did not advance, and never restates one at a state earlier than it already reached. Compression keeps patterns from filling with redundant carry-forwards; the exception keeps the end state readable.
 
 **Empty View Elimination:** After compression, any non-final PatternView with zero alpha states should be removed. Merge its activities into the next view and renumber `seq` values. An empty view means no alpha progresses during that phase — the view adds no value to the pattern.
 
@@ -17,18 +21,19 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
 - Result: Initial pattern structure with explicit source mappings
 
 ### Pass 2: Alpha-Driven Completeness (REQUIRED)
-- **For each alpha in the pattern:**
+- **Decide which alphas the pattern carries** (Participation Rule above). An alpha the pattern never advances belongs to another pattern, or to none — leave it out rather than parking it at a state to fill a cell.
+- **For each alpha the pattern does carry:**
   - Review ALL states of the alpha
   - For EACH PatternView, determine appropriate state:
     - **First View (Prerequisites/Initial):** Starting state or "not yet started" state
     - **Middle Views:** Progressive states showing maturation
     - **Last View (Target/Final):** Advanced/optimized state
   - **Backfill missing alpha states** using these heuristics:
-    - If alpha doesn't appear in a view, identify which state is appropriate for that lifecycle phase
+    - If the alpha doesn't appear in a view it does participate in, identify which state is appropriate for that lifecycle phase
     - States should progress logically across views (earlier states -> later states)
   - **Apply state compression to the JSON output:**
     - **Non-final views:** Only include alpha states that CHANGE from the previous view. Omit unchanged carry-forward states.
-    - **Final view:** MUST include ALL alphas — even if their state hasn't changed from the previous view. This provides a complete end-state snapshot.
+    - **Final view:** restate every alpha the pattern carries, at the last state it reached. Never at an earlier state, and never an alpha the pattern did not advance.
 
 ### Pass 3: Related Alpha Discovery (OPTIONAL but RECOMMENDED)
 - **Identify candidate alphas from:**
@@ -130,25 +135,27 @@ Common anti-pattern: Patterns only include alpha states explicitly mentioned in 
    - Identify late-appearing alphas with advanced states
    - Backfill earlier views with progressive states for late alphas
 6. **Validate completeness:**
-   - Every alpha appears in the first view AND the final view (bookend rule)
+   - Every alpha the pattern carries appears in its first view AND its final view
+   - Alphas the pattern never advances appear in none of its views
    - Non-final views only include alpha states that CHANGE (compression)
    - States progress logically from early to late
-   - Final PatternView includes ALL alphas (even if state unchanged from previous view)
+   - The final PatternView restates every carried alpha at the last state it reached
    - No alpha has more than 2 states in a single view
    - No alpha suddenly appears late with advanced state (backfill complete)
 
 ## Pattern Completeness Checklist (Phase 2 Mapping)
 
-- [ ] Pattern identifies all participating alphas upfront
-- [ ] Each alpha has state progression documented across all views
+- [ ] Pattern identifies its participating alphas upfront — the ones whose state it changes
+- [ ] Alphas the pattern never advances are absent from it, not parked at a state
+- [ ] Every practice alpha participates in at least one of the practice's patterns
+- [ ] Each carried alpha has state progression documented across the views it participates in
 - [ ] Missing cells backfilled using state sequence analysis
-- [ ] Final PatternView includes ALL alphas (mandatory completeness rule)
 - [ ] Related alphas from dependencies considered for inclusion
 - [ ] Pattern narrative explains lifecycle progression coherently
 - [ ] **State compression (JSON output):**
   - [ ] Non-final views include ONLY alpha states that change from the previous view
   - [ ] No redundant carry-forward states in non-final views
-  - [ ] Final view includes ALL alphas (even if unchanged)
+  - [ ] Final view restates every carried alpha at the last state it reached
 - [ ] **State distribution quality (Pass 4):**
   - [ ] No alpha has more than 2 states in a single PatternView (prefer 1)
   - [ ] If 3+ states detected, pattern views subdivided into finer granularity
@@ -184,10 +191,12 @@ Identified Alphas: Team Topology Design, Cognitive Load, Team Interaction Mode, 
 - View 3: "Active Load Reduction" (proactive management)
 
 *Team Interaction Mode - Missing in View 4:*
-- FINAL VIEW RULE: Must include even if state unchanged
+- FINAL VIEW RULE: restated at the last state it reached, even if unchanged
 - View 4: "Optimized Interaction Patterns" (final state)
 
 Result: Complete 4x5 matrix (20 alphaState entries)
+
+Note this practice has a **single** pattern and all four alphas transition across it, so every alpha participates and the matrix is genuinely complete. A practice with several patterns distributes its alphas between them; a 4x5 matrix in each would mean alphas carried by patterns that never move them.
 
 **Pass 3 (Related Alpha Discovery):**
 - Review practice alphas: Team, Work, Way of Working

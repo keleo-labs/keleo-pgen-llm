@@ -1,6 +1,6 @@
 ---
 name: generate-method
-version: 1.1.0
+version: 1.2.0
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -950,10 +950,12 @@ python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
 - Then: At least one LOD has `contributesTo` targeting the alpha state
 
 ### Scenario: Patterns cover all practice alphas (@rule:coverage-004)
-- Given: A pattern is defined in the practice
+- Given: A practice defines one or more patterns
 - When: PatternViews are checked
-- Then: Every practice alpha appears in at least one PatternView
-- Then: Each alpha appears in every view (backfilled if needed)
+- Then: Every practice alpha appears in at least one PatternView of some pattern
+- Then: An alpha that never changes state within a pattern is absent from that pattern
+- Then: Each pattern's final view carries every alpha that pattern does advance
+- Then: Each such alpha is at the last state it reached in that pattern
 
 ### Scenario: Alpha states have supporting activities (@rule:coverage-005)
 - Given: An alpha state beyond the initial state exists on a new alpha

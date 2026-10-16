@@ -441,7 +441,14 @@ Ensures redeclared personas preserve all competencies from dependencies and flag
 python3 utils/fix-pattern-progression.py <practice>.json --fix
 ```
 
-Removes non-progressing alphas (stuck at the same state across all views), degenerate single-alpha patterns, and reorders reversed state progressions (e.g., advanced states in early views, initial states in later views). Always run after Phase 3 generation.
+Removes non-progressing alphas (stuck at the same state across all views) and degenerate single-alpha patterns. Always run after Phase 3 generation.
+
+An alpha whose state runs backwards across views is **not** fixed here. Reordering assumes the pattern placed a sound progression in the wrong order, which is one of four reasons a walk goes backwards — the others being a lifecycle that genuinely repeats (declare `loopsBackTo`), an alpha whose own state array is misordered, and states that are variants rather than stages. Run `check-pattern-prerequisites.py` to tell them apart, then reorder only what it still calls a `regression`:
+
+```bash
+python3 utils/check-pattern-prerequisites.py <practice>.json _effective-context.json
+python3 utils/fix-pattern-progression.py <practice>.json --fix --reorder-reversed
+```
 
 ### 5.2.7 Resolve Reference URL Anchors (when source is web documentation)
 
