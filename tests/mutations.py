@@ -268,8 +268,14 @@ MUTATIONS = [
     ),
     (
         "qual:pattern-prerequisites", "prerequisite-after-assertion",
-        "the pattern's first view asserts a state whose prerequisite its last view reaches",
-        lambda d: _alpha(d, "Platform Onboarding")["states"][0].__setitem__(
+        "a middle view asserts a state whose prerequisite the last view reaches",
+        # states[1], not states[0]. The checker treats the first view of a
+        # pattern as its entry condition and classifies a prerequisite there
+        # as established before the pattern begins -- non-blocking, by design.
+        # Planted on the first state the mutation was detected and then
+        # excused, so the assertion never failed and the instrument could not
+        # be proven to work. A middle view has no such excuse.
+        lambda d: _alpha(d, "Platform Onboarding")["states"][1].__setitem__(
             "background", {"alphaStates": [
                 {"alphaName": "Onboarding Readiness", "stateName": "Enforced"},
             ]}),
