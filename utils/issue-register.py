@@ -135,7 +135,8 @@ VALID_KINDS = ["practice", "practiceBaseline", "method"]
 VALID_ELEMENT_TYPES = [
     "alpha", "state", "checklistItem", "activity", "activitySpace",
     "workProduct", "levelOfDetail", "persona", "personaGroup", "pattern",
-    "patternGroup", "patternView", "narrative", "narrativeType", "citation",
+    "patternGroup", "patternOrchestration", "patternView", "narrative",
+    "narrativeType", "citation",
     "outcome", "focus", "competency", "asset", "reference", "alias", "practice",
 ]
 

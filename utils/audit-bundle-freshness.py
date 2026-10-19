@@ -182,6 +182,38 @@ def stage_bundled_document(keleo_path, document_name, staging_dir):
     return None
 
 
+def missing_dependencies(document_paths, manifest):
+    """Names each document declares as a dependency that the bundle lacks.
+
+    A rebuild repackages the document set the manifest already lists. When an
+    entry point gains a dependency after the bundle was built, that set is no
+    longer the closure, and repackaging it produces an archive whose entry
+    point cannot resolve -- which a later freshness audit then passes, because
+    every document the archive does contain is current. Catching it here is
+    the difference between the tool reporting what is true and certifying the
+    opposite.
+    """
+    present = {
+        (entry.get("documentName") or "")
+        for entry in manifest.get("documents", [])
+    }
+    present.discard("")
+
+    missing = []
+    for path in document_paths:
+        data, err = load_json_pair(path)
+        if err or not isinstance(data, dict):
+            continue
+        declared = [data.get("baselinePracticeName")]
+        declared += data.get("practiceDependencyNames") or []
+        declared += data.get("baselinePracticeNames") or []
+        declared += data.get("practiceNames") or []
+        for name in declared:
+            if name and name not in present and name not in missing:
+                missing.append(name)
+    return sorted(missing)
+
+
 def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
     """Repackage one bundle from current on-disk sources. Returns a result dict."""
     rel = str(keleo_path.relative_to(root))
@@ -213,6 +245,23 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
             resolved.append((KIND_ORDER.get(kind, 1), staged))
 
         ordered = [str(p) for _, p in sorted(resolved, key=lambda x: x[0])]
+
+        missing = missing_dependencies(ordered, manifest)
+        if missing:
+            return {
+                "bundle": rel, "status": "error",
+                "message": (
+                    "bundle is missing declared dependencies: "
+                    + ", ".join(repr(m) for m in missing)
+                    + ". A rebuild repackages the documents the bundle already "
+                      "holds and does not add newly declared ones, so it would "
+                      "report success on an archive that cannot resolve its own "
+                      "entry point. Repackage with package-keleo.py, passing the "
+                      "closure from: discover-dependencies.py --resolve-from "
+                      "<entry-point>.json --transitive"
+                ),
+                "missingDependencies": missing,
+            }
 
         if not apply_changes:
             return {

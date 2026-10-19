@@ -794,6 +794,17 @@ Add patterns array:
             "context": "1-2 sentences"
           }
         ],
+        "loopsBackTo": {  // Optional — ONLY on the view where a cycle closes
+          "patternViewName": "Earlier view of THIS pattern",
+          "description": "What going round again achieves",
+          "condition": {  // A Test — BOTH name and description are required
+            "name": "More increments remain",
+            "description": "When the loop is taken rather than exited",
+            "given": ["the objective is not yet met"],
+            "when": ["this pass completes"],
+            "then": ["the team re-enters the named view"]
+          }
+        },
         "tags": { ... }
       }
     ],
@@ -1474,7 +1485,12 @@ Names must be imperative verb phrases (actions to take), not past-participle con
 
 ### 16. Pattern View Alpha State Deduplication
 ❌ Wrong: Same alpha appearing multiple times in a single PatternView's `alphaStates`
-✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate
+✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate. Two states of one alpha in a view is a schema error, and it also makes the walk across views look as though it moves backwards, so the ambiguity gets mistaken for an ordering defect. Where a phase genuinely advances an alpha twice, split it into sub-views (`Phase: Sub-step`).
+
+### 16a. Cyclical Patterns
+❌ Wrong: A recurring lifecycle flattened into a one-way sequence, with an alpha dropping back to an earlier state in a later view to suggest the repetition
+❌ Wrong: `loopsBackTo` naming a view in a different pattern, or a view at or after its own `seq`
+✅ Right: `loopsBackTo` on the view where the cycle closes, naming an earlier view of the same pattern, with a `condition` saying when the loop is taken rather than exited. A re-entered view's `alphaStates` are the minimum that must hold on that pass, never a reset — so the states still run forwards
 
 ### 17. Outcomes
 **Missing:** `outcomes` array absent — practices should have 1-3 outcomes describing value delivery

@@ -909,32 +909,190 @@ def fix_narrative_placement(data):
     return fixes
 
 
-def fix_pattern_completeness(data):
-    """Add carry-forward alpha states to pattern views missing practice alphas,
-    then compress by removing unchanged carry-forward states from non-final views."""
+def _canonical_state_order(data, file_path=None):
+    """{alphaName: [stateName, ...]} from the document and its effective context.
+
+    The context is picked up from the practice directory the way
+    `assess-practice.py` does, because a pattern routinely places states of an
+    alpha it inherits rather than declares, and without the merge those states
+    have no known order.
+    """
+    order = {}
+
+    def absorb(doc):
+        if not isinstance(doc, dict):
+            return
+        for source in [doc] + [p for p in doc.get("practices", []) if isinstance(p, dict)]:
+            for alpha in source.get("alphas", []) or []:
+                name = alpha.get("name")
+                states = [s.get("name") for s in alpha.get("states", []) or []
+                          if s.get("name")]
+                if name and states and name not in order:
+                    order[name] = states
+
+    absorb(data)
+    if file_path:
+        context = Path(file_path).parent / "_effective-context.json"
+        if context.is_file():
+            try:
+                with open(context, encoding="utf-8") as fh:
+                    absorb(json.load(fh))
+            except (OSError, json.JSONDecodeError):
+                pass
+    return order
+
+
+def fix_ambiguous_pattern_views(data, state_order=None, collapse=False):
+    """One alpha, one state per pattern view.
+
+    Two entries for the same alpha in one view is a schema error the validator
+    reports and the assessment never checked, so 57 of them accumulated across
+    11 documents. It also makes the walk across views appear to move backwards,
+    so the ambiguity gets reported as an ordering defect and the real one is
+    never addressed.
+
+    An exact repeat is dropped outright: it says nothing the single entry does
+    not. Two *different* states are only collapsed when asked, because the
+    prescribed fix is to split the view into sub-views (Pass 4 Constraint 1),
+    which needs names, activities and narrative context that no rule supplies.
+    Where collapsing is chosen, the later state in the alpha's canonical order
+    is kept: a view declares what holds at that point in the lifecycle, which
+    is where the phase ends, and passing through the earlier state is implied.
+    """
+    state_order = state_order or {}
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(p for p in data.get("practices", []) if isinstance(p, dict))
+
+    for source in sources:
+        for pi, pattern in enumerate(source.get("patterns", [])):
+            pat_name = pattern.get("name", f"pattern[{pi}]")
+            for view in pattern.get("patternViews", []) or []:
+                view_seq = view.get("seq", "?")
+                entries = view.get("alphaStates", []) or []
+                by_alpha = {}
+                for entry in entries:
+                    by_alpha.setdefault(entry.get("alphaName", ""), []).append(entry)
+
+                drop = []
+                for alpha, group in by_alpha.items():
+                    if len(group) < 2:
+                        continue
+                    states = [e.get("stateName", "") for e in group]
+                    distinct = list(dict.fromkeys(states))
+
+                    if len(distinct) == 1:
+                        drop.extend(group[1:])
+                        fixes.append({
+                            "category": "pattern-view-ambiguity",
+                            "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                            "old": f"'{alpha}' declared {len(group)} times at '{distinct[0]}'",
+                            "new": "duplicate entries removed",
+                        })
+                        continue
+
+                    order = state_order.get(alpha, [])
+                    unknown = [s for s in distinct if s not in order]
+                    if not collapse or unknown:
+                        fixes.append({
+                            "category": "pattern-view-ambiguity",
+                            "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                            "old": f"'{alpha}' targets {len(distinct)} states: "
+                                   f"{', '.join(distinct)}",
+                            "new": ("not changed — state order unknown, cannot tell "
+                                    "which the view ends at"
+                                    if unknown else
+                                    "not changed — split the view into sub-views, or "
+                                    "pass --collapse-ambiguous-views to keep the last"),
+                            "applied": False,
+                        })
+                        continue
+
+                    keep = max(distinct, key=order.index)
+                    drop.extend(e for e in group if e.get("stateName") != keep)
+                    # A repeat of the kept state would otherwise survive twice.
+                    kept_seen = False
+                    for entry in group:
+                        if entry.get("stateName") == keep:
+                            if kept_seen:
+                                drop.append(entry)
+                            kept_seen = True
+                    fixes.append({
+                        "category": "pattern-view-ambiguity",
+                        "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                        "old": f"'{alpha}' targets {len(distinct)} states: "
+                               f"{', '.join(distinct)}",
+                        "new": f"collapsed to '{keep}' (the state the view ends at)",
+                    })
+
+                if drop:
+                    dropped = {id(e) for e in drop}
+                    view["alphaStates"] = [e for e in entries if id(e) not in dropped]
+
+    return fixes
+
+
+def _raise_understated_final_states(views_sorted, final_view, pat_name,
+                                    view_seq, state_order):
+    """Lift a final-view state that sits below the one the pattern reached."""
+    fixes = []
+    highest = {}
+    for view in views_sorted[:-1]:
+        for astate in view.get("alphaStates", []) or []:
+            alpha, state = astate.get("alphaName"), astate.get("stateName")
+            order = state_order.get(alpha, [])
+            if not alpha or state not in order:
+                continue
+            idx = order.index(state)
+            if alpha not in highest or idx > highest[alpha][0]:
+                highest[alpha] = (idx, state)
+
+    for astate in final_view.get("alphaStates", []) or []:
+        alpha, state = astate.get("alphaName"), astate.get("stateName")
+        order = state_order.get(alpha, [])
+        if not alpha or state not in order or alpha not in highest:
+            continue
+        if order.index(state) < highest[alpha][0]:
+            astate["stateName"] = highest[alpha][1]
+            fixes.append({
+                "category": "pattern-completeness",
+                "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                "old": f"final view restates '{alpha}' at '{state}'",
+                "new": f"raised to '{highest[alpha][1]}', the state the pattern reached",
+            })
+    return fixes
+
+
+def fix_pattern_completeness(data, state_order=None):
+    """Restate each pattern's own alphas in its final view, then compress.
+
+    The final view is a complete end-state snapshot of **the alphas this
+    pattern carries** — the ones whose state it actually changes. It is not a
+    roll-call of the practice.
+
+    Taking the roll-call reading is what fills closing views with alphas
+    belonging to a different pattern, at whichever state came to hand: with no
+    appearance anywhere in the pattern there is no state to carry forward, so
+    the only candidate is the alpha's first. A pattern that ends by announcing
+    three alphas at their opening states is reporting the fixer, not the
+    methodology. So an alpha the pattern never advanced is skipped here, per
+    `semantics/execution-and-patterns.md` §9.2 rule 1 and the Participation
+    Rule in `references/pattern-completeness.md`.
+    """
     fixes = []
     sources = [data]
     if "practices" in data:
         sources.extend(data.get("practices", []))
 
     for source in sources:
-        alpha_first_state = {}
-        for alpha in source.get("alphas", []):
-            aname = alpha.get("name", "")
-            states = alpha.get("states", [])
-            if aname and states:
-                alpha_first_state[aname] = states[0].get("name", "")
-
-        all_alpha_names = set(alpha_first_state.keys())
-        if len(all_alpha_names) < 2:
-            continue
-
         for pi, pattern in enumerate(source.get("patterns", [])):
             pat_name = pattern.get("name", f"pattern[{pi}]")
             views = pattern.get("patternViews", [])
             views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
+            loops = any(v.get("loopsBackTo") for v in views_sorted)
 
-            # Pass 1: Add carry-forward states for truly missing alphas (final view only)
+            # Pass 1: Restate carried alphas missing from the final view
             last_state = {}
             for vi, view in enumerate(views_sorted):
                 is_final = (vi == len(views_sorted) - 1)
@@ -946,10 +1104,12 @@ def fix_pattern_completeness(data):
 
                 if is_final:
                     view_alphas = {a.get("alphaName", "") for a in view.get("alphaStates", [])}
-                    missing = all_alpha_names - view_alphas
+                    # last_state holds exactly the alphas some view advanced,
+                    # which is the set the pattern carries.
+                    missing = set(last_state) - view_alphas
                     for aname in sorted(missing):
-                        carry = last_state.get(aname, alpha_first_state.get(aname, ""))
-                        if not carry:
+                        carry = last_state.get(aname, "")
+                        if not aname or not carry:
                             continue
                         view.setdefault("alphaStates", []).append({
                             "alphaName": aname,
@@ -961,6 +1121,16 @@ def fix_pattern_completeness(data):
                             "old": f"missing alpha '{aname}' in final view",
                             "new": f"carry-forward state '{carry}'",
                         })
+
+                    # A closing view that restates an alpha *below* where the
+                    # pattern already took it reads as the lifecycle going
+                    # backwards, and is the same mistake as omitting it: the
+                    # snapshot has to show the end state. Inside a loop the
+                    # lower state is a per-pass minimum, so patterns that
+                    # declare one are left alone.
+                    if not loops and state_order:
+                        fixes.extend(_raise_understated_final_states(
+                            views_sorted, view, pat_name, view_seq, state_order))
 
             # Pass 2: Compress — remove unchanged carry-forward states from non-final views
             fixes.extend(compress_pattern_states_for_pattern(
@@ -1907,6 +2077,19 @@ def main():
         help="Add missing version (1.0.0) and schemaVersion (from schema)"
     )
     parser.add_argument(
+        "--fix-ambiguous-views", action="store_true",
+        help="Drop repeated alphaStates entries from a pattern view. Two "
+             "different states for one alpha are reported, not changed — the "
+             "prescribed fix is to split the view into sub-views"
+    )
+    parser.add_argument(
+        "--collapse-ambiguous-views", action="store_true",
+        help="Also resolve two different states for one alpha by keeping the "
+             "later one in the alpha's canonical order — the state the view "
+             "ends at. Lossless as to ordering, but loses the hint that the "
+             "phase did two steps of work; splitting into sub-views keeps it"
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="Enable all optional fixes"
     )
@@ -1959,8 +2142,16 @@ def main():
     if args.fix_narrative_placement or args.all:
         all_fixes.extend(fix_narrative_placement(data))
 
+    if args.fix_ambiguous_views or args.collapse_ambiguous_views or args.all:
+        all_fixes.extend(fix_ambiguous_pattern_views(
+            data,
+            state_order=_canonical_state_order(data, file_path),
+            collapse=args.collapse_ambiguous_views,
+        ))
+
     if args.fix_pattern_completeness or args.all:
-        all_fixes.extend(fix_pattern_completeness(data))
+        all_fixes.extend(fix_pattern_completeness(
+            data, state_order=_canonical_state_order(data, file_path)))
 
     if args.compress_patterns or args.all:
         all_fixes.extend(compress_pattern_states(data))

@@ -176,10 +176,12 @@ Feature: Coverage Completeness
     Then at least one LOD has contributesTo targeting the alpha state
 
   Scenario: Patterns cover all practice alphas (@rule:coverage-004)
-    Given a pattern is defined in the practice
+    Given a practice defines one or more patterns
     When PatternViews are checked
-    Then every practice alpha appears in at least one PatternView
-    And each alpha appears in every view (backfilled if needed)
+    Then every practice alpha appears in at least one PatternView of some pattern
+    And an alpha that never changes state within a pattern is absent from that pattern
+    And each pattern's final view carries every alpha that pattern does advance
+    And each such alpha is at the last state it reached in that pattern
 
   Scenario: Alpha states have supporting activities (@rule:coverage-005)
     Given an alpha state beyond the initial state exists on a new alpha

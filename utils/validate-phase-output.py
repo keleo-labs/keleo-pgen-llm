@@ -613,54 +613,7 @@ def extract_pattern_views(content):
         pattern_section = content[marker.start():]
 
     views = []
-
-    def _pairs(block):
-        """Extract (alpha, state) pairs from a view body.
-
-        Two conventions are in use. The verbose one lists each pair on its own
-        pair of lines; the compact one puts them on a single semicolon-separated
-        "Alpha States:" line using an arrow. Supporting only the verbose form
-        yields zero pairs for compact guides, which then report every view as
-        missing every alpha.
-        """
-        found = [
-            (a.strip(), s.strip())
-            for a, s in re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
-        ]
-        if found:
-            return found
-
-        # Keyed-brace form, bare or JSON-quoted keys, on one line or many:
-        #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
-        #   - alphaStates: [{"alphaName": "Platform", "stateName": "Ready"}]
-        keyed = re.findall(
-            r"\{\s*\"?alphaName\"?\s*:\s*\"?([^,{}\"]+?)\"?\s*,"
-            r"\s*\"?stateName\"?\s*:\s*\"?([^{}\"]+?)\"?\s*\}",
-            block, re.IGNORECASE,
-        )
-        if keyed:
-            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
-
-        # The label may carry a qualifier ("Alpha States (changed only):") and
-        # may be written as prose or as the schema's camelCase property name.
-        line = re.search(
-            r"(?:Alpha States?|alphaStates)\s*(?:\([^)]*\))?\s*:\s*(.+)", block
-        )
-        if not line:
-            return []
-        raw = line.group(1)
-
-        # Brace-tuple form: [{Alpha Name, State Name}, {Alpha Name, State Name}]
-        braced = re.findall(r"\{\s*([^,{}]+?)\s*,\s*([^{}]+?)\s*\}", raw)
-        if braced:
-            return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in braced]
-
-        # Arrow form: Alpha → State; Alpha → State
-        for entry in raw.split(";"):
-            parts = re.split(r"\s*(?:→|->|=>)\s*", entry.strip(), maxsplit=1)
-            if len(parts) == 2 and parts[0] and parts[1]:
-                found.append((parts[0].strip().strip("`"), parts[1].strip().strip("`")))
-        return found
+    _pairs = extract_alpha_state_pairs
 
     # Format 1: **View: Name** (seq: N)
     view_splits = re.split(r"\*\*View:\s*", pattern_section)
@@ -735,15 +688,194 @@ def _heading_blocks(content):
         yield depth, m.group(2).strip(), content[m.end():end]
 
 
-def extract_described_patterns(content):
-    """Patterns the phase output describes, as {name: [view names]}.
+def extract_alpha_state_pairs(block):
+    """Extract (alpha, state) pairs from a block of guide prose.
+
+    Several conventions are in use, and a parser that knows only one returns
+    nothing for the others — which reads as a guide declaring no states rather
+    than as a parser miss. The verbose form lists each pair over two lines; the
+    compact one puts them on a single "Alpha States:" line with arrows or
+    commas; and the schema-shaped one writes keyed braces.
+
+    Shared by pattern views and by state Background blocks, which use the same
+    conventions for the same thing.
+    """
+    found = [
+        (a.strip(), s.strip())
+        for a, s in re.findall(r"Alpha Name:\s*(.+)\n\s*State Name:\s*(.+)", block)
+    ]
+    # Same-line variant: "Alpha Name: X, State Name: Y"
+    found += [
+        (a.strip(), s.strip())
+        for a, s in re.findall(r"Alpha Name:\s*([^,\n]+?)\s*,\s*State Name:\s*(.+)", block)
+    ]
+    if found:
+        return found
+
+    # Keyed-brace form, bare or JSON-quoted keys, on one line or many:
+    #   - {alphaName: Portal Identity Federation, stateName: Guest Access Only}
+    #   - alphaStates: [{"alphaName": "Platform", "stateName": "Ready"}]
+    keyed = re.findall(
+        r"\{\s*\"?alphaName\"?\s*:\s*\"?([^,{}\"]+?)\"?\s*,"
+        r"\s*\"?stateName\"?\s*:\s*\"?([^{}\"]+?)\"?\s*\}",
+        block, re.IGNORECASE,
+    )
+    if keyed:
+        return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in keyed]
+
+    # The label may carry a qualifier ("Alpha States (changed only):") and
+    # may be written as prose or as the schema's camelCase property name.
+    line = re.search(
+        r"(?:Alpha States?|alphaStates)\s*(?:\([^)]*\))?\s*:\s*(.+)", block
+    )
+    if not line:
+        return []
+    raw = line.group(1)
+
+    # Brace-tuple form: [{Alpha Name, State Name}, {Alpha Name, State Name}]
+    braced = re.findall(r"\{\s*([^,{}]+?)\s*,\s*([^{}]+?)\s*\}", raw)
+    if braced:
+        return [(a.strip().strip("`"), s.strip().strip("`")) for a, s in braced]
+
+    # Arrow form: Alpha → State; Alpha → State
+    for entry in raw.split(";"):
+        parts = re.split(r"\s*(?:→|->|=>)\s*", entry.strip(), maxsplit=1)
+        if len(parts) == 2 and parts[0] and parts[1]:
+            found.append((parts[0].strip().strip("`"), parts[1].strip().strip("`")))
+    return found
+
+
+def _background_block(body):
+    """The text of a state's Background block, or "".
+
+    Taken by indentation rather than by looking for the next bullet: the block
+    nests `Given:` and `Alpha States:` beneath itself, so a terminator matching
+    any following list item ends it on its own first child and the alpha states
+    are never seen.
+    """
+    match = re.search(r"^(\s*)-?\s*\*{0,2}Background\*{0,2}\s*:(.*)$",
+                      body, re.MULTILINE)
+    if not match:
+        return ""
+    indent = len(match.group(1))
+    collected = [match.group(2)]
+    for line in body[match.end():].splitlines():
+        if not line.strip():
+            collected.append(line)
+            continue
+        if len(line) - len(line.lstrip()) <= indent:
+            break
+        collected.append(line)
+    return "\n".join(collected)
+
+
+def extract_state_prerequisites(content):
+    """{(alpha, state): [(alpha, state), ...]} from each state's Background block.
+
+    A state's `background.alphaStates` are the cross-concern conditions that
+    must hold before it is reached. They are authored in the alpha step and the
+    views in the pattern step, and until Pass 5 nothing compared the two — so a
+    view could assert a state several views before the pattern went anywhere
+    near its prerequisites, and the guide would pass.
+    """
+    prereqs = {}
+    anchors = list(ALPHA_ANCHOR_RE.finditer(content))
+    for i, match in enumerate(anchors):
+        alpha = _clean_alpha_name(match.group("h") or match.group("b") or "")
+        if not alpha:
+            continue
+        end = anchors[i + 1].start() if i + 1 < len(anchors) else len(content)
+        block = content[match.end():end]
+
+        states = list(STATE_RE.finditer(block))
+        for j, state_match in enumerate(states):
+            state = state_match.group(1).strip()
+            state_end = states[j + 1].start() if j + 1 < len(states) else len(block)
+            background = _background_block(block[state_match.end():state_end])
+            if not background:
+                continue
+            pairs = extract_alpha_state_pairs(background)
+            if pairs:
+                prereqs[(alpha, state)] = pairs
+    return prereqs
+
+
+def validate_prerequisite_order(content):
+    """Pass 5 — a view may not assert a state the pattern reaches later.
+
+    The same rule `check-pattern-prerequisites.py` applies to generated JSON,
+    applied to the mapping guide instead, so the ordering is settled before
+    Phase 3 spends tokens rendering it. The guide cannot see the effective
+    context, so only prerequisites naming alphas the guide itself declares are
+    judged; the rest wait for the JSON.
+    """
+    checks = []
+    prereqs = extract_state_prerequisites(content)
+    if not prereqs:
+        return checks
+
+    alphas = extract_alphas_and_states(content)
+    failures = []
+    for pattern_name, body in iter_pattern_sections(content):
+        views = extract_pattern_views(body)
+        if len(views) < 2:
+            continue
+        views.sort(key=lambda v: v["seq"])
+
+        # Earliest view declaring each (alpha, state), plus the implication
+        # that a later state of an alpha means the earlier ones were passed.
+        reached = {}
+        for idx, view in enumerate(views):
+            for pair in view["alpha_states"]:
+                reached.setdefault(pair, idx)
+
+        def earliest(alpha, state):
+            order = alphas.get(alpha, [])
+            if state not in order:
+                return reached.get((alpha, state))
+            hits = [reached[(alpha, s)] for s in order[order.index(state):]
+                    if (alpha, s) in reached]
+            return min(hits) if hits else None
+
+        for idx, view in enumerate(views):
+            if idx == 0:
+                continue  # entry view: conditions met before the pattern begins
+            for alpha, state in view["alpha_states"]:
+                for req_alpha, req_state in prereqs.get((alpha, state), []):
+                    if req_alpha not in alphas:
+                        continue  # inherited; resolvable only against the JSON
+                    at = earliest(req_alpha, req_state)
+                    if at is None or at > idx:
+                        failures.append(
+                            f"{pattern_name or 'pattern'} view {view['seq']} "
+                            f"({view['name']}) asserts {alpha}.{state}, which "
+                            f"requires {req_alpha}.{req_state} — "
+                            + (f"reached only at view {views[at]['seq']}"
+                               if at is not None else "never reached")
+                        )
+
+    checks.append({
+        "check": "pattern_prerequisite_order",
+        "description": (
+            "Each view reaches the prerequisites of the states it asserts "
+            "(pattern-completeness.md Pass 5)"
+        ),
+        "expected": 0,
+        "actual": len(failures),
+        "failures": failures[:20],
+        "pass": not failures,
+    })
+    return checks
+
+
+def iter_pattern_sections(content):
+    """Yield (pattern name, section body) for every pattern the guide describes.
 
     A subsection counts as a pattern when its body carries a "Pattern Views"
     block. That is structural rather than a guess from the title, so a section
     *about* patterns — an orchestration note, an overarching lifecycle summary —
     is not mistaken for one.
     """
-    described = {}
     for _, title, body in _heading_blocks(content):
         # Only the section's own prose counts. A body runs to the next heading
         # of the same depth, so it contains its children — and without this a
@@ -760,9 +892,15 @@ def extract_described_patterns(content):
         name = re.sub(r"^Pattern\s*[:—–-]\s*", "", name, flags=re.IGNORECASE).strip()
         if not name or _norm(name) in ("patterns", "pattern views", "pattern mappings"):
             continue
-        views = [v["name"] for v in extract_pattern_views(body) if v.get("name")]
-        described[name] = views
-    return described
+        yield name, body
+
+
+def extract_described_patterns(content):
+    """Patterns the phase output describes, as {name: [view names]}."""
+    return {
+        name: [v["name"] for v in extract_pattern_views(body) if v.get("name")]
+        for name, body in iter_pattern_sections(content)
+    }
 
 
 def _norm(name):
@@ -913,7 +1051,24 @@ def validate_pattern_views(content):
         })
         return checks
 
-    views = extract_pattern_views(content)
+    # Each pattern is judged on its own views and its own alphas. Pooling them
+    # makes every pattern's closing view the final view of all of them — two
+    # patterns ending at seq 4 both count as "final" — and demands that each
+    # carry every alpha in the guide, including alphas belonging to a different
+    # lifecycle. Guides that satisfy that demand are how closing views come to
+    # hold alphas the pattern never advanced, parked at their opening state.
+    sections = list(iter_pattern_sections(content))
+    if not sections:
+        sections = [(None, content)]
+
+    views = []
+    for pattern_name, body in sections:
+        section_views = extract_pattern_views(body)
+        if not section_views:
+            continue
+        views.extend(section_views)
+        checks.extend(_validate_one_pattern(pattern_name, section_views, alphas))
+
     if not views:
         checks.append({
             "check": "pattern_views_found",
@@ -928,91 +1083,23 @@ def validate_pattern_views(content):
         "pass": len(views) >= 2,
     })
 
-    expected_alphas = set(alphas.keys())
-    # phase-2-skill.md "State Compression Rule": non-final views carry ONLY the
-    # alpha states that change from the previous view; unchanged states are
-    # implicit carry-forward. Only the final view must be a complete snapshot.
-    # Requiring every alpha in every view contradicts that rule and fails
-    # correctly-compressed guides.
-    final_seq = max(v["seq"] for v in views)
-
-    for view in views:
-        view_alphas = {a for a, _ in view["alpha_states"]}
-        is_final = view["seq"] == final_seq
-        missing = expected_alphas - view_alphas
-        extra = view_alphas - expected_alphas
-
-        if is_final:
-            checks.append({
-                "check": f"view_{view['seq']}_alpha_count",
-                "description": (
-                    f"Final view {view['seq']} ({view['name']}) is a complete "
-                    f"snapshot: {len(view_alphas)} alphas"
-                ),
-                "expected": len(expected_alphas),
-                "actual": len(view_alphas),
-                "pass": not missing,
-            })
-            if missing:
-                checks.append({
-                    "check": f"view_{view['seq']}_missing_alphas",
-                    "description": f"Final view {view['seq']} missing alphas",
-                    "missing": sorted(missing),
-                    "pass": False,
-                })
-        else:
-            # A compressed view may legitimately carry a subset, but an empty
-            # one should have been eliminated and its activities merged.
-            checks.append({
-                "check": f"view_{view['seq']}_alpha_count",
-                "description": (
-                    f"View {view['seq']} ({view['name']}): {len(view_alphas)} "
-                    f"changed alphas (compressed)"
-                ),
-                "expected": ">=1",
-                "actual": len(view_alphas),
-                "pass": len(view_alphas) >= 1,
-            })
-        if extra:
-            # Informational, not scored. A pattern view may legitimately place
-            # an *inherited* alpha (redeclared, or merely related) alongside the
-            # practice's own. This parser reads only the markdown, so it cannot
-            # see the effective context and must not call that a defect.
-            checks.append({
-                "check": f"view_{view['seq']}_alphas_not_declared_here",
-                "description": (
-                    f"View {view['seq']} names alphas not declared in this guide "
-                    f"(expected if they are inherited)"
-                ),
-                "names": sorted(extra),
-            })
-
-        for alpha_name, state_name in view["alpha_states"]:
-            if alpha_name in alphas:
-                valid_states = alphas[alpha_name]
-                if state_name not in valid_states:
-                    checks.append({
-                        "check": f"view_{view['seq']}_invalid_state",
-                        "description": f"View {view['seq']}: invalid state \"{state_name}\" for alpha \"{alpha_name}\"",
-                        "valid_states": valid_states,
-                        "pass": False,
-                    })
-
-        alpha_counts = {}
-        for a, _ in view["alpha_states"]:
-            alpha_counts[a] = alpha_counts.get(a, 0) + 1
-        for a, count in alpha_counts.items():
-            if count > 2:
-                checks.append({
-                    "check": f"view_{view['seq']}_state_density",
-                    "description": f"View {view['seq']}: alpha \"{a}\" has {count} states (max 2)",
-                    "pass": False,
-                })
-
     all_states_used = {}
     for view in views:
         for alpha_name, state_name in view["alpha_states"]:
             all_states_used.setdefault(alpha_name, set()).add(state_name)
+
+    # Practice-level coverage: an alpha should take part in some pattern, not
+    # in every pattern (references/pattern-completeness.md, Participation Rule).
+    uncovered = sorted(set(alphas) - set(all_states_used))
+    checks.append({
+        "check": "alpha_pattern_coverage",
+        "description": (
+            f"{len(alphas) - len(uncovered)}/{len(alphas)} alphas take part in "
+            f"at least one pattern"
+        ),
+        "missing": uncovered,
+        "pass": not uncovered,
+    })
 
     for alpha_name, defined_states in alphas.items():
         used = all_states_used.get(alpha_name, set())
@@ -1026,6 +1113,117 @@ def validate_pattern_views(content):
             })
 
     return checks
+
+
+def _validate_one_pattern(pattern_name, views, alphas):
+    """Checks for a single pattern's views, judged against the alphas it carries."""
+    checks = []
+    label = f"{pattern_name}: " if pattern_name else ""
+    prefix = f"{_slug(pattern_name)}_" if pattern_name else ""
+    expected_alphas = set(alphas.keys())
+
+    # The alphas this pattern carries are the ones it names, not the ones the
+    # practice declares. The final view is a snapshot of those.
+    carried = {a for v in views for a, _ in v["alpha_states"]}
+    # phase-2-skill.md "State Compression Rule": non-final views carry ONLY the
+    # alpha states that change from the previous view; unchanged states are
+    # implicit carry-forward. Only the final view must be a complete snapshot.
+    # Requiring every alpha in every view contradicts that rule and fails
+    # correctly-compressed guides.
+    final_seq = max(v["seq"] for v in views)
+
+    for view in views:
+        view_alphas = {a for a, _ in view["alpha_states"]}
+        is_final = view["seq"] == final_seq
+        missing = carried - view_alphas
+        extra = view_alphas - expected_alphas
+
+        if is_final:
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alpha_count",
+                "description": (
+                    f"{label}final view {view['seq']} ({view['name']}) is a "
+                    f"complete snapshot of the {len(carried)} alphas this "
+                    f"pattern carries"
+                ),
+                "expected": len(carried),
+                "actual": len(view_alphas),
+                "pass": not missing,
+            })
+            if missing:
+                checks.append({
+                    "check": f"{prefix}view_{view['seq']}_missing_alphas",
+                    "description": (
+                        f"{label}final view {view['seq']} omits alphas this "
+                        f"pattern advances"
+                    ),
+                    "missing": sorted(missing),
+                    "pass": False,
+                })
+        else:
+            # A compressed view may legitimately carry a subset, but an empty
+            # one should have been eliminated and its activities merged.
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alpha_count",
+                "description": (
+                    f"{label}view {view['seq']} ({view['name']}): "
+                    f"{len(view_alphas)} changed alphas (compressed)"
+                ),
+                "expected": ">=1",
+                "actual": len(view_alphas),
+                "pass": len(view_alphas) >= 1,
+            })
+        if extra:
+            # Informational, not scored. A pattern view may legitimately place
+            # an *inherited* alpha (redeclared, or merely related) alongside the
+            # practice's own. This parser reads only the markdown, so it cannot
+            # see the effective context and must not call that a defect.
+            checks.append({
+                "check": f"{prefix}view_{view['seq']}_alphas_not_declared_here",
+                "description": (
+                    f"{label}view {view['seq']} names alphas not declared in "
+                    f"this guide (expected if they are inherited)"
+                ),
+                "names": sorted(extra),
+            })
+
+        for alpha_name, state_name in view["alpha_states"]:
+            if alpha_name in alphas:
+                valid_states = alphas[alpha_name]
+                if state_name not in valid_states:
+                    checks.append({
+                        "check": f"{prefix}view_{view['seq']}_invalid_state",
+                        "description": (
+                            f"{label}view {view['seq']}: invalid state "
+                            f"\"{state_name}\" for alpha \"{alpha_name}\""
+                        ),
+                        "valid_states": valid_states,
+                        "pass": False,
+                    })
+
+        alpha_counts = {}
+        for a, _ in view["alpha_states"]:
+            alpha_counts[a] = alpha_counts.get(a, 0) + 1
+        for a, count in alpha_counts.items():
+            if count > 1:
+                # One alpha, one target state per view. Two make the view
+                # ambiguous about what it is asking for, and make the walk
+                # across views look as though it moves backwards.
+                checks.append({
+                    "check": f"{prefix}view_{view['seq']}_state_density",
+                    "description": (
+                        f"{label}view {view['seq']}: alpha \"{a}\" has {count} "
+                        f"states (max 1 — split into sub-views)"
+                    ),
+                    "pass": False,
+                })
+
+    return checks
+
+
+def _slug(name):
+    """A check-name fragment from a pattern title."""
+    return re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_")[:40]
 
 
 def print_file_stats(paths):
@@ -1137,6 +1335,7 @@ def main():
 
     if args.validate_patterns and args.phase == 2:
         checks.extend(validate_pattern_views(content))
+        checks.extend(validate_prerequisite_order(content))
 
     if args.source_manifest:
         combined = "\n".join(

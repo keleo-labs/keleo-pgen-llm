@@ -1,6 +1,6 @@
 ---
 name: generate-method
-version: 1.1.0
+version: 1.2.0
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -718,6 +718,35 @@ Alpha hierarchies and cross-practice dependencies are covered in `references/sem
 - **Orchestration practices**: Use `practiceDependencyNames` to load alphas, create patterns that coordinate across them
 - **Validation**: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <dep>.json`
 
+### Determining practiceDependencyNames
+
+**Declare a dependency when this practice names any element the other document
+owns** — not only when it references an alpha.
+
+Symbolic references resolve against one scope: the baseline chain, the declared
+dependencies, and the document itself. Anything named from outside that scope fails to
+resolve, whatever kind of element it is. So the test is what you name, not what kind of
+thing you named:
+
+| You name | Where it appears | Declare the owner? |
+|---|---|---|
+| An alpha, as a `contributesTo` or `mapsTo` target | `alphas[]` | Yes |
+| A pattern, as an orchestration stage's `patternName` | `patternOrchestrations[].stages[]` | Yes |
+| A pattern, as a stage's `relativeTo.patternName` host | `patternOrchestrations[].stages[]` | Yes |
+| An orchestration you extend, or embed via `orchestrationName` | `patternOrchestrations[]` | Yes |
+
+Alphas used to be the only case worth stating, which is why the rule was once written
+as "practices whose unique non-baseline alphas are actually referenced". That wording
+excludes a real and increasingly common case: a **composition practice** exists only to
+declare a `patternOrchestration` sequencing patterns its dependencies own, so it holds
+no alphas at all. A practice extending such an orchestration must declare its owner, and
+the alpha-only reading says not to — then the orchestration name fails to resolve, with
+nothing at the point of decision to warn you.
+
+**Still declare the minimum.** This widens what counts as a reference; it does not
+license declaring a dependency you never name. An unused entry drags the whole document
+into the effective context and into every bundle that carries this practice.
+
 ---
 
 ## Practice vs Method Handling
@@ -950,10 +979,12 @@ python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
 - Then: At least one LOD has `contributesTo` targeting the alpha state
 
 ### Scenario: Patterns cover all practice alphas (@rule:coverage-004)
-- Given: A pattern is defined in the practice
+- Given: A practice defines one or more patterns
 - When: PatternViews are checked
-- Then: Every practice alpha appears in at least one PatternView
-- Then: Each alpha appears in every view (backfilled if needed)
+- Then: Every practice alpha appears in at least one PatternView of some pattern
+- Then: An alpha that never changes state within a pattern is absent from that pattern
+- Then: Each pattern's final view carries every alpha that pattern does advance
+- Then: Each such alpha is at the last state it reached in that pattern
 
 ### Scenario: Alpha states have supporting activities (@rule:coverage-005)
 - Given: An alpha state beyond the initial state exists on a new alpha

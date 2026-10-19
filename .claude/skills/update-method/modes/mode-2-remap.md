@@ -55,7 +55,7 @@ This classifies practices into Tier 1 (baseline-only, can run in parallel) and T
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
+- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - **Practice summary context:** If practice summaries were generated (Step 2A.5), include the JSON summary in each subagent prompt. This provides alpha names, pattern views, outcomes, dependencies without requiring ad hoc inspection.
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
 
@@ -119,7 +119,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 
 **Apply ALL latest validations from generate-method skill:**

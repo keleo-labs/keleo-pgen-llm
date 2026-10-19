@@ -10,9 +10,20 @@ directories and build artifacts gets forgotten.
 Each document is assessed on its own, so assess-practice's per-directory
 auto-discovery of _effective-context.json still applies.
 
+`--validator` runs the schema and integrity validators instead of the
+assessment. The two check different things, and only the assessment reached
+this sweep — so an error class the validator owns was invisible to the tool
+triage uses to ask where else a defect occurs. Ambiguous pattern views are the
+clearest case: `validate-practice-json.py` calls them errors, the assessment
+never looked, and 57 accumulated across 11 documents against a rule nobody
+disputed.
+
 Usage:
     # Where else does this defect class occur?
     python3 utils/scan-corpus.py --category outcome-forecast
+
+    # Schema and integrity errors the assessment does not check
+    python3 utils/scan-corpus.py --validator --severity error --json
 
     # Errors only, across one directory, as JSON
     python3 utils/scan-corpus.py --dir practices/red-hat-ai --severity error --json
@@ -31,6 +42,9 @@ from utils._shared import get_project_root
 
 DEFAULT_DIRS = ["baselines", "practices", "deps"]
 ASSESS = Path(__file__).resolve().parent / "assess-practice.py"
+VALIDATE_PRACTICE = Path(__file__).resolve().parent / "validate-practice-json.py"
+VALIDATE_BASELINE = Path(__file__).resolve().parent / "validate-baseline-json.py"
+DEFAULT_SCHEMA = Path(__file__).resolve().parent.parent / "deps" / "language.schema.json"
 
 
 def candidate_documents(root, dirs):
@@ -79,8 +93,8 @@ CROSSREF_CATEGORIES = (
 )
 
 
-def resolve_context(path):
-    """Resolve a document's baseline and dependency practices. Returns CLI args."""
+def resolve_context_paths(path):
+    """Resolve a document's dependencies. Returns (baselines, parents, complete)."""
     try:
         out = subprocess.run(
             [sys.executable, str(DISCOVER), "--resolve-from", str(path), "--transitive"],
@@ -88,9 +102,9 @@ def resolve_context(path):
         )
         deps = json.loads(out.stdout).get("dependencies", [])
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError, AttributeError):
-        return [], False
+        return [], [], False
 
-    args, complete = [], True
+    baselines, parents, complete = [], [], True
     for dep in deps:
         dep_path = dep.get("path")
         if not dep_path and dep.get("candidates"):
@@ -105,8 +119,18 @@ def resolve_context(path):
         if not dep_path or "::" in dep_path:
             complete = False
             continue
-        args += (["--baseline", dep_path] if dep.get("role") == "baselinePractice"
-                 else ["--parent", dep_path])
+        (baselines if dep.get("role") == "baselinePractice" else parents).append(dep_path)
+    return baselines, parents, complete
+
+
+def resolve_context(path):
+    """Resolve a document's baseline and dependency practices. Returns CLI args."""
+    baselines, parents, complete = resolve_context_paths(path)
+    args = []
+    for dep_path in baselines:
+        args += ["--baseline", dep_path]
+    for dep_path in parents:
+        args += ["--parent", dep_path]
     return args, complete
 
 
@@ -127,6 +151,71 @@ def assess(path, schema, resolve=True):
         return json.loads(out.stdout).get("issues", []), context_complete
     except (json.JSONDecodeError, AttributeError):
         return None, False
+
+
+def validate(path, schema):
+    """Validate one document against the schema and integrity rules.
+
+    `assess-practice.py` and `validate-practice-json.py` check different
+    things, and only the assessment reaches corpus-wide triage — so an
+    error class the validator owns is invisible to it. Ambiguous pattern
+    views are the clearest case: the validator calls them errors, the
+    assessment never looked, and 50 of them accumulated across 11 documents
+    against a rule nobody disputed.
+
+    Resolving the right baseline matters more here than for the assessment.
+    Pointed at the wrong one, every symbolic reference into it reports as
+    dangling and a clean document shows hundreds of errors.
+
+    Returns (issues, context_complete), or (None, False) on failure.
+    """
+    try:
+        with open(path, encoding="utf-8") as fh:
+            kind = json.load(fh).get("kind")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return None, False
+
+    if kind not in ("practice", "method", "practiceBaseline"):
+        # A change request, a working file, a fragment someone left behind.
+        # Not a document this validates, and not a document that failed to
+        # validate — reporting it as unreadable would overstate both.
+        return [], True
+
+    baselines, parents, complete = resolve_context_paths(path)
+
+    if kind == "practiceBaseline":
+        # validate-baseline.py: <baseline> [parent-baseline] <schema>
+        cmd = [sys.executable, str(VALIDATE_BASELINE), str(path)]
+        cmd += baselines[:1]
+        cmd += [str(schema)]
+    else:
+        # validate-practice.py: <practice> <baseline> <schema> [deps ...]
+        if not baselines:
+            return None, False
+        cmd = [sys.executable, str(VALIDATE_PRACTICE), str(path),
+               baselines[0], str(schema)] + parents
+
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.SubprocessError):
+        return None, False
+    try:
+        report = json.loads(out.stdout)
+    except (json.JSONDecodeError, AttributeError):
+        return None, False
+
+    issues = []
+    for severity in ("errors", "warnings"):
+        for entry in report.get(severity, []):
+            issues.append({
+                "severity": entry.get("severity", severity[:-1]),
+                "category": entry.get("category", "integrity"),
+                "path": entry.get("path", ""),
+                "message": entry.get("issue", ""),
+                "suggestion": entry.get("suggestion", ""),
+                "autoFixable": False,
+            })
+    return issues, complete
 
 
 def _counts_by_category(issues):
@@ -229,6 +318,13 @@ def main():
     parser.add_argument("--severity", choices=["error", "warning"],
                         help="Only report issues at this severity")
     parser.add_argument("--schema", help="Language schema JSON, to include schema validation")
+    parser.add_argument("--validator", action="store_true",
+                        help="Run validate-practice-json.py / validate-baseline-json.py "
+                             "instead of assess-practice.py. The two check different "
+                             "things and only the assessment reached this sweep, so "
+                             "error classes the validator owns — an ambiguous pattern "
+                             "view, a dangling symbolic reference — were invisible to "
+                             "corpus-wide triage")
     parser.add_argument("--no-resolve", action="store_true",
                         help="Skip per-document baseline and dependency resolution. Much "
                              "faster, but cross-reference findings are then suppressed as "
@@ -252,8 +348,13 @@ def main():
     scanned = 0
     unreadable = []
     incomplete_context = []
+    schema = args.schema or (str(DEFAULT_SCHEMA) if args.validator else None)
     for path in candidate_documents(root, dirs):
-        issues, context_complete = assess(path, args.schema, resolve=not args.no_resolve)
+        if args.validator:
+            issues, context_complete = validate(path, schema)
+        else:
+            issues, context_complete = assess(path, args.schema,
+                                              resolve=not args.no_resolve)
         scanned += 1
         rel = str(path.relative_to(root))
         if issues is None:

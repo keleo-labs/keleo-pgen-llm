@@ -38,7 +38,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json_pair
+from utils._shared import (load_json_pair, _context_is_stale,
+                           merge_ancestor_baselines)
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
@@ -58,6 +59,29 @@ PRACTICE_MINIMUMS = {
     "patterns": 1,
     "citations": 3,
 }
+
+
+def is_composition_practice(source):
+    """A practice that exists only to compose other practices' patterns.
+
+    It declares a patternOrchestration whose stages name patterns owned
+    elsewhere, and no elements of its own. That is a shape the language
+    supports -- a stage resolves its patternName across the baseline chain and
+    declared dependencies -- so the element minimums above, which exist to
+    catch a truncated generation run, do not apply to it.
+
+    The conjunction is what keeps the check honest. Exempting anything that
+    merely declares an orchestration would let a genuinely truncated practice
+    through on the strength of one surviving array; requiring the element
+    arrays to be empty *and* an orchestration to be present describes the
+    composition shape and nothing else. A practice with everything empty,
+    orchestrations included, still fails.
+    """
+    if not source.get("patternOrchestrations"):
+        return False
+    return not any(
+        source.get(key) for key in ("alphas", "workProducts", "activities", "patterns")
+    )
 
 BASELINE_MINIMUMS = {
     "alphas": 3,
@@ -282,9 +306,12 @@ def check_practice_structure(data, kind):
             sources.append((p.get("name", f"practice[{i}]"), p))
 
     for source_name, source in sources:
+        composition = is_composition_practice(source)
         for key, minimum in PRACTICE_MINIMUMS.items():
             count = len(source.get(key, []))
-            results[f"{source_name}.{key}"] = count >= minimum
+            results[f"{source_name}.{key}"] = count >= minimum or composition
+            if composition:
+                continue
             if count < minimum and source_name == "root" and kind != "method":
                 issues.append({
                     "severity": "warning" if count > 0 else "error",
@@ -944,7 +971,17 @@ def check_narrative_citations(data):
 
 
 def check_narrative_placement(data):
-    """Warn when top-level narratives appear to belong to specific elements."""
+    """Warn when top-level narratives appear to belong to specific elements.
+
+    Ownership is read off the narrative's **name**, not its description, and
+    this must stay in step with `fix_narrative_placement` in
+    `fix-common-issues.py`. Matching on description flagged a practice narrative
+    called "Practice Intent" as belonging to an alpha, because its one-line
+    summary named the practice's primary concern — which is exactly what a
+    practice narrative's summary does. Two tools disagreeing about placement is
+    worse than either being wrong, because the disagreement reads as a finding
+    and an agent acts on it.
+    """
     issues = []
     element_names = set()
     for coll_key in ("alphas", "activitySpaces", "competencies"):
@@ -953,9 +990,8 @@ def check_narrative_placement(data):
 
     for i, narrative in enumerate(data.get("narratives", [])):
         narr_name = narrative.get("name", "").lower()
-        narr_desc = narrative.get("description", "").lower()
         for elem_name in sorted(element_names, key=len, reverse=True):
-            if elem_name in narr_name or elem_name in narr_desc:
+            if elem_name and elem_name in narr_name:
                 issues.append({
                     "severity": "warning",
                     "category": "narrative-placement",
@@ -2247,14 +2283,36 @@ def check_pattern_view_prerequisites(data, kind, baseline_data=None,
         pfx = "" if source is data else f"practice[{source.get('name', '?')}]."
         for p_idx, pattern in enumerate(source.get("patterns", [])):
             findings = mod.check_pattern(pattern, prereqs, state_order)
+            findings += mod.check_ambiguity(pattern)
             findings += mod.check_monotonicity(pattern, state_order)
             for f in findings:
-                if f["kind"] == "unreached":
+                # `unreached` follows from ordinary view compression, and
+                # `entry` and `cyclical` describe orderings the language
+                # permits — the first view states conditions met before the
+                # pattern begins, and inside a loop an earlier state is the
+                # minimum for that pass. Reporting them would bury the
+                # orderings that are actually wrong.
+                if f["kind"] in ("unreached", "entry", "cyclical"):
                     continue
-                if f["kind"] == "regression":
+                if f["kind"] == "ambiguous":
+                    message = (
+                        f"Pattern '{f['pattern']}' view {f['viewSeq']} "
+                        f"'{f['viewName']}' is ambiguous: "
+                        f"{f['state'].rsplit('.', 1)[0]} {f['detail']}"
+                    )
+                    suggestion = (
+                        "Split the view into sequential sub-views so each "
+                        "advances the alpha by one state, or drop the repeat"
+                    )
+                elif f["kind"] == "regression":
                     message = (
                         f"Pattern '{f['pattern']}' view {f['viewSeq']} "
                         f"'{f['viewName']}' moves {f['state']} backwards: {f['detail']}"
+                    )
+                    suggestion = (
+                        "Reorder the placements to follow the alpha's states; "
+                        "if the lifecycle genuinely repeats, declare loopsBackTo "
+                        "on the closing view instead"
                     )
                 else:
                     message = (
@@ -2262,15 +2320,16 @@ def check_pattern_view_prerequisites(data, kind, baseline_data=None,
                         f"'{f['viewName']}' asserts {f['state']}, which requires "
                         f"{f['prerequisite']} — {f['detail']}"
                     )
+                    suggestion = (
+                        "Move the state to a later view, bring the prerequisite "
+                        "forward, or drop the prerequisite if the ordering is wrong"
+                    )
                 issues.append({
                     "severity": "warning",
                     "category": "pattern-prerequisites",
                     "path": f"{pfx}patterns[{p_idx}].patternViews",
                     "message": message,
-                    "suggestion": (
-                        "Move the state to a later view, bring the prerequisite "
-                        "forward, or drop the prerequisite if the ordering is wrong"
-                    ),
+                    "suggestion": suggestion,
                     "autoFixable": False,
                 })
     return issues
@@ -2682,6 +2741,44 @@ def check_references(data, kind, baseline_data=None):
                     })
                 if evn:
                     seen_ev_names.add(evn)
+
+    return issues
+
+
+def check_persona_group_membership(data, kind):
+    """A persona group must group something.
+
+    The schema makes both `personaNames` and `personaGroupNames` optional, so a
+    group declaring neither — or declaring `personaNames: []` — validates clean
+    while naming no members at all. Two such groups were carried through ten
+    releases of one practice before a mapping agent noticed by eye. An empty
+    group is not a harmless stub: it merges into every consumer, appears in
+    their team listings, and resolves to nobody.
+    """
+    issues = []
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+        for idx, pg in enumerate(source.get("personaGroups", [])):
+            members = [n for n in pg.get("personaNames", []) or [] if n]
+            subgroups = [n for n in pg.get("personaGroupNames", []) or [] if n]
+            if members or subgroups:
+                continue
+            issues.append({
+                "severity": "error",
+                "category": "persona-group-membership",
+                "path": f"{pfx}personaGroups[{idx}].personaNames",
+                "message": (
+                    f"PersonaGroup '{pg.get('name', '?')}' names no personas and "
+                    f"no sub-groups — it groups nothing"
+                ),
+                "autoFixable": False,
+            })
 
     return issues
 
@@ -3141,6 +3238,13 @@ def check_baseline_references(data, baseline_data, kind):
 
     practice_alpha_names = set()
     practice_nt_names = set()
+    # A Practice may declare its own focuses, activitySpaces and competencies
+    # alongside alphas and narrativeTypes. Union them in, or every reference to a
+    # locally declared element is reported as unresolved against the baseline.
+    practice_focus_names = set()
+    practice_as_names = set()
+    practice_comp_names = set()
+    practice_comp_levels = set()
     for source in sources:
         for a in source.get("alphas", []):
             if a.get("name"):
@@ -3148,9 +3252,25 @@ def check_baseline_references(data, baseline_data, kind):
         for nt in source.get("narrativeTypes", []):
             if nt.get("name"):
                 practice_nt_names.add(nt["name"])
+        for f in source.get("focuses", []):
+            if f.get("name"):
+                practice_focus_names.add(f["name"])
+        for s in source.get("activitySpaces", []):
+            if s.get("name"):
+                practice_as_names.add(s["name"])
+        for comp in source.get("competencies", []):
+            if comp.get("name"):
+                practice_comp_names.add(comp["name"])
+            for level in comp.get("competencyLevels", comp.get("levels", [])):
+                if level.get("name"):
+                    practice_comp_levels.add(level["name"])
 
     all_alpha_names = bl_alpha_names | practice_alpha_names
     all_nt_names = bl_nt_names | practice_nt_names
+    bl_focus_names |= practice_focus_names
+    bl_as_names |= practice_as_names
+    bl_comp_names |= practice_comp_names
+    bl_comp_levels |= practice_comp_levels
 
     for si, source in enumerate(sources):
         if si == 0:
@@ -4101,7 +4221,14 @@ def check_narrative_name_uniqueness(data, kind):
 
 
 def check_pattern_alpha_coverage(data, kind):
-    """Check that patterns cover all practice alphas."""
+    """Check that the practice's patterns, taken together, cover its alphas.
+
+    Coverage is a property of the practice, not of each pattern. A pattern
+    carries the alphas whose state it changes (`semantics/execution-and-
+    patterns.md` §9.2 rule 1); asking every pattern to carry every alpha forces
+    alphas into lifecycles they have no part in, at whichever state is nearest
+    to hand, and the closing view is where they land.
+    """
     issues = []
 
     sources = [data]
@@ -4117,28 +4244,32 @@ def check_pattern_alpha_coverage(data, kind):
         if len(alpha_names) < 2:
             continue
 
-        for pi, pat in enumerate(source.get("patterns", [])):
-            pat_name = pat.get("name", f"<unnamed-{pi}>")
-            covered = set()
+        covered_anywhere = set()
+        for pat in source.get("patterns", []):
             for view in pat.get("patternViews", []):
                 for astate in view.get("alphaStates", []):
-                    covered.add(astate.get("alphaName", ""))
+                    covered_anywhere.add(astate.get("alphaName", ""))
 
-            missing = alpha_names - covered
-            if missing:
-                issues.append({
-                    "severity": "warning",
-                    "category": "pattern-coverage",
-                    "path": f"{pfx}patterns[{pat_name}]",
-                    "message": (
-                        f"Pattern '{pat_name}' covers {len(covered)}/{len(alpha_names)} "
-                        f"alphas. Missing: {sorted(missing)}"
-                    ),
-                    "autoFixable": False,
-                })
+        uncovered = alpha_names - covered_anywhere
+        if uncovered and source.get("patterns"):
+            issues.append({
+                "severity": "warning",
+                "category": "pattern-coverage",
+                "path": f"{pfx}patterns",
+                "message": (
+                    f"{len(alpha_names) - len(uncovered)}/{len(alpha_names)} alphas "
+                    f"take part in a pattern. Absent from all of them: "
+                    f"{sorted(uncovered)}"
+                ),
+                "autoFixable": False,
+            })
 
-            # Final-view completeness: all alphas must appear in the last view
-            # Non-final views use compression (unchanged states omitted)
+        for pi, pat in enumerate(source.get("patterns", [])):
+            pat_name = pat.get("name", f"<unnamed-{pi}>")
+
+            # Final-view completeness: the alphas THIS pattern advances must
+            # appear in its last view, each at the last state it reached.
+            # Non-final views use compression (unchanged states omitted).
             views_sorted = sorted(
                 pat.get("patternViews", []),
                 key=lambda v: v.get("seq", 0),
@@ -4147,11 +4278,16 @@ def check_pattern_alpha_coverage(data, kind):
                 final_view = views_sorted[-1]
                 final_seq = final_view.get("seq", "?")
                 final_name = final_view.get("name", "?")
+                carried = {
+                    astate.get("alphaName", "")
+                    for view in views_sorted
+                    for astate in view.get("alphaStates", [])
+                }
                 final_alphas = {
                     astate.get("alphaName", "")
                     for astate in final_view.get("alphaStates", [])
                 }
-                final_missing = alpha_names - final_alphas
+                final_missing = carried - final_alphas
                 if final_missing:
                     issues.append({
                         "severity": "warning",
@@ -4159,8 +4295,8 @@ def check_pattern_alpha_coverage(data, kind):
                         "path": f"{pfx}patterns[{pat_name}].patternViews[{final_seq}]",
                         "message": (
                             f"Pattern '{pat_name}' final view {final_seq} '{final_name}' "
-                            f"missing alphas (all must appear in final view): "
-                            f"{sorted(final_missing)}"
+                            f"omits alphas the pattern advances (the final view is a "
+                            f"snapshot of what it carries): {sorted(final_missing)}"
                         ),
                         "autoFixable": False,
                     })
@@ -4352,6 +4488,10 @@ def check_narrative_context_length(data, kind):
 
     long_count = 0
     total = 0
+    # Name the offenders. A count alone leaves an agent guessing which of
+    # eighty-odd contexts to shorten, which is the complaint already on record
+    # against `checklist-style`; the `lod-naming` check sets the precedent.
+    long_paths = []
 
     for source in sources:
         pfx = ""
@@ -4369,6 +4509,11 @@ def check_narrative_context_length(data, kind):
                     )
                     if sentences > 3:
                         long_count += 1
+                        long_paths.append(
+                            f"{base_path}['{narr.get('name', f'[{ni}]')}']"
+                            f".{nc.get('narrativeElementName', '?')}"
+                            f" ({sentences} sentences)"
+                        )
 
         _check_narratives(source.get("narratives", []), f"{pfx}narratives")
         for coll in ("alphas", "activities", "workProducts", "patterns"):
@@ -4392,6 +4537,7 @@ def check_narrative_context_length(data, kind):
             "message": (
                 f"{long_count}/{total} narrative contexts exceed 3 sentences "
                 f"(target: 1-3 sentences per context)"
+                + ("\n  " + "\n  ".join(long_paths) if long_paths else "")
             ),
             "autoFixable": False,
         })
@@ -4714,6 +4860,8 @@ def main():
                 "message": f"Could not load baseline: {berr}",
                 "autoFixable": False,
             })
+        elif baseline_data:
+            merge_ancestor_baselines(baseline_data, baseline_path)
 
     # Auto-discover _effective-context.json for transitive baseline resolution
     if baseline_data and kind != "practiceBaseline":
@@ -4722,6 +4870,13 @@ def main():
             auto_path = file_path.parent / auto_name
             if auto_path.exists():
                 ectx, ectx_err = load_json_pair(auto_path)
+                # Same staleness guard as resolve_reference_context. This is a
+                # second, independent override path — it merges straight into
+                # baseline_data — so without the check here a context built
+                # against an older baseline still silently wins, and the guard
+                # on the other path proves nothing.
+                if not ectx_err and _context_is_stale(str(auto_path), ectx, baseline_data):
+                    break
                 if not ectx_err:
                     # Merge effective context elements into baseline_data
                     for arr_key in ("narrativeTypes", "competencies", "activitySpaces",
@@ -4834,6 +4989,7 @@ def main():
     all_issues.extend(check_alias_isolation(data, kind))
 
     all_issues.extend(check_internal_crossrefs(data, kind, baseline_data))
+    all_issues.extend(check_persona_group_membership(data, kind))
     all_issues.extend(check_persona_group_acyclicity(data, kind, baseline_data))
 
     if baseline_data and kind != "practiceBaseline":

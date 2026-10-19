@@ -548,14 +548,16 @@
       "name": "Patterns cover all practice alphas",
       "feature": "Coverage Completeness",
       "given": [
-        "A pattern is defined in the practice"
+        "A practice defines one or more patterns"
       ],
       "when": [
         "PatternViews are checked"
       ],
       "then": [
-        "Every practice alpha appears in at least one PatternView",
-        "Each alpha appears in every view (backfilled if needed)"
+        "Every practice alpha appears in at least one PatternView of some pattern",
+        "An alpha that never changes state within a pattern is absent from that pattern",
+        "Each pattern's final view carries every alpha that pattern does advance",
+        "Each such alpha is at the last state it reached in that pattern"
       ],
       "line": 952,
       "assess_categories": [
@@ -576,7 +578,7 @@
       "then": [
         "At least one activity has `contributesTo` targeting the alpha state"
       ],
-      "line": 958,
+      "line": 960,
       "assess_categories": [
         "activity-state-gap"
       ],
@@ -597,7 +599,7 @@
         "A later state of the same alpha counts as reaching an earlier one",
         "An alpha state declared at one view does not go backwards at a later view"
       ],
-      "line": 963,
+      "line": 965,
       "assess_categories": [
         "pattern-prerequisites"
       ],
@@ -616,7 +618,7 @@
       "then": [
         "Each baseline element has at most one alias"
       ],
-      "line": 972,
+      "line": 974,
       "assess_categories": [
         "alias-uniqueness"
       ],
@@ -636,7 +638,7 @@
         "Only canonical baseline names appear in structural reference fields",
         "Alias names never appear in structural reference fields"
       ],
-      "line": 977,
+      "line": 979,
       "assess_categories": [
         "alias-isolation"
       ],
@@ -655,7 +657,7 @@
       "then": [
         "The array contains between 10 and 20 keywords"
       ],
-      "line": 983,
+      "line": 985,
       "assess_categories": [
         "keyword-count"
       ],
@@ -674,7 +676,7 @@
       "then": [
         "The `kind` property is \"practice\" for single practices, \"method\" for multi-practice methods"
       ],
-      "line": 990,
+      "line": 992,
       "assess_categories": [
         "structure"
       ],
@@ -693,7 +695,7 @@
       "then": [
         "alphas, activities, workProducts, patterns, and citations arrays are present and non-empty"
       ],
-      "line": 995,
+      "line": 997,
       "assess_categories": [
         "structure"
       ],
@@ -713,7 +715,7 @@
         "Every alphaName in patternViews.alphaStates resolves to an alpha in the practice or baseline",
         "Every stateName resolves to a valid state on that alpha"
       ],
-      "line": 1000,
+      "line": 1002,
       "assess_categories": [
         "crossref-pattern"
       ],
@@ -732,7 +734,7 @@
       "then": [
         "Every alphaName and stateName in activity contributesTo resolves to a defined alpha and state"
       ],
-      "line": 1006,
+      "line": 1008,
       "assess_categories": [
         "crossref-activity-alpha"
       ],
@@ -751,7 +753,7 @@
       "then": [
         "Every workProductName and levelOfDetailName in worksOn resolves to defined elements"
       ],
-      "line": 1011,
+      "line": 1013,
       "assess_categories": [
         "crossref-activity-wp"
       ],
@@ -771,7 +773,7 @@
         "01-analysis-report.md exists with all 8 required sections",
         "Analysis has sufficient depth (5+ numbered subsections and 3+ source references)"
       ],
-      "line": 1018,
+      "line": 1020,
       "assess_categories": [],
       "automatable": false
     },
@@ -789,7 +791,7 @@
         "02-mapping-guide.md exists with all 7 required sections",
         "At least 3 alphas, 5 activities, and 1 pattern are mapped"
       ],
-      "line": 1024,
+      "line": 1026,
       "assess_categories": [],
       "automatable": false
     },
@@ -807,7 +809,7 @@
         "validate-practice-json.py has been run with 0 schema errors",
         "assess-practice.py has been run with 0 error-severity issues"
       ],
-      "line": 1030,
+      "line": 1032,
       "assess_categories": [],
       "automatable": false
     }
