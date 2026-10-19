@@ -26,6 +26,7 @@ ARRAY_SECTIONS = [
     "activitySpaces", "competencies", "narrativeTypes", "assets",
     "personas", "personaGroups", "practiceElementAliases", "narratives",
     "focuses", "references", "outcomes", "alphaInstances",
+    "patternOrchestrations",
 ]
 
 SCALAR_FIELDS = [
@@ -320,6 +321,7 @@ GATE_SECTIONS = [
 # emptying an alphas array ever is.
 GATE_ADVISORY_SECTIONS = [
     "alphaInstances", "references", "assets", "narratives",
+    "patternOrchestrations",
 ]
 
 
@@ -331,6 +333,19 @@ def run_gate(diff):
     critical = []
     warnings = []
 
+    # A pattern emptied while orchestrations grew is the refactor the orchestration
+    # model invites, not a truncated run: the sequencing a monolithic pattern held by
+    # restating its constituents' phases moves into stages that name those patterns
+    # instead. The elements did not vanish, they changed construct. Still surfaced,
+    # because only a human can confirm that is what happened — just not as CRITICAL,
+    # which would make the gate unpassable for a legitimate and intended change.
+    # It requires patterns to have actually fallen from a non-zero count. A document
+    # that never held one and gains an orchestration has refactored nothing, and a
+    # baseline can hold no patterns at all, so without the floor every baseline
+    # publishing its first shell would be told to confirm a sequencing that never existed.
+    orch = diff["sections"].get("patternOrchestrations") or {"old": 0, "new": 0}
+    patterns_refactored = orch["new"] > orch["old"]
+
     for section in GATE_SECTIONS:
         info = diff["sections"].get(section)
         if not info:
@@ -338,7 +353,18 @@ def run_gate(diff):
         old_count = info["old"]
         new_count = info["new"]
 
-        if old_count > 0 and new_count == 0:
+        if section == "patterns" and old_count > 0 and new_count == 0 and patterns_refactored:
+            warnings.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": (
+                    f"patterns dropped from {old_count} to 0 while patternOrchestrations "
+                    f"rose from {orch['old']} to {orch['new']} — looks like a pattern was "
+                    f"refactored into an orchestration; confirm the sequencing survived"
+                ),
+            })
+        elif old_count > 0 and new_count == 0:
             critical.append({
                 "section": section,
                 "old": old_count,
