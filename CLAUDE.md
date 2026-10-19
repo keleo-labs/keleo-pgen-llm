@@ -268,7 +268,16 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 - Multiple distinct value streams or use cases
 - Each practice analyzed and mapped in single documents
 - `.keleo` package in `bundles/` bundles externalized method JSON (with `practiceNames` string references) + individual practice JSONs + baseline JSON
-- Methods spanning multiple baselines can declare `alphaBindings` for cross-baseline contribution relationships
+- Methods spanning multiple baselines can declare cross-baseline relationships under the
+  method's **`bindings`** property — `bindings.alphaBindings` and
+  `bindings.workProductBindings`, not at the root. Each entry requires `relationship`
+  (`contribution` or `variant`), `sourceAlphas` and `targetAlpha`; the older
+  `baselineAlpha`/`contributingAlphas` field names were renamed in schema 3.1.0.
+  Bindings are for **orthogonal** baseline families, designed independently with no
+  knowledge of each other (`semantics/composition.md` §4.8). Before reaching for them,
+  check whether one baseline already declares the other in `baselinePracticeNames` — if
+  it does they are one chain, ordinary inheritance applies, and bindings are the wrong
+  construct.
 
 ### Key Framework Concepts
 
