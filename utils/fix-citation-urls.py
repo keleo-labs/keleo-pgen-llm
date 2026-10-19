@@ -48,6 +48,7 @@ Usage:
 
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -55,7 +56,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json
+from utils._shared import load_json, load_json_pair
 
 
 # A plain library user agent, matching extract-html-text.py and
@@ -199,11 +200,100 @@ def collect_reference_uris(data):
     return uris
 
 
-def main():
+def normalize_url(url):
+    """Repair URLs mangled by an extra round of percent-encoding.
+
+    Sales Hub doccenter URLs legitimately carry a double-encoded path segment —
+    the live form has ``%252F``, ``%252C`` and ``%253D``, because an already
+    encoded path is encoded again to sit inside one segment. Something in the
+    authoring chain encoded them a *third* time, storing ``%25252F`` and a
+    doubled trailing slash. 31 authored documents carry it, including two
+    shipped at v2.0.0, so it is systematic rather than a typo.
+
+    The repair is mechanical and needs no network: collapse each surplus
+    ``%25`` prefix until one encoding round remains, and fold a doubled
+    trailing slash. Returns the URL unchanged when neither applies.
+    """
+    fixed = url
+    # "%2525..." is always one round too many; loop in case of worse.
+    while "%2525" in fixed:
+        fixed = fixed.replace("%2525", "%25")
+    # Guard the scheme's "//" by only touching a doubled slash at the very end.
+    if fixed.endswith("//"):
+        fixed = fixed[:-1]
+    return fixed
+
+
+def normalize_markdown(path):
+    """Apply normalize_url to the URLs in a markdown file.
+
+    The JSON sweep left the **analysis reports** untouched, and that was a real
+    gap rather than a tidiness one: every Phase 2 agent in this run is told to
+    take citation URLs from §11 of its analysis report rather than from an
+    existing JSON, so a report carrying the over-escaped form feeds it straight
+    back into a freshly generated document. Six reports still carried it after
+    the JSON sweep, two of them for documents not yet mapped.
+
+    Matches whole URL tokens so a doubled slash elsewhere in prose is untouched.
+    """
+    text = path.read_text(encoding="utf-8")
+    changes = []
+
+    def _sub(match):
+        original = match.group(0)
+        fixed = normalize_url(original)
+        if fixed != original:
+            changes.append((f"line {text[:match.start()].count(chr(10)) + 1}",
+                            original, fixed))
+        return fixed
+
+    new_text = re.sub(r"https?://[^\s)\]\}\"'<>|]+", _sub, text)
+    return new_text, changes
+
+
+def normalize_file(path):
+    """Apply normalize_url to every citation URL and reference link in one file.
+
+    Offline and idempotent, which is why it is allowed to sweep a whole tree
+    where --fix is not: there is no probe to misread, so there is no way for it
+    to mistake a live SSO-gated URL for a broken one.
+    """
+    # A sweep reaches whatever *.json sits in the tree, including fragments and
+    # scratch files that are not documents at all. One unparseable file must not
+    # abort a corpus-wide normalisation, so read tolerantly and skip.
+    data, err = load_json_pair(path)
+    if err or not isinstance(data, dict):
+        return None, []
+    changes = []
+
+    for citation in data.get("citations", []) or []:
+        url = citation.get("url")
+        if not isinstance(url, str):
+            continue
+        fixed = normalize_url(url)
+        if fixed != url:
+            citation["url"] = fixed
+            changes.append((citation.get("name", "(unnamed citation)"), url, fixed))
+
+    for entry in collect_reference_uris(data):
+        fixed = normalize_url(entry["uri"])
+        if fixed != entry["uri"]:
+            entry["obj"][entry["field"]] = fixed
+            changes.append((entry["path"], entry["uri"], fixed))
+
+    return data, changes
+
+
+def build_parser():
     parser = argparse.ArgumentParser(
         description="Test citation URLs and reference URIs; fix or remove broken ones"
     )
-    parser.add_argument("json_file", help="Practice/baseline/method JSON file")
+    parser.add_argument("json_file", nargs="*",
+                        help="One or more practice/baseline/method JSON files")
+    parser.add_argument("--dir", action="append", default=[], metavar="DIR",
+                        help="Sweep every practice/baseline/method JSON in a directory "
+                             "(repeatable; skips backups, ChangeRequests and "
+                             "underscore-prefixed build artifacts)")
     parser.add_argument("--fix", action="store_true",
                         help="Apply fixes (remove broken URLs or citations)")
     parser.add_argument("--remove-citations", action="store_true",
@@ -222,19 +312,22 @@ def main():
                         help="Detect citations missing URLs when source type suggests one should exist")
     parser.add_argument("--no-references", action="store_true",
                         help="Skip reference URI checks (citations only)")
+    parser.add_argument("--normalize-escaping", action="store_true",
+                        help="Repair over-percent-encoded URLs (%%25252F -> %%252F) and "
+                             "doubled trailing slashes, offline. Safe to sweep with "
+                             "--dir because it probes nothing; combine with --fix to "
+                             "write, omit --fix to preview.")
     parser.add_argument("--json", action="store_true",
                         help="Output results as JSON")
-    args = parser.parse_args()
+    return parser
 
-    replacements = {}
-    for r in args.replace:
-        if "=" not in r:
-            print(f"Error: --replace value must be 'old=new', got: {r}", file=sys.stderr)
-            sys.exit(1)
-        old, new = r.split("=", 1)
-        replacements[old] = new
 
-    data = load_json(args.json_file)
+def process_file(path, args, replacements):
+    """Check (and optionally fix) one document's citation and reference URLs.
+
+    Returns 0 when everything resolved, 1 when anything was broken or unknown.
+    """
+    data = load_json(path)
     citations = data.get("citations", [])
     has_problems = False
 
@@ -322,8 +415,8 @@ def main():
             output["missing_urls"] = missing_urls
         print(json.dumps(output, indent=2))
         if cit_broken or ref_broken or missing_urls:
-            sys.exit(1)
-        return
+            return 1
+        return 0
 
     # --- Text output ---
     if not args.json:
@@ -402,10 +495,10 @@ def main():
             if hints:
                 print(f"\nRun with {', or '.join(hints)}. "
                       "This applies only to the URLs reported broken above.")
-            sys.exit(1)
+            return 1
         if cit_unknown or ref_unknown:
-            sys.exit(1)
-        return
+            return 1
+        return 0
 
     # --- Apply fixes ---
     fixes_applied = 0
@@ -494,11 +587,11 @@ def main():
     fixes_applied += ref_fixes
 
     if fixes_applied > 0:
-        with open(args.json_file, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
             f.write("\n")
         if not args.json:
-            print(f"\nWrote {fixes_applied} fixes to {args.json_file}")
+            print(f"\nWrote {fixes_applied} fixes to {path}")
 
     if args.json:
         print(json.dumps({
@@ -515,6 +608,145 @@ def main():
             },
             **({"missing_urls": missing_urls} if args.check_missing else {}),
         }, indent=2))
+
+    return 1 if (cit_broken or ref_broken) else 0
+
+
+def collect_targets(files, dirs):
+    """Resolve the documents to check from explicit files and swept directories.
+
+    A sweep skips the same things the rest of the toolchain skips: backup
+    directories, ChangeRequests (written as "<name>.changerequest.json" or
+    "change-request-*.json") and underscore-prefixed build artifacts such as
+    _effective-context.json, none of which are authored documents.
+    """
+    targets = [Path(f) for f in files]
+    for d in dirs:
+        base = Path(d)
+        if not base.is_dir():
+            print(f"Warning: not a directory, skipped: {d}", file=sys.stderr)
+            continue
+        for found in sorted(base.rglob("*.json")):
+            if found.name.startswith("_") or found.name.startswith("change-request"):
+                continue
+            if found.name.endswith(".changerequest.json"):
+                continue
+            if "backup" in str(found).lower():
+                continue
+            targets.append(found)
+
+    seen, unique = set(), []
+    for t in targets:
+        key = os.path.realpath(t)
+        if key not in seen:
+            seen.add(key)
+            unique.append(t)
+    return unique
+
+
+def main():
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if not args.json_file and not args.dir:
+        parser.error("give at least one JSON file or --dir DIR")
+
+    replacements = {}
+    for r in args.replace:
+        if "=" not in r:
+            print(f"Error: --replace value must be 'old=new', got: {r}", file=sys.stderr)
+            sys.exit(1)
+        old, new = r.split("=", 1)
+        replacements[old] = new
+
+    targets = collect_targets(args.json_file, args.dir)
+    if not targets:
+        print("No documents to check.", file=sys.stderr)
+        sys.exit(1)
+
+    # Normalisation is a self-contained mode: offline, idempotent, and therefore
+    # exempt from the multi-document --fix guard below, which exists only because
+    # network verdicts are unreliable against SSO-gated hosts.
+    if args.normalize_escaping:
+        total, touched = 0, []
+        for path in targets:
+            is_markdown = Path(path).suffix.lower() in (".md", ".markdown")
+            if is_markdown:
+                payload, changes = normalize_markdown(Path(path))
+            else:
+                payload, changes = normalize_file(path)
+                # A JSON file that is not a document — a bare array, a refs
+                # spec, any build artifact — has no citations or references for
+                # the structured path to walk, so it came back untouched while
+                # still carrying the defect. Five `_refs-spec*.json` files held
+                # 78 over-escaped URLs this way. Fall back to the textual sweep,
+                # which needs no shape at all.
+                if payload is None:
+                    payload, changes = normalize_markdown(Path(path))
+                    is_markdown = True
+            if not changes:
+                continue
+            touched.append(str(path))
+            total += len(changes)
+            if not args.json:
+                print(f"\n{path}")
+                for label, old, new in changes:
+                    print(f"  {label}\n    - {old}\n    + {new}")
+            if args.fix:
+                if is_markdown:
+                    Path(path).write_text(payload, encoding="utf-8")
+                else:
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(payload, f, indent=2, ensure_ascii=False)
+                        f.write("\n")
+        if args.json:
+            print(json.dumps({"normalized": total, "files": touched}, indent=2))
+        else:
+            verb = "normalized" if args.fix else "would normalize"
+            print(f"\n{verb} {total} URL(s) across {len(touched)} document(s).")
+            if not args.fix and total:
+                print("(preview — add --fix to write)")
+        sys.exit(0)
+
+    # Hosts that sit behind SSO answer an unauthenticated probe with 404 or 403
+    # even when the document is perfectly reachable to a signed-in reader, so a
+    # sweep reads them as broken. Stripping those URLs would destroy working
+    # citations wholesale, which is the opposite of the job.
+    if args.fix and not args.replace_only and len(targets) > 1:
+        print(
+            "Refusing to --fix across several documents without --replace-only.\n"
+            "Authenticated hosts (saleshub.redhat.com, source.redhat.com,\n"
+            "content.redhat.com, docs.google.com) return 404/403 to an\n"
+            "unauthenticated probe, so a sweep reports live URLs as broken and\n"
+            "--fix would strip them. Sweep without --fix to get the report, verify\n"
+            "each finding against the authenticated route, then fix one document at\n"
+            "a time with --replace.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    # A --replace swap names one specific URL, so applying it across a swept
+    # set would be guesswork about which document meant it.
+    if replacements and len(targets) > 1:
+        parser.error("--replace works on a single document; name one file")
+
+    failed = []
+    for path in targets:
+        if len(targets) > 1 and not args.json:
+            print(f"\n{'=' * 70}\n{path}\n{'=' * 70}")
+        try:
+            if process_file(path, args, replacements):
+                failed.append(str(path))
+        except Exception as exc:                                  # noqa: BLE001
+            print(f"Error processing {path}: {exc}", file=sys.stderr)
+            failed.append(str(path))
+
+    if len(targets) > 1 and not args.json:
+        print(f"\n{len(targets) - len(failed)}/{len(targets)} documents clean.")
+        for f in failed:
+            print(f"  needs attention: {f}")
+
+    sys.exit(1 if failed else 0)
 
 
 if __name__ == "__main__":
