@@ -86,23 +86,146 @@ def discover_baseline(practice_path):
     return None
 
 
+def _resolve_baseline_by_name(bl_name):
+    """Resolve a baseline document name to a path under deps/ or baselines/."""
+    if not bl_name:
+        return None
+    project_root = UTILS_DIR.parent
+    slug = re.sub(r"[^a-z0-9]+", "-", bl_name.lower()).strip("-")
+    for c in (project_root / "deps" / f"{slug}.json",
+              project_root / "baselines" / slug / f"{slug}.json"):
+        if c.exists():
+            return str(c)
+    for json_file in list((project_root / "deps").glob("*.json")) + \
+            list((project_root / "baselines").glob("*/*.json")):
+        try:
+            if load_json(json_file, exit_on_error=False).get("name") == bl_name:
+                return str(json_file)
+        except Exception:
+            continue
+    return None
+
+
+def ancestor_baselines(baseline_path):
+    """Resolve the baseline's own ancestor baselines, transitively.
+
+    A baseline may itself extend another, through the array
+    `baselinePracticeNames` or the singular `baselinePracticeName`. The
+    dependency walk below covers `practiceDependencyNames` only, so for a
+    practice sitting under an extension baseline the root baseline's
+    vocabulary — its focuses, activity spaces and competencies — was never
+    supplied to the validator.
+
+    The failure is the dangerous kind: `Partner Ecosystem Essentials` extends
+    `Red Hat Sales Essentials`, and every shipped document in that subtree
+    reported *confident* `Invalid competency name`, `Unknown focus` and
+    `Unknown activity space` errors for vocabulary that resolves perfectly
+    well. An agent clearing them would remap correct references onto baseline
+    substitutes. Reproduced before the fix on four shipped documents at 58, 26,
+    24 and 8 errors, every one of which clears when the root baseline is
+    supplied.
+    """
+    paths, seen, queue = [], set(), []
+    try:
+        data = load_json(baseline_path, exit_on_error=False)
+    except Exception:
+        return paths
+    if not isinstance(data, dict):
+        return paths
+    queue.extend(data.get("baselinePracticeNames", []) or [])
+    if data.get("baselinePracticeName"):
+        queue.append(data["baselinePracticeName"])
+
+    while queue:
+        name = queue.pop(0)
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        resolved = _resolve_baseline_by_name(name)
+        if not resolved:
+            continue
+        paths.append(resolved)
+        try:
+            parent = load_json(resolved, exit_on_error=False)
+        except Exception:
+            continue
+        if isinstance(parent, dict):
+            queue.extend(parent.get("baselinePracticeNames", []) or [])
+            if parent.get("baselinePracticeName"):
+                queue.append(parent["baselinePracticeName"])
+    return paths
+
+
 def discover_schema():
     """Return schema path if deps/language.schema.json exists."""
     candidate = UTILS_DIR.parent / "deps" / "language.schema.json"
     return str(candidate) if candidate.exists() else None
 
 
+def _canonical_candidate(name, candidates):
+    """Pick the authoring home from the candidates of an ambiguous resolution.
+
+    Mirrors _canonical_entry in discover-dependencies.py: prefer the directory
+    named after the document itself, then deps/, then any other path.
+    """
+    slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    paths = [c["path"] for c in candidates if c.get("path")]
+    if not paths:
+        return None
+
+    def score(p):
+        path = Path(p)
+        parent, stem = path.parent.name, path.stem
+        if parent == slug and stem == slug:
+            return (0, len(p))
+        if parent == stem:
+            return (1, len(p))
+        if parent == slug or stem == slug:
+            return (2, len(p))
+        if parent == "deps":
+            return (3, len(p))
+        return (4, len(p))
+
+    return sorted(paths, key=score)[0]
+
+
 def discover_parents(practice_path, baseline_path=None):
-    """Resolve parent practice paths from practiceDependencyNames."""
+    """Resolve parent practice paths from practiceDependencyNames, transitively.
+
+    A dependency has dependencies of its own, and everything they declare is in
+    scope for the document at the bottom. Resolving only the first hop made a
+    clean tier-4 practice report **FAIL with 46 errors** — 46 `Invalid
+    competency name` findings for competencies declared two hops out, on
+    `Partner Go-to-Market Execution`, which this document reaches through
+    `Partner Demand Generation`. Every one vanishes when that second hop is
+    supplied.
+
+    That is the dangerous direction: an agent clearing 46 confident competency
+    errors would remap every persona and activity reference onto baseline
+    substitutes. `resolve-context.py --transitive` has always walked this;
+    the three checkers did not.
+    """
+    # The baseline's own ancestor baselines, which the dependency walk below
+    # does not reach. Supplied first so their vocabulary is present even for a
+    # practice that declares no practice dependencies at all.
+    parents = ancestor_baselines(baseline_path) if baseline_path else []
+
     try:
         data = load_json(practice_path, exit_on_error=False)
-        dep_names = data.get("practiceDependencyNames", [])
+        dep_names = list(data.get("practiceDependencyNames", []) or [])
         if not dep_names:
-            return []
+            return parents
 
-        parents = []
-        for name in dep_names:
-            # Try discover-dependencies.py --resolve
+        # Breadth-first over the dependency graph; `seen` keyed on name so a
+        # diamond or a cycle terminates. Each parent resolved is loaded so its
+        # own dependencies join the queue.
+        seen = set(dep_names)
+        queue = list(dep_names)
+
+        while queue:
+            name = queue.pop(0)
+            resolved_path = None
+
             result = subprocess.run(
                 [sys.executable, str(UTILS_DIR / "discover-dependencies.py"), "--resolve", name],
                 capture_output=True, text=True,
@@ -110,25 +233,49 @@ def discover_parents(practice_path, baseline_path=None):
             if result.returncode == 0:
                 try:
                     report = json.loads(result.stdout)
-                    if report.get("status") == "found" and report.get("path"):
-                        parents.append(report["path"])
-                        continue
-                except (json.JSONDecodeError, TypeError):
+                    # --resolve emits {"results": [ ... ]}, one entry per name.
+                    entry = (report.get("results") or [report])[0]
+                    if entry.get("status") == "found" and entry.get("path"):
+                        resolved_path = entry["path"]
+                    # A document synced beside each consumer makes its name
+                    # ambiguous. Dropping the parent in silence is worse than
+                    # picking the authoring home, because every reference into
+                    # that parent then reads as an unresolvable error.
+                    elif entry.get("status") == "ambiguous":
+                        resolved_path = _canonical_candidate(
+                            name, entry.get("candidates", []))
+                except (json.JSONDecodeError, TypeError, IndexError):
                     pass
 
-            # Fallback: check _effective-context.json in practice directory
+            if resolved_path:
+                parents.append(resolved_path)
+                parent_data = load_json(resolved_path, exit_on_error=False)
+                if isinstance(parent_data, dict):
+                    for onward in parent_data.get("practiceDependencyNames", []) or []:
+                        if onward and onward not in seen:
+                            seen.add(onward)
+                            queue.append(onward)
+                continue
+
+            # Fallback: an effective context beside the practice covers them all.
             practice_dir = Path(practice_path).parent
             ec_path = practice_dir / "_effective-context.json"
             if ec_path.exists():
                 parents.append(str(ec_path))
-                break  # effective context covers all parents
+                break
         return parents
     except Exception:
-        return []
+        return parents
 
 
-def run_validator(practice, baseline, schema):
-    """Run validate-practice-json.py and return (error_count, warning_count, report)."""
+def run_validator(practice, baseline, schema, parents=None):
+    """Run validate-practice-json.py and return (error_count, warning_count, report).
+
+    Dependency practices are forwarded as trailing positional arguments. Without
+    them the validator cannot resolve a reference into a declared dependency —
+    an orchestration stage nested to a dependency's pattern, for instance — and
+    reports it as an error the document cannot fix.
+    """
     cmd = [
         sys.executable,
         str(UTILS_DIR / "validate-practice-json.py"),
@@ -136,6 +283,7 @@ def run_validator(practice, baseline, schema):
         str(baseline),
         str(schema),
     ]
+    cmd.extend(str(p) for p in (parents or []))
     result = subprocess.run(cmd, capture_output=True, text=True)
     try:
         report = json.loads(result.stdout)
@@ -254,7 +402,7 @@ def main():
 
     parents = args.parent if args.parent else discover_parents(practice, baseline)
 
-    initial_errors, initial_warnings, initial_report = run_validator(practice, baseline, schema)
+    initial_errors, initial_warnings, initial_report = run_validator(practice, baseline, schema, parents)
     fixes_applied = []
     iterations = 0
     current_errors = initial_errors
@@ -271,7 +419,7 @@ def main():
             if comp_fixes > 0:
                 fixes_applied.append(f"fix-competency-levels: {comp_fixes} fixes")
 
-            current_errors, current_warnings, _ = run_validator(practice, baseline, schema)
+            current_errors, current_warnings, _ = run_validator(practice, baseline, schema, parents)
 
             if current_errors == 0:
                 break

@@ -192,8 +192,15 @@ def validate(path, schema):
         # validate-practice.py: <practice> <baseline> <schema> [deps ...]
         if not baselines:
             return None, False
+        # Every resolved baseline, not just the nearest. `baselines[1:]` are the
+        # ancestors of `baselines[0]`, and the validator takes them as further
+        # positional context. Dropping them made this sweep manufacture the very
+        # cross-reference phantoms it exists to find: on the partner subtree it
+        # reported 1,160 `baseline` findings — `Invalid competency name:
+        # 'Ecosystem Operations'`, `Target alpha 'Partner Capability' not found`
+        # — against documents that validate at 0 errors when handed their chain.
         cmd = [sys.executable, str(VALIDATE_PRACTICE), str(path),
-               baselines[0], str(schema)] + parents
+               baselines[0], str(schema)] + baselines[1:] + parents
 
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
