@@ -115,11 +115,26 @@ def sync_practices(source_dir, fix=False):
     holding one document under two filenames.
     """
     source_dir = Path(source_dir).resolve()
-    practices_root = source_dir.parent  # e.g. <repo>/practices
+    source_root = source_dir.parent  # e.g. <repo>/practices
 
-    if not practices_root.is_dir():
-        print(json.dumps({"error": f"Parent directory does not exist: {practices_root}"}))
+    if not source_root.is_dir():
+        print(json.dumps({"error": f"Parent directory does not exist: {source_root}"}))
         sys.exit(1)
+
+    # Copies of a document do not stay inside the tree it was authored in: a
+    # regenerated baseline in baselines/ commonly has synced copies sitting in
+    # practices/<method>/ so that method directory is self-contained. Deriving
+    # the target root from the source's own parent missed those entirely, and a
+    # stale copy left behind is worse than no copy — resolution goes ambiguous
+    # and tools silently pick the old version.
+    repo_root = source_root.parent
+    target_roots = []
+    for candidate in ("practices", "baselines"):
+        candidate_path = repo_root / candidate
+        if candidate_path.is_dir():
+            target_roots.append(candidate_path)
+    if source_root not in target_roots:
+        target_roots.append(source_root)
 
     duplicates = []
     source_index = scan_directory(source_dir, duplicates)
@@ -129,11 +144,13 @@ def sync_practices(source_dir, fix=False):
 
     results = []
 
-    for target_dir in sorted(practices_root.iterdir()):
-        if not target_dir.is_dir():
-            continue
-        if target_dir.resolve() == source_dir:
-            continue
+    target_dirs = []
+    for root in target_roots:
+        for entry in sorted(root.iterdir()):
+            if entry.is_dir() and entry.resolve() != source_dir:
+                target_dirs.append(entry)
+
+    for target_dir in target_dirs:
 
         target_index = scan_directory(target_dir, duplicates)
         if not target_index:

@@ -25,7 +25,7 @@ ARRAY_SECTIONS = [
     "alphas", "workProducts", "activities", "patterns", "citations",
     "activitySpaces", "competencies", "narrativeTypes", "assets",
     "personas", "personaGroups", "practiceElementAliases", "narratives",
-    "focuses", "references", "outcomes",
+    "focuses", "references", "outcomes", "alphaInstances",
 ]
 
 SCALAR_FIELDS = [
@@ -311,6 +311,17 @@ GATE_SECTIONS = [
     "personas", "personaGroups", "outcomes",
 ]
 
+# Arrays a truncated Phase 3 run drops just as readily, but whose loss the gate
+# used to pass in silence: a regeneration took alphaInstances 4 → 0 and assets
+# 24 → 17 without a murmur. Both were deliberate there, which is the point —
+# the gate cannot tell deliberate from truncated, so it must surface the drop
+# and let a human say which it was. Reported at warning severity rather than
+# critical, because emptying one of these is legitimate far more often than
+# emptying an alphas array ever is.
+GATE_ADVISORY_SECTIONS = [
+    "alphaInstances", "references", "assets", "narratives",
+]
+
 
 def run_gate(diff):
     """Completeness gate: check for element arrays that dropped to 0 or decreased significantly.
@@ -342,6 +353,22 @@ def run_gate(diff):
                 "issue": f"{section} decreased by >{int((1 - new_count/old_count) * 100)}% ({old_count} → {new_count})",
             })
 
+    for section in GATE_ADVISORY_SECTIONS:
+        info = diff["sections"].get(section)
+        if not info:
+            continue
+        old_count, new_count = info["old"], info["new"]
+        if old_count > 0 and new_count < old_count:
+            warnings.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": (
+                    f"{section} dropped from {old_count} to {new_count} — confirm this "
+                    f"is deliberate and not truncation"
+                ),
+            })
+
     return critical, warnings
 
 
@@ -349,10 +376,12 @@ def print_gate_report(diff, critical, warnings):
     """Print gate-style pass/fail summary."""
     print("=== COMPLETENESS GATE ===\n")
 
-    for section in GATE_SECTIONS:
+    for section in GATE_SECTIONS + GATE_ADVISORY_SECTIONS:
         info = diff["sections"].get(section, {"old": 0, "new": 0, "delta": 0})
         old_count = info["old"]
         new_count = info["new"]
+        if section in GATE_ADVISORY_SECTIONS and old_count == 0 and new_count == 0:
+            continue
 
         is_crit = any(c["section"] == section for c in critical)
         is_warn = any(w["section"] == section for w in warnings)

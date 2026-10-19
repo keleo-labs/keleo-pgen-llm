@@ -38,7 +38,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json_pair
+from utils._shared import (load_json_pair, _context_is_stale,
+                           merge_ancestor_baselines)
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
@@ -944,7 +945,17 @@ def check_narrative_citations(data):
 
 
 def check_narrative_placement(data):
-    """Warn when top-level narratives appear to belong to specific elements."""
+    """Warn when top-level narratives appear to belong to specific elements.
+
+    Ownership is read off the narrative's **name**, not its description, and
+    this must stay in step with `fix_narrative_placement` in
+    `fix-common-issues.py`. Matching on description flagged a practice narrative
+    called "Practice Intent" as belonging to an alpha, because its one-line
+    summary named the practice's primary concern — which is exactly what a
+    practice narrative's summary does. Two tools disagreeing about placement is
+    worse than either being wrong, because the disagreement reads as a finding
+    and an agent acts on it.
+    """
     issues = []
     element_names = set()
     for coll_key in ("alphas", "activitySpaces", "competencies"):
@@ -953,9 +964,8 @@ def check_narrative_placement(data):
 
     for i, narrative in enumerate(data.get("narratives", [])):
         narr_name = narrative.get("name", "").lower()
-        narr_desc = narrative.get("description", "").lower()
         for elem_name in sorted(element_names, key=len, reverse=True):
-            if elem_name in narr_name or elem_name in narr_desc:
+            if elem_name and elem_name in narr_name:
                 issues.append({
                     "severity": "warning",
                     "category": "narrative-placement",
@@ -2709,6 +2719,44 @@ def check_references(data, kind, baseline_data=None):
     return issues
 
 
+def check_persona_group_membership(data, kind):
+    """A persona group must group something.
+
+    The schema makes both `personaNames` and `personaGroupNames` optional, so a
+    group declaring neither — or declaring `personaNames: []` — validates clean
+    while naming no members at all. Two such groups were carried through ten
+    releases of one practice before a mapping agent noticed by eye. An empty
+    group is not a harmless stub: it merges into every consumer, appears in
+    their team listings, and resolves to nobody.
+    """
+    issues = []
+    sources = [data]
+    if kind == "method":
+        sources.extend(data.get("practices", []))
+
+    for source in sources:
+        pfx = ""
+        if kind == "method" and source is not data:
+            pfx = f"practice[{source.get('name', '?')}]."
+        for idx, pg in enumerate(source.get("personaGroups", [])):
+            members = [n for n in pg.get("personaNames", []) or [] if n]
+            subgroups = [n for n in pg.get("personaGroupNames", []) or [] if n]
+            if members or subgroups:
+                continue
+            issues.append({
+                "severity": "error",
+                "category": "persona-group-membership",
+                "path": f"{pfx}personaGroups[{idx}].personaNames",
+                "message": (
+                    f"PersonaGroup '{pg.get('name', '?')}' names no personas and "
+                    f"no sub-groups — it groups nothing"
+                ),
+                "autoFixable": False,
+            })
+
+    return issues
+
+
 def check_persona_group_acyclicity(data, kind, baseline_data=None):
     """Detect cycles in the personaGroupNames directed graph (must be a DAG)."""
     issues = []
@@ -3164,6 +3212,13 @@ def check_baseline_references(data, baseline_data, kind):
 
     practice_alpha_names = set()
     practice_nt_names = set()
+    # A Practice may declare its own focuses, activitySpaces and competencies
+    # alongside alphas and narrativeTypes. Union them in, or every reference to a
+    # locally declared element is reported as unresolved against the baseline.
+    practice_focus_names = set()
+    practice_as_names = set()
+    practice_comp_names = set()
+    practice_comp_levels = set()
     for source in sources:
         for a in source.get("alphas", []):
             if a.get("name"):
@@ -3171,9 +3226,25 @@ def check_baseline_references(data, baseline_data, kind):
         for nt in source.get("narrativeTypes", []):
             if nt.get("name"):
                 practice_nt_names.add(nt["name"])
+        for f in source.get("focuses", []):
+            if f.get("name"):
+                practice_focus_names.add(f["name"])
+        for s in source.get("activitySpaces", []):
+            if s.get("name"):
+                practice_as_names.add(s["name"])
+        for comp in source.get("competencies", []):
+            if comp.get("name"):
+                practice_comp_names.add(comp["name"])
+            for level in comp.get("competencyLevels", comp.get("levels", [])):
+                if level.get("name"):
+                    practice_comp_levels.add(level["name"])
 
     all_alpha_names = bl_alpha_names | practice_alpha_names
     all_nt_names = bl_nt_names | practice_nt_names
+    bl_focus_names |= practice_focus_names
+    bl_as_names |= practice_as_names
+    bl_comp_names |= practice_comp_names
+    bl_comp_levels |= practice_comp_levels
 
     for si, source in enumerate(sources):
         if si == 0:
@@ -4391,6 +4462,10 @@ def check_narrative_context_length(data, kind):
 
     long_count = 0
     total = 0
+    # Name the offenders. A count alone leaves an agent guessing which of
+    # eighty-odd contexts to shorten, which is the complaint already on record
+    # against `checklist-style`; the `lod-naming` check sets the precedent.
+    long_paths = []
 
     for source in sources:
         pfx = ""
@@ -4408,6 +4483,11 @@ def check_narrative_context_length(data, kind):
                     )
                     if sentences > 3:
                         long_count += 1
+                        long_paths.append(
+                            f"{base_path}['{narr.get('name', f'[{ni}]')}']"
+                            f".{nc.get('narrativeElementName', '?')}"
+                            f" ({sentences} sentences)"
+                        )
 
         _check_narratives(source.get("narratives", []), f"{pfx}narratives")
         for coll in ("alphas", "activities", "workProducts", "patterns"):
@@ -4431,6 +4511,7 @@ def check_narrative_context_length(data, kind):
             "message": (
                 f"{long_count}/{total} narrative contexts exceed 3 sentences "
                 f"(target: 1-3 sentences per context)"
+                + ("\n  " + "\n  ".join(long_paths) if long_paths else "")
             ),
             "autoFixable": False,
         })
@@ -4753,6 +4834,8 @@ def main():
                 "message": f"Could not load baseline: {berr}",
                 "autoFixable": False,
             })
+        elif baseline_data:
+            merge_ancestor_baselines(baseline_data, baseline_path)
 
     # Auto-discover _effective-context.json for transitive baseline resolution
     if baseline_data and kind != "practiceBaseline":
@@ -4761,6 +4844,13 @@ def main():
             auto_path = file_path.parent / auto_name
             if auto_path.exists():
                 ectx, ectx_err = load_json_pair(auto_path)
+                # Same staleness guard as resolve_reference_context. This is a
+                # second, independent override path — it merges straight into
+                # baseline_data — so without the check here a context built
+                # against an older baseline still silently wins, and the guard
+                # on the other path proves nothing.
+                if not ectx_err and _context_is_stale(str(auto_path), ectx, baseline_data):
+                    break
                 if not ectx_err:
                     # Merge effective context elements into baseline_data
                     for arr_key in ("narrativeTypes", "competencies", "activitySpaces",
@@ -4873,6 +4963,7 @@ def main():
     all_issues.extend(check_alias_isolation(data, kind))
 
     all_issues.extend(check_internal_crossrefs(data, kind, baseline_data))
+    all_issues.extend(check_persona_group_membership(data, kind))
     all_issues.extend(check_persona_group_acyclicity(data, kind, baseline_data))
 
     if baseline_data and kind != "practiceBaseline":
