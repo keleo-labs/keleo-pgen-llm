@@ -361,6 +361,15 @@ def extract_dependency_names(data, kind):
             if name not in seen_practice_deps:
                 deps.append((name, "practiceDependency"))
                 seen_practice_deps.add(name)
+        # Externalized form: practiceNames replaces embedded practice objects
+        # in a packaged method, and is the only record of what the method is
+        # made of. Omitting it leaves the closure short by every constituent
+        # practice, which is the difference between a packageable document set
+        # and one whose entry point cannot resolve.
+        for name in data.get("practiceNames", []):
+            if name not in seen_practice_deps:
+                deps.append((name, "methodPractice"))
+                seen_practice_deps.add(name)
         for practice in data.get("practices", []):
             for name in practice.get("practiceDependencyNames", []):
                 if name not in seen_practice_deps:
@@ -377,17 +386,30 @@ def _load_for_transitive(match, file_path_fallback):
     return load_json_pair(file_path_fallback)
 
 
-def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesystem=True):
-    """Recursively resolve transitive baseline dependencies.
+def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesystem=True,
+                       emitted=None):
+    """Recursively resolve the full dependency closure of a document.
 
     file_path_or_entry can be a filesystem path (str/Path) or a resolved
     index entry dict (with optional keleo_path).
 
-    Only baselinePracticeNames are resolved transitively.
-    practiceDependencyNames are reported but not recursed into.
+    Both baselinePracticeNames and practiceDependencyNames are recursed into.
+    A practice dependency has dependencies of its own, and stopping at the
+    first level returns a closure that is short by however many of those there
+    are -- which the packaging step then ships as an archive that cannot
+    resolve its own entry point.
+
+    The return is flat, de-duplicated by document name, and in dependency
+    order: a document appears after everything it depends on. That is the
+    order package-keleo.py wants its --documents in, so a caller can pass the
+    resolved paths straight through. `transitiveDependencies` is retained on
+    each entry, naming that document's own direct dependencies, so a reader
+    can still see the shape the closure was flattened from.
     """
     if visited is None:
         visited = set()
+    if emitted is None:
+        emitted = {}
 
     if isinstance(file_path_or_entry, dict):
         data, err = load_resolved_json(file_path_or_entry)
@@ -407,6 +429,9 @@ def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesyste
     results = []
 
     for dep_name, role in dep_names:
+        if dep_name in emitted:
+            continue
+
         match = resolve_name(dep_name, index, prefer_filesystem=prefer_filesystem)
         dep_result = {
             "name": dep_name,
@@ -420,12 +445,20 @@ def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesyste
         if match.get("candidates"):
             dep_result["candidates"] = match["candidates"]
 
-        if match["status"] == "found" and role != "practiceDependency":
-            dep_result["transitiveDependencies"] = resolve_transitive(
-                match, index, visited, prefer_filesystem=prefer_filesystem
+        nested = []
+        if match["status"] == "found":
+            nested = resolve_transitive(
+                match, index, visited, prefer_filesystem=prefer_filesystem,
+                emitted=emitted,
             )
+            dep_result["transitiveDependencies"] = [d["name"] for d in nested]
 
-        results.append(dep_result)
+        # Post-order: whatever this dependency needs is emitted before it, so
+        # the flattened list stays in dependency order.
+        results.extend(nested)
+        if dep_name not in emitted:
+            emitted[dep_name] = dep_result
+            results.append(dep_result)
 
     return results
 
