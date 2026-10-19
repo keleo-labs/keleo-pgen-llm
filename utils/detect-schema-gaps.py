@@ -2,9 +2,13 @@
 """Detect schema feature gaps in practice JSON files.
 
 When the Practice Language schema evolves, existing practices may be missing
-newer features (outcomes, patternGroups, checklist priorities, etc.). This
-utility reads a practice JSON, compares its schemaVersion to the current
+newer features (outcomes, pattern orchestrations, checklist priorities, etc.).
+This utility reads a practice JSON, compares its schemaVersion to the current
 schema, and reports which features are missing or incomplete.
+
+A deprecated construct is not a gap. patternGroups was deprecated at schema
+2.21.0, so its absence is never reported — only an existing declaration with
+an empty group, which is broken for the navigation it still serves.
 
 Usage:
     python3 utils/detect-schema-gaps.py <practice>.json [--schema deps/language.schema.json] [--json]
@@ -113,21 +117,84 @@ def check_outcomes(data, kind):
 
 
 def check_pattern_groups(data):
-    """Check patternGroups: present? non-empty entries?"""
+    """Check patternGroups, which is deprecated as of schema 2.21.0.
+
+    Absence is not a gap — new documents do not get one. Only an existing
+    declaration is reported, and only when an entry is empty, since a group
+    that lists no patterns is broken for the navigation it still serves.
+    """
     pgs = data.get("patternGroups", [])
     if not pgs:
-        return {
-            "feature": "patternGroups",
-            "status": "missing",
-            "detail": "No patternGroups array",
-        }
+        return None
 
     empty = [pg.get("name", "?") for pg in pgs if not pg.get("entries")]
     if empty:
         return {
             "feature": "patternGroups",
             "status": "incomplete",
-            "detail": f"{len(empty)} group(s) with empty entries: {', '.join(empty)}",
+            "detail": (
+                f"{len(empty)} group(s) with empty entries: {', '.join(empty)} "
+                "(construct deprecated at 2.21.0 — repair in place, do not extend)"
+            ),
+        }
+    return None
+
+
+def check_pattern_orchestrations(data, kind):
+    """Check patternOrchestration adoption (schema 2.21.0, extended through 3.1.0).
+
+    Only a document with two or more patterns in its own right is a candidate:
+    orchestration-strategy.md 1 is explicit that a practice with one pattern
+    never needs one, and that independent patterns need no ordering invented
+    for them. A baseline defines no patterns, so only a shell is meaningful there.
+    """
+    orchestrations = data.get("patternOrchestrations", [])
+
+    if kind == "practiceBaseline":
+        return None  # A baseline may publish a shell, but absence is not a gap.
+
+    patterns = data.get("patterns", [])
+    if kind == "method":
+        for practice in data.get("practices", []):
+            if isinstance(practice, dict):
+                patterns = patterns + practice.get("patterns", [])
+
+    if not orchestrations:
+        if len(patterns) >= 2:
+            return {
+                "feature": "patternOrchestrations",
+                "status": "missing",
+                "detail": (
+                    f"{len(patterns)} patterns and no orchestration — check whether the "
+                    "source states how they relate in time (see orchestration-strategy.md)"
+                ),
+            }
+        return None
+
+    # Every stage must declare a relationship (required from schema 3.0.0), name
+    # exactly one of patternName/orchestrationName, and carry the companion
+    # property its relationship requires.
+    issues = []
+    for orch in orchestrations:
+        name = orch.get("name", "?")
+        for i, stage in enumerate(orch.get("stages", [])):
+            where = f"{name}[{i}]"
+            named = [k for k in ("patternName", "orchestrationName") if stage.get(k)]
+            if len(named) != 1:
+                issues.append(f"{where} names {len(named)} of patternName/orchestrationName")
+            rel = stage.get("relationship")
+            if not rel:
+                issues.append(f"{where} has no relationship")
+            elif rel in ("concurrent", "nested") and not stage.get("relativeTo"):
+                issues.append(f"{where} is '{rel}' without relativeTo")
+            elif rel == "onDemand" and not stage.get("trigger"):
+                issues.append(f"{where} is 'onDemand' without trigger")
+
+    if issues:
+        return {
+            "feature": "patternOrchestrations",
+            "status": "incomplete",
+            "detail": f"{len(issues)} stage issue(s): {'; '.join(issues[:5])}",
         }
     return None
 
@@ -324,10 +391,24 @@ def suggest_update_mode(gaps, current_version, latest_version):
     if major_distance(current_version, latest_version) >= 2:
         return "remap"
 
-    gap_features = {g["feature"] for g in gaps}
+    # A missing orchestration is advisory, not a verdict. Whether two patterns
+    # belong in one depends on the source stating how they relate in time, which
+    # this utility cannot see — so it reports the candidate and leaves the mode
+    # to the other gaps. A malformed stage is a real defect and does count.
+    gap_features = {
+        g["feature"]
+        for g in gaps
+        if not (g["feature"] == "patternOrchestrations" and g["status"] == "missing")
+    }
 
     # Structural features that need re-mapping
-    remap_features = {"outcomes", "patternGroups", "references", "gherkinStructures", "expectedMetrics"}
+    remap_features = {
+        "outcomes",
+        "patternOrchestrations",
+        "references",
+        "gherkinStructures",
+        "expectedMetrics",
+    }
     if gap_features & remap_features:
         return "remap"
 
@@ -348,6 +429,7 @@ def analyze_gaps(data, latest_version):
     for check_fn, args in [
         (check_outcomes, (data, kind)),
         (check_pattern_groups, (data,)),
+        (check_pattern_orchestrations, (data, kind)),
         (check_checklist_priority, (data,)),
         (check_references, (data, kind)),
         (check_acknowledgements, (data,)),

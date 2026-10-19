@@ -406,10 +406,29 @@ def print_human_readable(summary):
               f"could={tp['could']} ({tp['could']*100//total}%)")
 
 
+def _display_name(item):
+    """How an element should be labelled when listed.
+
+    Most carry `name`. An alias is identified by the pair it declares, so show
+    both sides — the element it renames and the name it gives it — since either
+    alone is useless for the collision checks these listings are read for.
+    """
+    if not isinstance(item, dict):
+        return str(item)
+    if item.get("name"):
+        return item["name"]
+    if item.get("aliasName"):
+        element = item.get("practiceElementName", "?")
+        etype = item.get("practiceElementType", "")
+        suffix = f" [{etype}]" if etype else ""
+        return f"{element} → {item['aliasName']}{suffix}"
+    return "(unnamed)"
+
+
 DETAIL_KEYS = [
     "personas", "personaGroups", "alphas", "workProducts",
     "activities", "outcomes", "narratives", "citations",
-    "patternOrchestrations",
+    "patternOrchestrations", "practiceElementAliases", "references",
 ]
 
 
@@ -441,12 +460,17 @@ def print_detail(data, keys, needle):
     needs the underlying text, not a count of it.
     """
     for key in keys:
-        items = [i for i in (data.get(key) or []) if _matches(i.get("name"), needle)]
+        # practiceElementAliases carry no `name` — they are keyed on
+        # practiceElementName/aliasName. Filtering and printing on `name` alone
+        # rendered every alias as "None", which is why an agent reached for a
+        # python3 one-liner to inspect them instead of using this tool.
+        items = [i for i in (data.get(key) or [])
+                 if _matches(_display_name(i), needle)]
         if not items:
             continue
         print(f"=== {key} ({len(items)}) ===")
         for item in items:
-            print(f"- {item.get('name')}")
+            print(f"- {_display_name(item)}")
             if item.get("description"):
                 print(f"    {item['description']}")
 
@@ -538,7 +562,11 @@ def main():
         files = sorted(
             f for f in dir_path.glob("*.json")
             if not f.name.startswith("_")
+            # ChangeRequests are written as "<name>.changerequest.json", so the
+            # prefix test alone never matched them and they were summarised as
+            # versionless practiceBaselines.
             and not f.name.startswith("change-request")
+            and not f.name.endswith(".changerequest.json")
             and "backup" not in str(f)
         )
     else:

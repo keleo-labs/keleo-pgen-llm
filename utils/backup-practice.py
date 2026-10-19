@@ -45,7 +45,8 @@ def main():
     )
     parser.add_argument(
         "directory",
-        help="Path to practice or baseline directory (e.g., practices/my-practice/)",
+        nargs="+",
+        help="One or more practice or baseline directories (e.g., practices/my-practice/)",
     )
     parser.add_argument(
         "--files",
@@ -65,12 +66,34 @@ def main():
     )
     args = parser.parse_args()
 
-    directory = args.directory.rstrip("/")
-    if not os.path.isdir(directory):
-        print(json.dumps({"error": f"Directory not found: {directory}"}))
+    results = []
+    missing = []
+    for raw in args.directory:
+        directory = raw.rstrip("/")
+        if not os.path.isdir(directory):
+            missing.append(directory)
+            continue
+        results.append(backup_one(directory, args))
+
+    if len(args.directory) == 1 and not results:
+        print(json.dumps({"error": f"Directory not found: {missing[0]}"}))
         sys.exit(1)
 
-    result = {}
+    if len(args.directory) == 1:
+        print(json.dumps(results[0], indent=2))
+    else:
+        print(json.dumps({
+            "backups": results,
+            "count": len(results),
+            "missing": missing,
+            "totalFiles": sum(r.get("count", 0) for r in results),
+        }, indent=2))
+    sys.exit(1 if missing else 0)
+
+
+def backup_one(directory, args):
+    """Back up one practice or baseline directory, returning a result record."""
+    result = {"directory": directory}
 
     if not args.prune_only:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -85,10 +108,13 @@ def main():
                 full = os.path.join(directory, f)
                 if not os.path.isfile(full):
                     continue
-                if f.endswith(".json") or f in (
-                    "01-analysis-report.md",
-                    "01.5-distilled-essentials.md",
-                    "02-mapping-guide.md",
+                # Phase outputs are numbered by convention (00-prompt-history,
+                # 01-analysis-report, 01.5-distilled-essentials, 02-mapping-guide,
+                # and the per-practice 02-mapping-guide-practice-*.md a method
+                # directory carries). Matching the convention rather than a fixed
+                # list keeps split mapping guides from being left unprotected.
+                if f.endswith(".json") or (
+                    f.endswith(".md") and f[:2].isdigit() and f[2] in ".-"
                 ):
                     targets.append(full)
 
@@ -117,7 +143,7 @@ def main():
         result["prunedCount"] = len(removed)
         result["remaining"] = len(remaining)
 
-    print(json.dumps(result, indent=2))
+    return result
 
 
 if __name__ == "__main__":

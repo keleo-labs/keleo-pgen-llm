@@ -112,14 +112,50 @@ def _navigate(current, token):
     raise KeyError(f"Cannot navigate into {type(current).__name__} with '{token}'")
 
 
-def deep_replace(obj, old, new):
-    """Recursively replace old with new in all string values."""
+def deep_replace(obj, old, new, protected=None):
+    """Recursively rename an element, matching whole values and whole words.
+
+    A plain `str.replace` is wrong for element renames in two ways that both
+    bite on the commonest shape — extending a name with a qualifier:
+
+    1. **The new name contains the old.** Renaming `Partner Account Manager` to
+       `Red Hat Partner Account Manager` rewrites the already-renamed value on
+       any later pass, giving `Red Hat Red Hat Partner Account Manager`.
+    2. **The old name is a substring of a different element's name.** The same
+       rename turns the genuinely distinct `Global Partner Account Manager`
+       into `Global Red Hat Partner Account Manager`.
+
+    Both were live on one document in this corpus, which is why the rename had
+    to be done by hand. So: replace a string that *equals* the old name, and
+    otherwise only on word boundaries where the match is not already preceded
+    or followed by more of a longer name.
+    """
     if isinstance(obj, str):
-        return obj.replace(old, new)
+        if obj == old:
+            return new
+        pattern = r'(?<![\w-])' + re.escape(old) + r'(?![\w-])'
+
+        def _sub(match):
+            # Skip where this occurrence is really part of a *different*
+            # declared element's name — `Global Partner Account Manager`
+            # contains `Partner Account Manager` verbatim — or part of the new
+            # name itself, which is what makes a second pass idempotent.
+            for other in list(protected or ()) + [new]:
+                if other == old:
+                    continue
+                idx = other.find(old)
+                while idx != -1:
+                    start, end = match.start() - idx, match.start() - idx + len(other)
+                    if start >= 0 and obj[start:end] == other:
+                        return match.group(0)
+                    idx = other.find(old, idx + 1)
+            return new
+
+        return re.sub(pattern, _sub, obj)
     if isinstance(obj, list):
-        return [deep_replace(item, old, new) for item in obj]
+        return [deep_replace(item, old, new, protected) for item in obj]
     if isinstance(obj, dict):
-        return {k: deep_replace(v, old, new) for k, v in obj.items()}
+        return {k: deep_replace(v, old, new, protected) for k, v in obj.items()}
     return obj
 
 
@@ -266,7 +302,18 @@ def main():
         if not found:
             print(f"Error: no element named '{old_name}' in {collection}", file=sys.stderr)
             sys.exit(1)
-        data = deep_replace(data, old_name, new_name)
+        # Collect every other declared name so the replace can tell a reference
+        # apart from a different element that merely contains the old name.
+        protected = set()
+        for key, value in data.items():
+            if not isinstance(value, list):
+                continue
+            for entry in value:
+                if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                    if entry["name"] != new_name:
+                        protected.add(entry["name"])
+        protected.discard(old_name)
+        data = deep_replace(data, old_name, new_name, protected)
         changes.append(
             f"  rename-in {collection}: \"{old_name}\" -> \"{new_name}\" (all references updated)"
         )

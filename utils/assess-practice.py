@@ -4762,6 +4762,10 @@ def main():
         help="Output concise summary (counts by severity and category) instead of full report"
     )
     parser.add_argument(
+        "--brief", action="store_true",
+        help="Print one-line summary instead of full JSON report (same form as validate-practice.py --brief)"
+    )
+    parser.add_argument(
         "--errors-only", action="store_true",
         help="Filter issues to only include severity='error' items"
     )
@@ -5096,7 +5100,12 @@ def main():
         "summary": f"{error_count} error(s), {warning_count} warning(s). Suggested mode: {suggested_mode}",
     }
 
-    if args.summary:
+    if args.brief:
+        status = "PASS" if error_count == 0 else "FAIL"
+        warn_str = f" ({warning_count} warnings)" if warning_count else ""
+        print(f"{status} {error_count} errors{warn_str} — {file_path.name} "
+              f"[{kind}; mode: {suggested_mode}]")
+    elif args.summary:
         from collections import Counter
         errors = [i for i in all_issues if i["severity"] == "error"]
         warnings = [i for i in all_issues if i["severity"] == "warning"]

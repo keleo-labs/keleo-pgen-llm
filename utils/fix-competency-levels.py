@@ -270,7 +270,7 @@ def main():
     # Competencies are inherited down the whole baseline chain. Validating
     # against a leaf baseline reports every inherited competency as invalid,
     # so prefer the merged vocabulary in _effective-context.json when present.
-    baseline_data, vocab_source = resolve_reference_context(args.file, baseline_data)
+    baseline_data, vocab_source = resolve_reference_context(args.file, baseline_data, data)
 
     explicit_level_maps = {}
     for m in args.map:

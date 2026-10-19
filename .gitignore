@@ -13,6 +13,12 @@ bundles/*
 !baselines/platform-adoption-essentials/
 baselines/platform-adoption-essentials/*
 !baselines/platform-adoption-essentials/platform-adoption-essentials.json
+# backup-practice.py writes timestamped backups beside the documents it
+# protects. Everywhere else that lands under an already-ignored tree, but
+# deps/ is tracked, so without this a regeneration run would offer its own
+# safety copies up for commit.
+deps/backup-*/
+
 reviews/*
 practice-resources/*
 archive

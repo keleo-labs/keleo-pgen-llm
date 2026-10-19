@@ -328,7 +328,10 @@ def validate_phase_2(content, lines, kind="practice"):
 
     all_headings = h2_lines + h3_lines
     for variants, key in PHASE_2_REQUIRED_SECTIONS:
-        if kind == "baseline" and key in ("activities", "work_products", "patterns"):
+        if kind in ("baseline", "method") and key in ("activities", "work_products", "patterns"):
+            continue
+        # An orchestration practice owns activities and a pattern, but no work products.
+        if kind == "orchestration" and key == "work_products":
             continue
         found = any(v in l for v in variants for l in all_headings)
         checks.append({
@@ -336,26 +339,30 @@ def validate_phase_2(content, lines, kind="practice"):
             "pass": found,
         })
 
-    if kind == "practice":
+    if kind in ("practice", "orchestration"):
+        # An orchestration practice coordinates its dependencies' patterns, so it
+        # carries a handful of coordinating activities rather than a full set.
+        min_activities = 5 if kind == "practice" else 1
         activity_lines = [l for l in lines
                           if re.match(r"^\*\*Activity:\s", l) or re.match(r"^#{3,5} Activity[:\s]", l)]
         checks.append({
             "check": "activity_count",
             "description": "Mapped activities",
             "actual": len(activity_lines),
-            "expected": ">=5",
-            "pass": len(activity_lines) >= 5,
+            "expected": f">={min_activities}",
+            "pass": len(activity_lines) >= min_activities,
         })
 
-        wp_lines = [l for l in lines
-                    if re.match(r"^\*\*Work Product:\s", l) or re.match(r"^#{3,5} Work Product[:\s]", l)]
-        checks.append({
-            "check": "work_product_count",
-            "description": "Mapped work products",
-            "actual": len(wp_lines),
-            "expected": ">=3",
-            "pass": len(wp_lines) >= 3,
-        })
+        if kind == "practice":
+            wp_lines = [l for l in lines
+                        if re.match(r"^\*\*Work Product:\s", l) or re.match(r"^#{3,5} Work Product[:\s]", l)]
+            checks.append({
+                "check": "work_product_count",
+                "description": "Mapped work products",
+                "actual": len(wp_lines),
+                "expected": ">=3",
+                "pass": len(wp_lines) >= 3,
+            })
 
         lod_names = re.findall(
             r'(?:^\s*-\s*\*\*Level:\s*(.+?)\*\*|^#{3,5}\s*LOD:\s*(.+?)(?:\s*\(seq:|\s*$))',
@@ -397,14 +404,19 @@ def validate_phase_2(content, lines, kind="practice"):
         })
 
     # Matches `**Alpha: X**`, `#### Alpha: X` and `##### **Alpha: X**`.
-    alpha_lines = [l for l in lines if re.match(r"^(?:#{0,6}\s*)?\*{0,2}Alpha:\s", l)]
-    checks.append({
-        "check": "alpha_count",
-        "description": "Mapped alphas",
-        "actual": len(alpha_lines),
-        "expected": ">=3",
-        "pass": len(alpha_lines) >= 3,
-    })
+    # A method document declares no alphas of its own — it composes practices that
+    # do — so counting them measures nothing on a method guide.
+    # An orchestration practice is in the same position for alphas: it composes
+    # the patterns its dependencies own and declares none of its own concerns.
+    if kind not in ("method", "orchestration"):
+        alpha_lines = [l for l in lines if re.match(r"^(?:#{0,6}\s*)?\*{0,2}Alpha:\s", l)]
+        checks.append({
+            "check": "alpha_count",
+            "description": "Mapped alphas",
+            "actual": len(alpha_lines),
+            "expected": ">=3",
+            "pass": len(alpha_lines) >= 3,
+        })
 
     competency_matches = set()
     for line in lines:
@@ -1258,9 +1270,17 @@ def main():
     )
     parser.add_argument(
         "--kind",
-        choices=["practice", "baseline"],
+        choices=["practice", "baseline", "method", "orchestration"],
         default="practice",
-        help="Kind of output being validated (default: practice)",
+        help=(
+            "Kind of output being validated (default: practice). 'method' is "
+            "for a guide covering a method document alone, which — like a "
+            "baseline — declares no patterns, work products or activities. "
+            "'orchestration' is for a host practice that sequences the patterns "
+            "of its dependencies: it owns a pattern and a patternOrchestration "
+            "but no alphas or work products of its own, so counting those "
+            "measures nothing."
+        ),
     )
     parser.add_argument(
         "--gate",
@@ -1333,7 +1353,13 @@ def main():
     else:
         checks = validate_phase_2(content, lines, kind=args.kind)
 
-    if args.validate_patterns and args.phase == 2:
+    # Patterns are an extension-practice construct; neither a practiceBaseline
+    # nor a Method declares any — `patterns` is absent from both shapes — so
+    # their guides have no pattern views to find. Running the check anyway
+    # reports a critical `pattern_views_found` failure on a guide that is
+    # correct, which is why the kind gate is here rather than at the call site:
+    # the phase brief tells every Phase 2 agent to pass --validate-patterns.
+    if args.validate_patterns and args.phase == 2 and args.kind not in ("baseline", "method"):
         checks.extend(validate_pattern_views(content))
         checks.extend(validate_prerequisite_order(content))
 

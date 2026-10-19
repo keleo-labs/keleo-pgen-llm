@@ -33,7 +33,7 @@ def fetch_presentation(presentation_id):
     result = subprocess.run(
         [GWS_PATH, "slides", "presentations", "get",
          "--params", json.dumps({"presentationId": presentation_id})],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, timeout=180,
     )
     if result.returncode != 0:
         raise RuntimeError(
@@ -73,6 +73,27 @@ def extract_text_from_elements(elements):
     return texts
 
 
+TITLE_PLACEHOLDERS = {"TITLE", "CENTERED_TITLE"}
+
+
+def extract_title_from_elements(elements):
+    """Return the text of the first title placeholder shape, if any."""
+    for elem in elements:
+        shape = elem.get("shape")
+        if shape:
+            ptype = shape.get("placeholder", {}).get("type")
+            if ptype in TITLE_PLACEHOLDERS:
+                texts = extract_text_from_elements([elem])
+                if texts:
+                    return " ".join(texts).strip()
+        if "elementGroup" in elem:
+            nested = extract_title_from_elements(
+                elem["elementGroup"].get("children", []))
+            if nested:
+                return nested
+    return ""
+
+
 def extract_notes(slide):
     notes_page = slide.get("slideProperties", {}).get("notesPage", {})
     notes_elements = notes_page.get("pageElements", [])
@@ -87,20 +108,38 @@ def extract_slides(presentation, include_notes=False):
         elements = slide.get("pageElements", [])
         texts = extract_text_from_elements(elements)
         notes = extract_notes(slide) if include_notes else []
+        slide_title = extract_title_from_elements(elements)
+        if not slide_title and texts:
+            slide_title = texts[0]
         slides_data.append({
             "slideNumber": i,
             "objectId": slide.get("objectId", ""),
+            "title": slide_title,
             "content": texts,
             "notes": notes,
         })
 
-    return {"title": title, "slideCount": len(slides_data), "slides": slides_data}
+    return {
+        "title": title,
+        "presentationId": presentation.get("presentationId", ""),
+        "slideCount": len(slides_data),
+        "slides": slides_data,
+    }
 
 
-def format_markdown(extracted):
+def format_markdown(extracted, source_url=None):
     lines = [f"# {extracted['title']}", ""]
+    if source_url:
+        lines.extend([f"Source: {source_url}", ""])
+    pid = extracted.get("presentationId")
+    if pid:
+        lines.extend([f"Presentation ID: `{pid}`", ""])
+    lines.extend([f"Slides: {extracted['slideCount']}", ""])
     for slide in extracted["slides"]:
-        lines.append(f"## Slide {slide['slideNumber']}")
+        heading = f"## Slide {slide['slideNumber']}"
+        if slide.get("title"):
+            heading += f": {slide['title']}"
+        lines.append(heading)
         lines.append("")
         for text in slide["content"]:
             lines.append(text)
@@ -124,6 +163,8 @@ def main():
                         help="Include speaker notes")
     parser.add_argument("--json", action="store_true",
                         help="Output raw extracted data as JSON")
+    parser.add_argument("--url", help="Source URL to record in the output "
+                                      "header (defaults to the editor URL)")
     args = parser.parse_args()
 
     if not Path(GWS_PATH).exists():
@@ -136,7 +177,10 @@ def main():
     if args.json:
         output = json.dumps(extracted, indent=2, ensure_ascii=False)
     else:
-        output = format_markdown(extracted)
+        url = args.url or (
+            "https://docs.google.com/presentation/d/"
+            f"{args.presentation_id}/edit")
+        output = format_markdown(extracted, source_url=url)
 
     if args.output:
         Path(args.output).write_text(output, encoding="utf-8")

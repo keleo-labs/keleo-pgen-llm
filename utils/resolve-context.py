@@ -46,6 +46,7 @@ Outputs structured JSON report to stdout.
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -239,13 +240,31 @@ def resolve_transitive_baselines(baselines, search_dirs, dd=None, index=None):
         for dep_name in dep_names:
             if dep_name in existing:
                 continue
-            match = dd.resolve_name(dep_name, index, prefer_filesystem=True)
+            # prefer_canonical, because an ambiguous parent used to be skipped in
+            # silence. A synced copy of Red Hat Sales Essentials beside a
+            # consuming method made the root baseline ambiguous, so the whole
+            # grandparent tier — 3 focuses, 11 activity spaces, 8 competencies —
+            # vanished from the merged vocabulary with no warning, and two
+            # separate mapping agents compromised their mapping to work around
+            # elements that were there all along.
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
+                if match.get("disambiguated"):
+                    print(f"Note: '{dep_name}' resolved to the authoring home "
+                          f"{match['path']} (also at: "
+                          f"{', '.join(match.get('alternatives', []))})",
+                          file=sys.stderr)
                 dep_data, err = dd.load_resolved_json(match)
                 if dep_data:
                     existing.add(dep_name)
                     result.append((dep_name, dep_data))
                     to_check.append((dep_name, dep_data))
+            else:
+                print(f"Warning: parent baseline '{dep_name}' not loaded "
+                      f"(status: {match['status']}) — its focuses, activity "
+                      f"spaces and competencies will be absent from the "
+                      f"resolved context", file=sys.stderr)
 
     return result
 
@@ -269,13 +288,28 @@ def resolve_transitive_practices(practices, search_dirs, dd=None, index=None):
         for dep_name in data.get("practiceDependencyNames", []):
             if dep_name in existing:
                 continue
-            match = dd.resolve_name(dep_name, index, prefer_filesystem=True)
+            # The baseline paths got prefer_canonical and a warning; this one was
+            # missed, and the gap is identical: Sales Play Framework has three
+            # byte-identical copies, so the name resolves ambiguous and the whole
+            # dependency vanished from a resolved context that reported
+            # documentCount 4 and said nothing at all.
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
+                if match.get("disambiguated"):
+                    print(f"Note: practice dependency '{dep_name}' resolved to the "
+                          f"authoring home {match['path']} (also at: "
+                          f"{', '.join(match.get('alternatives', []))})",
+                          file=sys.stderr)
                 dep_data, err = dd.load_resolved_json(match)
                 if dep_data and detect_kind(dep_data) != "practiceBaseline":
                     existing.add(dep_name)
                     result.append((dep_name, dep_data))
                     to_check.append((dep_name, dep_data))
+            else:
+                print(f"Warning: practice dependency '{dep_name}' not loaded "
+                      f"(status: {match['status']}) — everything it declares will "
+                      f"be absent from the resolved context", file=sys.stderr)
 
     return result
 
@@ -305,7 +339,17 @@ def resolve_method_practices(methods, practices, search_dirs, dd=None, index=Non
         for p_name in method_data.get("practiceNames", []):
             if p_name in existing:
                 continue
-            match = dd.resolve_name(p_name, index, prefer_filesystem=True)
+            # A method's members are commonly synced into several directories,
+            # so ambiguity is the normal case here rather than the exception.
+            # Without prefer_canonical every member of a widely-copied document
+            # lands in `unresolved` and the method resolves against nothing.
+            match = dd.resolve_name(p_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
+            if match["status"] == "found" and match.get("disambiguated"):
+                print(f"Note: method member '{p_name}' resolved to the authoring "
+                      f"home {match['path']} (also at: "
+                      f"{', '.join(match.get('alternatives', []))})",
+                      file=sys.stderr)
             if match["status"] != "found":
                 unresolved.append({
                     "method": method_name,
@@ -337,12 +381,16 @@ def collect_practice_baselines(practices, baselines, dd, index):
     for _, data in practices:
         bpn = data.get("baselinePracticeName")
         if bpn and bpn not in existing:
-            match = dd.resolve_name(bpn, index, prefer_filesystem=True)
+            match = dd.resolve_name(bpn, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
                 bl_data, err = dd.load_resolved_json(match)
                 if bl_data:
                     existing.add(bpn)
                     result.append((bpn, bl_data))
+            else:
+                print(f"Warning: baseline '{bpn}' not loaded "
+                      f"(status: {match['status']})", file=sys.stderr)
 
     return result
 
@@ -461,6 +509,18 @@ def build_provenance(effective, merge_order, tiers):
             if shared:
                 multi_source_elements[key] = shared
 
+    # Record the version each source was merged at, and when. Without this a
+    # consumer cannot tell a current context from one built against a baseline
+    # two major versions ago — and the file silently outranks the baseline the
+    # caller passed explicitly. In this project that has rewritten correct
+    # pinned names onto fuzzy matches while reporting success. Names alone were
+    # never enough; the version is what makes staleness detectable.
+    source_versions = {}
+    for tier in ("baselines", "practices", "methods"):
+        for name, data in tiers[tier]:
+            if isinstance(data, dict) and data.get("version"):
+                source_versions[name] = data["version"]
+
     provenance = {
         "mergeOrder": merge_order,
         "tiers": {
@@ -468,6 +528,8 @@ def build_provenance(effective, merge_order, tiers):
             "practices": [name for name, _ in tiers["practices"]],
             "methods": [name for name, _ in tiers["methods"]],
         },
+        "sourceVersions": source_versions,
+        "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "elementSources": element_sources,
         "multiSourceElements": multi_source_elements,
     }
