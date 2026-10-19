@@ -317,6 +317,118 @@ def print_results(results, source_dir, fix):
 # Main
 # ---------------------------------------------------------------------------
 
+def sync_embedded_practices(repo_root, fix=False):
+    """Refresh practice objects embedded inside method documents.
+
+    A method document on disk carries its constituent practices inline under
+    `practices`, while each also exists as a standalone file. Only the
+    standalone file is maintained -- every generation and update run writes
+    that one -- so the embedded copy falls behind silently, and anyone reading
+    the method document rather than the practice files gets superseded content
+    with nothing marking it stale. Packaging does not catch it, because the
+    archive is built from the standalone documents.
+
+    Comparison is by document version, newest wins. An embedded copy that is
+    somehow ahead of its standalone source is reported and left alone rather
+    than overwritten: that is a signal someone edited the method directly, and
+    silently discarding it would be the same class of data loss this is here
+    to prevent.
+    """
+    standalone = {}
+    for root_name in ("practices", "baselines"):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob("*/*.json")):
+            if should_skip_file(path):
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if not isinstance(data, dict) or not data.get("name"):
+                continue
+            if data.get("kind") == "method":
+                continue
+            entry = standalone.get(data["name"])
+            version = data.get("version", "0.0.0")
+            if entry is None or parse_semver(version) > parse_semver(entry["version"]):
+                standalone[data["name"]] = {
+                    "path": path, "version": version, "data": data,
+                }
+
+    actions = []
+    for root_name in ("practices",):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob("*/*.json")):
+            if should_skip_file(path):
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if not isinstance(data, dict) or data.get("kind") != "method":
+                continue
+            embedded = data.get("practices")
+            if not isinstance(embedded, list) or not embedded:
+                continue
+
+            changed = False
+            for i, practice in enumerate(embedded):
+                if not isinstance(practice, dict):
+                    continue
+                name = practice.get("name")
+                source = standalone.get(name)
+                if not source:
+                    continue
+                embedded_version = practice.get("version", "0.0.0")
+                cmp_embedded = parse_semver(embedded_version)
+                cmp_source = parse_semver(source["version"])
+                if cmp_embedded == cmp_source:
+                    continue
+                record = {
+                    "method": str(path),
+                    "practice": name,
+                    "embeddedVersion": embedded_version,
+                    "sourceVersion": source["version"],
+                    "source": str(source["path"]),
+                }
+                if cmp_embedded > cmp_source:
+                    record["status"] = "embedded-ahead"
+                    actions.append(record)
+                    continue
+                record["status"] = "stale"
+                if fix:
+                    embedded[i] = json.loads(json.dumps(source["data"]))
+                    record["applied"] = True
+                    changed = True
+                actions.append(record)
+
+            if changed and fix:
+                path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+    return actions
+
+
+def print_embedded(actions, fix):
+    if not actions:
+        print("\nEmbedded method practices: all in step with their sources.")
+        return
+    print(f"\n=== EMBEDDED METHOD PRACTICES ({len(actions)}) ===")
+    for a in actions:
+        if a["status"] == "embedded-ahead":
+            mark = "AHEAD  "
+            note = " — embedded copy is newer; left alone, reconcile by hand"
+        else:
+            mark = "SYNCED " if a.get("applied") else "STALE  "
+            note = "" if fix else " (dry run)"
+        print(f"  {mark} {a['practice']}: v{a['embeddedVersion']} -> "
+              f"v{a['sourceVersion']}{note}")
+        print(f"          in {a['method']}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Synchronize shared practice files between method directories"
@@ -334,6 +446,10 @@ def main():
         help="After syncing, rebuild affected .keleo bundles via rebuild-keleo.py"
     )
     parser.add_argument(
+        "--no-embedded", action="store_true",
+        help="Skip refreshing practice objects embedded inside method documents"
+    )
+    parser.add_argument(
         "--json", action="store_true",
         help="Output results as JSON"
     )
@@ -346,12 +462,23 @@ def main():
 
     results, duplicates = sync_practices(source_dir, fix=args.fix)
 
+    embedded = []
+    if not args.no_embedded:
+        embedded = sync_embedded_practices(
+            source_dir.resolve().parent.parent, fix=args.fix
+        )
+
     if args.json:
-        json.dump({"results": results, "duplicates": duplicates}, sys.stdout, indent=2)
+        json.dump(
+            {"results": results, "duplicates": duplicates, "embedded": embedded},
+            sys.stdout, indent=2,
+        )
         print()
     else:
         print_duplicates(duplicates)
         print_results(results, source_dir, fix=args.fix)
+        if not args.no_embedded:
+            print_embedded(embedded, fix=args.fix)
 
     # Rebuild bundles if requested and changes were applied
     if args.rebuild_bundles and args.fix:
