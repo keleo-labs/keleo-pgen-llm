@@ -718,6 +718,35 @@ Alpha hierarchies and cross-practice dependencies are covered in `references/sem
 - **Orchestration practices**: Use `practiceDependencyNames` to load alphas, create patterns that coordinate across them
 - **Validation**: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <dep>.json`
 
+### Determining practiceDependencyNames
+
+**Declare a dependency when this practice names any element the other document
+owns** — not only when it references an alpha.
+
+Symbolic references resolve against one scope: the baseline chain, the declared
+dependencies, and the document itself. Anything named from outside that scope fails to
+resolve, whatever kind of element it is. So the test is what you name, not what kind of
+thing you named:
+
+| You name | Where it appears | Declare the owner? |
+|---|---|---|
+| An alpha, as a `contributesTo` or `mapsTo` target | `alphas[]` | Yes |
+| A pattern, as an orchestration stage's `patternName` | `patternOrchestrations[].stages[]` | Yes |
+| A pattern, as a stage's `relativeTo.patternName` host | `patternOrchestrations[].stages[]` | Yes |
+| An orchestration you extend, or embed via `orchestrationName` | `patternOrchestrations[]` | Yes |
+
+Alphas used to be the only case worth stating, which is why the rule was once written
+as "practices whose unique non-baseline alphas are actually referenced". That wording
+excludes a real and increasingly common case: a **composition practice** exists only to
+declare a `patternOrchestration` sequencing patterns its dependencies own, so it holds
+no alphas at all. A practice extending such an orchestration must declare its owner, and
+the alpha-only reading says not to — then the orchestration name fails to resolve, with
+nothing at the point of decision to warn you.
+
+**Still declare the minimum.** This widens what counts as a reference; it does not
+license declaring a dependency you never name. An unused entry drags the whole document
+into the effective context and into every bundle that carries this practice.
+
 ---
 
 ## Practice vs Method Handling
