@@ -60,6 +60,29 @@ PRACTICE_MINIMUMS = {
     "citations": 3,
 }
 
+
+def is_composition_practice(source):
+    """A practice that exists only to compose other practices' patterns.
+
+    It declares a patternOrchestration whose stages name patterns owned
+    elsewhere, and no elements of its own. That is a shape the language
+    supports -- a stage resolves its patternName across the baseline chain and
+    declared dependencies -- so the element minimums above, which exist to
+    catch a truncated generation run, do not apply to it.
+
+    The conjunction is what keeps the check honest. Exempting anything that
+    merely declares an orchestration would let a genuinely truncated practice
+    through on the strength of one surviving array; requiring the element
+    arrays to be empty *and* an orchestration to be present describes the
+    composition shape and nothing else. A practice with everything empty,
+    orchestrations included, still fails.
+    """
+    if not source.get("patternOrchestrations"):
+        return False
+    return not any(
+        source.get(key) for key in ("alphas", "workProducts", "activities", "patterns")
+    )
+
 BASELINE_MINIMUMS = {
     "alphas": 3,
     "activitySpaces": 3,
@@ -283,9 +306,12 @@ def check_practice_structure(data, kind):
             sources.append((p.get("name", f"practice[{i}]"), p))
 
     for source_name, source in sources:
+        composition = is_composition_practice(source)
         for key, minimum in PRACTICE_MINIMUMS.items():
             count = len(source.get(key, []))
-            results[f"{source_name}.{key}"] = count >= minimum
+            results[f"{source_name}.{key}"] = count >= minimum or composition
+            if composition:
+                continue
             if count < minimum and source_name == "root" and kind != "method":
                 issues.append({
                     "severity": "warning" if count > 0 else "error",
