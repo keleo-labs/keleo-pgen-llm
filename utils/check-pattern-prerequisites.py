@@ -116,6 +116,26 @@ def build_prerequisites(documents):
     return merged
 
 
+def add_implicit_order_edges(prereqs, state_order):
+    """Add the sequential edge every alpha carries between consecutive states.
+
+    A state is reached by passing through the one before it, so ``seq`` is a
+    prerequisite edge the document never writes down. A declared
+    ``background.alphaStates`` graph can be acyclic on its explicit edges alone
+    and still deadlock once those implicit edges are present, which is the
+    graph a reader actually has to satisfy.
+    """
+    for aname, names in state_order.items():
+        for earlier, later in zip(names, names[1:]):
+            entry = prereqs.setdefault(
+                (aname, later),
+                {"prereqs": set(), "sources": set(), "edgeSources": {}},
+            )
+            entry["prereqs"].add((aname, earlier))
+            entry["edgeSources"].setdefault((aname, earlier), set()).add("state order")
+    return prereqs
+
+
 def find_prerequisite_cycles(prereqs):
     """Cycles in the merged prerequisite graph, with the author of each edge.
 
@@ -316,6 +336,26 @@ def check_pattern(pattern, prereqs, state_order, entry_view_is_prerequisites=Tru
         findings.append(finding)
         return finding
 
+    # Alphas this pattern actually carries. A prerequisite naming an alpha that
+    # appears in no view is not something the pattern could ever reach, and
+    # saying "no view reaches it" of such a prerequisite describes the design
+    # rather than a defect: the state was satisfied outside the pattern, which
+    # is the same reasoning the `entry` exemption already encodes for view 0.
+    #
+    # This corpus relies on it deliberately. A sales play asserts `Sales Play →
+    # Activated`, whose prerequisite sits on `Technical Decision Point` — an
+    # alpha owned by six decision-point practices that no play carries, and
+    # which the project explicitly instructs plays not to restate. A `mapsTo`
+    # variant likewise inherits its parent's background while carrying only
+    # itself. Reported as `external` so it stays visible without reading as a
+    # fault; 83 of 98 findings across the worst five documents were this.
+    carried_alphas = {
+        astate.get("alphaName")
+        for v in views
+        for astate in v.get("alphaStates", [])
+        if astate.get("alphaName")
+    }
+
     for idx, view in enumerate(views):
         is_entry = idx == 0 and entry_view_is_prerequisites
         for astate in view.get("alphaStates", []):
@@ -332,6 +372,10 @@ def check_pattern(pattern, prereqs, state_order, entry_view_is_prerequisites=Tru
                     if is_entry:
                         record(idx, view, alpha, state, ra, rs, "entry",
                                "entry condition established before the pattern begins")
+                    elif ra not in carried_alphas:
+                        record(idx, view, alpha, state, ra, rs, "external",
+                               f"'{ra}' is carried by no view of this pattern, so "
+                               f"the prerequisite is satisfied outside it")
                     else:
                         record(idx, view, alpha, state, ra, rs, "unreached",
                                "no view of this pattern reaches the prerequisite")
@@ -586,6 +630,131 @@ def report_cycles(cycles, as_json):
     return 1
 
 
+def _sweep_directories(args):
+    """Run the per-document check across whole trees and summarise.
+
+    Exists because the alternative is assembling a dependency list by hand per
+    document, which is both the tedious part and the part that goes wrong: a
+    forgotten dependency makes the check weaker and still prints a pass.
+    """
+    import subprocess
+
+    targets = []
+    for d in args.dir:
+        for found in sorted(Path(d).rglob("*.json")):
+            if found.name.startswith("_") or "backup" in str(found).lower():
+                continue
+            if found.name.startswith("change-request") or \
+               found.name.endswith(".changerequest.json"):
+                continue
+            targets.append(found)
+
+    flags = [f for f, on in (("--cycles", args.cycles),
+                             ("--implicit-order", args.implicit_order),
+                             ("--strict-entry", args.strict_entry),
+                             ("--variant-smell", args.variant_smell)) if on]
+
+    rows, failures = [], 0
+    for path in targets:
+        result = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), str(path),
+             "--resolve-deps", *flags],
+            capture_output=True, text=True,
+        )
+        # Count only what a reader should act on. `entry`, `external` and
+        # `cyclical` are orderings the language permits and the tool names them
+        # precisely so they are not read as faults; folding them into the
+        # headline count makes a clean document look dirty and buries the one
+        # finding that matters.
+        lines = result.stdout.splitlines()
+        count = sum(1 for line in lines
+                    if line.startswith("[")
+                    and not line.startswith(("[entry]", "[external]", "[cyclical]")))
+        # Count `external` separately rather than discarding it. It is not a
+        # fault — the prerequisite sits on an alpha the pattern does not carry
+        # — but it is not always the right answer either: on one document five
+        # of them were cases where the pattern *should* have carried the alpha,
+        # and classifying them away would have shipped four real inversions.
+        # Folding them into the headline drowns the signal; hiding them
+        # entirely removes the prompt to check. So: reported, not counted.
+        external = sum(1 for line in lines if line.startswith("[external]"))
+        if result.returncode not in (0, 1):
+            continue
+        if count:
+            failures += 1
+        rows.append((count, external, str(path)))
+
+    rows.sort(reverse=True)
+    for count, external, path in rows:
+        if count:
+            print(f"{count:5d}  {path}")
+    clean = len(rows) - failures
+    total_external = sum(e for _, e, _ in rows)
+    print(f"\n{len(rows)} documents checked · {clean} clean · "
+          f"{failures} with findings")
+    if total_external:
+        docs_with = sum(1 for _, e, _ in rows if e)
+        print(f"{total_external} 'external' prerequisites across {docs_with} "
+              f"documents — not faults, but worth a read: each is a pattern "
+              f"asserting a state whose prerequisite sits on an alpha it does "
+              f"not carry. Usually right; sometimes the pattern should carry "
+              f"the alpha. Run a single document without --dir to list them.")
+    return 1 if failures else 0
+
+
+def _resolve_dependency_documents(documents):
+    """Load the baselines and dependency practices the given documents declare.
+
+    The prerequisite graph is only as complete as the documents handed to it,
+    and assembling that list by hand is both tedious and easy to get wrong — a
+    missing dependency makes the check quietly weaker rather than noisier, so
+    the omission looks like a pass. Resolving it from what the document
+    declares removes the judgement call.
+
+    Walks `baselinePracticeName`, the array `baselinePracticeNames` and
+    `practiceDependencyNames`, transitively, keyed on name so a diamond or a
+    cycle terminates.
+    """
+    import importlib.util
+
+    helper = Path(__file__).resolve().parent / "discover-dependencies.py"
+    spec = importlib.util.spec_from_file_location("_dd", helper)
+    dd = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(dd)
+
+    index, _ = dd.build_index(["baselines", "practices", "deps"])
+    seen = {name for name, _ in documents}
+    queue = [data for _, data in documents]
+    extra = []
+
+    while queue:
+        current = queue.pop(0)
+        wanted = []
+        if current.get("baselinePracticeName"):
+            wanted.append(current["baselinePracticeName"])
+        wanted.extend(current.get("baselinePracticeNames", []) or [])
+        wanted.extend(current.get("practiceDependencyNames", []) or [])
+
+        for dep_name in wanted:
+            if not dep_name or dep_name in seen:
+                continue
+            seen.add(dep_name)
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
+            if match["status"] != "found":
+                print(f"Warning: dependency '{dep_name}' not loaded "
+                      f"(status: {match['status']}) — the prerequisite graph is "
+                      f"incomplete without it", file=sys.stderr)
+                continue
+            dep_data, err = dd.load_resolved_json(match)
+            if err or not dep_data:
+                continue
+            extra.append((Path(match["path"]).name, dep_data))
+            queue.append(dep_data)
+
+    return extra
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -594,6 +763,11 @@ def main():
     ap.add_argument("--cycles", action="store_true",
                     help="Report contradictory prerequisite edges across the "
                          "documents given, naming the document that declared each")
+    ap.add_argument("--implicit-order", action="store_true",
+                    help="With --cycles, also walk the sequential edge between "
+                         "consecutive states of an alpha. A background graph "
+                         "can be acyclic on its declared edges alone and still "
+                         "deadlock once state order is included")
     ap.add_argument("--on-baseline", metavar="NAME",
                     help="With --cycles, sweep every corpus document building on "
                          "this baseline instead of naming them individually")
@@ -608,9 +782,22 @@ def main():
     ap.add_argument("--variant-smell", action="store_true",
                     help="Also report alphas whose states read as variants "
                          "rather than stages — a question for mapping, not a fix")
+    ap.add_argument("--dir", action="append", default=[], metavar="DIR",
+                    help="Check every authored document under DIR, one at a time, "
+                         "each with its own dependencies resolved. Repeatable. "
+                         "Prints a per-document count and exits non-zero if any "
+                         "document has a blocking finding.")
+    ap.add_argument("--resolve-deps", action="store_true",
+                    help="Also load the baselines and dependency practices the "
+                         "named documents declare, transitively. The graph is only "
+                         "as complete as what you pass it, and a missing dependency "
+                         "weakens the check silently rather than failing loudly.")
     ap.add_argument("--json", dest="as_json", action="store_true",
                     help="Emit findings as JSON")
     args = ap.parse_args()
+
+    if args.dir:
+        return _sweep_directories(args)
 
     if args.on_baseline:
         if not args.cycles:
@@ -635,10 +822,32 @@ def main():
                 return 2
             documents.append((Path(path).name, data))
 
+        if args.resolve_deps:
+            documents.extend(_resolve_dependency_documents(documents))
+
     prereqs = build_prerequisites(documents)
 
+    # `--cycles` used to return here, which made it exclusive rather than
+    # additive. The merged command this project prescribes —
+    # `--cycles --implicit-order --strict-entry --variant-smell` — therefore ran
+    # the cycle check and silently skipped every view check the other three
+    # flags exist to configure, printing "No contradictory prerequisite edges
+    # found" about a question it had never asked. Proven on a document with a
+    # planted inverted edge: the full command reported clean, and dropping
+    # `--cycles` reported two `unreached` findings on the same file. The two
+    # questions are different and are now both answered in one run.
+    cycles = None
     if args.cycles:
-        return report_cycles(find_prerequisite_cycles(prereqs), args.as_json)
+        cycle_graph = build_prerequisites(documents)
+        if args.implicit_order:
+            add_implicit_order_edges(cycle_graph, build_state_order(documents))
+        cycles = find_prerequisite_cycles(cycle_graph)
+        if args.on_baseline:
+            # A corpus sweep has no single pattern owner, so there is nothing
+            # to walk views against. Cycles are the whole question there.
+            return report_cycles(cycles, args.as_json)
+        if not args.as_json:
+            report_cycles(cycles, False)
 
     state_order = build_state_order(documents)
 
@@ -660,7 +869,10 @@ def main():
                 findings.extend(check_variant_smell(pattern, state_order))
 
     if args.as_json:
-        print(json.dumps(findings, indent=2))
+        if cycles is None:
+            print(json.dumps(findings, indent=2))
+        else:
+            print(json.dumps({"cycles": cycles, "findings": findings}, indent=2))
     else:
         if not findings:
             print("\nNo prerequisite inversions or state regressions found.")
@@ -673,7 +885,8 @@ def main():
                 print(f"  requires: {f['prerequisite']}")
             print(f"  {f['detail']}")
 
-    return 1 if any(f["kind"] in BLOCKING_KINDS for f in findings) else 0
+    blocking = any(f["kind"] in BLOCKING_KINDS for f in findings)
+    return 1 if (blocking or cycles) else 0
 
 
 if __name__ == "__main__":

@@ -121,7 +121,7 @@ def build_externalized_method(args, documents):
         f"Comprehensive methodology combining {len(practice_names)} practices."
     )
     method["version"] = args.method_version or args.version
-    schema_version = get_schema_version()
+    schema_version = getattr(args, "schema_version", None) or get_schema_version()
     if schema_version:
         method["schemaVersion"] = schema_version
     method["baselinePracticeName"] = baseline_name
@@ -212,15 +212,19 @@ def collect_package_dependencies(documents):
     ]
 
 
-def build_manifest(package_identity, documents_meta, documents=None, dependencies=None):
+def build_manifest(package_identity, documents_meta, documents=None, dependencies=None,
+                   schema_version=None):
     """Build a PackageManifest dict.
 
-    Auto-reads schemaVersion from the schema $comment. When documents are
-    provided and no explicit dependencies are given, auto-builds package
-    dependencies from document-level dependencyVersions.
+    Reads schemaVersion from the schema $comment unless `schema_version` pins it.
+    Pinning matters when the local schema working tree is ahead of what the corpus
+    was authored against — an unpinned build stamps the working-tree version on the
+    manifest while every document in the package declares the committed one.
+    When documents are provided and no explicit dependencies are given, auto-builds
+    package dependencies from document-level dependencyVersions.
     """
     manifest = OrderedDict()
-    manifest["schemaVersion"] = get_schema_version() or "1.0.0"
+    manifest["schemaVersion"] = schema_version or get_schema_version() or "1.0.0"
     manifest["package"] = package_identity
     manifest["documents"] = documents_meta
     if dependencies:
@@ -350,7 +354,8 @@ def run_bundle(args):
         package_identity["license"] = args.license
 
     asset_files = collect_file_assets(documents, source_dirs)
-    manifest = build_manifest(package_identity, documents_meta, documents=documents)
+    manifest = build_manifest(package_identity, documents_meta, documents=documents,
+                              schema_version=getattr(args, "schema_version", None))
 
     create_package(args.output, manifest, documents_with_paths, asset_files)
 
@@ -430,7 +435,8 @@ def run_convert(args):
     package_identity["description"] = args.description or externalized.get("description", "")
 
     asset_files = collect_file_assets(documents, source_dirs)
-    manifest = build_manifest(package_identity, documents_meta, documents=documents)
+    manifest = build_manifest(package_identity, documents_meta, documents=documents,
+                              schema_version=getattr(args, "schema_version", None))
 
     create_package(args.output, manifest, documents_with_paths, asset_files)
 
@@ -483,6 +489,12 @@ def main():
     parser.add_argument("--extra-documents", nargs="+",
                         help="Additional JSON documents to include (transitive baselines, "
                              "practice dependencies)")
+    parser.add_argument("--schema-version", metavar="X.Y.Z",
+                        help="Pin the manifest's schemaVersion instead of reading it from the "
+                             "local schema's $comment. Use when the schema working tree is "
+                             "ahead of the version the bundled documents declare, so the "
+                             "manifest does not claim a schema the package was not built "
+                             "against")
     parser.add_argument("--verify", action="store_true",
                         help="List package contents after creation to confirm all documents "
                              "are included")
