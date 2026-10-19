@@ -136,7 +136,129 @@ def load_json_pair(file_path):
         return None, f"Invalid JSON in {file_path}: {e}"
 
 
-def resolve_reference_context(practice_path, baseline_data):
+VOCABULARY_ARRAYS = ("narrativeTypes", "competencies", "activitySpaces", "focuses")
+
+BASELINE_INHERITED_ARRAYS = (
+    "focuses", "activitySpaces", "competencies", "narrativeTypes",
+    "alphas", "personas", "personaGroups", "citations",
+)
+
+
+def merge_ancestor_baselines(baseline_data, baseline_path):
+    """Pull a baseline's own ancestors into it, so the whole chain is in scope.
+
+    A Practice names one parent with the singular `baselinePracticeName`; a
+    PracticeBaseline names its parents with the **array**
+    `baselinePracticeNames`. A tool reading only the leaf sees nothing the root
+    declares, and the consequences scale with how much the tool trusts itself:
+    `assess-practice.py` merely reported root-baseline names as unknown, but
+    `fix-common-issues.py` *renamed* against its nearest leaf match — on one
+    partner-subtree document it proposed five competency renames, two
+    narrative-type retypes and eight consequent element renames, every one a
+    false positive produced by a vocabulary it could not see.
+
+    Breadth-first over both property forms; `seen` keyed on name terminates a
+    diamond or a cycle. Elements merge only where the name is new, so the leaf
+    keeps precedence over anything it overrides.
+    """
+    search_dirs = []
+    root = Path(baseline_path).resolve().parent
+    search_dirs.append(root)
+    probe = root
+    while probe != probe.parent:
+        for sub in ("deps", "baselines"):
+            if (probe / sub).is_dir():
+                search_dirs.append(probe / sub)
+        if (probe / "deps").is_dir() or (probe / "baselines").is_dir():
+            break
+        probe = probe.parent
+
+    def _find(name):
+        for d in search_dirs:
+            for candidate in sorted(Path(d).glob("*.json")) + sorted(Path(d).glob("*/*.json")):
+                if candidate.name.startswith("_") or "backup" in str(candidate).lower():
+                    continue
+                data, err = load_json_pair(candidate)
+                if not err and isinstance(data, dict) and data.get("name") == name:
+                    return data
+        return None
+
+    seen = {baseline_data.get("name")}
+    queue = [baseline_data]
+    while queue:
+        current = queue.pop(0)
+        parents = []
+        if current.get("baselinePracticeName"):
+            parents.append(current["baselinePracticeName"])
+        parents.extend(current.get("baselinePracticeNames", []) or [])
+        for parent_name in parents:
+            if not parent_name or parent_name in seen:
+                continue
+            seen.add(parent_name)
+            parent = _find(parent_name)
+            if not parent:
+                continue
+            for key in BASELINE_INHERITED_ARRAYS:
+                existing = {e.get("name") for e in baseline_data.get(key, [])
+                            if isinstance(e, dict)}
+                for elem in parent.get(key, []) or []:
+                    if isinstance(elem, dict) and elem.get("name") not in existing:
+                        baseline_data.setdefault(key, []).append(elem)
+                        existing.add(elem.get("name"))
+            queue.append(parent)
+
+
+_CONTEXT_WARNED = set()
+
+
+def _context_is_stale(path, context_data, baseline_data):
+    """Decide whether a merged context still describes the baseline in hand.
+
+    `_effective-context.json` silently outranks the baseline the caller passed
+    explicitly, which is right when it is current and destructive when it is
+    not: a context built against an older baseline has made correct pinned
+    names look invalid, fuzzy-matched them onto unrelated parents, and rewritten
+    them — reporting success throughout.
+
+    The context records `sourceVersions`, so the baseline's version is directly
+    comparable. A mismatch means stale, and the explicitly-passed baseline wins.
+    Contexts written before that field existed cannot be checked; those are
+    flagged once rather than rejected, because silently changing the vocabulary
+    for every such document would be its own surprise.
+    """
+    if not isinstance(baseline_data, dict):
+        return False
+    baseline_name = baseline_data.get("name")
+    baseline_version = baseline_data.get("version")
+    provenance = context_data.get("_provenance") or {}
+    source_versions = provenance.get("sourceVersions") or {}
+
+    if not source_versions:
+        if path not in _CONTEXT_WARNED:
+            _CONTEXT_WARNED.add(path)
+            sys.stderr.write(
+                f"Warning: {path} predates version-stamped provenance, so its "
+                f"freshness cannot be checked. Regenerate it with "
+                f"resolve-context.py if the baseline has moved.\n"
+            )
+        return False
+
+    if baseline_name and baseline_version:
+        recorded = source_versions.get(baseline_name)
+        if recorded and recorded != baseline_version:
+            if path not in _CONTEXT_WARNED:
+                _CONTEXT_WARNED.add(path)
+                sys.stderr.write(
+                    f"Warning: ignoring stale {path} — built against "
+                    f"'{baseline_name}' {recorded}, but {baseline_version} was "
+                    f"passed. Using the supplied baseline. Regenerate the "
+                    f"context with resolve-context.py.\n"
+                )
+            return True
+    return False
+
+
+def resolve_reference_context(practice_path, baseline_data, document_data=None):
     """Return the vocabulary source for name-validation checks.
 
     Narrative types and competencies are inherited down the whole baseline
@@ -147,15 +269,35 @@ def resolve_reference_context(practice_path, baseline_data):
     `_effective-context.json` already holds the merged vocabulary from every
     baseline and dependency practice, so prefer it whenever it sits beside the
     practice being fixed. Falls back to the supplied baseline when absent.
+
+    `document_data` is the document being checked. Its *own* declarations are
+    part of the vocabulary it resolves against — a baseline that declares
+    fifteen narrative types is the authority for all fifteen — and omitting
+    them is the same defect in the other direction: every local name looks
+    invalid and gets fuzzy-matched onto a parent's unrelated type. Pass it
+    whenever it is available.
     """
+    resolved, source = baseline_data, None
     if practice_path:
         candidate = os.path.join(os.path.dirname(os.path.abspath(practice_path)),
                                  "_effective-context.json")
         if os.path.exists(candidate):
             data, err = load_json_pair(candidate)
-            if data and not err:
-                return data, candidate
-    return baseline_data, None
+            if data and not err and not _context_is_stale(candidate, data, baseline_data):
+                resolved, source = data, candidate
+    if not isinstance(document_data, dict):
+        return resolved, source
+
+    merged = dict(resolved) if isinstance(resolved, dict) else {}
+    for key in VOCABULARY_ARRAYS:
+        local = document_data.get(key) or []
+        inherited = merged.get(key) or []
+        if not local:
+            continue
+        seen = {item.get("name") for item in local if isinstance(item, dict)}
+        merged[key] = list(local) + [item for item in inherited
+                                     if isinstance(item, dict) and item.get("name") not in seen]
+    return merged, source
 
 
 MERGEABLE_ARRAYS = [
