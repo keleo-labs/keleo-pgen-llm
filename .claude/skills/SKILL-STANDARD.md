@@ -1,6 +1,6 @@
 # Skill Specification Standard
 
-**Version:** 1.3.0
+**Version:** 1.3.1
 
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
@@ -31,13 +31,13 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
 - `create-baseline-method`: 200–399
 - `update-method`: 400–599
 - `method-based-report` family: 600–799 (sub-allocated in 20-number blocks):
-  - Shared foundation (`reporting-foundation/REPORT-FOUNDATION.md`): 600–619
+  - Shared foundation (`reporting-foundation/REPORT-FOUNDATION.md`): 600–619, 720–739
   - `reference-architecture`: 620–639
   - `project-plan`: 640–659
   - `decision-analysis`: 660–679
   - `document-review`: 680–699
   - `method-based-report` (type-specific): 700–719
-  - Reserved for future report types: 720–799
+  - Reserved for future report types: 740–799
 - `improve-tooling`: 800–949
 - Cross-cutting standards defined in this document: 950–999
 
@@ -68,6 +68,7 @@ Steps should be concrete and verifiable: "The alpha has exactly one of `contribu
 | `process` | Workflow steps, phase ordering, gate checks | Phase 1 before Phase 2, delineation gate decision |
 | `aliasing` | Terminology aliases, keywords, domain term handling | One alias per element, alias names not in structural refs |
 | `fidelity` | Output traces to the sources provided and cited | Structural claims traceable to a source span, citation supports its claim, no invention between phases |
+| `report` | Shared and type-specific reporting behaviour | Source fidelity, diagnostic reasoning, actionable recommendations and report scope |
 
 ---
 

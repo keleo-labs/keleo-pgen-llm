@@ -1,0 +1,70 @@
+{
+  "status": "completed_targeted_rerun",
+  "scope": "Cases 1 and 3 only; case 2 retained from runs/20261023-102333 because its relevant guidance did not change.",
+  "grading": "Manual semantic review against unchanged evals-frozen.json. Per-cell grading.json contains quoted evidence. Raw practice-oriented grader scores remain in results.json and harness-benchmark.json and are not reporting-quality results.",
+  "isolation": "The harness self-test passed including planted contaminants before execution. Cells ran outside git with ambient instruction files and auto-memory disabled, settings restricted to project/local, no phase prompts, and paired arms interleaved.",
+  "comparison": "Tightened current method-based-report/shared foundations versus no skill using Claude CLI. This is not a Codex-versus-Claude benchmark or an isolated experiment on the two added sentences.",
+  "metric_definitions": {
+    "mean_pass_rate": "Mean of one frozen discriminating check per case; checks were selected after the first run, before this rerun. Not a general report-quality rate.",
+    "tokens": "CLI input_tokens + output_tokens; excludes cache creation/read tokens and is not total context consumption",
+    "cost": "CLI-reported total_cost_usd"
+  },
+  "byArm": {
+    "with-skill": {
+      "cells": 2,
+      "scored_passes": 2,
+      "scored_total": 2,
+      "mean_pass_rate": 1.0,
+      "all_diagnostic_passes": 5,
+      "all_diagnostic_checks": 8,
+      "mean_total_tokens": 6669,
+      "mean_duration_ms": 68857.5,
+      "mean_cost_usd": 0.4376139,
+      "median_total_tokens": 6669,
+      "median_duration_ms": 68857,
+      "median_cost_usd": 0.4376
+    },
+    "without-skill": {
+      "cells": 2,
+      "scored_passes": 0,
+      "scored_total": 2,
+      "mean_pass_rate": 0.0,
+      "all_diagnostic_passes": 3,
+      "all_diagnostic_checks": 8,
+      "mean_total_tokens": 3646,
+      "mean_duration_ms": 43177,
+      "mean_cost_usd": 0.3351074,
+      "median_total_tokens": 3646,
+      "median_duration_ms": 43177,
+      "median_cost_usd": 0.3351
+    }
+  },
+  "delta": {
+    "mean_pass_rate": 1.0,
+    "mean_total_tokens": 3023,
+    "mean_duration_ms": 25680.5,
+    "mean_cost_usd": 0.1025065,
+    "median_total_tokens": 3023,
+    "median_duration_ms": 25680,
+    "median_cost_usd": 0.1025
+  },
+  "changes_observed": [
+    "With-skill programme report now explicitly treats contracting/invoicing as unknown and labels interim billing as proposed, repairing the prior invention.",
+    "With-skill programme report explicitly distinguishes credentials from staffing, support processes and commercial appetite.",
+    "The broader frozen commercial diagnostic still fails because participant economics are incompletely tested; training-readiness and delivery-capacity gating remain incomplete.",
+    "Both comparison reports still invent unified internal fault ownership. The with-skill internal-credential caveat passes the narrow frozen assertion but is less explicit about applicability than its first-run counterpart.",
+    "The no-skill programme rerun independently added proposed owners, unlike its first output. It still lacks explicit success evidence for each priority. This illustrates run-to-run variability."
+  ],
+  "comparison_to_first_iteration": {
+    "frozen_scored_checks": "Same result for rerun cases: with-skill 2/2, without-skill 0/2. No improvement in the aggregate frozen checks from the added sentences.",
+    "shared_gap_diagnostics": "Still 3 shared failing diagnostics across the two cases. Specific contracting and credential wording improved inside those broad diagnostics, so the repair is partial."
+  },
+  "limitations": [
+    "No general uplift claim: two repeated synthetic cases and single outputs per arm cannot establish reliable general performance.",
+    "Frozen checks originated from post-hoc review of the first outputs; these cases are not a fresh holdout.",
+    "Whole skill/foundation context differs between arms, and model variability is visible in the baseline. The rerun does not establish causality for individual sentences.",
+    "The existing harness omits full CLI transcripts, model identifier and cache-token metrics; no missing numbers have been invented.",
+    "Do not call the practice-oriented --rescore for these reports: it will overwrite this manually reviewed semantic benchmark."
+  ],
+  "rerun_command": "python3 utils/run-skill-eval.py --evals .claude/skills/reporting-foundation/evals/evals.json --case 1,3 --no-prompts --timeout 600"
+}

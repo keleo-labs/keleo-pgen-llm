@@ -1,6 +1,6 @@
 # Report Foundation
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
@@ -159,6 +159,18 @@ From the effective context, build a mental model of:
 
 ---
 
+## From diagnosis to action (Steps 2–3)
+
+Use the subject's evidence to test the strategy against its operating conditions before recommending action. For each priority finding, connect the observed rule or dependency to the mechanism affecting the outcome, who gains or bears the cost, and the consequence for the reader's decision. Examine incentives, eligibility, capacity and handoffs where relevant; do not force a commercial lens onto an unrelated subject. Distinguish product limitations from programme, commercial and delivery constraints because they have different owners and remedies.
+
+For an offer or investment recommendation, test the mutual value case: the buyer and measurable outcome, each participant's benefit and contribution, revenue against acquisition/delivery/support costs, and who contracts, invoices, delivers and supports. Missing evidence becomes a named assumption or validation action, not an invented margin or commitment. Selling a service does not establish its contracting or invoicing arrangement; label such arrangements as proposals until confirmed. Credentials establish only the eligibility or capability they actually attest, not delivery capacity or commercial readiness. A market opportunity alone does not establish willingness or ability to participate.
+
+Build priority recommendations from those findings. Where implementation is in scope, identify the accountable role, next action, prerequisite and observable success evidence. Sequence by dependency, urgency and impact; a blocker must be resolved before the activity it blocks. Use calendar phases only when supported or explicitly proposed, and do not defer a prerequisite merely to fill a later phase. Informational and comparison-only reports retain their requested scope.
+
+Explain the causal argument in prose before using a compact table to compare options, map responsibilities or specify execution. Preserve the chosen narrative; these are analytical checks, not mandatory section headings. See [contract.feature](contract.feature) for the shared behavioural contract.
+
+---
+
 ## Content Defects (Steps 1–3)
 
 The practice you are reporting from is not yours to fix mid-report, and it will not always
@@ -236,6 +248,7 @@ Organization Name. (Year). *Title of work*. URL
 
 - Write in clear, professional English appropriate to the audience
 - Use active voice and concrete language
+- Distinguish sourced facts, analytical judgement and proposed actions at the point of use. Own material inferences with natural phrasing such as "I assess" or "This suggests", without repeating a disclaimer in every paragraph. Cite the premises and qualify uncertainty; a documented eligibility rule does not by itself prove a future capacity loss. Label proposed owners, dates and targets as proposals rather than approved commitments.
 - Avoid jargon, acronyms, and technical terms without explanation
 - NO references to Keleo, Practice Language, alphas, states, activity spaces, work products, narrative types, baselines, or any schema constructs
 - The practice provides the *structure and knowledge* — it should be invisible in the output
@@ -557,7 +570,7 @@ When the user requests N separate reports from a shared method (e.g., one report
    ```bash
    # Extract a specific practice document from a .keleo bundle
    python3 utils/inspect-keleo.py bundles/<method>.keleo --extract-doc "Practice Name" -o /tmp/practice.json
-   
+
    # Build a structured summary for an agent prompt
    python3 utils/practice-summary.py /tmp/practice.json
    ```
@@ -635,6 +648,30 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - And: both ran before any PDF export or Google Doc publish
 
 ### Feature: Source Fidelity
+
+#### Scenario: Diagnosis explains the mechanism (@rule:report-724)
+- Given: a report evaluates a strategy against operating conditions
+- When: it presents a priority finding
+- Then: it connects evidence to the mechanism affecting the outcome and the affected participants
+- And: it distinguishes sourced facts from inferred consequences
+
+#### Scenario: Commercial recommendations test mutual value (@rule:report-725)
+- Given: a report recommends an offer or investment
+- When: it evaluates viability
+- Then: it identifies the buyer, outcome, participant benefits and costs, and contracting, billing, delivery and support responsibilities
+- And: missing evidence is explicit rather than replaced by invented economics
+
+#### Scenario: Actions address constraints in dependency order (@rule:report-726)
+- Given: implementation recommendations are within the agreed scope
+- When: the report prioritises actions
+- Then: priority actions trace to findings and specify a role, prerequisite and success evidence
+- And: blockers precede dependent activities and proposed commitments are labelled
+
+#### Scenario: Analysis respects the requested scope (@rule:report-727)
+- Given: an informational or comparison-only report is requested
+- When: the report is written
+- Then: causal analysis remains within that scope without an unsolicited execution plan
+- And: prose explains the argument while tables support comparison or execution detail
 
 These rules are checked by verification agents, not by a script — no tool can tell whether a claim is true. The briefs live in `.claude/skills/verification-foundation/verifiers/report.md`.
 

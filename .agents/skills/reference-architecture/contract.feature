@@ -72,3 +72,9 @@ Feature: Reference Architecture Generation
     When the skill resumes
     Then it proceeds with the approved work and required validation
     And it does not require a native Plan mode control to continue
+
+  Scenario: Shared diagnosis-to-action contract applies
+    Given a report is within this skill's agreed scope
+    When it presents findings and any requested recommendations
+    Then it satisfies the applicable scenarios in reporting-foundation/contract.feature
+    And it preserves this report type's scope and output structure

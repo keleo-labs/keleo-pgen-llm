@@ -1,0 +1,27 @@
+{
+  "status": "blocked_before_generation",
+  "quality_comparison": null,
+  "interpretation": "No report outputs: all six cells failed before generation. The times below measure failed startup attempts; they are not reporting performance.",
+  "diagnostic": "execution-diagnostic.json",
+  "byArm": {
+    "with-skill": {
+      "cells": 3,
+      "mean_pass_rate": null,
+      "mean_error_pass_rate": null,
+      "median_total_tokens": null,
+      "median_duration_ms": 3676,
+      "median_cost_usd": null
+    },
+    "without-skill": {
+      "cells": 3,
+      "mean_pass_rate": null,
+      "mean_error_pass_rate": null,
+      "median_total_tokens": null,
+      "median_duration_ms": 3646,
+      "median_cost_usd": null
+    }
+  },
+  "delta": {
+    "median_duration_ms": 30
+  }
+}

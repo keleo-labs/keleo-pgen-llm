@@ -1,6 +1,6 @@
 # Verification Foundation
 
-**Version:** 1.0.1
+**Version:** 1.1.0
 
 Shared verification protocol for the generation skills — `generate-method`,
 `create-baseline-method`, `update-method`. **This is not a skill.** It is reference

@@ -29,6 +29,8 @@ import re
 import sys
 from pathlib import Path
 
+__version__ = "1.1.0"
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Scenarios sit at h3 in most skills but at h4 in improve-tooling, which nests
@@ -50,7 +52,7 @@ FEATURE_HEADER_RE = re.compile(
 
 VALID_CATEGORIES = {
     "structural", "semantic", "naming", "coverage",
-    "narrative", "process", "aliasing", "fidelity",
+    "narrative", "process", "aliasing", "fidelity", "report",
 }
 
 ASSESS_CATEGORY_BRIDGE = {

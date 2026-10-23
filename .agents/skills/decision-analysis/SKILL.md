@@ -1,7 +1,7 @@
 ---
 name: decision-analysis
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 description: Structured trade-off analysis for architectural, strategic, or technical decisions — balanced options evaluation with contextual verdicts
 triggerPatterns:
   - "analyze.*question"
@@ -32,6 +32,8 @@ The output is a standalone analysis document in plain English. No Keleo terminol
 ---
 
 ## Reporting Foundation
+
+At Step 2, apply [From diagnosis to action](../reporting-foundation/REPORT-FOUNDATION.md#from-diagnosis-to-action-steps-23). Its [shared contract](../reporting-foundation/contract.feature) applies within this report type's agreed scope; use the shared evals in `../reporting-foundation/evals/evals.json`.
 
 This skill builds on the common reporting infrastructure. Load these **on demand**:
 

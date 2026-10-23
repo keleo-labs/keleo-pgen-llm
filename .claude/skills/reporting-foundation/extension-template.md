@@ -27,7 +27,7 @@ How to create a new specialised reporting skill that builds on the shared report
 | Reserved | 740–799 |
 
 The foundation holds two blocks because 600–619 filled up. Its verification rules
-(720–723) took the next free block rather than spilling into 620–639, which
+(720–727) took the next free block rather than spilling into 620–639, which
 `reference-architecture` already uses up to 624. **Check actual usage before claiming a
 range** — this table has been wrong before:
 
@@ -55,6 +55,8 @@ triggerPatterns:
 <2–3 sentence purpose statement. What kind of report this produces, when to use it, and what makes it distinct from the general-purpose method-based-report.>
 
 ## Workflow Overview
+
+Apply REPORT-FOUNDATION's "From diagnosis to action" section at Steps 2–3 and its shared `contract.feature` within the agreed report scope.
 
 **Step 0: Plan** → <type-specific planning focus>
 **Step 1: Load Context** → Resolve practice/method into effective context

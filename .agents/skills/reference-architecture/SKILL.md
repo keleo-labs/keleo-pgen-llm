@@ -1,7 +1,7 @@
 ---
 name: reference-architecture
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
 description: Create reference architecture documents — topology, component selection, evaluation frameworks, sizing guidance, and deployment recommendations
 triggerPatterns:
   - "reference.*architecture"
@@ -27,6 +27,8 @@ The output is a standalone architecture document in plain English with diagrams,
 ---
 
 ## Reporting Foundation
+
+At Step 2, apply [From diagnosis to action](../reporting-foundation/REPORT-FOUNDATION.md#from-diagnosis-to-action-steps-23). Its [shared contract](../reporting-foundation/contract.feature) applies within this report type's agreed scope; use the shared evals in `../reporting-foundation/evals/evals.json`.
 
 This skill builds on the common reporting infrastructure. Load these **on demand**:
 
