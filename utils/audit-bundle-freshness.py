@@ -15,13 +15,24 @@ the manifest version. Documents that exist only inside the bundle (typically
 externalized method documents generated at packaging time) are carried over
 verbatim, since they reference their practices by name rather than by value.
 
+A rebuild that writes requires an explicit scope: `--bundle`, `--document`, or
+`--all`. Without one it refuses and names the count it would have touched. The
+default audit is corpus-wide, so an unscoped `--rebuild --fix` inherits that
+breadth and repackages every bundle carrying a drifted copy -- which is the
+right operation when a shared baseline moves, and the wrong one when a single
+practice was updated and the caller is thinking about its bundle alone. The two
+read as the same command, so the scope is made explicit rather than assumed.
+Dry runs stay unscoped: surveying the whole corpus costs nothing and the survey
+is the point.
+
 Usage:
     python3 utils/audit-bundle-freshness.py
     python3 utils/audit-bundle-freshness.py --bundle bundles/red-hat-ai.keleo
     python3 utils/audit-bundle-freshness.py --document "Observability"
     python3 utils/audit-bundle-freshness.py --stale-only --json
-    python3 utils/audit-bundle-freshness.py --rebuild            # dry run
-    python3 utils/audit-bundle-freshness.py --rebuild --fix --bump patch
+    python3 utils/audit-bundle-freshness.py --rebuild            # dry run, corpus-wide
+    python3 utils/audit-bundle-freshness.py --rebuild --fix --bundle bundles/x.keleo
+    python3 utils/audit-bundle-freshness.py --rebuild --fix --all --bump patch
 """
 
 import argparse
@@ -182,8 +193,30 @@ def stage_bundled_document(keleo_path, document_name, staging_dir):
     return None
 
 
-def missing_dependencies(document_paths, manifest):
-    """Names each document declares as a dependency that the bundle lacks.
+def manifest_document_names(manifest):
+    """The set of document names a manifest lists."""
+    present = {
+        (entry.get("documentName") or "")
+        for entry in manifest.get("documents", [])
+    }
+    present.discard("")
+    return present
+
+
+def declared_dependencies(path):
+    """Every document name one document declares as a dependency."""
+    data, err = load_json_pair(path)
+    if err or not isinstance(data, dict):
+        return []
+    declared = [data.get("baselinePracticeName")]
+    declared += data.get("practiceDependencyNames") or []
+    declared += data.get("baselinePracticeNames") or []
+    declared += data.get("practiceNames") or []
+    return [name for name in declared if name]
+
+
+def missing_dependencies(document_paths, present_names):
+    """Names the given documents declare that are not in present_names.
 
     A rebuild repackages the document set the manifest already lists. When an
     entry point gains a dependency after the bundle was built, that set is no
@@ -193,28 +226,50 @@ def missing_dependencies(document_paths, manifest):
     the difference between the tool reporting what is true and certifying the
     opposite.
     """
-    present = {
-        (entry.get("documentName") or "")
-        for entry in manifest.get("documents", [])
-    }
-    present.discard("")
-
     missing = []
     for path in document_paths:
-        data, err = load_json_pair(path)
-        if err or not isinstance(data, dict):
-            continue
-        declared = [data.get("baselinePracticeName")]
-        declared += data.get("practiceDependencyNames") or []
-        declared += data.get("baselinePracticeNames") or []
-        declared += data.get("practiceNames") or []
-        for name in declared:
-            if name and name not in present and name not in missing:
+        for name in declared_dependencies(path):
+            if name not in present_names and name not in missing:
                 missing.append(name)
     return sorted(missing)
 
 
-def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
+def close_over_dependencies(resolved, present, source_index, root):
+    """Pull in declared dependencies the bundle lacks, until the set is closed.
+
+    Transitive by construction: a document added to close one gap may declare
+    dependencies of its own, so the frontier is recomputed after each pass
+    rather than taken once. Names the source index cannot place are left for
+    the caller to report -- adding nothing is the honest outcome, since a
+    bundle that still cannot resolve its entry point must not be written.
+
+    Added documents sort ahead of the ones already in the manifest, and later
+    waves ahead of earlier ones, because each wave is the dependencies of the
+    one before it. Order is not cosmetic here: package-keleo takes the last
+    document as the entry point where no method is present, so appending a
+    dependency to a practice bundle would silently make that dependency the
+    entry point.
+    """
+    added, depth = [], 0
+    while True:
+        frontier = missing_dependencies([p for _, _, p in resolved], present)
+        depth += 1
+        wave = []
+        for name in frontier:
+            source = source_index.get(name)
+            if source is None:
+                continue
+            # Negative rank sorts ahead of the manifest's own documents (0), and a
+            # deeper wave ahead of the one that pulled it in.
+            wave.append((KIND_ORDER.get(source["kind"], 1), -depth, root / source["path"]))
+            present.add(name)
+            added.append(name)
+        if not wave:
+            return added
+        resolved.extend(wave)
+
+
+def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=False):
     """Repackage one bundle from current on-disk sources. Returns a result dict."""
     rel = str(keleo_path.relative_to(root))
     manifest = read_manifest(keleo_path)
@@ -233,7 +288,7 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
             kind = entry.get("documentType", "practice")
             source = source_index.get(name)
             if source:
-                resolved.append((KIND_ORDER.get(source["kind"], 1), root / source["path"]))
+                resolved.append((KIND_ORDER.get(source["kind"], 1), 0, root / source["path"]))
                 continue
             staged = stage_bundled_document(keleo_path, name, staging)
             if staged is None:
@@ -242,23 +297,29 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
                     "message": f"cannot resolve document {name!r}",
                 }
             carried.append(name)
-            resolved.append((KIND_ORDER.get(kind, 1), staged))
+            resolved.append((KIND_ORDER.get(kind, 1), 0, staged))
 
-        ordered = [str(p) for _, p in sorted(resolved, key=lambda x: x[0])]
+        present = manifest_document_names(manifest)
+        added = close_over_dependencies(resolved, present, source_index, root) if reclose else []
 
-        missing = missing_dependencies(ordered, manifest)
+        ordered = [str(p) for _, _, p in sorted(resolved, key=lambda x: (x[0], x[1]))]
+
+        missing = missing_dependencies(ordered, present)
         if missing:
+            remedy = (
+                ". Those names are not in deps/, baselines/ or practices/, so the "
+                "closure cannot be completed from disk. Generate or pull them first"
+                if reclose else
+                ". A rebuild repackages the documents the bundle already "
+                "holds and does not add newly declared ones, so it would "
+                "report success on an archive that cannot resolve its own "
+                "entry point. Re-run with --reclose to add them from disk"
+            )
             return {
                 "bundle": rel, "status": "error",
                 "message": (
                     "bundle is missing declared dependencies: "
-                    + ", ".join(repr(m) for m in missing)
-                    + ". A rebuild repackages the documents the bundle already "
-                      "holds and does not add newly declared ones, so it would "
-                      "report success on an archive that cannot resolve its own "
-                      "entry point. Repackage with package-keleo.py, passing the "
-                      "closure from: discover-dependencies.py --resolve-from "
-                      "<entry-point>.json --transitive"
+                    + ", ".join(repr(m) for m in missing) + remedy
                 ),
                 "missingDependencies": missing,
             }
@@ -268,6 +329,7 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
                 "bundle": rel, "status": "dry-run",
                 "oldVersion": old_version, "newVersion": new_version,
                 "documents": len(ordered), "carriedOver": carried,
+                "addedDependencies": added,
             }
 
         out_tmp = staging / keleo_path.name
@@ -297,6 +359,7 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes):
             "bundle": rel, "status": "rebuilt",
             "oldVersion": old_version, "newVersion": new_version,
             "documents": len(ordered), "carriedOver": carried,
+            "addedDependencies": added,
         }
     finally:
         shutil.rmtree(staging, ignore_errors=True)
@@ -376,8 +439,20 @@ def main():
         help="Repackage bundles that carry stale documents from current on-disk sources",
     )
     parser.add_argument(
+        "--reclose", action="store_true",
+        help="On rebuild, add declared dependencies the bundle lacks from "
+             "deps/, baselines/ and practices/, transitively, rather than "
+             "refusing. Use when an entry point gained a dependency after "
+             "the bundle was built",
+    )
+    parser.add_argument(
         "--bump", choices=["patch", "minor", "major", "none"], default="patch",
         help="Manifest version bump applied on rebuild (default: patch)",
+    )
+    parser.add_argument(
+        "--all", action="store_true",
+        help="Permit an unscoped rebuild to write. Required with --rebuild --fix "
+             "when neither --bundle nor --document narrows the target set",
     )
     parser.add_argument(
         "--fix", action="store_true",
@@ -423,11 +498,30 @@ def main():
             print("No stale bundles — nothing to rebuild.")
             return 0
 
+        # An unscoped rebuild that writes must say so. The audit defaults to the
+        # whole corpus, so `--rebuild --fix` after updating one practice looks
+        # identical to the deliberate corpus-wide repackage and does the latter.
+        # Refuse once, naming the count, rather than reporting the breadth after
+        # the archives have already been replaced.
+        if args.fix and not args.bundle and not args.document and not args.all:
+            print(
+                f"REFUSED — an unscoped rebuild would write {len(targets)} bundle(s):",
+                file=sys.stderr,
+            )
+            for result in targets:
+                print(f"  {result['bundle']}", file=sys.stderr)
+            print(
+                "\nNarrow it with --bundle or --document, or pass --all to confirm "
+                "you mean every drifted bundle. Drop --fix to dry-run instead.",
+                file=sys.stderr,
+            )
+            return 2
+
         outcomes = []
         for result in targets:
             keleo_path = root / result["bundle"]
             outcome = rebuild_bundle(
-                keleo_path, source_index, root, args.bump, args.fix
+                keleo_path, source_index, root, args.bump, args.fix, args.reclose
             )
             outcomes.append(outcome)
             if args.json:
@@ -436,8 +530,12 @@ def main():
                 print(f"  ERROR   {outcome['bundle']}: {outcome['message']}")
             else:
                 verb = "REBUILT" if outcome["status"] == "rebuilt" else "would rebuild"
-                carried = outcome.get("carriedOver") or []
-                note = f"  (carried over: {', '.join(carried)})" if carried else ""
+                notes = []
+                if outcome.get("carriedOver"):
+                    notes.append("carried over: " + ", ".join(outcome["carriedOver"]))
+                if outcome.get("addedDependencies"):
+                    notes.append("added: " + ", ".join(outcome["addedDependencies"]))
+                note = f"  ({'; '.join(notes)})" if notes else ""
                 print(f"  {verb:<14} {outcome['bundle']}  "
                       f"v{outcome['oldVersion']} -> v{outcome['newVersion']}  "
                       f"({outcome['documents']} docs){note}")

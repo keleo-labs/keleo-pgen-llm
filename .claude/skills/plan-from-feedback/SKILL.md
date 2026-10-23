@@ -157,7 +157,10 @@ python3 utils/scan-corpus.py --category <category>
 ```
 
 **Always rebundle after changing any document** — `utils/audit-bundle-freshness.py
---rebuild --fix`. A bundle carrying a stale copy reintroduces the defect downstream.
+--rebuild --fix --all`. A bundle carrying a stale copy reintroduces the defect
+downstream. `--all` is required because a rebuild that writes will not run unscoped;
+here the corpus-wide sweep is the intent, since triage fixes documents wherever they
+sit. When you know which bundles are affected, name them with `--bundle` instead.
 
 ---
 
