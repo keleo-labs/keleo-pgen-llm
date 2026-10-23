@@ -74,6 +74,60 @@ Feature: Report Issue
     Then exactly one register row is drafted
     And it has a Type, a Summary under 120 characters, and a Description
 
+  # --- Description structure ---
+
+  Scenario: Description orients before it specifies
+    Given the user reports a defect in a named element
+    When the description is written
+    Then it says what the element is for and what depends on it before naming the defect
+    And it states the consequence for someone the triager can picture
+    And it states the condition under which the issue would be closed
+
+  Scenario: Identifying detail is separated from orientation
+    Given the report names a practice, a product, and the work that prompted it
+    When the description is written
+    Then the orientation paragraph does not depend on those names to make sense
+    And the names are recorded in the description's detail
+    And nothing the reporter supplied is discarded
+
+  Scenario: Enhancement describes a gap, not a defect
+    Given the user requests a capability that does not exist
+    When the description is written
+    Then it states what cannot be done today rather than asserting something is broken
+    And it states what becomes possible and what that is worth
+    And it states the shape of an acceptable answer rather than a finished design
+
+  Scenario: Enhancement with unresolved design questions
+    Given the user's request leaves a design decision open
+    When the description is written
+    Then the open question is recorded for triage to settle
+    And no mechanism is chosen on triage's behalf
+
+  Scenario: Orientation is written from the document where possible
+    Given the reported document is resolvable in this session
+    And the user described only the symptom
+    When the description is written
+    Then the element's purpose is read from the document rather than asked for
+    And the user is not asked for context the document already carries
+
+  Scenario: Orientation cannot be derived
+    Given the element's purpose is not evident from the document or the session
+    When context is elicited
+    Then the user is asked what they were trying to do when the defect got in the way
+    And the answer supplies the consequence rather than abstract background
+
+  Scenario: Trivial defect is not padded
+    Given the user reports a typo in a description field
+    When the description is written
+    Then the moves collapse into one or two sentences
+    And no significance is invented to fill the structure
+
+  Scenario: Thin description is flagged but not blocked
+    Given a draft description too short to carry orientation
+    When the drafts are validated
+    Then a warning is raised naming the drafting guidance
+    And the draft is not rejected
+
   Scenario: Multiple issues in one message
     Given the user describes three unrelated problems in a single message
     When the issues are captured

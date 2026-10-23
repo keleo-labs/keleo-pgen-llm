@@ -41,11 +41,11 @@ IDENTITY_SCAN = Path.home() / ".claude/skills/satools-git-guardrails/scripts/ide
 # Terms short enough to collide with ordinary prose are skipped during harvest.
 MIN_TERM_LENGTH = 4
 
-# A harvested single word that is also ordinary English is dropped. The corpus
-# names elements things like "Architecture", "Backlog" and "Benefits", and
-# blocking those would flag every second sentence until the gate was ignored —
-# which is worse than the narrow false negative it costs. Multi-word terms are
-# kept regardless, being specific enough not to collide.
+# Harvested terms that are ordinary English are dropped — see
+# is_ordinary_language for which ones and why. A gate that fires on normal
+# prose costs more than the narrow false negative it saves: every false
+# positive is paid for in rewriting, and a writer who learns to read the
+# output as noise stops seeing the term that mattered.
 WORDLISTS = ("/usr/share/dict/words", "/usr/dict/words")
 
 # Vendor and platform names that may not appear in the corpus but must never be
@@ -104,15 +104,42 @@ def load_wordlist():
     return set()
 
 
-def is_ordinary_word(term, words, protected):
-    """Is this a single ordinary English word rather than a name?"""
-    if not words or " " in term or "-" in term:
+def _is_dictionary_word(token, words):
+    # Check the singular too, since the corpus pluralises element names.
+    return token in words or (token.endswith("s") and token[:-1] in words)
+
+
+def is_ordinary_language(term, words, protected):
+    """Is this ordinary English rather than something that identifies anyone?
+
+    A single dictionary word is dropped whatever its capitalisation: the
+    corpus names elements "Architecture" and "Backlog", and blocking those
+    flags every second sentence until the gate is ignored.
+
+    A multi-word phrase is dropped only where it is lowercase as harvested.
+    Capitalisation is not what makes a term sensitive, but it is a reliable
+    signal of where the term came from: a declared element name is written
+    in title case, so a lowercase phrase of dictionary words is a keyword or
+    a fragment of prose and identifies nobody. Dropping title-case phrases
+    too would take most of the element vocabulary with them, which is the
+    content the gate exists to withhold.
+
+    A hyphen or a digit anywhere keeps the term, both being the shape of a
+    slug or a product name rather than a sentence.
+    """
+    if not words:
         return False
     if term.lower() in {p.lower() for p in protected}:
         return False
-    lower = term.lower()
-    # Check the singular too, since the corpus pluralises element names.
-    return lower in words or (lower.endswith("s") and lower[:-1] in words)
+    if re.search(r"[0-9_/.@-]", term):
+        return False
+
+    parts = term.split()
+    if len(parts) == 1:
+        return _is_dictionary_word(term.lower(), words)
+    if term != term.lower():
+        return False
+    return all(_is_dictionary_word(part, words) for part in parts)
 
 
 def _run(cmd, cwd=None):
@@ -167,12 +194,13 @@ def build_denylist(root):
                   if isinstance(t, str) and len(t.strip()) >= MIN_TERM_LENGTH}
     kept, dropped = set(), []
     for term in candidates:
-        if is_ordinary_word(term, words, VENDOR_SEED):
+        if is_ordinary_language(term, words, VENDOR_SEED):
             dropped.append(term)
         else:
             kept.add(term)
 
     sources["droppedAsOrdinaryEnglish"] = len(dropped)
+    sources["droppedPhrases"] = sum(1 for t in dropped if " " in t)
     cleaned = sorted(kept, key=len, reverse=True)
     return {
         "terms": cleaned,
@@ -197,7 +225,11 @@ def load_denylist(root, rebuild=False):
 
 
 def scan_identities(text):
-    """Shell out to the identity scanner for named people and teams."""
+    """Shell out to the identity scanner for named people and teams.
+
+    Returns (findings, note) where each finding is the scanner's own dict,
+    so the caller can see which rule fired rather than only what matched.
+    """
     if not IDENTITY_SCAN.exists():
         return [], "identity-scan.py not found; people were not checked"
     try:
@@ -211,7 +243,46 @@ def scan_identities(text):
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as exc:
         return [], f"identity scan failed: {exc}"
     findings = payload if isinstance(payload, list) else payload.get("findings", [])
-    return [str(f.get("match", f)) if isinstance(f, dict) else str(f) for f in findings], None
+    return [f if isinstance(f, dict) else {"match": str(f)} for f in findings], None
+
+
+# A fenced block, then a double-backtick span, then a single one. Longest
+# delimiter first, so a backtick inside a span is not read as opening another.
+# The double form is how markdown quotes a token that itself contains a
+# backtick, and reading it as two single spans leaves the token between them
+# looking like prose.
+_CODE_REGIONS = re.compile(r'```.*?```|~~~.*?~~~|``.+?``|`[^`\n]+`', re.S)
+
+
+def code_spans(text):
+    """Character ranges the author marked as code."""
+    return [m.span() for m in _CODE_REGIONS.finditer(text)]
+
+
+def in_code(text, token, spans):
+    """Does every occurrence of `token` as a mention sit inside a code region?
+
+    The question is every occurrence rather than any, because a token quoted
+    as code in one sentence and used as a mention in the next is still a
+    mention.
+
+    Only occurrences carrying the at-sign count. The sigil is what makes a
+    token a mention, and the bare word is often an ordinary English one — a
+    draft writing `@rule:` in a code span and "rule" in a sentence was failing
+    this test on the noun, which hands the gate a veto over any draft whose
+    code token happens to be a word.
+    """
+    if not token:
+        return False
+    bare = token.lstrip('@')
+    if not bare:
+        return False
+    found = False
+    for m in re.finditer(r'@' + re.escape(bare), text):
+        found = True
+        if not any(start <= m.start() and m.end() <= end for start, end in spans):
+            return False
+    return found
 
 
 def check(text, denylist):
@@ -238,8 +309,18 @@ def check(text, denylist):
     people, note = scan_identities(text)
     if note:
         notes.append(note)
-    for p in people:
-        blocking.append({"kind": "named person or team", "match": p[:80]})
+    spans = code_spans(text)
+    for finding in people:
+        match = str(finding.get("match", ""))
+        # The scanner's handle rule reads an at-sign followed by a word as a
+        # user mention, which is also the shape of a JSON-LD keyword, an npm
+        # scope, a decorator and a shell array expansion. Backticks are the
+        # author's own statement that the token is code, and a real mention
+        # is not usually written that way. A handle in prose still blocks.
+        if finding.get("rule") == "handle" and in_code(text, match, spans):
+            notes.append(f"handle {match!r} allowed: every occurrence is in code")
+            continue
+        blocking.append({"kind": "named person or team", "match": match[:80]})
 
     for label, pattern in REVIEW_PATTERNS:
         for m in re.finditer(pattern, text, re.I):
@@ -267,6 +348,10 @@ def main():
                        help="Harvest the denylist from the corpus and cache it")
     group.add_argument("--check", metavar="FILE",
                        help="Check a draft file; '-' reads stdin")
+    group.add_argument("--audit-denylist", action="store_true",
+                       help="Report cached terms that are ordinary language and "
+                            "identify nobody. Should be zero; anything else means "
+                            "the harvest filter has drifted from what it blocks")
     parser.add_argument("--rebuild", action="store_true",
                         help="With --check: refresh the denylist before checking")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -288,6 +373,24 @@ def main():
             for k, v in data["sources"].items():
                 print(f"  {k}: {v}")
         return 0
+
+    if args.audit_denylist:
+        denylist = load_denylist(root, rebuild=args.rebuild)
+        words = load_wordlist()
+        terms = denylist.get("terms", [])
+        ordinary = sorted(t for t in terms
+                          if is_ordinary_language(t, words, VENDOR_SEED))
+        if args.json:
+            print(json.dumps({"terms": len(terms), "ordinary": ordinary,
+                              "wordlist": bool(words)}, indent=2))
+        else:
+            if not words:
+                print("no system wordlist; ordinary language cannot be judged")
+                return 0
+            print(f"{len(ordinary)} of {len(terms)} cached terms are ordinary language")
+            for term in ordinary[:40]:
+                print(f"  {term}")
+        return 1 if ordinary else 0
 
     text = sys.stdin.read() if args.check == "-" else Path(args.check).read_text(encoding="utf-8")
     denylist = load_denylist(root, rebuild=args.rebuild)

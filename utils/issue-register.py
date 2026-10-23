@@ -135,12 +135,18 @@ VALID_KINDS = ["practice", "practiceBaseline", "method"]
 VALID_ELEMENT_TYPES = [
     "alpha", "state", "checklistItem", "activity", "activitySpace",
     "workProduct", "levelOfDetail", "persona", "personaGroup", "pattern",
-    "patternGroup", "patternView", "narrative", "narrativeType", "citation",
+    "patternGroup", "patternOrchestration", "patternView", "narrative",
+    "narrativeType", "citation",
     "outcome", "focus", "competency", "asset", "reference", "alias", "practice",
 ]
 
 SUMMARY_MAX = 120
 DUPLICATE_THRESHOLD = 0.72
+
+# A description shorter than this cannot carry the orientation a triager needs on top
+# of the defect itself — see feedback-foundation/drafting.md. Advisory only: a genuine
+# one-line defect is allowed to be one line.
+DESCRIPTION_MIN = 180
 
 
 # --- gws plumbing ---
@@ -272,8 +278,13 @@ def validate_drafts(drafts, default_email=None):
             warnings.append(f"{label}: summary is {len(summary)} chars (over {SUMMARY_MAX}); "
                             "move detail into description")
 
-        if not (draft.get("description") or "").strip():
+        description = (draft.get("description") or "").strip()
+        if not description:
             errors.append(f"{label}: description is required")
+        elif len(description) < DESCRIPTION_MIN:
+            warnings.append(f"{label}: description is {len(description)} chars; check it says what "
+                            "the element is for and why the defect matters, not only what is wrong "
+                            "(feedback-foundation/drafting.md)")
 
         if not (draft.get("email") or default_email or "").strip():
             errors.append(f"{label}: email is required (set it on the issue, pass --email, "
@@ -530,6 +541,82 @@ def cmd_schema(spreadsheet_id, as_json):
         print(f"  {column_letter(col['index'])} ({col['index']:>2}) {col['name']}{suffix}")
 
 
+def cmd_ensure_columns(spreadsheet_id, dry_run, as_json):
+    """Add any column this utility writes that the register does not yet carry.
+
+    The register predates the Issue URL and Issue State columns, so a sheet set
+    up before they existed has a table covering A-T while --resolve writes P-V.
+    Values would land outside the table in unlabelled cells. Adding the headers
+    and widening the table range is idempotent, so this is safe to run first.
+    """
+    sheet_title, sheet_id, table = get_table(spreadsheet_id)
+    table_range = table.get("range", {})
+    end_column = table_range.get("endColumnIndex", 0)
+    header_row = table_range.get("startRowIndex", 0) + 1  # 1-based sheet row
+
+    missing = [
+        {"column": column_letter(i), "name": label}
+        for i, (_key, label) in enumerate(ALL_COLUMNS)
+        if i >= end_column
+    ]
+
+    result = {
+        "sheet": sheet_title,
+        "headerRow": header_row,
+        "currentWidth": end_column,
+        "requiredWidth": len(ALL_COLUMNS),
+        "missing": missing,
+        "applied": False,
+    }
+
+    if missing and not dry_run:
+        first = column_letter(end_column)
+        last = column_letter(len(ALL_COLUMNS) - 1)
+        run_gws(
+            ["sheets", "spreadsheets", "values", "update",
+             "--params", json.dumps({
+                 "spreadsheetId": spreadsheet_id,
+                 "range": f"{sheet_title}!{first}{header_row}:{last}{header_row}",
+                 "valueInputOption": "USER_ENTERED",
+             }),
+             "--json", json.dumps({"values": [[c["name"] for c in missing]]})],
+            "Writing missing column headers",
+        )
+        run_gws(
+            ["sheets", "spreadsheets", "batchUpdate",
+             "--params", json.dumps({"spreadsheetId": spreadsheet_id}),
+             "--json", json.dumps({"requests": [{
+                 "updateTable": {
+                     "table": {
+                         "tableId": table.get("tableId"),
+                         "range": {
+                             "sheetId": sheet_id,
+                             "startRowIndex": table_range.get("startRowIndex", 0),
+                             "endRowIndex": table_range.get("endRowIndex", 1),
+                             "startColumnIndex": table_range.get("startColumnIndex", 0),
+                             "endColumnIndex": len(ALL_COLUMNS),
+                         },
+                     },
+                     "fields": "range",
+                 },
+             }]})],
+            "Widening table range",
+        )
+        result["applied"] = True
+
+    if as_json:
+        print(json.dumps(result, indent=2))
+        return
+    if not missing:
+        print(f"Register already carries all {len(ALL_COLUMNS)} columns.")
+        return
+    verb = "Would add" if dry_run else "Added"
+    for col in missing:
+        print(f"  {verb} {col['column']}: {col['name']}")
+    if not dry_run:
+        print(f"Table range widened to {len(ALL_COLUMNS)} columns.")
+
+
 def cmd_list(spreadsheet_id, status, as_json, limit):
     sheet_title, _sheet_id, _table = get_table(spreadsheet_id)
     _header, rows = read_rows(spreadsheet_id, sheet_title)
@@ -737,8 +824,11 @@ def main():
     mode.add_argument("--append", metavar="FILE",
                       help="Append draft issues to the register (Status is written as 'New')")
     mode.add_argument("--resolve", metavar="FILE",
-                      help="Write Status and resolution columns (P-T) onto "
+                      help="Write Status and resolution columns (P-V) onto "
                            "existing rows from a resolution file")
+    mode.add_argument("--ensure-columns", action="store_true",
+                      help="Add any column this utility writes that the register "
+                           "does not yet carry, and widen the table range")
 
     parser.add_argument("--spreadsheet", metavar="URL_OR_ID",
                         help="Override the register from .claude/user-config.json")
@@ -802,6 +892,8 @@ def main():
 
     if args.schema:
         cmd_schema(spreadsheet_id, args.json)
+    elif args.ensure_columns:
+        cmd_ensure_columns(spreadsheet_id, args.dry_run, args.json)
     elif args.list:
         cmd_list(spreadsheet_id, args.status, args.json, args.limit)
     elif args.check_duplicates:

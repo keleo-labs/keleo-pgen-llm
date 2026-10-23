@@ -38,7 +38,7 @@ Understand the mapping guide structure:
 - **Persona Mappings** -> `personas` and `personaGroups` arrays
 - **Activity Mappings** -> `activities` array
 - **Pattern Mappings** -> `patterns` array (lifecycle orchestrations)
-- **Pattern Group Mappings** -> `patternGroups` array (if present)
+- **Orchestration Mappings** -> `patternOrchestrations` array (if present). Do NOT emit `patternGroups` — deprecated as of schema 2.21.0
 - **Outcome Mappings** -> `outcomes` array
 - **Reference Content Mappings** -> `references` array (if present)
 - **Citation Mappings** -> `citations` array
@@ -295,12 +295,16 @@ Translate each alpha from the mapping guide.
 - **State compression:** Non-final views include ONLY alpha states that CHANGE from previous view. FINAL view MUST include ALL alphas as complete end-state snapshot.
 - `PatternView.seq` is REQUIRED (0 for prerequisites, 1+ for main phases)
 
-### 4.11 Pattern Groups (if present in mapping guide)
+### 4.11 Pattern Orchestrations (if present in mapping guide)
 
-- Use exact baseline group name as merge key
-- Only emit groups with patterns assigned (not empty baseline groups)
-- `patternName` must match a defined Pattern.name exactly
-- Include narratives when mapping guide provides group-level rationale
+- **Do NOT emit `patternGroups`** — deprecated as of schema 2.21.0, including baseline group names
+- `stages` is REQUIRED, at least one (empty only in a baseline shell). Each stage declares **exactly one** of `patternName` or `orchestrationName`
+- Both resolve across the baseline chain and declared dependencies. `orchestrationName` embeds a whole sub-endeavour — a programme embedding a project — and must not form a cycle
+- `relationship` is REQUIRED on every stage and always explicit: `sequential`, `concurrent`, `nested`, `onDemand`
+- `relativeTo` REQUIRED for `concurrent`/`nested`, naming exactly one of a host pattern or host orchestration; `trigger` REQUIRED for `onDemand`. `viewNames` and `recurrence: perView` apply only to a pattern host
+- `seq` unique among `sequential` stages; elsewhere it is only the presentation anchor
+- **Extending an orchestration in scope is additive**: emit only this practice's stages. Restating an inherited stage, or adding a `sequential` stage at or below the highest inherited sequential `seq`, is a validation error
+- Prefer `orchestrationName` over placing another document's pattern directly — the latter warns and names the orchestration to embed
 
 ### 4.12 Outcomes
 
@@ -437,7 +441,14 @@ Ensures redeclared personas preserve all competencies from dependencies and flag
 python3 utils/fix-pattern-progression.py <practice>.json --fix
 ```
 
-Removes non-progressing alphas (stuck at the same state across all views), degenerate single-alpha patterns, and reorders reversed state progressions (e.g., advanced states in early views, initial states in later views). Always run after Phase 3 generation.
+Removes non-progressing alphas (stuck at the same state across all views) and degenerate single-alpha patterns. Always run after Phase 3 generation.
+
+An alpha whose state runs backwards across views is **not** fixed here. Reordering assumes the pattern placed a sound progression in the wrong order, which is one of four reasons a walk goes backwards — the others being a lifecycle that genuinely repeats (declare `loopsBackTo`), an alpha whose own state array is misordered, and states that are variants rather than stages. Run `check-pattern-prerequisites.py` to tell them apart, then reorder only what it still calls a `regression`:
+
+```bash
+python3 utils/check-pattern-prerequisites.py <practice>.json _effective-context.json
+python3 utils/fix-pattern-progression.py <practice>.json --fix --reorder-reversed
+```
 
 ### 5.2.7 Resolve Reference URL Anchors (when source is web documentation)
 

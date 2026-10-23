@@ -1,5 +1,5 @@
 {
-  "skill": null,
+  "skill": "create-baseline-method",
   "source": ".claude/skills/create-baseline-method/SKILL.md",
   "features": [
     "Baseline Structural Integrity",
@@ -22,7 +22,7 @@
       "then": [
         "The `kind` property is \"practiceBaseline\""
       ],
-      "line": 717,
+      "line": 721,
       "assess_categories": [
         "structure"
       ],
@@ -41,7 +41,7 @@
       "then": [
         "focuses, alphas, activitySpaces, competencies, and narrativeTypes arrays are present and non-empty"
       ],
-      "line": 722,
+      "line": 726,
       "assess_categories": [
         "structure"
       ],
@@ -60,9 +60,10 @@
       "then": [
         "The JSON does NOT contain activities, workProducts, or patterns arrays with content",
         "These elements belong in extension practices, not baselines",
-        "patternGroups ARE allowed but with empty entries arrays (canonical categories for extensions to adopt)"
+        "The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0",
+        "Any patternOrchestrations entry is a shell with an empty stages array, since a baseline defines no patterns to sequence"
       ],
-      "line": 727,
+      "line": 731,
       "assess_categories": [
         "structure"
       ],
@@ -81,7 +82,7 @@
       "then": [
         "The focuses array contains 2-4 focus definitions"
       ],
-      "line": 734,
+      "line": 739,
       "assess_categories": [
         "structure"
       ],
@@ -100,7 +101,7 @@
         "Each outcome has measureDescription",
         "Outcomes count is between 1 and 3"
       ],
-      "line": 739,
+      "line": 744,
       "assess_categories": [],
       "automatable": false
     },
@@ -117,7 +118,7 @@
       "then": [
         "Each competency has exactly 5 competencyLevels"
       ],
-      "line": 745,
+      "line": 750,
       "assess_categories": [
         "structure"
       ],
@@ -136,7 +137,7 @@
       "then": [
         "Each narrativeType has 3-7 narrativeElements with name, description, and howToUse"
       ],
-      "line": 750,
+      "line": 755,
       "assess_categories": [
         "structure"
       ],
@@ -156,7 +157,7 @@
         "The alpha does NOT have a `contributesTo` property",
         "Baseline alphas are root-level and relate to each other via `relatesTo`"
       ],
-      "line": 759,
+      "line": 764,
       "assess_categories": [
         "baseline-alpha"
       ],
@@ -175,7 +176,7 @@
       "then": [
         "The alpha has a non-empty `relatesTo` array showing inter-alpha relationships"
       ],
-      "line": 765,
+      "line": 770,
       "assess_categories": [
         "baseline-alpha"
       ],
@@ -194,7 +195,7 @@
       "then": [
         "Each relatesTo entry has `relationship`, `alphaName`, and `direction` (outgoing|incoming|mutual)"
       ],
-      "line": 770,
+      "line": 775,
       "assess_categories": [
         "integrity"
       ],
@@ -214,7 +215,7 @@
         "Each activitySpace has a `contributesTo` array referencing alpha states",
         "Every non-initial alpha state is targeted by at least one activitySpace"
       ],
-      "line": 775,
+      "line": 780,
       "assess_categories": [
         "crossref-activity-alpha"
       ],
@@ -233,7 +234,7 @@
       "then": [
         "The alpha has 5-7 states representing progressive maturity"
       ],
-      "line": 781,
+      "line": 786,
       "assess_categories": [
         "alpha-state-minimum"
       ],
@@ -253,7 +254,7 @@
         "Names use vendor-neutral, framework-level language",
         "Implementation-specific terms (product names, tool names) are generalized"
       ],
-      "line": 790,
+      "line": 795,
       "assess_categories": [],
       "automatable": false
     },
@@ -270,7 +271,7 @@
       "then": [
         "Level names follow the standard progression: Basic, Applies, Masters, Adapts, Innovating"
       ],
-      "line": 796,
+      "line": 801,
       "assess_categories": [
         "competency-levels"
       ],
@@ -290,7 +291,7 @@
         "background, test, and examples properties are used sparingly",
         "Detailed Gherkin structure is deferred to the practice layer"
       ],
-      "line": 801,
+      "line": 806,
       "assess_categories": [
         "gherkin-structure"
       ],
@@ -309,7 +310,7 @@
       "then": [
         "01.5-distilled-essentials.md exists with 8-15 essential concerns and 2-4 focus areas"
       ],
-      "line": 811,
+      "line": 816,
       "assess_categories": [],
       "automatable": false
     },
@@ -326,7 +327,7 @@
       "then": [
         "01-analysis-report.md is the primary input, NOT the original source materials directly"
       ],
-      "line": 816,
+      "line": 821,
       "assess_categories": [],
       "automatable": false
     },
@@ -344,7 +345,7 @@
         "validate-baseline-json.py has been run with 0 schema errors",
         "assess-practice.py confirms 0 error-severity issues"
       ],
-      "line": 821,
+      "line": 826,
       "assess_categories": [],
       "automatable": false
     },
@@ -363,7 +364,7 @@
         "No blocking error survives reconciliation",
         "The verdict is recorded in the prompt history as a decision"
       ],
-      "line": 827,
+      "line": 832,
       "assess_categories": [],
       "automatable": false
     },
@@ -382,7 +383,7 @@
         "Every substantive Phase 1 concern is absorbed, generalised, or dropped with a stated rationale",
         "Elements with no Phase 1 antecedent are reported as errors"
       ],
-      "line": 838,
+      "line": 843,
       "assess_categories": [],
       "automatable": false
     },
@@ -401,7 +402,7 @@
         "Every distilled alpha is assigned to exactly one focus it fits more naturally than any other",
         "Use of the default Value/Solution/Endeavor triad is justified against the domain rather than assumed"
       ],
-      "line": 845,
+      "line": 850,
       "assess_categories": [],
       "automatable": false
     }

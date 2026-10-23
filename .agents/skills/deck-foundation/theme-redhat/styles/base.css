@@ -1,0 +1,152 @@
+/* Red Hat brand tokens and type scale.
+ *
+ * Values are harvested from the "Red Hat - Light" theme in the official
+ * expressive presentation template, so decks match corporate collateral.
+ *
+ * Everything here is restricted to constructs that survive the
+ * pptx-editable export: solid fills, solid borders, and explicit font sizes.
+ * Gradients, shadows, border-radius and pseudo-element content are avoided
+ * because PowerPoint has no faithful shape equivalent and the exporter falls
+ * back to rasterising the element, which costs text editability.
+ */
+
+:root {
+  --rh-red: #ee0000;
+  --rh-red-dark: #a60000;
+  --rh-red-darkest: #5f0000;
+  --rh-red-light: #f56e6e;
+  --rh-red-pale: #f9a8a8;
+  --rh-black: #151515;
+  --rh-white: #ffffff;
+  --rh-grey: #f2f2f2;
+  --rh-grey-text: #6a6e73;
+  --rh-green: #63993d;
+  --rh-orange: #f0561d;
+  --rh-link: #0066cc;
+
+  --rh-font-display: 'Red Hat Display', Arial, sans-serif;
+  --rh-font-text: 'Red Hat Text', Arial, sans-serif;
+}
+
+.slidev-layout {
+  font-family: var(--rh-font-text);
+  color: var(--rh-black);
+  background-color: var(--rh-white);
+  padding: 3rem 3.5rem;
+}
+
+/* Type scale. Sizes are absolute rather than relative so the exporter emits
+ * a concrete point size per run instead of inheriting an unresolved cascade. */
+.rh-display {
+  font-family: var(--rh-font-display);
+  font-size: 4.25rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.rh-headline {
+  font-family: var(--rh-font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.rh-subhead {
+  font-family: var(--rh-font-text);
+  font-size: 1.375rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--rh-grey-text);
+  margin: 0;
+}
+
+.rh-body {
+  font-family: var(--rh-font-text);
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+
+.rh-eyebrow {
+  font-family: var(--rh-font-text);
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rh-red);
+}
+
+.rh-stat {
+  font-family: var(--rh-font-display);
+  font-size: 5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--rh-red);
+}
+
+/* The 4px red rule is the template's main structural device: it opens a
+ * column, a step or a callout without needing a container box. */
+.rh-rule {
+  border-top: 4px solid var(--rh-red);
+  padding-top: 0.875rem;
+}
+
+.rh-rule-light {
+  border-top: 4px solid var(--rh-red-light);
+  padding-top: 0.875rem;
+}
+
+.rh-rule-pale {
+  border-top: 4px solid var(--rh-red-pale);
+  padding-top: 0.875rem;
+}
+
+.rh-on-dark {
+  background-color: var(--rh-black);
+  color: var(--rh-white);
+}
+
+.rh-on-dark .rh-subhead {
+  color: var(--rh-white);
+  opacity: 0.75;
+}
+
+.rh-on-red {
+  background-color: var(--rh-red);
+  color: var(--rh-white);
+}
+
+.rh-on-red .rh-subhead {
+  color: var(--rh-white);
+  opacity: 0.85;
+}
+
+/* Markdown lists stay native. A <ul><li> exports to a real PowerPoint
+ * bulleted paragraph, which keeps the text editable and lets the bullet
+ * survive; faking markers with ::before would drop them on export. */
+.slidev-layout ul {
+  list-style: square;
+  padding-left: 1.1rem;
+  margin: 0;
+}
+
+.slidev-layout ul li {
+  margin-bottom: 0.6rem;
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.slidev-layout ul li::marker {
+  color: var(--rh-red);
+}
+
+.slidev-layout strong {
+  font-weight: 700;
+}
+
+.slidev-layout a {
+  color: var(--rh-link);
+  text-decoration: underline;
+}

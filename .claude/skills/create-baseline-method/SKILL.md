@@ -1,9 +1,16 @@
+---
+name: create-baseline-method
+description: Generate foundational baseline practice JSON from source methodology
+metadata:
+  version: "1.2.0"
+---
+
 # create-baseline-method Skill
 
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -42,8 +49,8 @@ Baselines are foundational — they typically have no upstream practice dependen
 This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).
 
 **Key Distinction:**
-- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces, canonical patternGroups)
-- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns (adopting baseline patternGroups)
+- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
+- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns, and the orchestrations that sequence them
 
 ### Alpha Instances in Baselines
 
@@ -66,7 +73,7 @@ This skill orchestrates a 4-phase pipeline:
 
 **BEFORE executing any phase, you MUST:**
 
-1. **Enter Plan Mode** using the EnterPlanMode tool
+1. Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 2. **Analyze source materials** to understand:
    - Domain scope and objectives
    - Natural concern clustering (for Focus identification)
@@ -75,9 +82,9 @@ This skill orchestrates a 4-phase pipeline:
    - Confirm baseline creation approach (vs extension practice)
    - Estimate token requirements per phase
    - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
-4. **Exit Plan Mode** and present plan to user for approval
+4. **Present the plan and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-5. **Initialise prompt history:**
+5. **After approval, initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
      --type baseline --name "<Baseline Name>" \
@@ -104,7 +111,7 @@ This skill orchestrates a 4-phase pipeline:
    If you are resuming a baseline in a new session, re-arm the hooks first:
    `python3 utils/prompt-history.py baselines/<baseline-name>/ --activate`
 
-**Planning ensures:**
+**Planning establishes:**
 - Appropriate baseline vs extension practice decision
 - Token budget management
 - User alignment on scope and approach
@@ -476,8 +483,6 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
 
 12. **Define Assets** (icons, diagrams, templates)
 
-13. **Define Canonical PatternGroups** (3-5 template categories with empty entries for extension practices to adopt)
-
 **Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
 
 **Phase 2 Validation:**
@@ -586,7 +591,6 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
    - **narratives** - With narrative contexts
    - **citations** - Using Citation Standard
    - **outcomes** - Universal value propositions with measureDescription (1-3)
-   - **patternGroups** - Canonical categories with empty entries (extension practices populate)
    - **assets** - Icons, diagrams, templates
 
 5. **Validate Cross-References**:
@@ -729,7 +733,8 @@ Validates that baseline JSON has correct shape, required top-level sections, and
 - When: Phase 3 produces the JSON
 - Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
 - And: These elements belong in extension practices, not baselines
-- And: patternGroups ARE allowed but with empty entries arrays (canonical categories for extensions to adopt)
+- And: The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0
+- And: Any patternOrchestrations entry is a shell with an empty stages array, since a baseline defines no patterns to sequence
 
 ### Scenario: Focus count within range (@rule:structural-204)
 - Given: A baseline defines focus areas

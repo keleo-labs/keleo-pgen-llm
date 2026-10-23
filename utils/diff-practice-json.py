@@ -25,7 +25,8 @@ ARRAY_SECTIONS = [
     "alphas", "workProducts", "activities", "patterns", "citations",
     "activitySpaces", "competencies", "narrativeTypes", "assets",
     "personas", "personaGroups", "practiceElementAliases", "narratives",
-    "focuses", "references", "outcomes",
+    "focuses", "references", "outcomes", "alphaInstances",
+    "patternOrchestrations",
 ]
 
 SCALAR_FIELDS = [
@@ -33,8 +34,77 @@ SCALAR_FIELDS = [
 ]
 
 
+# Nested parts worth comparing when element counts alone are unchanged. A merge
+# or remap change usually shows up here rather than in the section counts: the
+# alphas are the same alphas, but a state or a checklist item has gone.
+PART_PATHS = {
+    "alphas": [("states", "checklist")],
+    "workProducts": [("levelsOfDetail", "checklist")],
+    "patterns": [("patternViews", None)],
+    "activitySpaces": [("activities", None)],
+    "competencies": [("levels", None)],
+    "narrativeTypes": [("narrativeElements", None)],
+    "patternOrchestrations": [("stages", None)],
+}
+
+
 def names_from(items):
     return {item["name"] for item in items if isinstance(item, dict) and "name" in item}
+
+
+def _part_key(item):
+    """Identify a nested part. Orchestration stages are keyed on placement."""
+    if not isinstance(item, dict):
+        return None
+    if "name" in item:
+        return item["name"]
+    if "patternName" in item:
+        relative = (item.get("relativeTo") or {}).get("patternName", "")
+        return f"{item['patternName']}::{item.get('relationship', '')}::{relative}"
+    return None
+
+
+def _keys_from(items):
+    return {k for k in (_part_key(i) for i in items or []) if k}
+
+
+def diff_parts(old, new):
+    """Compare the nested parts of same-named elements across two documents."""
+    findings = []
+    for section, paths in PART_PATHS.items():
+        old_by_name = {e["name"]: e for e in old.get(section, []) if isinstance(e, dict) and "name" in e}
+        new_by_name = {e["name"]: e for e in new.get(section, []) if isinstance(e, dict) and "name" in e}
+        for name in sorted(set(old_by_name) & set(new_by_name)):
+            for part_key, grandchild_key in paths:
+                old_parts = old_by_name[name].get(part_key, []) or []
+                new_parts = new_by_name[name].get(part_key, []) or []
+                _record(findings, f"{section}/{name}", part_key, old_parts, new_parts)
+                if not grandchild_key:
+                    continue
+                old_children = {_part_key(p): p for p in old_parts if _part_key(p)}
+                new_children = {_part_key(p): p for p in new_parts if _part_key(p)}
+                for child in sorted(set(old_children) & set(new_children)):
+                    _record(
+                        findings, f"{section}/{name}/{child}", grandchild_key,
+                        old_children[child].get(grandchild_key, []) or [],
+                        new_children[child].get(grandchild_key, []) or [],
+                    )
+    return findings
+
+
+def _record(findings, path, part_key, old_parts, new_parts):
+    old_keys = _keys_from(old_parts)
+    new_keys = _keys_from(new_parts)
+    if old_keys == new_keys and len(old_parts) == len(new_parts):
+        return
+    findings.append({
+        "path": path,
+        "part": part_key,
+        "old": len(old_parts),
+        "new": len(new_parts),
+        "added": sorted(new_keys - old_keys),
+        "removed": sorted(old_keys - new_keys),
+    })
 
 
 def extract_competency_levels(data):
@@ -81,7 +151,7 @@ def extract_aliases(data):
     ]
 
 
-def diff_files(old, new):
+def diff_files(old, new, parts=False):
     result = {"sections": {}, "scalars": {}}
 
     for field in SCALAR_FIELDS:
@@ -148,6 +218,11 @@ def diff_files(old, new):
     if new_aliases:
         result["aliases"] = new_aliases
 
+    if parts:
+        part_changes = diff_parts(old, new)
+        if part_changes:
+            result["parts"] = part_changes
+
     return result
 
 
@@ -174,6 +249,19 @@ def print_report(diff, changes_only=False):
             for name in info["removed"]:
                 print(f"    - {name}")
     print()
+
+    if diff.get("parts"):
+        print("=== NESTED PART CHANGES ===")
+        for change in diff["parts"]:
+            sign = "+" if change["new"] > change["old"] else ""
+            delta = change["new"] - change["old"]
+            print(f"  {change['path']} {change['part']}: "
+                  f"{change['old']} → {change['new']} ({sign}{delta})")
+            for name in change["added"]:
+                print(f"    + {name}")
+            for name in change["removed"]:
+                print(f"    - {name}")
+        print()
 
     if diff.get("workProductProperties"):
         print("=== WORK PRODUCT PROPERTY CHANGES ===")
@@ -224,6 +312,18 @@ GATE_SECTIONS = [
     "personas", "personaGroups", "outcomes",
 ]
 
+# Arrays a truncated Phase 3 run drops just as readily, but whose loss the gate
+# used to pass in silence: a regeneration took alphaInstances 4 → 0 and assets
+# 24 → 17 without a murmur. Both were deliberate there, which is the point —
+# the gate cannot tell deliberate from truncated, so it must surface the drop
+# and let a human say which it was. Reported at warning severity rather than
+# critical, because emptying one of these is legitimate far more often than
+# emptying an alphas array ever is.
+GATE_ADVISORY_SECTIONS = [
+    "alphaInstances", "references", "assets", "narratives",
+    "patternOrchestrations",
+]
+
 
 def run_gate(diff):
     """Completeness gate: check for element arrays that dropped to 0 or decreased significantly.
@@ -233,6 +333,19 @@ def run_gate(diff):
     critical = []
     warnings = []
 
+    # A pattern emptied while orchestrations grew is the refactor the orchestration
+    # model invites, not a truncated run: the sequencing a monolithic pattern held by
+    # restating its constituents' phases moves into stages that name those patterns
+    # instead. The elements did not vanish, they changed construct. Still surfaced,
+    # because only a human can confirm that is what happened — just not as CRITICAL,
+    # which would make the gate unpassable for a legitimate and intended change.
+    # It requires patterns to have actually fallen from a non-zero count. A document
+    # that never held one and gains an orchestration has refactored nothing, and a
+    # baseline can hold no patterns at all, so without the floor every baseline
+    # publishing its first shell would be told to confirm a sequencing that never existed.
+    orch = diff["sections"].get("patternOrchestrations") or {"old": 0, "new": 0}
+    patterns_refactored = orch["new"] > orch["old"]
+
     for section in GATE_SECTIONS:
         info = diff["sections"].get(section)
         if not info:
@@ -240,7 +353,18 @@ def run_gate(diff):
         old_count = info["old"]
         new_count = info["new"]
 
-        if old_count > 0 and new_count == 0:
+        if section == "patterns" and old_count > 0 and new_count == 0 and patterns_refactored:
+            warnings.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": (
+                    f"patterns dropped from {old_count} to 0 while patternOrchestrations "
+                    f"rose from {orch['old']} to {orch['new']} — looks like a pattern was "
+                    f"refactored into an orchestration; confirm the sequencing survived"
+                ),
+            })
+        elif old_count > 0 and new_count == 0:
             critical.append({
                 "section": section,
                 "old": old_count,
@@ -255,6 +379,22 @@ def run_gate(diff):
                 "issue": f"{section} decreased by >{int((1 - new_count/old_count) * 100)}% ({old_count} → {new_count})",
             })
 
+    for section in GATE_ADVISORY_SECTIONS:
+        info = diff["sections"].get(section)
+        if not info:
+            continue
+        old_count, new_count = info["old"], info["new"]
+        if old_count > 0 and new_count < old_count:
+            warnings.append({
+                "section": section,
+                "old": old_count,
+                "new": new_count,
+                "issue": (
+                    f"{section} dropped from {old_count} to {new_count} — confirm this "
+                    f"is deliberate and not truncation"
+                ),
+            })
+
     return critical, warnings
 
 
@@ -262,10 +402,12 @@ def print_gate_report(diff, critical, warnings):
     """Print gate-style pass/fail summary."""
     print("=== COMPLETENESS GATE ===\n")
 
-    for section in GATE_SECTIONS:
+    for section in GATE_SECTIONS + GATE_ADVISORY_SECTIONS:
         info = diff["sections"].get(section, {"old": 0, "new": 0, "delta": 0})
         old_count = info["old"]
         new_count = info["new"]
+        if section in GATE_ADVISORY_SECTIONS and old_count == 0 and new_count == 0:
+            continue
 
         is_crit = any(c["section"] == section for c in critical)
         is_warn = any(w["section"] == section for w in warnings)
@@ -322,12 +464,17 @@ def main():
                         help="Only show sections with changes")
     parser.add_argument("--gate", action="store_true",
                         help="Completeness gate: exit 1 if element arrays dropped to 0")
+    parser.add_argument("--parts", action="store_true",
+                        help="Also compare the nested parts of same-named elements "
+                             "(states, checklists, levels of detail, pattern views, "
+                             "orchestration stages). Section counts can be identical "
+                             "while a state or checklist item has gone")
     args = parser.parse_args()
 
     old_data = load_json(args.old)
     new_data = load_json(args.new)
 
-    diff = diff_files(old_data, new_data)
+    diff = diff_files(old_data, new_data, parts=args.parts)
 
     if args.gate:
         critical, warnings = run_gate(diff)

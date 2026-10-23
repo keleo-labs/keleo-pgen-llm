@@ -1,6 +1,8 @@
 ---
 name: generate-method
-version: 1.1.0
+version: 1.3.0
+metadata:
+  version: "1.3.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -55,9 +57,9 @@ The baseline JSON is the only hard requirement — it defines the alphas, compet
 
 ---
 
-## Critical Process: ALWAYS Use EnterPlanMode
+## Critical process: planning before execution
 
-**MANDATORY FIRST STEP:** Before starting ANY phase, you MUST use EnterPlanMode to:
+**MANDATORY FIRST STEP:** Complete the planning stage in Step 0 before starting any phase:
 
 1. Analyze source materials thoroughly
 2. Determine if this is a Practice or Method (multiple practices)
@@ -151,15 +153,15 @@ Use these utilities instead of ad-hoc `python3 -c` scripts for common inspection
 
 ## Execution Workflow
 
-### Step 0: EnterPlanMode (REQUIRED)
+### Step 0: Planning stage (required)
 
-**YOU MUST DO THIS FIRST.**
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 
-In plan mode:
+During read-only planning:
 
 1. **Read source materials completely**
    - All provided PDFs, URLs, markdown files
-   - Take comprehensive notes
+   - Keep comprehensive notes in the conversation
 
 2. **Identify context sources (baselines, practices, methods, .keleo bundles):**
    - Ask user which baseline, parent practice/method, or `.keleo` bundle(s) to use
@@ -170,11 +172,7 @@ In plan mode:
      ```
      - `found` → use the resolved path
      - `ambiguous` → present candidates to user, let them choose (filesystem entries preferred over bundle copies)
-     - `not_found` → attempt remote download:
-       ```bash
-       python3 utils/studio-client.py --pull "Name Provided By User"
-       ```
-       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
+     - `not_found` → list the missing dependency and proposed `studio-client.py --pull` operation in the plan. Download and re-resolve only after approval; if the pull then fails, ask for a local path.
    - **`.keleo` bundles:** Accepted directly — all documents inside are extracted and classified
    - **Classify all inputs:**
      ```bash
@@ -214,9 +212,9 @@ In plan mode:
    - Expected complexity and size
    - Whether secondary reference research (Step 2.5) will be performed
 
-7. **Exit plan mode** with clear execution roadmap
+7. **Present the execution roadmap and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-8. **Initialise prompt history:**
+8. **After approval, initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --init \
      --type <practice|method> --name "<Practice Name>" \
@@ -718,6 +716,35 @@ Alpha hierarchies and cross-practice dependencies are covered in `references/sem
 - **Orchestration practices**: Use `practiceDependencyNames` to load alphas, create patterns that coordinate across them
 - **Validation**: `python3 utils/assess-practice.py <file>.json --baseline <baseline>.json --parent <dep>.json`
 
+### Determining practiceDependencyNames
+
+**Declare a dependency when this practice names any element the other document
+owns** — not only when it references an alpha.
+
+Symbolic references resolve against one scope: the baseline chain, the declared
+dependencies, and the document itself. Anything named from outside that scope fails to
+resolve, whatever kind of element it is. So the test is what you name, not what kind of
+thing you named:
+
+| You name | Where it appears | Declare the owner? |
+|---|---|---|
+| An alpha, as a `contributesTo` or `mapsTo` target | `alphas[]` | Yes |
+| A pattern, as an orchestration stage's `patternName` | `patternOrchestrations[].stages[]` | Yes |
+| A pattern, as a stage's `relativeTo.patternName` host | `patternOrchestrations[].stages[]` | Yes |
+| An orchestration you extend, or embed via `orchestrationName` | `patternOrchestrations[]` | Yes |
+
+Alphas used to be the only case worth stating, which is why the rule was once written
+as "practices whose unique non-baseline alphas are actually referenced". That wording
+excludes a real and increasingly common case: a **composition practice** exists only to
+declare a `patternOrchestration` sequencing patterns its dependencies own, so it holds
+no alphas at all. A practice extending such an orchestration must declare its owner, and
+the alpha-only reading says not to — then the orchestration name fails to resolve, with
+nothing at the point of decision to warn you.
+
+**Still declare the minimum.** This widens what counts as a reference; it does not
+license declaring a dependency you never name. An unused entry drags the whole document
+into the effective context and into every bundle that carries this practice.
+
 ---
 
 ## Practice vs Method Handling
@@ -762,7 +789,7 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Post-Completion Review (MANDATORY)
 
-**After completing the skill workflow OR after completing planning**, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then:
+If planning is awaiting approval, keep this review read-only and defer all writes. After completing the approved skill workflow, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then:
 
 1. **Content defects (file immediately)**: If any defects in inherited content were drafted, invoke `report-issue` in mid-execution mode with the drafts path and report the row numbers (§13)
 2. **Utils remediation (apply immediately)**: Audit session for inline scripts or workarounds → extend/create utilities
@@ -950,15 +977,24 @@ python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
 - Then: At least one LOD has `contributesTo` targeting the alpha state
 
 ### Scenario: Patterns cover all practice alphas (@rule:coverage-004)
-- Given: A pattern is defined in the practice
+- Given: A practice defines one or more patterns
 - When: PatternViews are checked
-- Then: Every practice alpha appears in at least one PatternView
-- Then: Each alpha appears in every view (backfilled if needed)
+- Then: Every practice alpha appears in at least one PatternView of some pattern
+- Then: An alpha that never changes state within a pattern is absent from that pattern
+- Then: Each pattern's final view carries every alpha that pattern does advance
+- Then: Each such alpha is at the last state it reached in that pattern
 
 ### Scenario: Alpha states have supporting activities (@rule:coverage-005)
 - Given: An alpha state beyond the initial state exists on a new alpha
 - When: Activity contributesTo references are checked
 - Then: At least one activity has `contributesTo` targeting the alpha state
+
+### Scenario: Pattern views reach prerequisites before they assert them (@rule:coverage-006)
+- Given: A pattern view asserts an alpha state that declares `background.alphaStates`
+- When: The views are walked in `seq` order against the merged prerequisite graph
+- Then: Each prerequisite is reached at that view or an earlier one
+- Then: A later state of the same alpha counts as reaching an earlier one
+- Then: An alpha state declared at one view does not go backwards at a later view
 
 ## Feature: Terminology Aliasing
 

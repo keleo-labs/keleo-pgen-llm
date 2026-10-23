@@ -21,6 +21,9 @@ Usage:
     # Compute dependency tiers for a method's practices
     python3 utils/discover-dependencies.py --tiers practices/red-hat-sales-plays/red-hat-sales-plays.json
 
+    # Compute the full dependency-ordered closure under a root baseline
+    python3 utils/discover-dependencies.py --closure "Red Hat Sales Essentials" --search-dirs baselines practices deps
+
     # Find all methods/practices that contain a given practice name
     python3 utils/discover-dependencies.py --consumers "AI Platform TDP"
 
@@ -31,6 +34,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -250,7 +254,7 @@ def _annotate_versions(entries):
     return entries
 
 
-def resolve_name(name, index, prefer_filesystem=False):
+def resolve_name(name, index, prefer_filesystem=False, prefer_canonical=False):
     """Resolve a single name against the index.
 
     If prefer_filesystem is True and multiple candidates exist, prefer
@@ -260,6 +264,16 @@ def resolve_name(name, index, prefer_filesystem=False):
     Ambiguous results carry a version on every candidate and a "newest" flag on
     the highest, so a caller choosing between versions of one document does not
     have to open them all.
+
+    ``prefer_canonical`` resolves a remaining filesystem-vs-filesystem tie to the
+    authoring home via _canonical_entry, returning "found" with
+    ``disambiguated: True`` rather than "ambiguous". It is opt-in because an
+    ambiguity is usually worth reporting — but a caller that merely needs to
+    *load* a parent has no use for a tie it cannot act on, and silently skipping
+    it is worse than picking the authoring home. Context resolution dropped the
+    root baseline for exactly this reason: a synced copy of it sat beside a
+    consuming method, so the name went ambiguous and the whole grandparent tier
+    vanished from the merged vocabulary without a word.
     """
     entries = index.get(name, [])
     if not entries:
@@ -277,10 +291,33 @@ def resolve_name(name, index, prefer_filesystem=False):
             if len(fs_entries) == 1:
                 return {"name": name, "status": "found", **fs_entries[0]}
             if fs_entries:
+                if prefer_canonical:
+                    chosen = _canonical_entry(name, fs_entries)
+                    if chosen:
+                        return {
+                            "name": name, "status": "found",
+                            "disambiguated": True,
+                            "alternatives": [
+                                e["path"] for e in fs_entries if e is not chosen
+                            ],
+                            **chosen,
+                        }
                 return {
                     "name": name,
                     "status": "ambiguous",
                     "candidates": _annotate_versions(fs_entries),
+                }
+        if prefer_canonical:
+            chosen = _canonical_entry(name, local_entries)
+            if chosen:
+                return {
+                    "name": name, "status": "found",
+                    "disambiguated": True,
+                    "alternatives": [
+                        e.get("path", e.get("keleo_path"))
+                        for e in local_entries if e is not chosen
+                    ],
+                    **chosen,
                 }
         return {
             "name": name,
@@ -324,6 +361,15 @@ def extract_dependency_names(data, kind):
             if name not in seen_practice_deps:
                 deps.append((name, "practiceDependency"))
                 seen_practice_deps.add(name)
+        # Externalized form: practiceNames replaces embedded practice objects
+        # in a packaged method, and is the only record of what the method is
+        # made of. Omitting it leaves the closure short by every constituent
+        # practice, which is the difference between a packageable document set
+        # and one whose entry point cannot resolve.
+        for name in data.get("practiceNames", []):
+            if name not in seen_practice_deps:
+                deps.append((name, "methodPractice"))
+                seen_practice_deps.add(name)
         for practice in data.get("practices", []):
             for name in practice.get("practiceDependencyNames", []):
                 if name not in seen_practice_deps:
@@ -340,17 +386,30 @@ def _load_for_transitive(match, file_path_fallback):
     return load_json_pair(file_path_fallback)
 
 
-def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesystem=True):
-    """Recursively resolve transitive baseline dependencies.
+def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesystem=True,
+                       emitted=None):
+    """Recursively resolve the full dependency closure of a document.
 
     file_path_or_entry can be a filesystem path (str/Path) or a resolved
     index entry dict (with optional keleo_path).
 
-    Only baselinePracticeNames are resolved transitively.
-    practiceDependencyNames are reported but not recursed into.
+    Both baselinePracticeNames and practiceDependencyNames are recursed into.
+    A practice dependency has dependencies of its own, and stopping at the
+    first level returns a closure that is short by however many of those there
+    are -- which the packaging step then ships as an archive that cannot
+    resolve its own entry point.
+
+    The return is flat, de-duplicated by document name, and in dependency
+    order: a document appears after everything it depends on. That is the
+    order package-keleo.py wants its --documents in, so a caller can pass the
+    resolved paths straight through. `transitiveDependencies` is retained on
+    each entry, naming that document's own direct dependencies, so a reader
+    can still see the shape the closure was flattened from.
     """
     if visited is None:
         visited = set()
+    if emitted is None:
+        emitted = {}
 
     if isinstance(file_path_or_entry, dict):
         data, err = load_resolved_json(file_path_or_entry)
@@ -370,6 +429,9 @@ def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesyste
     results = []
 
     for dep_name, role in dep_names:
+        if dep_name in emitted:
+            continue
+
         match = resolve_name(dep_name, index, prefer_filesystem=prefer_filesystem)
         dep_result = {
             "name": dep_name,
@@ -383,12 +445,20 @@ def resolve_transitive(file_path_or_entry, index, visited=None, prefer_filesyste
         if match.get("candidates"):
             dep_result["candidates"] = match["candidates"]
 
-        if match["status"] == "found" and role != "practiceDependency":
-            dep_result["transitiveDependencies"] = resolve_transitive(
-                match, index, visited, prefer_filesystem=prefer_filesystem
+        nested = []
+        if match["status"] == "found":
+            nested = resolve_transitive(
+                match, index, visited, prefer_filesystem=prefer_filesystem,
+                emitted=emitted,
             )
+            dep_result["transitiveDependencies"] = [d["name"] for d in nested]
 
-        results.append(dep_result)
+        # Post-order: whatever this dependency needs is emitted before it, so
+        # the flattened list stays in dependency order.
+        results.extend(nested)
+        if dep_name not in emitted:
+            emitted[dep_name] = dep_result
+            results.append(dep_result)
 
     return results
 
@@ -616,6 +686,175 @@ def fmt_tiers(result):
     return "\n".join(lines)
 
 
+def _slugify(name):
+    """Lower-case hyphenated slug matching the project's directory naming."""
+    slug = name.lower().replace("&", " and ")
+    slug = re.sub(r"[^a-z0-9]+", "-", slug)
+    return slug.strip("-")
+
+
+def _canonical_entry(name, entries):
+    """Pick the authoring home for a document from its indexed copies.
+
+    A document is commonly carried in several places: its own directory, a
+    synced copy inside each consuming method's directory, and a packaged copy
+    inside one or more .keleo bundles. Regeneration has to edit exactly one of
+    them and let sync-practices.py propagate, so the choice is not arbitrary.
+    Prefer the directory named after the document itself, then deps/, then any
+    other filesystem path, and only fall back to a bundle copy when there is no
+    filesystem path at all.
+    """
+    local = [e for e in _dedupe_same_file(entries) if not e.get("remote")]
+    fs = [e for e in local if "keleo_path" not in e]
+    if not fs:
+        return local[0] if local else None
+
+    slug = _slugify(name)
+
+    def score(entry):
+        path = Path(entry["path"])
+        parent, stem = path.parent.name, path.stem
+        if parent == slug and stem == slug:
+            return (0, len(str(path)))
+        if parent == stem:
+            return (1, len(str(path)))
+        if parent == slug or stem == slug:
+            return (2, len(str(path)))
+        if parent == "deps":
+            return (3, len(str(path)))
+        return (4, len(str(path)))
+
+    return sorted(fs, key=score)[0]
+
+
+def cmd_closure(root_name, index):
+    """Compute the full dependency-ordered closure of documents under a root.
+
+    Walks reverse-dependency edges from the root to every document that depends
+    on it directly or transitively, collapses the duplicate copies of each
+    document to one authoring path, and assigns each a tier by longest path from
+    the root. Documents sharing a tier have no dependency between them, so a
+    batch regeneration can run a whole tier concurrently and only has to
+    serialise between tiers.
+
+    Differs from --tiers, which answers the narrower question of ordering the
+    practices named by one method.
+    """
+    canonical = {}
+    for name, entries in index.items():
+        entry = _canonical_entry(name, entries)
+        if entry:
+            canonical[name] = entry
+
+    if root_name not in canonical:
+        return {"error": f"Root document not found: {root_name}"}
+
+    deps_of = {}
+    kinds = {}
+    versions = {}
+    for name, entry in canonical.items():
+        data, err = load_resolved_json(entry)
+        if err or not isinstance(data, dict):
+            continue
+        kind = detect_kind(data)
+        kinds[name] = kind
+        versions[name] = data.get("version", "")
+        deps_of[name] = {d for d, _ in extract_dependency_names(data, kind) if d != name}
+
+    dependents_of = defaultdict(set)
+    for name, deps in deps_of.items():
+        for dep in deps:
+            dependents_of[dep].add(name)
+
+    closure = {root_name}
+    queue = [root_name]
+    while queue:
+        current = queue.pop()
+        for child in dependents_of.get(current, ()):
+            if child not in closure:
+                closure.add(child)
+                queue.append(child)
+
+    in_closure_deps = {
+        name: sorted(deps_of.get(name, set()) & closure) for name in closure
+    }
+
+    tiers = {root_name: 0}
+    remaining = set(closure) - {root_name}
+    cycles = []
+    while remaining:
+        ready = [n for n in remaining if all(d in tiers for d in in_closure_deps[n])]
+        if not ready:
+            cycles = sorted(remaining)
+            for name in remaining:
+                tiers[name] = -1
+            break
+        for name in ready:
+            tiers[name] = 1 + max((tiers[d] for d in in_closure_deps[name]), default=-1)
+        remaining -= set(ready)
+
+    documents = []
+    for name in sorted(closure, key=lambda n: (tiers[n], n)):
+        entry = canonical[name]
+        dupes = [
+            e["path"] for e in _dedupe_same_file(index[name])
+            if not e.get("remote") and e.get("path") != entry.get("path")
+        ]
+        documents.append({
+            "name": name,
+            "kind": kinds.get(name, entry.get("kind", "")),
+            "version": versions.get(name, ""),
+            "tier": tiers[name],
+            "canonicalPath": entry.get("path"),
+            "dependsOn": in_closure_deps[name],
+            "dependents": sorted(dependents_of.get(name, set()) & closure),
+            "duplicatePaths": dupes,
+        })
+
+    by_tier = defaultdict(list)
+    for doc in documents:
+        by_tier[doc["tier"]].append(doc["name"])
+
+    return {
+        "root": root_name,
+        "count": len(documents),
+        "tierCount": len([t for t in by_tier if t >= 0]),
+        "tiers": [
+            {"tier": t, "documents": sorted(by_tier[t])} for t in sorted(by_tier)
+        ],
+        "documents": documents,
+        "cycles": cycles or None,
+    }
+
+
+def fmt_closure(result):
+    """Format a closure result as human-readable text."""
+    if "error" in result:
+        return f"Error: {result['error']}"
+
+    lines = [
+        f"Dependency closure under \"{result['root']}\" "
+        f"({result['count']} documents, {result['tierCount']} tiers):"
+    ]
+    by_name = {d["name"]: d for d in result["documents"]}
+    for tier in result["tiers"]:
+        label = "unordered (cycle)" if tier["tier"] < 0 else f"Tier {tier['tier']}"
+        lines.append(f"\n{label}:")
+        for name in tier["documents"]:
+            doc = by_name[name]
+            dupes = f"  [+{len(doc['duplicatePaths'])} copies]" if doc["duplicatePaths"] else ""
+            lines.append(
+                f"  - {name} ({doc['kind']} v{doc['version']}) — {doc['canonicalPath']}{dupes}"
+            )
+            if doc["dependsOn"]:
+                lines.append(f"      depends on: {', '.join(doc['dependsOn'])}")
+
+    if result.get("cycles"):
+        lines.append(f"\nCycle detected among: {', '.join(result['cycles'])}")
+
+    return "\n".join(lines)
+
+
 def cmd_consumers(target_name, search_dirs):
     """Find all methods/practices that contain or reference a given practice name.
 
@@ -828,6 +1067,10 @@ def main():
         help="Compute dependency tiers for a method's practices"
     )
     group.add_argument(
+        "--closure", metavar="NAME",
+        help="Compute the full dependency-ordered closure of documents under a root baseline/practice"
+    )
+    group.add_argument(
         "--consumers", metavar="NAME",
         help="Find all methods/practices containing or referencing a named practice"
     )
@@ -880,6 +1123,12 @@ def main():
         result = cmd_tiers(args.tiers)
         print(json.dumps(result, indent=2) if args.json else fmt_tiers(result))
         sys.exit(0)
+
+    if args.closure:
+        index, skipped = build_index(args.search_dirs, include_remote=use_remote)
+        result = cmd_closure(args.closure, index)
+        print(json.dumps(result, indent=2) if args.json else fmt_closure(result))
+        sys.exit(1 if "error" in result else 0)
 
     if args.consumers:
         result = cmd_consumers(args.consumers, args.search_dirs)

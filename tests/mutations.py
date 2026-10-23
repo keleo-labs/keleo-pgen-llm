@@ -180,7 +180,18 @@ MUTATIONS = [
     (
         "xref:narrative-type", "invented-narrative-type",
         "memory: a narrative names a type the baseline does not define",
-        lambda d: d["narratives"][0].__setitem__("narrativeTypeName", "The Hero's Journey"),
+        # The planted name must be one no baseline in the resolved chain can
+        # ever declare. This mutation previously planted "The Hero's Journey",
+        # which Project Essentials defines — and once Platform Adoption
+        # Essentials gained `baselinePracticeNames: ["Project Essentials"]` the
+        # ancestor merge resolved it as legitimate, so the mutation planted a
+        # *valid* value and the assertion could no longer fail. It still passed
+        # in CI, where `baselines/` is git-ignored and the ancestor is absent,
+        # and failed only on a machine with the corpus on disk. The assertion
+        # tests "name not in the resolved set", so a realistic string buys
+        # nothing and costs exactly this.
+        lambda d: d["narratives"][0].__setitem__(
+            "narrativeTypeName", "Selftest Narrative Type That No Baseline Defines"),
     ),
     (
         "bref:alias", "alias-unknown-target",
@@ -265,5 +276,19 @@ MUTATIONS = [
         "qual:versioning", "missing-version",
         "the document declares no version or schemaVersion",
         lambda d: (d.pop("version", None), d.pop("schemaVersion", None)),
+    ),
+    (
+        "qual:pattern-prerequisites", "prerequisite-after-assertion",
+        "a middle view asserts a state whose prerequisite the last view reaches",
+        # states[1], not states[0]. The checker treats the first view of a
+        # pattern as its entry condition and classifies a prerequisite there
+        # as established before the pattern begins -- non-blocking, by design.
+        # Planted on the first state the mutation was detected and then
+        # excused, so the assertion never failed and the instrument could not
+        # be proven to work. A middle view has no such excuse.
+        lambda d: _alpha(d, "Platform Onboarding")["states"][1].__setitem__(
+            "background", {"alphaStates": [
+                {"alphaName": "Onboarding Readiness", "stateName": "Enforced"},
+            ]}),
     ),
 ]

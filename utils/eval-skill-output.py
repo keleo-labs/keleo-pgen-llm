@@ -137,6 +137,7 @@ ASSESS_CATEGORY_MAP = {
     "qual:pattern-progression": ("pattern-alpha-progression", "pattern-misaligned-state"),
     "qual:pattern-shape": ("pattern-few-views", "pattern-single-alpha", "pattern-sparse-alpha"),
     "qual:pattern-views": ("pattern-view-completeness", "pattern-view-state-density"),
+    "qual:pattern-prerequisites": ("pattern-prerequisites",),
     "qual:reference-quality": ("reference-evidence", "reference-merge", "reference-anchor"),
     "qual:versioning": ("versioning",),
 }
@@ -282,6 +283,7 @@ ASSERTION_TEXTS = {
     "qual:pattern-progression": "Pattern alphas show progression, states aligned",
     "qual:pattern-shape": "Patterns have enough views and alphas",
     "qual:pattern-views": "Pattern views complete and adequately dense",
+    "qual:pattern-prerequisites": "Pattern views reach prerequisites before asserting states",
     "qual:reference-quality": "References are actionable artifacts with anchored URLs",
     "qual:versioning": "version and schemaVersion present",
 }
@@ -326,8 +328,39 @@ def discover_files(directory):
             continue
         if name in ("grading.json", "benchmark.json", "timing.json"):
             continue
+        if _is_proposal_document(f):
+            continue
         files["json_files"].append(str(f))
     return files
+
+
+# A change request and a change set are Practice Language documents, and
+# /update-method writes one into the practice directory it just updated. They
+# are proposals about a practice rather than practices, so grading them against
+# the phase 3 assertions reports a document nobody authored as failing to be
+# something it never claimed to be.
+#
+# Neither carries a `kind`, so they are recognised by their required properties
+# — `changeId` with `operations`, `changeSetId` with `changeRequests`. Matching
+# on the filename instead would miss one written under any other name, and
+# detect_kind reads an unrecognised document as a baseline.
+PROPOSAL_SIGNATURES = (
+    ("changeId", "operations"),
+    ("changeSetId", "changeRequests"),
+)
+
+
+def _is_proposal_document(path):
+    """Is this a change request or change set rather than a practice?"""
+    try:
+        data = load_json(path, exit_on_error=False)
+    except Exception:
+        return False
+    if not isinstance(data, dict):
+        return False
+    if data.get("kind") in ("changeRequest", "changeSet"):
+        return True
+    return any(all(key in data for key in sig) for sig in PROPOSAL_SIGNATURES)
 
 
 def auto_discover_baseline(json_files):
@@ -617,6 +650,7 @@ def eval_phase_3(json_path, baseline=None, schema=None, parents=None):
         if kind == "practiceBaseline" and assertion_id in (
             "xref:reference-integrity", "qual:reference-quality",
             "qual:pattern-progression", "qual:pattern-shape", "qual:pattern-views",
+            "qual:pattern-prerequisites",
             "rel:mapsto-lod",
         ):
             continue

@@ -1,6 +1,6 @@
 # Skill Specification Standard
 
-**Version:** 1.2.0
+**Version:** 1.3.1
 
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
@@ -31,13 +31,13 @@ Rule IDs are globally unique across all skills. Each skill owns a non-overlappin
 - `create-baseline-method`: 200–399
 - `update-method`: 400–599
 - `method-based-report` family: 600–799 (sub-allocated in 20-number blocks):
-  - Shared foundation (`reporting-foundation/REPORT-FOUNDATION.md`): 600–619
+  - Shared foundation (`reporting-foundation/REPORT-FOUNDATION.md`): 600–619, 720–739
   - `reference-architecture`: 620–639
   - `project-plan`: 640–659
   - `decision-analysis`: 660–679
   - `document-review`: 680–699
   - `method-based-report` (type-specific): 700–719
-  - Reserved for future report types: 720–799
+  - Reserved for future report types: 740–799
 - `improve-tooling`: 800–949
 - Cross-cutting standards defined in this document: 950–999
 
@@ -68,6 +68,7 @@ Steps should be concrete and verifiable: "The alpha has exactly one of `contribu
 | `process` | Workflow steps, phase ordering, gate checks | Phase 1 before Phase 2, delineation gate decision |
 | `aliasing` | Terminology aliases, keywords, domain term handling | One alias per element, alias names not in structural refs |
 | `fidelity` | Output traces to the sources provided and cited | Structural claims traceable to a source span, citation supports its claim, no invention between phases |
+| `report` | Shared and type-specific reporting behaviour | Source fidelity, diagnostic reasoning, actionable recommendations and report scope |
 
 ---
 
@@ -251,7 +252,7 @@ A generation skill gates each phase on it: mechanical validation, then the verif
 
 ## 11. Post-Completion Review
 
-After completing the skill workflow OR after completing planning, every skill MUST review the session for improvement opportunities and **apply fixes directly** rather than proposing them to the user.
+After completing the skill workflow, every skill MUST review the session for improvement opportunities and **apply fixes directly** rather than proposing them to the user. If a skill stops after planning to await approval, keep the review read-only and defer fixes, issue drafts and external updates until approval. See [the planning stage](planning-foundation/PLANNING-FOUNDATION.md).
 
 ### 11.1 Utils Remediation (Apply Immediately)
 
@@ -271,6 +272,8 @@ Identify patterns that indicate skill instruction gaps (repeated manual correcti
 ## 12. Remote Bundle Resolution
 
 When a skill cannot resolve a dependency locally (via `discover-dependencies.py`), use the `studio-client.py` utility to download from the keleo-studio-gas remote library.
+
+During a planning stage awaiting approval, report missing dependencies in the plan and defer downloads and cache refreshes until approval.
 
 ### 12.1 Download a Missing Bundle
 
@@ -359,7 +362,7 @@ Record each defect **at the point of discovery**, not from memory at the end of 
 ```bash
 python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<slug>-<timestamp>.json \
   --type Issue --summary "<title under 120 chars>" \
-  --description "<what was observed, where, and what was expected instead>" \
+  --description "<the five moves — see below>" \
   --document "<Canonical Document Name>" --document-version <version> --document-kind <kind> \
   --element "<Exact Element Name>" --element-type <type>
 ```
@@ -368,9 +371,16 @@ The utility creates the file on first call, validates each draft as it is added,
 declines to add the same summary against the same document twice — so one defect seen in
 three sections yields one row.
 
-Write the description for a triager who was not in this session: what the document says,
-what the practice implied it should say, and what you did instead. Do not pre-judge the
-resolution; triage owns that.
+Write the description to the five moves in
+`.claude/skills/feedback-foundation/drafting.md`: what the element is and what depends on
+it, what the document actually says, the consequence, what would close it, and the
+detail. You hold context nobody downstream will have — you have just read the document,
+and the triager reads only the row. The first move is the one to get right, because a row
+that opens on an element name is unreadable to anyone who does not already know that
+element.
+
+Say what you did instead, in the detail move — the accommodation tells a triager how much
+the defect cost. Do not pre-judge the resolution; triage owns that.
 
 ### 13.5 Filing
 

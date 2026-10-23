@@ -25,9 +25,21 @@ Usage:
     python3 utils/update-method-json.py practices/red-hat-ai/red-hat-ai.json \
         --sync-tags --fix
 
+    # Convert an embedded method to externalized practiceNames:
+    python3 utils/update-method-json.py practices/red-hat-ai/red-hat-ai.json \
+        --externalize --fix
+
     # Combined: import + sync all:
     python3 utils/update-method-json.py practices/red-hat-ai/red-hat-ai.json \
         --import-practice external/practice.json --sync-deps --sync-tags --fix
+
+A method may carry its practices either as full embedded objects or as symbolic
+`practiceNames`. Every other operation here reads `practiceNames`, so an embedded
+method reports "Practices: 0" and silently does nothing. `--externalize` converts
+one to the referenced form, writing each embedded practice out as its own document
+beside the method where no file of that name already exists. The embedded copies
+are the problem it solves: they duplicate documents the package already ships and
+drift from them the moment a practice is regenerated.
 """
 import argparse
 import json
@@ -37,6 +49,60 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json_pair, detect_kind, get_project_root
+
+
+def externalize_embedded_practices(method_data, method_dir, apply_changes):
+    """Convert an embedded `practices` array to symbolic `practiceNames`.
+
+    Each embedded practice is written beside the method as its own document,
+    but only where no file of that name exists: a standalone file on disk is
+    the authored artifact and the embedded copy is a snapshot of it, so the
+    file wins. Returns (changes, warnings).
+    """
+    embedded = method_data.get("practices") or []
+    changes, warnings = [], []
+
+    if not embedded:
+        return changes, warnings
+
+    if not all(isinstance(p, dict) for p in embedded):
+        warnings.append("`practices` holds non-object entries; nothing externalized")
+        return changes, warnings
+
+    names = list(method_data.get("practiceNames", []))
+
+    for practice in embedded:
+        name = practice.get("name", "")
+        if not name:
+            warnings.append("an embedded practice has no name; skipped")
+            continue
+
+        slug = name.lower().replace("&", "and")
+        slug = "".join(c if c.isalnum() or c.isspace() else "" for c in slug)
+        slug = "-".join(slug.split())
+        dest = method_dir / f"{slug}.json"
+
+        if dest.exists():
+            warnings.append(
+                f"'{name}': kept {dest.name} on disk; embedded copy discarded"
+            )
+        else:
+            if apply_changes:
+                # An embedded practice omits `kind`, which context supplied.
+                written = dict(practice)
+                written.setdefault("kind", "practice")
+                dest.write_text(json.dumps(written, indent=2) + "\n")
+            changes.append(f"wrote embedded '{name}' → {dest.name}")
+
+        if name not in names:
+            names.append(name)
+            changes.append(f"added '{name}' to practiceNames")
+
+    method_data["practiceNames"] = names
+    del method_data["practices"]
+    changes.append(f"removed embedded `practices` ({len(embedded)} objects)")
+
+    return changes, warnings
 
 
 def find_practice_files(method_dir, practice_names, baseline_name=None):
@@ -190,6 +256,16 @@ def main():
         help="Merge tags/keywords from all constituent practices"
     )
     parser.add_argument(
+        "--externalize",
+        action="store_true",
+        help=(
+            "Convert an embedded `practices` array to symbolic `practiceNames`, "
+            "writing each embedded practice beside the method where no file of "
+            "that name exists. Runs before the other operations, so --sync-deps "
+            "and --sync-tags see the practices an embedded method would hide"
+        ),
+    )
+    parser.add_argument(
         "--fix", action="store_true",
         help="Write changes (default: dry-run)"
     )
@@ -209,6 +285,17 @@ def main():
     method_dir = method_path.parent
     changes = []
     warnings = []
+
+    # Externalize first: every operation below reads practiceNames, which an
+    # embedded method does not have.
+    if args.externalize:
+        ext_changes, ext_warnings = externalize_embedded_practices(
+            data, method_dir, args.fix
+        )
+        changes.extend(ext_changes)
+        warnings.extend(ext_warnings)
+        if not ext_changes:
+            warnings.append("no embedded `practices` array; already externalized")
 
     practice_names = list(data.get("practiceNames", []))
 

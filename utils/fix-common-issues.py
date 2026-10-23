@@ -18,6 +18,8 @@ Consolidates structural fixes detected by assess-practice.py:
 - relatesTo direction inference (adds required 'direction' field based on relationship verb)
 - Gherkin structure (background/test/examples type coercion and placement validation)
 - Element-level kind discriminators (narrativeTypes, activitySpaces, etc.)
+- Invalid kind values (remove `kind` from states, checklists, levels of detail and
+  narratives, which the schema's PracticeElement enum does not admit; schema-driven)
 - Alias isolation (replace alias names in structural references with canonical names)
 - mapsTo variant naming (strip parent type name from variant alpha names and update refs)
 - Narrative schema (remove invalid kind='narrative', fix narrativeContext field names)
@@ -28,6 +30,7 @@ Consolidates structural fixes detected by assess-practice.py:
 - Nested narrative wrappers (flatten narratives[i].narratives[] into top-level, merge citations)
 - Missing checklist seq (add sequential seq values to items that lack them)
 - Missing version/schemaVersion (add version 1.0.0 and schemaVersion from schema)
+- Reference evidence links (copy a reference's links onto evidenceBy rows carrying none)
 
 Usage:
     # Dry run — show what would be fixed
@@ -92,25 +95,43 @@ Output: JSON report to stdout. Exit 0 on success, 1 on error.
 
 import argparse
 import json
+import os
+import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json_pair, get_schema_version, resolve_reference_context
+from utils._shared import (load_json, load_json_pair, get_schema_version,
+                           resolve_reference_context, merge_ancestor_baselines)
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
 
 RELATIONSHIP_NORMALIZATIONS = {
-    "supports": "produces",
-    "enables": "produces",
-    "enables delivery of": "produces",
-    "provides": "produces",
-    "enhances": "produces",
-    "strengthens": "produces",
+    # REMOVED: the active enabling verbs that used to map to "produces" —
+    # "supports", "enables", "enables delivery of", "provides", "enhances",
+    # "strengthens", "drives". Three things were wrong with them.
+    #
+    # First, semantics/alphas.md §6 lists "enables" and "provides" among the
+    # valid domain verbs and says outright that the relationship string "is the
+    # human-readable label; tooling should not parse this string
+    # programmatically" — which is precisely what this table does.
+    #
+    # Second, it rewrote the verb and left `relationshipKind` alone, so the two
+    # disagreed. The spec maps kind `enabling` to exactly "enables",
+    # "facilitates", "supports"; `produces` belongs to kind `production`. 16
+    # documents in this corpus now carry `relationship: produces` beside
+    # `relationshipKind: enabling`, which this table created.
+    #
+    # Third, "A enables B" and "A produces B" are different claims. One
+    # practice caught it on "the value case produces the deal", which it does
+    # not — it enables it.
+    #
+    # The passive-to-canonical entries below stay: they regularise voice
+    # without changing the claim or contradicting the declared kind.
     "strengthened by": "uses",
-    "drives": "produces",
     # NOTE: active governance verbs ("governs", "constrains", "protects") are
     # deliberately NOT normalised. Per references/semantics/alphas.md the verb
     # reads from the declaring alpha, so rewriting "A governs B" to "A governed
@@ -122,8 +143,11 @@ RELATIONSHIP_NORMALIZATIONS = {
     "constrained by": "governed by",
     "guided by": "governed by",
     "aligned with": "governed by",
-    "coordinates with": "uses",
-    "requires": "uses",
+    # "requires" and "coordinates with" are gone for the same reason as the
+    # enabling verbs above: both are *active* verbs being genericised, and both
+    # cross a kind boundary doing it. "requires" is a dependency; "uses" is
+    # consumption. "coordinates with" is mutual. The entries below are all
+    # passive forms being put into a consistent voice, which changes no claim.
     "provided by": "uses",
     "enabled by": "uses",
     "enhanced by": "uses",
@@ -301,6 +325,105 @@ def fix_element_kind(data):
     return fixes
 
 
+def _schema_kind_enum(schema_path=None):
+    """Read the PracticeElement kind enum from the schema.
+
+    Returns a set of permitted values, or None when the schema cannot be read —
+    in which case the caller must do nothing rather than guess, since removing a
+    valid kind is worse than leaving an invalid one for the validator to report.
+    """
+    if schema_path is None:
+        schema_path = (Path(__file__).resolve().parent.parent
+                       / "deps" / "language.schema.json")
+    try:
+        schema = load_json(Path(schema_path), exit_on_error=False)
+    except Exception:
+        return None
+    if not isinstance(schema, dict):
+        return None
+    element = schema.get("$defs", {}).get("PracticeElement", {})
+    values = element.get("properties", {}).get("kind", {}).get("enum")
+    if isinstance(values, list) and values:
+        return set(values)
+    return None
+
+
+def fix_invalid_kind(data, schema_path=None):
+    """Remove `kind` values the schema's PracticeElement enum does not admit.
+
+    `kind` is optional and only a handful of element types carry it. States,
+    checklists, levels of detail and narratives do not, so a generating agent
+    that stamps `kind` uniformly produces one hard schema error per element —
+    several hundred on a full practice. The value is dropped rather than
+    corrected because there is no correct value to put there: the enum has no
+    member for these types.
+
+    Schema-driven rather than hardcoded, so the enum growing does not turn a
+    newly valid kind into a deletion.
+    """
+    permitted = _schema_kind_enum(schema_path)
+    if not permitted:
+        return []
+
+    fixes = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            kind = node.get("kind")
+            if isinstance(kind, str) and kind not in permitted:
+                del node["kind"]
+                fixes.append({
+                    "category": "invalid-kind",
+                    "path": f"{path}.kind" if path else "kind",
+                    "old": kind,
+                    "new": "kind removed",
+                    "reason": "not a member of the schema's PracticeElement kind enum",
+                })
+            for key, value in node.items():
+                walk(value, f"{path}.{key}" if path else key)
+        elif isinstance(node, list):
+            for i, item in enumerate(node):
+                walk(item, f"{path}.{i}")
+
+    walk(data, "")
+    return fixes
+
+
+def fix_reference_evidence_links(data):
+    """Give an evidenceBy entry the links of the reference that carries it.
+
+    `assess-practice.py` reports `reference-evidence` for an evidenceBy row with
+    no links, on the ground that evidence nobody can open is not evidence. The
+    row describes what a practitioner produces from the reference, so the
+    reference's own links are the honest source to point at — copying them is a
+    transcription, not an invention, and it is what the shipped Account Planning
+    references already do by hand.
+
+    All of the reference's links are copied rather than the first, because a
+    reference carrying two names two documents and guessing which one the
+    evidence came from is the only way this fixer could be wrong.
+    """
+    fixes = []
+    sources = [data] + data.get("practices", [])
+    for source in sources:
+        for ri, ref in enumerate(source.get("references", [])):
+            parent_links = ref.get("links") or []
+            if not parent_links:
+                continue
+            for ei, evidence in enumerate(ref.get("evidenceBy", [])):
+                if evidence.get("links"):
+                    continue
+                evidence["links"] = [dict(link) for link in parent_links]
+                fixes.append({
+                    "category": "reference-evidence-links",
+                    "path": f"references.{ri}.evidenceBy.{ei}.links",
+                    "old": None,
+                    "new": f"{len(parent_links)} link(s) copied from "
+                           f"reference '{ref.get('name', f'[{ri}]')}'",
+                })
+    return fixes
+
+
 def fix_contributes_to(data):
     fixes = []
     for i, alpha in enumerate(data.get("alphas", [])):
@@ -340,31 +463,34 @@ def fix_narrative_citations(data):
     return fixes
 
 
-METHOD_INVALID_PROPERTIES = {"authors", "createdAt", "updatedAt", "keywords"}
+# `authors`, `createdAt`, `updatedAt` and `keywords` were once stripped from
+# method-kind documents as invalid. They are all declared on the Method shape in
+# language.schema.json 3.1.0, so stripping them silently deleted valid authored
+# content. Nothing replaces the fixer: the schema validator is what rejects a
+# property a shape does not admit.
 
 
-def fix_method_properties(data):
-    """Strip properties that are invalid on method-kind documents."""
-    fixes = []
-    if data.get("kind") != "method":
-        return fixes
-    for prop in sorted(METHOD_INVALID_PROPERTIES):
-        if prop in data:
-            del data[prop]
-            fixes.append({
-                "category": "method-properties",
-                "path": prop,
-                "old": "(present)",
-                "new": "(removed — not valid on method-kind documents)",
-            })
-    return fixes
+def fix_focus_names(data, baseline=None, apply=True):
+    """Correct focusName on sub-alphas to match their contributesTo parent's focus.
 
+    Only where the declared focus does not exist. A focus that *is* declared in
+    the chain but differs from the parent's is a choice, not a defect — a
+    mapsTo variant can legitimately sit in a different focus from its parent,
+    and three documents in this run argued exactly that from their sources.
 
-def fix_focus_names(data, baseline=None):
-    """Correct focusName on sub-alphas to match their contributesTo parent's focus."""
+    This fixer runs unconditionally, so until now there was no way to decline
+    it: one practice reverted a sourced focus twice and it was re-applied both
+    times. Where the focus resolves, the mismatch is now *reported* and left
+    alone, so a human sees it without the document being rewritten under them.
+    """
     fixes = []
     if not baseline:
         return fixes
+
+    known_focuses = {f.get("name") for f in baseline.get("focuses", []) or []
+                     if isinstance(f, dict)}
+    known_focuses |= {f.get("name") for f in data.get("focuses", []) or []
+                      if isinstance(f, dict)}
 
     baseline_alpha_focus = {}
     for alpha in baseline.get("alphas", []):
@@ -382,16 +508,31 @@ def fix_focus_names(data, baseline=None):
         if not expected_focus:
             continue
         current_focus = alpha.get("focusName", "")
-        if current_focus != expected_focus:
-            old = current_focus
-            alpha["focusName"] = expected_focus
+        if current_focus == expected_focus:
+            continue
+
+        if current_focus and current_focus in known_focuses:
             fixes.append({
-                "category": "focus-name",
+                "category": "focus-name-differs",
                 "path": f"alphas[{alpha['name']}].focusName",
-                "old": old,
-                "new": expected_focus,
-                "reason": f"contributesTo/mapsTo parent '{parent}' has focusName '{expected_focus}'",
+                "old": current_focus,
+                "new": current_focus,
+                "reason": (
+                    f"left alone — '{current_focus}' is a declared focus, so this "
+                    f"is an authoring choice, not an error. Parent '{parent}' sits "
+                    f"in '{expected_focus}'; change it only if the source says so"
+                ),
             })
+            continue
+
+        alpha["focusName"] = expected_focus
+        fixes.append({
+            "category": "focus-name",
+            "path": f"alphas[{alpha['name']}].focusName",
+            "old": current_focus,
+            "new": expected_focus,
+            "reason": f"contributesTo/mapsTo parent '{parent}' has focusName '{expected_focus}'",
+        })
     return fixes
 
 
@@ -415,6 +556,71 @@ def fix_truncated_names(data):
                         "old": old_name,
                         "new": desc,
                     })
+    return fixes
+
+
+_MARKUP_KEYS = (
+    "description", "context", "howToUse", "measureDescription", "rationale",
+    "given", "when", "then", "note", "content", "summary",
+)
+
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*", re.DOTALL)
+_ITALIC_RE = re.compile(r"(?<![\*\w])\*(?!\s)([^\*\n]+?)(?<!\s)\*(?![\*\w])")
+_CODE_RE = re.compile(r"`([^`\n]+)`")
+
+
+def _strip_markup(text):
+    """Remove Markdown emphasis and code spans from a prose string.
+
+    Phase 3 agents transcribe prose out of a Markdown mapping guide, and the
+    guide's ``**bold**``, ``*italic*`` and ``` `code` ``` markers travel into
+    JSON string values where nothing renders them. Consumers show the literal
+    asterisks and backticks, so they are authoring residue rather than content.
+    """
+    new = _BOLD_RE.sub(r"\1", text)
+    new = _ITALIC_RE.sub(r"\1", new)
+    new = _CODE_RE.sub(r"\1", new)
+    return new
+
+
+def fix_prose_markup(data):
+    """Strip Markdown emphasis and code spans from prose-bearing fields."""
+    fixes = []
+
+    def walk(node, path):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                here = f"{path}.{key}" if path else key
+                if key in _MARKUP_KEYS and isinstance(value, str):
+                    new = _strip_markup(value)
+                    if new != value:
+                        node[key] = new
+                        fixes.append({
+                            "category": "prose-markup",
+                            "path": here,
+                            "old": value,
+                            "new": new,
+                        })
+                elif key in _MARKUP_KEYS and isinstance(value, list):
+                    for idx, item in enumerate(value):
+                        if not isinstance(item, str):
+                            continue
+                        new = _strip_markup(item)
+                        if new != item:
+                            value[idx] = new
+                            fixes.append({
+                                "category": "prose-markup",
+                                "path": f"{here}[{idx}]",
+                                "old": item,
+                                "new": new,
+                            })
+                else:
+                    walk(value, here)
+        elif isinstance(node, list):
+            for idx, item in enumerate(node):
+                walk(item, f"{path}[{idx}]")
+
+    walk(data, "")
     return fixes
 
 
@@ -872,7 +1078,20 @@ def fix_gherkin_structure(data):
 
 
 def fix_narrative_placement(data):
-    """Move top-level narratives to matching element's narratives[] array."""
+    """Move top-level narratives to matching element's narratives[] array.
+
+    Ownership is read off the narrative's **name**, not its description. A
+    narrative that belongs to an alpha is named for it; a narrative that merely
+    *mentions* an alpha is usually the document's own practice narrative, whose
+    home is `Practice.narratives` and whose subject is, naturally, the practice's
+    primary concern. Matching on description moved a practice narrative called
+    "Practice Intent" onto an alpha because its one-line summary contained the
+    alpha's name — the move validated, so nothing downstream reported it.
+
+    A description-only match is still evidence of something, so it is reported
+    as a skip rather than discarded, in the same shape as the mapsTo naming
+    guard: a human can act on a reported skip and cannot act on a silent one.
+    """
     fixes = []
     element_map = {}
     for coll_key in ("alphas", "activitySpaces", "competencies"):
@@ -887,8 +1106,9 @@ def fix_narrative_placement(data):
     for i, narrative in enumerate(data.get("narratives", [])):
         narr_name = narrative.get("name", "").lower()
         narr_desc = narrative.get("description", "").lower()
+        moved = False
         for elem_name_lower in sorted_names:
-            if elem_name_lower in narr_name or elem_name_lower in narr_desc:
+            if elem_name_lower in narr_name:
                 coll_key, elem = element_map[elem_name_lower]
                 elem.setdefault("narratives", []).append(narrative)
                 to_remove.append(i)
@@ -897,6 +1117,21 @@ def fix_narrative_placement(data):
                     "path": f"narratives[{i}]",
                     "old": f"top-level narrative '{narrative.get('name', '')}'",
                     "new": f"moved to {coll_key}['{elem.get('name', '')}'].narratives",
+                })
+                moved = True
+                break
+        if moved:
+            continue
+        for elem_name_lower in sorted_names:
+            if elem_name_lower in narr_desc:
+                coll_key, elem = element_map[elem_name_lower]
+                fixes.append({
+                    "category": "narrative-placement-skipped",
+                    "path": f"narratives[{i}]",
+                    "old": f"top-level narrative '{narrative.get('name', '')}'",
+                    "new": (f"left in place — only its description mentions "
+                            f"{coll_key}['{elem.get('name', '')}'], which is what a "
+                            f"practice narrative about that concern looks like"),
                 })
                 break
 
@@ -909,32 +1144,190 @@ def fix_narrative_placement(data):
     return fixes
 
 
-def fix_pattern_completeness(data):
-    """Add carry-forward alpha states to pattern views missing practice alphas,
-    then compress by removing unchanged carry-forward states from non-final views."""
+def _canonical_state_order(data, file_path=None):
+    """{alphaName: [stateName, ...]} from the document and its effective context.
+
+    The context is picked up from the practice directory the way
+    `assess-practice.py` does, because a pattern routinely places states of an
+    alpha it inherits rather than declares, and without the merge those states
+    have no known order.
+    """
+    order = {}
+
+    def absorb(doc):
+        if not isinstance(doc, dict):
+            return
+        for source in [doc] + [p for p in doc.get("practices", []) if isinstance(p, dict)]:
+            for alpha in source.get("alphas", []) or []:
+                name = alpha.get("name")
+                states = [s.get("name") for s in alpha.get("states", []) or []
+                          if s.get("name")]
+                if name and states and name not in order:
+                    order[name] = states
+
+    absorb(data)
+    if file_path:
+        context = Path(file_path).parent / "_effective-context.json"
+        if context.is_file():
+            try:
+                with open(context, encoding="utf-8") as fh:
+                    absorb(json.load(fh))
+            except (OSError, json.JSONDecodeError):
+                pass
+    return order
+
+
+def fix_ambiguous_pattern_views(data, state_order=None, collapse=False):
+    """One alpha, one state per pattern view.
+
+    Two entries for the same alpha in one view is a schema error the validator
+    reports and the assessment never checked, so 57 of them accumulated across
+    11 documents. It also makes the walk across views appear to move backwards,
+    so the ambiguity gets reported as an ordering defect and the real one is
+    never addressed.
+
+    An exact repeat is dropped outright: it says nothing the single entry does
+    not. Two *different* states are only collapsed when asked, because the
+    prescribed fix is to split the view into sub-views (Pass 4 Constraint 1),
+    which needs names, activities and narrative context that no rule supplies.
+    Where collapsing is chosen, the later state in the alpha's canonical order
+    is kept: a view declares what holds at that point in the lifecycle, which
+    is where the phase ends, and passing through the earlier state is implied.
+    """
+    state_order = state_order or {}
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(p for p in data.get("practices", []) if isinstance(p, dict))
+
+    for source in sources:
+        for pi, pattern in enumerate(source.get("patterns", [])):
+            pat_name = pattern.get("name", f"pattern[{pi}]")
+            for view in pattern.get("patternViews", []) or []:
+                view_seq = view.get("seq", "?")
+                entries = view.get("alphaStates", []) or []
+                by_alpha = {}
+                for entry in entries:
+                    by_alpha.setdefault(entry.get("alphaName", ""), []).append(entry)
+
+                drop = []
+                for alpha, group in by_alpha.items():
+                    if len(group) < 2:
+                        continue
+                    states = [e.get("stateName", "") for e in group]
+                    distinct = list(dict.fromkeys(states))
+
+                    if len(distinct) == 1:
+                        drop.extend(group[1:])
+                        fixes.append({
+                            "category": "pattern-view-ambiguity",
+                            "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                            "old": f"'{alpha}' declared {len(group)} times at '{distinct[0]}'",
+                            "new": "duplicate entries removed",
+                        })
+                        continue
+
+                    order = state_order.get(alpha, [])
+                    unknown = [s for s in distinct if s not in order]
+                    if not collapse or unknown:
+                        fixes.append({
+                            "category": "pattern-view-ambiguity",
+                            "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                            "old": f"'{alpha}' targets {len(distinct)} states: "
+                                   f"{', '.join(distinct)}",
+                            "new": ("not changed — state order unknown, cannot tell "
+                                    "which the view ends at"
+                                    if unknown else
+                                    "not changed — split the view into sub-views, or "
+                                    "pass --collapse-ambiguous-views to keep the last"),
+                            "applied": False,
+                        })
+                        continue
+
+                    keep = max(distinct, key=order.index)
+                    drop.extend(e for e in group if e.get("stateName") != keep)
+                    # A repeat of the kept state would otherwise survive twice.
+                    kept_seen = False
+                    for entry in group:
+                        if entry.get("stateName") == keep:
+                            if kept_seen:
+                                drop.append(entry)
+                            kept_seen = True
+                    fixes.append({
+                        "category": "pattern-view-ambiguity",
+                        "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                        "old": f"'{alpha}' targets {len(distinct)} states: "
+                               f"{', '.join(distinct)}",
+                        "new": f"collapsed to '{keep}' (the state the view ends at)",
+                    })
+
+                if drop:
+                    dropped = {id(e) for e in drop}
+                    view["alphaStates"] = [e for e in entries if id(e) not in dropped]
+
+    return fixes
+
+
+def _raise_understated_final_states(views_sorted, final_view, pat_name,
+                                    view_seq, state_order):
+    """Lift a final-view state that sits below the one the pattern reached."""
+    fixes = []
+    highest = {}
+    for view in views_sorted[:-1]:
+        for astate in view.get("alphaStates", []) or []:
+            alpha, state = astate.get("alphaName"), astate.get("stateName")
+            order = state_order.get(alpha, [])
+            if not alpha or state not in order:
+                continue
+            idx = order.index(state)
+            if alpha not in highest or idx > highest[alpha][0]:
+                highest[alpha] = (idx, state)
+
+    for astate in final_view.get("alphaStates", []) or []:
+        alpha, state = astate.get("alphaName"), astate.get("stateName")
+        order = state_order.get(alpha, [])
+        if not alpha or state not in order or alpha not in highest:
+            continue
+        if order.index(state) < highest[alpha][0]:
+            astate["stateName"] = highest[alpha][1]
+            fixes.append({
+                "category": "pattern-completeness",
+                "path": f"patterns['{pat_name}'].patternViews[{view_seq}]",
+                "old": f"final view restates '{alpha}' at '{state}'",
+                "new": f"raised to '{highest[alpha][1]}', the state the pattern reached",
+            })
+    return fixes
+
+
+def fix_pattern_completeness(data, state_order=None):
+    """Restate each pattern's own alphas in its final view, then compress.
+
+    The final view is a complete end-state snapshot of **the alphas this
+    pattern carries** — the ones whose state it actually changes. It is not a
+    roll-call of the practice.
+
+    Taking the roll-call reading is what fills closing views with alphas
+    belonging to a different pattern, at whichever state came to hand: with no
+    appearance anywhere in the pattern there is no state to carry forward, so
+    the only candidate is the alpha's first. A pattern that ends by announcing
+    three alphas at their opening states is reporting the fixer, not the
+    methodology. So an alpha the pattern never advanced is skipped here, per
+    `semantics/execution-and-patterns.md` §9.2 rule 1 and the Participation
+    Rule in `references/pattern-completeness.md`.
+    """
     fixes = []
     sources = [data]
     if "practices" in data:
         sources.extend(data.get("practices", []))
 
     for source in sources:
-        alpha_first_state = {}
-        for alpha in source.get("alphas", []):
-            aname = alpha.get("name", "")
-            states = alpha.get("states", [])
-            if aname and states:
-                alpha_first_state[aname] = states[0].get("name", "")
-
-        all_alpha_names = set(alpha_first_state.keys())
-        if len(all_alpha_names) < 2:
-            continue
-
         for pi, pattern in enumerate(source.get("patterns", [])):
             pat_name = pattern.get("name", f"pattern[{pi}]")
             views = pattern.get("patternViews", [])
             views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
+            loops = any(v.get("loopsBackTo") for v in views_sorted)
 
-            # Pass 1: Add carry-forward states for truly missing alphas (final view only)
+            # Pass 1: Restate carried alphas missing from the final view
             last_state = {}
             for vi, view in enumerate(views_sorted):
                 is_final = (vi == len(views_sorted) - 1)
@@ -946,10 +1339,12 @@ def fix_pattern_completeness(data):
 
                 if is_final:
                     view_alphas = {a.get("alphaName", "") for a in view.get("alphaStates", [])}
-                    missing = all_alpha_names - view_alphas
+                    # last_state holds exactly the alphas some view advanced,
+                    # which is the set the pattern carries.
+                    missing = set(last_state) - view_alphas
                     for aname in sorted(missing):
-                        carry = last_state.get(aname, alpha_first_state.get(aname, ""))
-                        if not carry:
+                        carry = last_state.get(aname, "")
+                        if not aname or not carry:
                             continue
                         view.setdefault("alphaStates", []).append({
                             "alphaName": aname,
@@ -961,6 +1356,16 @@ def fix_pattern_completeness(data):
                             "old": f"missing alpha '{aname}' in final view",
                             "new": f"carry-forward state '{carry}'",
                         })
+
+                    # A closing view that restates an alpha *below* where the
+                    # pattern already took it reads as the lifecycle going
+                    # backwards, and is the same mistake as omitting it: the
+                    # snapshot has to show the end state. Inside a loop the
+                    # lower state is a per-pass minimum, so patterns that
+                    # declare one are left alone.
+                    if not loops and state_order:
+                        fixes.extend(_raise_understated_final_states(
+                            views_sorted, view, pat_name, view_seq, state_order))
 
             # Pass 2: Compress — remove unchanged carry-forward states from non-final views
             fixes.extend(compress_pattern_states_for_pattern(
@@ -989,11 +1394,94 @@ def compress_pattern_states(data):
     return fixes
 
 
+def restore_loop_span_states(data):
+    """Re-add held alpha states pruned from inside a `loopsBackTo` span.
+
+    The inverse of the compression above, for documents compressed before the
+    span was declared — or by a compressor that did not yet know about one.
+    Within a span, an alpha carried by the previous view and absent from this
+    one was pruned as a held state, so its previous state is restored. Only
+    alphas the pattern already carries are touched: nothing new is introduced,
+    and an alpha that genuinely enters later still enters later.
+    """
+    fixes = []
+    sources = [data]
+    if "practices" in data:
+        sources.extend(data.get("practices", []))
+
+    for src in sources:
+        for pattern in src.get("patterns", []):
+            pat_name = pattern.get("name", "?")
+            views = pattern.get("patternViews", [])
+            if not views:
+                continue
+            views_sorted = sorted(views, key=lambda v: v.get("seq", 0))
+            in_loop = loop_span_indices(views_sorted)
+            if not in_loop:
+                continue
+
+            prev_states = {}
+            for vi, view in enumerate(views_sorted):
+                alpha_states = view.setdefault("alphaStates", [])
+                present = {a.get("alphaName", "") for a in alpha_states}
+
+                if vi in in_loop:
+                    for aname, sname in sorted(prev_states.items()):
+                        if aname in present:
+                            continue
+                        alpha_states.append(
+                            {"alphaName": aname, "stateName": sname}
+                        )
+                        fixes.append({
+                            "category": "loop-span-restore",
+                            "path": (
+                                f"patterns['{pat_name}']"
+                                f".patternViews[{view.get('seq', '?')}]"
+                            ),
+                            "old": f"'{aname}' absent inside loop span",
+                            "new": f"restored held state '{sname}'",
+                        })
+
+                for astate in alpha_states:
+                    prev_states[astate.get("alphaName", "")] = astate.get("stateName", "")
+
+    return fixes
+
+
+def loop_span_indices(views_sorted):
+    """Indices of views sitting inside a `loopsBackTo` span.
+
+    A view declaring `loopsBackTo` closes a cycle back to a named earlier view;
+    every view from that target through the declaring one is re-entered on each
+    lap. `pattern-completeness.md` suspends Sequential View Pruning across that
+    span: a re-entered view emptied of its held states hides what the iteration
+    actually works on, and the states are the minimum that must hold on that
+    pass rather than a progression the reader can infer from the previous view.
+    """
+    by_name = {v.get("name", ""): i for i, v in enumerate(views_sorted)}
+    inside = set()
+
+    for i, view in enumerate(views_sorted):
+        loops = view.get("loopsBackTo")
+        if not isinstance(loops, dict):
+            continue
+        target = by_name.get(loops.get("patternViewName", ""))
+        if target is None or target > i:
+            continue  # unresolvable or forward-pointing: not a span we trust
+        inside.update(range(target, i + 1))
+
+    return inside
+
+
 def compress_pattern_states_for_pattern(pattern, pat_name, views_sorted):
     """Remove unchanged carry-forward alpha states from non-final views,
-    then remove empty non-final views (merging activities into the next view)."""
+    then remove empty non-final views (merging activities into the next view).
+
+    Views inside a `loopsBackTo` span are left alone — see loop_span_indices.
+    """
     fixes = []
     prev_states = {}
+    in_loop = loop_span_indices(views_sorted)
 
     for vi, view in enumerate(views_sorted):
         is_final = (vi == len(views_sorted) - 1)
@@ -1001,6 +1489,13 @@ def compress_pattern_states_for_pattern(pattern, pat_name, views_sorted):
         alpha_states = view.get("alphaStates", [])
 
         if is_final:
+            for astate in alpha_states:
+                prev_states[astate.get("alphaName", "")] = astate.get("stateName", "")
+            continue
+
+        if vi in in_loop:
+            # Carry the states forward for later views to compare against, but
+            # remove nothing: this view is re-entered on every lap.
             for astate in alpha_states:
                 prev_states[astate.get("alphaName", "")] = astate.get("stateName", "")
             continue
@@ -1022,10 +1517,14 @@ def compress_pattern_states_for_pattern(pattern, pat_name, views_sorted):
 
         view["alphaStates"] = kept
 
-    # Remove empty non-final views, merging activities into next view
+    # Remove empty non-final views, merging activities into next view.
+    # A view inside a loop span is never removed: it is re-entered each lap, and
+    # a loop edge naming a view that no longer exists is worse than an empty one.
     to_remove = []
     for vi in range(len(views_sorted) - 1):
         view = views_sorted[vi]
+        if vi in in_loop:
+            continue
         if not view.get("alphaStates"):
             next_view = views_sorted[vi + 1] if vi + 1 < len(views_sorted) else None
             if next_view:
@@ -1212,6 +1711,84 @@ def fix_alias_isolation(data):
     return fixes
 
 
+def _element_names(data):
+    """Every declared element name in a document, for collision testing."""
+    names = set()
+    for key in ("alphas", "workProducts", "activities", "patterns", "personas",
+                "personaGroups", "activitySpaces", "competencies", "narrativeTypes"):
+        for item in data.get(key, []) or []:
+            if isinstance(item, dict) and item.get("name"):
+                names.add(item["name"])
+    return names
+
+
+def _residue_is_a_name(residue, owner_name, data, baseline):
+    """Is the leftover of a mapsTo strip still the name of a thing?
+
+    Stripping the parent type is right when what remains still names something
+    — `OpenShift Virtualization Platform` mapsTo `Platform` leaves `OpenShift
+    Virtualization`, which is a thing. It is wrong when what remains is the bare
+    domain qualifier: `Virtualization Competitive Position` mapsTo `Competitive
+    Position` left `Virtualization`, a meaningless element name, and the rename
+    was propagated across fourteen references before anyone looked.
+
+    Three mechanical tests, all of which must pass:
+
+    1. The residue must not already be some other element's name. A rename onto
+       an occupied name is a collision, not a tidy-up.
+    2. The residue must not be the name of the document that declares the alpha
+       (or of its baseline, or of a member practice). `IT Operations Efficiency
+       Sales Play` mapsTo `Sales Play` strips to `IT Operations Efficiency`,
+       which is the practice's own name: every reference to it would then read
+       ambiguously as the practice or the alpha. A residue equal to the
+       document's subject is the domain word by definition.
+    3. The residue must not be the prefix of **any** other element name in the
+       same document. A string used to qualify another element is this
+       document's domain word, not a name available to one of them.
+
+    The threshold on test 2 was originally two, and that was one too high:
+    `Application Platform Competitive Position` strips to `Application Platform`,
+    which prefixes exactly one other name (`Application Platform TDP`), so the
+    rename went through and rewrote eleven references. Virtualization was spared
+    only by happening to have six qualifier matches.
+
+    One is the right threshold because the two failure modes are not
+    symmetric. Refusing a legitimate strip leaves a slightly redundant name and
+    a reported skip a human can act on; allowing a wrong one destroys an element
+    name and rewrites every reference to it. Prefer refusing.
+    """
+    if not residue:
+        return False, "stripping the parent name leaves nothing"
+
+    taken = _element_names(data) | (_element_names(baseline) if baseline else set())
+    taken.discard(owner_name)
+    if residue in taken:
+        return False, f"'{residue}' is already another element's name"
+
+    document_names = {data.get("name", "")}
+    for member in data.get("practices", []) or []:
+        if isinstance(member, dict):
+            document_names.add(member.get("name", ""))
+    if baseline:
+        document_names.add(baseline.get("name", ""))
+    document_names.discard("")
+    if residue in document_names:
+        return False, (
+            f"'{residue}' is the name of the document that declares this alpha, "
+            f"so it names the subject of the whole practice, not one element inside it"
+        )
+
+    prefixed = [n for n in taken if n != residue and n.startswith(residue + " ")]
+    if prefixed:
+        noun = "name" if len(prefixed) == 1 else "names"
+        return False, (
+            f"'{residue}' is the qualifier on {len(prefixed)} other element {noun} "
+            f"(e.g. {', '.join(sorted(prefixed)[:2])}), so it names the domain, "
+            f"not this alpha"
+        )
+    return True, ""
+
+
 def fix_mapsto_naming(data, baseline=None):
     """Strip parent type name from mapsTo variant alpha names and update all references."""
     fixes = []
@@ -1243,7 +1820,16 @@ def fix_mapsto_naming(data, baseline=None):
 
         idx = alpha_name.lower().find(parent_name.lower())
         new_name = (alpha_name[:idx] + alpha_name[idx + len(parent_name):]).strip(" -–—")
-        if not new_name:
+
+        ok, why = _residue_is_a_name(new_name, alpha_name, data, baseline)
+        if not ok:
+            fixes.append({
+                "category": "mapsto-naming-skipped",
+                "path": f"alphas['{alpha_name}'].name",
+                "old": alpha_name,
+                "new": alpha_name,
+                "note": f"left alone — {why}",
+            })
             continue
 
         renames[alpha_name] = new_name
@@ -1536,8 +2122,16 @@ def fix_narrative_types(data, baseline):
     return fixes
 
 
-def fix_competency_refs(data, baseline, file_path):
-    """Fix invalid competency names and levels by delegating to fix-competency-levels.py."""
+def fix_competency_refs(data, baseline, file_path, apply=False):
+    """Fix invalid competency names and levels by delegating to fix-competency-levels.py.
+
+    ``apply`` must mirror the caller's ``--fix``. This fixer is the only one that
+    reaches the file through a subprocess rather than by mutating ``data``, and
+    the subprocess writes on its own authority — so passing ``--fix`` to it
+    unconditionally made a *dry run* rewrite the document on disk while
+    reporting ``"mode": "dry-run"``. Verified against a planted invalid
+    reference: the file's hash changed under a dry run.
+    """
     if not baseline:
         return []
     valid_comp_names = {c.get("name") for c in baseline.get("competencies", [])}
@@ -1576,34 +2170,51 @@ def fix_competency_refs(data, baseline, file_path):
         return []
 
     script = Path(__file__).resolve().parent / "fix-competency-levels.py"
-    baseline_path = None
-    for d in [Path("deps"), Path("baselines")]:
-        for f in d.glob("**/*.json"):
-            try:
-                with open(f) as fh:
-                    bd = json.load(fh)
-                if bd.get("name") == baseline.get("name"):
-                    baseline_path = str(f)
-                    break
-            except Exception:
-                continue
-        if baseline_path:
-            break
 
-    if not baseline_path:
-        return [{"category": "competency-refs", "path": "competencies", "old": "invalid refs detected", "new": "cannot auto-fix: baseline file path unknown"}]
-
-    result = subprocess.run(
-        [sys.executable, str(script), str(file_path), baseline_path, "--fix", "--partial"],
-        capture_output=True, text=True
+    # Hand the subprocess the vocabulary this process already resolved, not a
+    # baseline file it has to re-read. Finding the baseline on disk by name
+    # threw away every competency the ancestors and dependencies contribute,
+    # and the subprocess then "corrected" each unseen name onto its nearest
+    # match in the leaf. On one partner practice with three parents that was
+    # nine rewrites — `Value Articulation` → `Ecosystem Operations` and the
+    # like — all eight of the affected names being perfectly resolvable. Same
+    # class as the baseline chain-walk defect, reached through a subprocess
+    # boundary rather than a missing property.
+    vocab_file = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
     )
+    json.dump(baseline, vocab_file, ensure_ascii=False)
+    vocab_file.close()
+
+    cmd = [sys.executable, str(script), str(file_path), vocab_file.name, "--partial"]
+    if apply:
+        cmd.append("--fix")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    finally:
+        os.unlink(vocab_file.name)
 
     fixes = []
-    if result.returncode == 0:
+    # Parse stdout whatever the exit code: fix-competency-levels.py reports its
+    # findings as JSON and uses a non-zero exit to mean "issues found", which in
+    # a dry run is the normal and expected outcome, not a failure.
+    if result.stdout.strip():
         try:
             output = json.loads(result.stdout)
-            name_map = output.get("nameMapping", {})
-            level_map = output.get("levelMapping", {})
+            # Two output shapes. With --fix the tool reports what it did as
+            # nameMapping/levelMapping; without it, what it *would* do as
+            # invalidNames/invalidLevels carrying a suggestedMapping. Reading
+            # only the first made the dry run silent about real findings.
+            name_map = dict(output.get("nameMapping", {}))
+            level_map = dict(output.get("levelMapping", {}))
+            for bad, detail in (output.get("invalidNames") or {}).items():
+                suggested = (detail or {}).get("suggestedMapping")
+                if suggested and bad not in name_map:
+                    name_map[bad] = suggested
+            for bad, detail in (output.get("invalidLevels") or {}).items():
+                suggested = (detail or {}).get("suggestedMapping")
+                if suggested and bad not in level_map:
+                    level_map[bad] = suggested
             deduped = output.get("deduplicated", 0)
             for old, new in name_map.items():
                 fixes.append({"category": "competency-name", "path": "competencies", "old": old, "new": new})
@@ -1617,12 +2228,31 @@ def fix_competency_refs(data, baseline, file_path):
                 fixes.append({"category": "competency-name-unmapped", "path": "competencies", "old": name, "new": f"UNMAPPED — use --map-name '{name}=ValidName'"})
             for level in unmapped_levels:
                 fixes.append({"category": "competency-level-unmapped", "path": "competencies", "old": level, "new": f"UNMAPPED — use --map '{level}=ValidLevel'"})
-            with open(file_path, "r") as f:
-                reloaded = json.load(f)
-            data.clear()
-            data.update(reloaded)
+            if apply:
+                with open(file_path, "r") as f:
+                    reloaded = json.load(f)
+                data.clear()
+                data.update(reloaded)
         except json.JSONDecodeError:
-            pass
+            # Never swallow this. The subprocess may already have written the
+            # file, so returning an empty fix list reports "nothing changed"
+            # about a document that changed — the single worst thing a fixer
+            # can say. One agent only caught it by grepping the output for
+            # names it had authored.
+            fixes.append({
+                "category": "competency-refs-unreported",
+                "path": "competencies",
+                "old": "fix-competency-levels.py output was not JSON",
+                "new": ("changes may have been applied and are NOT itemised above — "
+                        "diff the file before trusting this report"),
+            })
+    elif result.returncode != 0:
+        fixes.append({
+            "category": "competency-refs-failed",
+            "path": "competencies",
+            "old": f"fix-competency-levels.py exited {result.returncode} with no output",
+            "new": (result.stderr or "").strip()[:200] or "no stderr",
+        })
     return fixes
 
 
@@ -1826,6 +2456,12 @@ def main():
     parser.add_argument("file", help="Practice, method, or baseline JSON file")
     parser.add_argument("baseline", nargs="?", default=None,
                         help="Baseline JSON file (optional, enables focusName correction)")
+    parser.add_argument("--parent", action="append", default=[], metavar="JSON",
+                        help="A practice this document depends on, whose declarations "
+                             "are part of the vocabulary it resolves against. Repeatable, "
+                             "one per practiceDependencyNames entry. Without it the "
+                             "competency fixer renames against the baseline alone and "
+                             "'corrects' every name a dependency supplies.")
     parser.add_argument(
         "--fix", action="store_true",
         help="Apply fixes in-place (default: dry run)"
@@ -1860,7 +2496,19 @@ def main():
     )
     parser.add_argument(
         "--compress-patterns", action="store_true",
-        help="Remove unchanged carry-forward alpha states from non-final pattern views"
+        help=(
+            "Remove unchanged carry-forward alpha states from non-final pattern "
+            "views. Views inside a loopsBackTo span are skipped — pruning is "
+            "suspended there (pattern-completeness.md, Cyclical Patterns)"
+        )
+    )
+    parser.add_argument(
+        "--restore-loop-states", action="store_true",
+        help=(
+            "Re-add held alpha states pruned from inside a loopsBackTo span. "
+            "For documents compressed before the span was declared. Runs before "
+            "--compress-patterns so the two do not fight"
+        )
     )
     parser.add_argument(
         "--fix-alias-isolation", action="store_true",
@@ -1907,6 +2555,32 @@ def main():
         help="Add missing version (1.0.0) and schemaVersion (from schema)"
     )
     parser.add_argument(
+        "--fix-ambiguous-views", action="store_true",
+        help="Drop repeated alphaStates entries from a pattern view. Two "
+             "different states for one alpha are reported, not changed — the "
+             "prescribed fix is to split the view into sub-views"
+    )
+    parser.add_argument(
+        "--collapse-ambiguous-views", action="store_true",
+        help="Also resolve two different states for one alpha by keeping the "
+             "later one in the alpha's canonical order — the state the view "
+             "ends at. Lossless as to ordering, but loses the hint that the "
+             "phase did two steps of work; splitting into sub-views keeps it"
+    )
+    parser.add_argument(
+        "--fix-prose-markup", action="store_true",
+        help="Strip Markdown emphasis (**bold**, *italic*) and `code spans` "
+             "from prose fields. Transcription residue from a Markdown "
+             "mapping guide; consumers render the markers literally"
+    )
+    parser.add_argument(
+        "--fix-reference-evidence-links", action="store_true",
+        help="Copy a reference's links onto any of its evidenceBy rows that "
+             "carry none. The assessor reports evidence without links as "
+             "providing no actionable value, and the reference's own source is "
+             "where the evidence is produced from"
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="Enable all optional fixes"
     )
@@ -1924,12 +2598,20 @@ def main():
         if b_err:
             print(json.dumps({"error": f"baseline: {b_err}"}))
             sys.exit(1)
+        # Walk the baseline's own ancestors in. This tool renames against its
+        # nearest match, so a vocabulary it cannot see is not a missing warning
+        # but a wrong rewrite: against the partner baseline alone it proposed
+        # five competency renames and two narrative-type retypes with eight
+        # consequent element renames, every one a false positive caused by the
+        # root baseline being invisible.
+        if baseline:
+            merge_ancestor_baselines(baseline, Path(args.baseline))
 
     all_fixes = []
 
     all_fixes.extend(fix_kind(data))
     all_fixes.extend(fix_element_kind(data))
-    all_fixes.extend(fix_method_properties(data))
+    all_fixes.extend(fix_invalid_kind(data))
     all_fixes.extend(fix_narratives(data))
     all_fixes.extend(fix_citations(data))
     all_fixes.extend(fix_contributes_to(data))
@@ -1939,6 +2621,12 @@ def main():
 
     if args.fix_truncated_names or args.all:
         all_fixes.extend(fix_truncated_names(data))
+
+    if args.fix_prose_markup or args.all:
+        all_fixes.extend(fix_prose_markup(data))
+
+    if args.fix_reference_evidence_links or args.all:
+        all_fixes.extend(fix_reference_evidence_links(data))
 
     if args.normalize_relationships or args.all:
         all_fixes.extend(fix_relationship_types(data))
@@ -1959,8 +2647,21 @@ def main():
     if args.fix_narrative_placement or args.all:
         all_fixes.extend(fix_narrative_placement(data))
 
+    if args.fix_ambiguous_views or args.collapse_ambiguous_views or args.all:
+        all_fixes.extend(fix_ambiguous_pattern_views(
+            data,
+            state_order=_canonical_state_order(data, file_path),
+            collapse=args.collapse_ambiguous_views,
+        ))
+
     if args.fix_pattern_completeness or args.all:
-        all_fixes.extend(fix_pattern_completeness(data))
+        all_fixes.extend(fix_pattern_completeness(
+            data, state_order=_canonical_state_order(data, file_path)))
+
+    # Restore before compressing: a span re-expanded here must not then be
+    # pruned by the same run.
+    if args.restore_loop_states or args.all:
+        all_fixes.extend(restore_loop_span_states(data))
 
     if args.compress_patterns or args.all:
         all_fixes.extend(compress_pattern_states(data))
@@ -1986,7 +2687,27 @@ def main():
     # Narrative types and competencies are inherited down the whole baseline
     # chain, so validate them against the merged vocabulary rather than
     # whichever baseline happened to be passed on the command line.
-    vocabulary, vocab_source = resolve_reference_context(file_path, baseline)
+    vocabulary, vocab_source = resolve_reference_context(file_path, baseline, data)
+
+    # A dependency practice declares vocabulary too, and nothing above reaches
+    # it: the baseline chain walk climbs ancestors, not siblings. One partner
+    # practice with three parents had nine competency references "corrected"
+    # onto nearest matches in the leaf baseline, every one of them resolvable
+    # through a dependency the tool could not see.
+    for parent_path in args.parent:
+        parent_data, parent_err = load_json_pair(Path(parent_path))
+        if parent_err or not isinstance(parent_data, dict):
+            print(f"Warning: --parent {parent_path} not loaded ({parent_err})",
+                  file=sys.stderr)
+            continue
+        for key in ("competencies", "narrativeTypes", "activitySpaces",
+                    "focuses", "alphas", "workProducts", "personas"):
+            existing = {e.get("name") for e in vocabulary.get(key, [])
+                        if isinstance(e, dict)}
+            for elem in parent_data.get(key, []) or []:
+                if isinstance(elem, dict) and elem.get("name") not in existing:
+                    vocabulary.setdefault(key, []).append(elem)
+                    existing.add(elem.get("name"))
 
     # Activity spaces inherit the same way. Checking them against the leaf
     # baseline alone flagged valid references to spaces defined further up the
@@ -2001,7 +2722,8 @@ def main():
             all_fixes.extend(fix_narrative_element_names(data, vocabulary))
 
     if args.fix_competency_refs or args.all:
-        all_fixes.extend(fix_competency_refs(data, vocabulary, file_path))
+        all_fixes.extend(fix_competency_refs(data, vocabulary, file_path,
+                                             apply=args.fix))
 
     if args.fix_missing_seq or args.all:
         all_fixes.extend(fix_missing_seq(data))

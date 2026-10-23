@@ -37,7 +37,8 @@ NAMED_SECTIONS = [
     "alphas", "workProducts", "activities", "patterns", "personas",
     "personaGroups", "citations", "assets", "practiceElementAliases",
     "narratives", "activitySpaces", "competencies", "narrativeTypes",
-    "focuses", "references",
+    "focuses", "references", "workProductInstances", "alphaInstances",
+    "patternOrchestrations", "outcomes", "patternGroups",
 ]
 
 ELEMENT_TYPE_MAP = {
@@ -56,6 +57,11 @@ ELEMENT_TYPE_MAP = {
     "narrativeTypes": "NarrativeType",
     "focuses": "Focus",
     "references": "AlphaInstance",
+    "workProductInstances": "WorkProductInstance",
+    "alphaInstances": "AlphaInstanceName",
+    "outcomes": "Outcome",
+    "patternGroups": "PatternGroup",
+    "patternOrchestrations": "PatternOrchestration",
 }
 
 SCALAR_FIELDS = [
@@ -82,8 +88,30 @@ def _make_change_id(author):
     return f"{slug}-{now.strftime('%Y%m%d-%H%M%S')}"
 
 
+def _identity(item):
+    """The key that identifies an element within its section.
+
+    Most elements are keyed on `name`, but two sections are not and were
+    therefore invisible to this generator: `practiceElementAliases` entries
+    carry `practiceElementName`/`aliasName` and no `name` at all, so a document
+    adding eight aliases and deleting two emitted **zero** alias operations;
+    `workProductInstances` likewise. Both failures were silent — the sections
+    are simply absent from the ChangeRequest rather than reported as skipped.
+    """
+    if not isinstance(item, dict):
+        return None
+    if "name" in item:
+        return item["name"]
+    if "aliasName" in item:
+        element = item.get("practiceElementName", "?")
+        return f"{element}::{item['aliasName']}"
+    if "workProductName" in item:
+        return f"{item['workProductName']}::{item.get('levelOfDetailName', '')}"
+    return None
+
+
 def _by_name(items):
-    return {item["name"]: item for item in items if isinstance(item, dict) and "name" in item}
+    return {k: item for item, k in ((i, _identity(i)) for i in items) if k}
 
 
 def _diff_fields(old_obj, new_obj, skip_keys=None):
@@ -101,18 +129,105 @@ def _diff_fields(old_obj, new_obj, skip_keys=None):
     return modifications
 
 
-def _detect_sub_renames(old_items, new_items):
-    """Detect renames in ordered sub-element lists (states, LODs) by index position."""
-    renames = []
-    old_names = [item.get("name") for item in old_items if isinstance(item, dict)]
-    new_names = [item.get("name") for item in new_items if isinstance(item, dict)]
+def _child_names(item):
+    """Names of an element's ordered children — states, levels of detail, views."""
+    names = set()
+    for key in ("states", "levelsOfDetail", "views", "checklist"):
+        for child in item.get(key, []) or []:
+            if isinstance(child, dict) and child.get("name"):
+                names.add(child["name"])
+    return names
 
-    if len(old_names) != len(new_names):
+
+def _looks_like_rename(old_item, new_item):
+    """Corroborate a positional pairing before calling it a rename.
+
+    Index position alone is not evidence at the top level: an array that
+    withdraws four elements and adds four others keeps its length, so every
+    positional mismatch reads as a rename. That produced six fabricated alpha
+    renames on one document in practice — including instructions to rename
+    *baseline* alphas, which would have been propagated into dependents by
+    apply-change-request.py.
+
+    A real rename keeps the element's substance. Require either an identical
+    description or a majority of shared child names before believing it.
+
+    One shape is refused outright, ahead of either test: a candidate that
+    declares ``mapsTo`` or ``contributesTo`` naming the element it is supposedly
+    a rename of. An element cannot be both a child of X and a renaming of X —
+    the first says X still exists and this is a kind of it, the second says X is
+    gone. This is the common Phase 3 shape of withdrawing a redeclaration and
+    adding a variant in its place: a four-state redeclaration of
+    ``Partner Capability`` withdrawn, a five-state ``Campaign Readiness``
+    carrying ``mapsTo: Partner Capability`` added, four shared state names, and
+    the shared-children test corroborating a rename of a root baseline alpha
+    that four practices touch.
+    """
+    for key in ("mapsTo", "contributesTo"):
+        target = new_item.get(key)
+        if isinstance(target, str) and target == old_item.get("name"):
+            return False
+
+    old_desc = (old_item.get("description") or "").strip()
+    new_desc = (new_item.get("description") or "").strip()
+    if old_desc and old_desc == new_desc:
+        return True
+
+    old_children, new_children = _child_names(old_item), _child_names(new_item)
+    if not old_children or not new_children:
+        return False
+    shared = len(old_children & new_children)
+    return shared * 2 >= min(len(old_children), len(new_children))
+
+
+def _detect_sub_renames(old_items, new_items, corroborate=False):
+    """Detect renames in ordered sub-element lists (states, LODs) by index position.
+
+    **A name present in both versions was not renamed.** That is the whole of the
+    first filter and it is not an optimisation — it is what makes the inference
+    sound. Pairing by index alone turns a *reordering* into a rename cascade:
+    five sales-tactic alphas written in guide order rather than backup order
+    produced four fabricated renames forming a cycle, where every ``fromName``
+    was also someone's ``toName`` and the one alpha that kept its index produced
+    nothing.
+
+    Corroboration alone could not catch that. These were ``mapsTo`` variants of
+    one parent, so all five carried byte-identical state names and
+    ``_looks_like_rename`` matched 100% on shared children for *any* pairing
+    among them — the guard is blind precisely where variant alphas are involved.
+    Only set membership distinguishes a reorder from a rename.
+
+    With ``corroborate``, what survives the filter must still look like the same
+    element, for the case where an array genuinely withdraws some elements and
+    adds others.
+    """
+    renames = []
+
+    def _named(items):
+        return [i for i in items if isinstance(i, dict) and i.get("name")]
+
+    old_named, new_named = _named(old_items), _named(new_items)
+    survived = {i["name"] for i in old_named} & {i["name"] for i in new_named}
+
+    old_rest = [i for i in old_named if i["name"] not in survived]
+    new_rest = [i for i in new_named if i["name"] not in survived]
+
+    if not old_rest or len(old_rest) != len(new_rest):
         return renames
 
-    for i, (old_name, new_name) in enumerate(zip(old_names, new_names)):
-        if old_name and new_name and old_name != new_name:
-            renames.append({"fromName": old_name, "toName": new_name})
+    for old_item, new_item in zip(old_rest, new_rest):
+        if corroborate and not _looks_like_rename(old_item, new_item):
+            continue
+        entry = {"fromName": old_item["name"], "toName": new_item["name"]}
+        # Sub-element lists are ordered progressions, so position is real
+        # evidence there and inference is usually right — nine of nine state
+        # and level renames on one document were correct. But a withdrawal plus
+        # an unrelated addition is indistinguishable from a rename by position
+        # alone, and one document emitted exactly that. Mark the weak ones so
+        # the caller is told which to read rather than trusting the lot.
+        if not corroborate and not _looks_like_rename(old_item, new_item):
+            entry["_uncorroborated"] = True
+        renames.append(entry)
 
     return renames
 
@@ -133,7 +248,8 @@ def _summarize_modifications(mods):
     return "; ".join(parts[:5]) + ("..." if len(parts) > 5 else "")
 
 
-def generate_change_request(old_data, new_data, author, status, note_text, schema_path):
+def generate_change_request(old_data, new_data, author, status, note_text, schema_path,
+                            declared_name_changes=None):
     doc_name = new_data.get("name") or old_data.get("name") or "Unknown"
     doc_kind = detect_kind(new_data) or detect_kind(old_data)
     target_type_map = {
@@ -148,7 +264,12 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
     schema_version = get_schema_version(schema_path)
 
     operations = []
-    name_changes = []
+    # Renames the author declares explicitly come first: a rename the differ
+    # cannot infer — because the new name shares little text with the old, or
+    # because the element was rewritten in the same release — is still a rename
+    # dependents must be told about, and silently losing it is the expensive
+    # failure. Inferred renames are appended and deduplicated below.
+    name_changes = list(declared_name_changes or [])
 
     # --- Scalar root-level changes ---
     scalar_mods = {}
@@ -178,8 +299,8 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
         old_names = set(old_map.keys())
         new_names = set(new_map.keys())
 
-        # Top-level renames (by index position)
-        top_renames = _detect_sub_renames(old_items, new_items)
+        # Top-level renames (by index position, corroborated by content)
+        top_renames = _detect_sub_renames(old_items, new_items, corroborate=True)
         rename_from = {r["fromName"] for r in top_renames}
         rename_to = {r["toName"] for r in top_renames}
         for r in top_renames:
@@ -225,22 +346,28 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
                 new_states = new_elem.get("states", [])
                 state_renames = _detect_sub_renames(old_states, new_states)
                 for sr in state_renames:
-                    name_changes.append({
+                    entry = {
                         "elementType": "State",
                         "fromName": sr["fromName"],
                         "toName": sr["toName"],
-                    })
+                    }
+                    if sr.get("_uncorroborated"):
+                        entry["_uncorroborated"] = True
+                    name_changes.append(entry)
 
             if section == "workProducts":
                 old_lods = old_elem.get("levelsOfDetail", [])
                 new_lods = new_elem.get("levelsOfDetail", [])
                 lod_renames = _detect_sub_renames(old_lods, new_lods)
                 for lr in lod_renames:
-                    name_changes.append({
+                    entry = {
                         "elementType": "LevelOfDetail",
                         "fromName": lr["fromName"],
                         "toName": lr["toName"],
-                    })
+                    }
+                    if lr.get("_uncorroborated"):
+                        entry["_uncorroborated"] = True
+                    name_changes.append(entry)
 
             operations.append({
                 "operation": "modify",
@@ -250,15 +377,32 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
                 "rationale": _summarize_modifications(mods),
             })
 
-    # Deduplicate nameChanges
+    # Deduplicate nameChanges, and strip the internal corroboration marker —
+    # it is not part of the schema. The weak ones are reported to stderr so the
+    # caller knows which entries to read before letting them propagate.
     seen = set()
     unique_nc = []
+    weak = []
     for nc in name_changes:
         key = (nc["elementType"], nc["fromName"], nc["toName"])
-        if key not in seen:
-            seen.add(key)
-            unique_nc.append(nc)
+        if key in seen:
+            continue
+        seen.add(key)
+        if nc.pop("_uncorroborated", False):
+            weak.append(f"{nc['elementType']}: {nc['fromName']} → {nc['toName']}")
+        unique_nc.append(nc)
     name_changes = unique_nc
+
+    if weak:
+        sys.stderr.write(
+            "\nReview these inferred renames before letting them propagate — "
+            "position paired them but their content does not corroborate it, "
+            "which is also what a withdrawal plus an unrelated addition looks "
+            "like:\n"
+        )
+        for w in weak:
+            sys.stderr.write(f"  ? {w}\n")
+        sys.stderr.write("")
 
     # Auto-generate note if not provided
     if not note_text:
@@ -315,16 +459,41 @@ def main():
                         help="Description of changes (auto-generated if omitted)")
     parser.add_argument("--schema", default=None,
                         help="Path to language.schema.json (default: deps/language.schema.json)")
+    parser.add_argument("--name-change", action="append", default=[], metavar="TYPE:FROM=TO",
+                        help="Declare a rename the diff cannot infer, e.g. "
+                             "--name-change 'Focus:Partner Value=Value'. Repeatable. "
+                             "TYPE is free text — it is written through to the "
+                             "ChangeRequest as given. The types in use are Alpha, State, "
+                             "LevelOfDetail, Focus, ActivitySpace, Competency, "
+                             "CompetencyLevel, NarrativeType, WorkProduct, Pattern, "
+                             "PatternView, Persona, PersonaGroup, Citation and Alias. "
+                             "An earlier, shorter list here read as an enum and pushed "
+                             "agents into mislabelling a persona-group rename as Persona.")
     parser.add_argument("-o", "--output", default=None,
                         help="Output file path (default: stdout)")
     args = parser.parse_args()
+
+    declared = []
+    for spec in args.name_change:
+        if ":" not in spec or "=" not in spec.split(":", 1)[1]:
+            parser.error(f"--name-change '{spec}' is not of the form TYPE:FROM=TO")
+        element_type, remainder = spec.split(":", 1)
+        from_name, to_name = remainder.split("=", 1)
+        if not element_type.strip() or not from_name.strip() or not to_name.strip():
+            parser.error(f"--name-change '{spec}' has an empty TYPE, FROM or TO")
+        declared.append({
+            "elementType": element_type.strip(),
+            "fromName": from_name.strip(),
+            "toName": to_name.strip(),
+        })
 
     old_data = load_json(args.old)
     new_data = load_json(args.new)
     author = args.author or _git_user()
     schema_path = args.schema
 
-    cr = generate_change_request(old_data, new_data, author, args.status, args.note, schema_path)
+    cr = generate_change_request(old_data, new_data, author, args.status, args.note, schema_path,
+                                 declared_name_changes=declared)
 
     output = json.dumps(cr, indent=2, ensure_ascii=False) + "\n"
     if args.output:

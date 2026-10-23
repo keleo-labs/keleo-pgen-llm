@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import load_json, detect_kind
+from utils._shared import load_json, detect_kind, merge_ancestor_baselines
 
 
 def load_practices(path):
@@ -281,6 +281,13 @@ def main():
 
     practices, source = load_practices(args.path)
     baseline = load_json(args.baseline)
+    # Walk the baseline's own ancestors into scope. Handed a leaf baseline, this
+    # tool used to see only what that leaf declares, so every reference into a
+    # root baseline read as dangling: on one cross-subtree method the same 18
+    # member files gave 0 errors against the root and 22 against the leaf, and
+    # the phantoms (`Customer Success`, `Technical Validation`) look exactly like
+    # the cross-practice collisions the tool exists to find.
+    merge_ancestor_baselines(baseline, Path(args.baseline))  # mutates in place
 
     if not practices:
         print(json.dumps({"error": "No practices found", "source": source}))

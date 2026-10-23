@@ -268,7 +268,16 @@ The system uses a simplified three-phase workflow that is reference-driven rathe
 - Multiple distinct value streams or use cases
 - Each practice analyzed and mapped in single documents
 - `.keleo` package in `bundles/` bundles externalized method JSON (with `practiceNames` string references) + individual practice JSONs + baseline JSON
-- Methods spanning multiple baselines can declare `alphaBindings` for cross-baseline contribution relationships
+- Methods spanning multiple baselines can declare cross-baseline relationships under the
+  method's **`bindings`** property — `bindings.alphaBindings` and
+  `bindings.workProductBindings`, not at the root. Each entry requires `relationship`
+  (`contribution` or `variant`), `sourceAlphas` and `targetAlpha`; the older
+  `baselineAlpha`/`contributingAlphas` field names were renamed in schema 3.1.0.
+  Bindings are for **orthogonal** baseline families, designed independently with no
+  knowledge of each other (`semantics/composition.md` §4.8). Before reaching for them,
+  check whether one baseline already declares the other in `baselinePracticeNames` — if
+  it does they are one chain, ordinary inheritance applies, and bindings are the wrong
+  construct.
 
 ### Key Framework Concepts
 
@@ -305,6 +314,7 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 - `references/domain-framework.md` - Modern enterprise architecture perspectives combining Open Agile, SAFe, Gartner CEA, Zachman, TOGAF
 - `references/semantics.md` - Hub document indexing semantic guidance sub-documents in `references/semantics/`
 - `references/workproduct-assessment-rubric.csv` - 5-level maturity rubric (Level 0: Non-Existent → Level 4: Comprehensive/Automated)
+- `references/orchestration-strategy.md` - Authoring gate for `patternOrchestrations`: inventory, then extend / embed / author new. Read at Phase 2 Step 8.5
 
 ### Dependencies (`deps/`)
 
@@ -423,7 +433,8 @@ Baseline practices are **foundational frameworks** that define the core ontology
 | **WorkProduct partOf / mapsTo** | Optional on WPs (may coexist on different targets) | NOT PRESENT |
 | **Patterns** | Defined in practice | NOT PRESENT |
 | **Outcomes** | 1-3 per practice with measureDescription; optional metricContributions/objectiveContributions | Optional high-level value propositions (measureDescription only) |
-| **PatternGroups** | Optional (adopt baseline groups, add patterns; novel groups need justification) | Optional (define canonical groups with empty entries as templates for extensions) |
+| **PatternGroups** | **Deprecated — do not author.** Existing declarations stay | **Deprecated — do not author.** Existing declarations stay |
+| **PatternOrchestrations** | Optional (stages declare an explicit relationship and name exactly one of a pattern or another orchestration) | Optional shells only (`stages: []`) — a baseline defines no patterns to sequence |
 | **Activity ledBy** | Optional (single Persona.name accountable for leading) | Optional (on ActivitySpace) |
 | **References** | Optional array of AlphaInstance (curated external content) | NOT PRESENT |
 | **Gherkin (background/test/examples)** | Full use on states, checklists, LODs, activities | Minimal use (practice layer adds detail) |
@@ -469,6 +480,53 @@ Each practice focuses on ONE primary alpha + related alphas (via `relatesTo`, 1-
 - All symbolic references are exact, case-sensitive string matches
 - Minimums: ≥3 states per alpha, ≥2 LODs per work product
 - WorkProduct `mapsTo` and `partOf` may coexist but must reference **different** work products (see `semantics/work-products.md` §7.4-7.5 and §7.7)
+
+### Pattern Grouping Is Retired
+
+`patternGroups` is deprecated as of schema 2.21.0. **Do not author it** — not in a
+practice, not in a baseline, and not by adopting a baseline's canonical group names.
+It remains valid and still merges, so the ~73 documents that already declare it keep
+it unchanged; `/update-method` copies an existing declaration across rather than
+dropping it. This is a decision about new work, not a migration.
+
+The construct answered two questions at once. Where it only classified patterns for
+navigation, nothing replaces it: the merge stamps `sourcePracticeName` on every pattern,
+so a consumer can group at display time without the document carrying the grouping.
+Where the order of entries meant *then* — or one pattern ran inside or alongside another
+— that was always sequencing, and the construct for it is `patternOrchestration`.
+
+Look for that case when mapping a practice with more than one pattern. An orchestration
+names its stages in order, and each stage declares an explicit `relationship`
+(`sequential`, `concurrent`, `nested`, `onDemand`) with entry and exit criteria. Do not
+invent an order the source material does not state; independent patterns need none.
+
+### Orchestrations Accumulate Rather Than Multiply
+
+An orchestration is meant to be reused, not reinvented per practice. Three routes, taken
+in order, and a new one is authored only when the first two do not reach:
+
+- **Extend by name.** Where an orchestration in scope already describes the shape and
+  what a practice adds serves the purpose its description states, the practice
+  redeclares the name and contributes stages. A baseline may publish a shell with
+  `stages: []` for exactly this.
+- **Embed.** A stage names **either** a `patternName` **or** an `orchestrationName`.
+  Naming an orchestration places that whole sub-endeavour — a programme embedding a
+  project. Embed rather than nest when the sub-endeavour has its own owner, completes on
+  its own terms, and is reusable by more than one host.
+- **Author new.** Only when nothing in scope describes the shape, with a description
+  saying what makes it distinct.
+
+**Extension is additive, and enforced.** An overlay contributes stages; it may not
+restate an inherited stage to move it, nor insert a `sequential` stage below the
+inherited sequence. The merge gives the first writer the placement properties, and
+`validate-practice.py` rejects the restatement. Wanting to reorder what you inherited
+means you have a different endeavour — author a new orchestration and name it.
+
+Both kinds of reference resolve across the baseline chain and declared dependencies, so
+a stage may place another document's pattern directly. That validates and warns:
+embedding the orchestration that owns it keeps the ordering with its author. The full
+framework is `references/semantics/execution-and-patterns.md` §9.5.4–9.5.6, with the
+authoring procedure in `references/orchestration-strategy.md`.
 
 ### Versioning
 
@@ -607,7 +665,7 @@ Use the `/create-baseline-method` skill to create foundational frameworks:
 This skill automates the four-phase baseline creation pipeline:
 
 **1. Planning (MANDATORY):**
-- Enters plan mode automatically
+- Uses read-only planning, then stops for explicit approval before execution
 - Analyzes source materials for baseline appropriateness
 - Identifies potential custom Focuses
 - Creates execution roadmap
@@ -652,7 +710,7 @@ Use the `/generate-method` skill to create practices that extend baselines:
 This skill automates the three-phase pipeline:
 
 **1. Planning (MANDATORY):**
-- Enters plan mode automatically
+- Uses read-only planning, then stops for explicit approval before execution
 - Analyzes source materials
 - Determines Practice vs Method
 - Creates execution roadmap
@@ -697,7 +755,7 @@ The protocol and the agent briefs live in `.claude/skills/verification-foundatio
 | 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
 | Reports — single gate | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style`, plus a `type-specific` verifier for all but `method-based-report` |
 
-The reporting skills have one gate rather than four, because the workflow produces one durable artifact: Steps 1–2 are in-context analysis and Step 0 is already user-gated in plan mode. Their gate sits in `reporting-foundation/REPORT-FOUNDATION.md` → Output (Step 3) and runs before any PDF export or Google Doc publish.
+The reporting skills have one gate rather than four, because the workflow produces one durable artifact: Steps 1–2 are in-context analysis and Step 0 is already gated by explicit user approval in the planning stage. Their gate sits in `reporting-foundation/REPORT-FOUNDATION.md` → Output (Step 3) and runs before any PDF export or Google Doc publish.
 
 Findings are consolidated and gated by `utils/verification-gate.py` (`--phase report` for reports). **Confirmed errors block the phase.** Warnings flow into the user review gate. `update-method` scopes its gates to changed elements only.
 
@@ -815,7 +873,7 @@ Use the `/improve-tooling` skill to create, extend, refactor, or consolidate uti
 
 The skill operates in two modes:
 
-- **Direct invocation**: User requests an improvement. Util changes are applied directly; skill instruction changes go through plan mode for approval.
+- **Direct invocation**: User requests an improvement. Util changes are applied directly; skill instruction changes use a read-only planning stage and stop for explicit approval, with or without native Plan mode.
 - **Mid-execution invocation**: Another skill discovers it needs a mechanical helper that doesn't exist. It invokes `/improve-tooling` via the Skill tool, which auto-proceeds and reports back.
 
 The skill enforces a mechanical-vs-semantic gate: only operations whose input/output is fully determined by rules and data are scriptable. Semantic decisions (meaning, quality, fitness) remain in the LLM layer.

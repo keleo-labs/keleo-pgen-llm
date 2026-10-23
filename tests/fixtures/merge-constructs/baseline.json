@@ -1,0 +1,87 @@
+{
+  "kind": "practiceBaseline",
+  "name": "Merge Constructs Baseline",
+  "description": "Fixture baseline exercising specificity, suppression, loop edges and orchestration merging.",
+  "version": "1.0.0",
+  "authors": ["Fixture"],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "focuses": [
+    { "name": "Solution", "description": "Technical realisation." }
+  ],
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "The platform on which the organisation's services run.",
+      "focusName": "Solution",
+      "relatesTo": [
+        { "relationship": "supports", "alphaName": "Multi-Cluster Federation", "direction": "outgoing" },
+        { "relationship": "maintained by", "alphaName": "Operational Automation", "direction": "incoming" }
+      ],
+      "states": [
+        {
+          "name": "Identified",
+          "seq": 1,
+          "description": "The platform need is named.",
+          "checklist": [
+            { "name": "Need stated", "seq": 1, "description": "Someone has written down what the platform is for." }
+          ]
+        },
+        {
+          "name": "Built",
+          "seq": 2,
+          "description": "The platform exists.",
+          "checklist": [
+            { "name": "Environment stood up", "seq": 1, "description": "A running environment exists." }
+          ]
+        },
+        {
+          "name": "Operational",
+          "seq": 3,
+          "description": "The platform carries production load.",
+          "loopsBackTo": {
+            "stateName": "Built",
+            "description": "Capacity growth returns the platform to build."
+          },
+          "checklist": [
+            { "name": "Production workload running", "seq": 1, "description": "Real traffic is served." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Multi-Cluster Federation",
+      "description": "Coordination of workloads across independently operated clusters.",
+      "focusName": "Solution",
+      "relatesTo": [
+        { "relationship": "supported by", "alphaName": "Platform", "direction": "incoming" }
+      ],
+      "states": [
+        { "name": "Unconsidered", "seq": 1, "description": "Federation has not been assessed.", "checklist": [{ "name": "Scope recorded", "seq": 1, "description": "The federation question is on the record." }] },
+        { "name": "Designed", "seq": 2, "description": "A federation topology is agreed.", "checklist": [{ "name": "Topology agreed", "seq": 1, "description": "The topology has sign-off." }] },
+        { "name": "Federated", "seq": 3, "description": "Clusters operate as one estate.", "checklist": [{ "name": "Estate operating", "seq": 1, "description": "Workloads move across clusters." }] }
+      ]
+    },
+    {
+      "name": "Operational Automation",
+      "description": "The automation that keeps the platform running without hands on it.",
+      "focusName": "Solution",
+      "relatesTo": [
+        { "relationship": "maintains", "alphaName": "Platform", "direction": "outgoing" }
+      ],
+      "states": [
+        { "name": "Manual", "seq": 1, "description": "Operations are performed by hand.", "checklist": [{ "name": "Runbooks written", "seq": 1, "description": "The steps exist in writing." }] },
+        { "name": "Scripted", "seq": 2, "description": "Common operations are scripted.", "checklist": [{ "name": "Scripts in version control", "seq": 1, "description": "Automation is reviewable." }] },
+        { "name": "Autonomous", "seq": 3, "description": "The platform self-heals.", "checklist": [{ "name": "Remediation runs unattended", "seq": 1, "description": "No human is paged for known faults." }] }
+      ]
+    }
+  ],
+  "activitySpaces": [
+    {
+      "name": "Build the Platform",
+      "description": "Work that brings a platform into existence.",
+      "focusName": "Solution",
+      "contributesTo": [{ "alphaName": "Platform", "stateName": "Built" }]
+    }
+  ]
+}

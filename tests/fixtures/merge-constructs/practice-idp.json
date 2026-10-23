@@ -1,0 +1,58 @@
+{
+  "kind": "practice",
+  "name": "IDP Delivery",
+  "description": "Fixture practice adding IDP specificity and an orchestration.",
+  "version": "1.0.0",
+  "authors": ["Fixture"],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "baselinePracticeName": "Merge Constructs Baseline",
+  "assets": [
+    { "name": "Platform Icon", "type": "icon", "format": "image", "path": "assets/idp-platform.png" }
+  ],
+  "personas": [
+    { "name": "Platform Engineer", "description": "Builds and runs the platform." }
+  ],
+  "personaGroups": [
+    { "name": "Platform Team", "description": "Who runs the platform.", "personaNames": ["Platform Engineer"] }
+  ],
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "Redeclaration ignored — the baseline owns the definition.",
+      "focusName": "Implicit focus",
+      "specificityName": "IDP",
+      "states": [
+        {
+          "name": "Operational",
+          "seq": 3,
+          "description": "Redeclared state.",
+          "checklist": [
+            { "name": "Golden paths published", "seq": 2, "description": "Developers can self-serve a paved road." }
+          ]
+        }
+      ]
+    }
+  ],
+  "patterns": [
+    { "name": "Platform Bootstrap", "description": "Standing the platform up.", "patternViews": [{ "name": "Inception", "seq": 1, "description": "First steps." }] },
+    { "name": "Steady State", "description": "Running the platform.", "patternViews": [{ "name": "Operate", "seq": 1, "description": "Day two." }] }
+  ],
+  "patternOrchestrations": [
+    {
+      "name": "Platform Endeavour",
+      "description": "How the platform patterns are sequenced.",
+      "stages": [
+        { "patternName": "Platform Bootstrap", "seq": 1, "relationship": "sequential", "entryCriteria": "Funding approved." },
+        { "patternName": "Steady State", "seq": 2, "relationship": "sequential" }
+      ]
+    },
+    {
+      "name": "Rollout Endeavour",
+      "description": "A sub-endeavour owned here and embeddable by a host that reaches for it.",
+      "stages": [
+        { "patternName": "Site Rollout", "seq": 1, "relationship": "sequential" }
+      ]
+    }
+  ]
+}

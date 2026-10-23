@@ -31,6 +31,11 @@ Merge hierarchy (higher tiers override lower on name conflicts):
     Tier 2: Practices (input order)
     Tier 3: Methods (highest precedence)
 
+Where the same document name arrives more than once — typically a method bundle
+embedding an older copy of a practice also supplied standalone — the highest
+version wins, regardless of input order, and the collision is reported under
+`nameCollisions` and as a warning.
+
 Exit codes:
     0 - Success
     1 - Error (missing files, invalid JSON, etc.)
@@ -41,16 +46,25 @@ Outputs structured JSON report to stdout.
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (
     detect_kind,
+    finalize_baseline_descriptions,
+    finalize_specificity,
+    finalize_suppression,
     finalize_variants,
     load_all_from_keleo,
     load_json,
+    merge_assets,
     merge_by_name,
     merge_pattern_groups,
+    merge_pattern_orchestrations,
+    scan_tracking_needs,
+    strip_merge_tracking,
+    version_sort_key,
     MERGEABLE_ARRAYS,
 )
 
@@ -82,55 +96,118 @@ def classify_documents(documents):
     """Sort documents into three tiers: baselines, practices, methods.
 
     For methods with embedded practices, extracts them into the practice tier.
-    Returns dict with 'baselines', 'practices', 'methods' keys,
-    each a list of (name, data) tuples.
+    Returns dict with 'baselines', 'practices', 'methods' keys, each a list of
+    (name, data) tuples, plus 'collisions' describing any name resolved by
+    version.
+
+    A name can arrive more than once — most often a method embedding an older
+    copy of a practice that is also supplied standalone. Settling that by input
+    order means the resolved context depends on the order of the command line,
+    and a bundle resolved on its own silently yields whatever copy it embeds.
+    The highest version wins instead, and the collision is reported so the
+    caller can see a choice was made.
     """
-    tiers = {"baselines": [], "practices": [], "methods": []}
-    seen_names = set()
+    tiers = {"baselines": [], "practices": [], "methods": [], "collisions": []}
 
+    # Flatten to candidates first: a method's embedded practices have to compete
+    # with standalone ones that may appear later in the input.
+    candidates = []
     for name, data in documents:
-        if name in seen_names:
-            continue
-        seen_names.add(name)
-
         kind = detect_kind(data)
+        if kind not in ("practiceBaseline", "practice", "method"):
+            continue
+        candidates.append((name, data, kind))
+        if kind == "method":
+            for practice in data.get("practices", []):
+                p_name = practice.get("name", "")
+                if p_name:
+                    candidates.append((p_name, practice, "practice"))
+
+    chosen = {}       # name -> (data, kind, version)
+    order = []        # names in first-seen order, so output ordering is stable
+    versions = {}     # name -> list of versions seen, for the collision report
+
+    for name, data, kind in candidates:
+        version = data.get("version", "")
+        versions.setdefault(name, []).append(version or "(none)")
+        if name not in chosen:
+            chosen[name] = (data, kind, version)
+            order.append(name)
+            continue
+        _, _, incumbent = chosen[name]
+        if version_sort_key(version) > version_sort_key(incumbent):
+            chosen[name] = (data, kind, version)
+
+    for name in order:
+        data, kind, version = chosen[name]
+        # The same document at the same version in two bundles is ordinary and
+        # harmless. Only a genuine version difference changes what is resolved.
+        distinct = sorted(set(versions[name]), key=version_sort_key)
+        if len(distinct) > 1:
+            tiers["collisions"].append({
+                "documentName": name,
+                "versionsSeen": distinct,
+                "selected": version or "(none)",
+            })
         if kind == "practiceBaseline":
             tiers["baselines"].append((name, data))
         elif kind == "practice":
             tiers["practices"].append((name, data))
         elif kind == "method":
-            for practice in data.get("practices", []):
-                p_name = practice.get("name", "")
-                if p_name and p_name not in seen_names:
-                    seen_names.add(p_name)
-                    tiers["practices"].append((p_name, practice))
             tiers["methods"].append((name, data))
 
     return tiers
 
 
-def topo_sort_baselines(baselines):
-    """Topologically sort baselines by baselinePracticeNames (root-first, leaf-last)."""
-    by_name = {name: data for name, data in baselines}
+def _topo_sort(entries, dependency_names):
+    """Topologically sort (name, data) entries root-first, leaf-last.
+
+    Entries that no dependency relates are visited in name order, so layers
+    that are incomparable in the dependency graph still come out in a fixed
+    sequence. Merge precedence and the specificity chain both read this order,
+    and either would otherwise depend on which path the documents arrived by.
+    """
+    by_name = {name: data for name, data in entries}
     sorted_names = []
     resolved = set()
+    visiting = set()
 
     def resolve(name):
-        if name in resolved or name not in by_name:
+        if name in resolved or name in visiting or name not in by_name:
             return
-        data = by_name[name]
-        for dep_name in data.get("baselinePracticeNames", []):
+        visiting.add(name)
+        for dep_name in sorted(dependency_names(by_name[name])):
             resolve(dep_name)
-        singular = data.get("baselinePracticeName")
-        if singular and singular not in resolved and singular in by_name:
-            resolve(singular)
+        visiting.discard(name)
         resolved.add(name)
         sorted_names.append(name)
 
-    for name, _ in baselines:
+    for name in sorted(by_name):
         resolve(name)
 
     return [(name, by_name[name]) for name in sorted_names]
+
+
+def topo_sort_baselines(baselines):
+    """Topologically sort baselines by baselinePracticeNames (root-first, leaf-last)."""
+    def dependencies(data):
+        names = list(data.get("baselinePracticeNames", []))
+        singular = data.get("baselinePracticeName")
+        if singular and singular not in names:
+            names.append(singular)
+        return names
+
+    return _topo_sort(baselines, dependencies)
+
+
+def topo_sort_practices(practices):
+    """Topologically sort practices by practiceDependencyNames (dependencies first).
+
+    A practice must overlay after everything it depends on, or it cannot refine
+    what it inherits. Resolution order previously stood in for this, which made
+    the merge depend on how the practices were discovered.
+    """
+    return _topo_sort(practices, lambda data: list(data.get("practiceDependencyNames", [])))
 
 
 def _load_discover_module():
@@ -163,13 +240,31 @@ def resolve_transitive_baselines(baselines, search_dirs, dd=None, index=None):
         for dep_name in dep_names:
             if dep_name in existing:
                 continue
-            match = dd.resolve_name(dep_name, index, prefer_filesystem=True)
+            # prefer_canonical, because an ambiguous parent used to be skipped in
+            # silence. A synced copy of Red Hat Sales Essentials beside a
+            # consuming method made the root baseline ambiguous, so the whole
+            # grandparent tier — 3 focuses, 11 activity spaces, 8 competencies —
+            # vanished from the merged vocabulary with no warning, and two
+            # separate mapping agents compromised their mapping to work around
+            # elements that were there all along.
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
+                if match.get("disambiguated"):
+                    print(f"Note: '{dep_name}' resolved to the authoring home "
+                          f"{match['path']} (also at: "
+                          f"{', '.join(match.get('alternatives', []))})",
+                          file=sys.stderr)
                 dep_data, err = dd.load_resolved_json(match)
                 if dep_data:
                     existing.add(dep_name)
                     result.append((dep_name, dep_data))
                     to_check.append((dep_name, dep_data))
+            else:
+                print(f"Warning: parent baseline '{dep_name}' not loaded "
+                      f"(status: {match['status']}) — its focuses, activity "
+                      f"spaces and competencies will be absent from the "
+                      f"resolved context", file=sys.stderr)
 
     return result
 
@@ -193,13 +288,28 @@ def resolve_transitive_practices(practices, search_dirs, dd=None, index=None):
         for dep_name in data.get("practiceDependencyNames", []):
             if dep_name in existing:
                 continue
-            match = dd.resolve_name(dep_name, index, prefer_filesystem=True)
+            # The baseline paths got prefer_canonical and a warning; this one was
+            # missed, and the gap is identical: Sales Play Framework has three
+            # byte-identical copies, so the name resolves ambiguous and the whole
+            # dependency vanished from a resolved context that reported
+            # documentCount 4 and said nothing at all.
+            match = dd.resolve_name(dep_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
+                if match.get("disambiguated"):
+                    print(f"Note: practice dependency '{dep_name}' resolved to the "
+                          f"authoring home {match['path']} (also at: "
+                          f"{', '.join(match.get('alternatives', []))})",
+                          file=sys.stderr)
                 dep_data, err = dd.load_resolved_json(match)
                 if dep_data and detect_kind(dep_data) != "practiceBaseline":
                     existing.add(dep_name)
                     result.append((dep_name, dep_data))
                     to_check.append((dep_name, dep_data))
+            else:
+                print(f"Warning: practice dependency '{dep_name}' not loaded "
+                      f"(status: {match['status']}) — everything it declares will "
+                      f"be absent from the resolved context", file=sys.stderr)
 
     return result
 
@@ -229,7 +339,17 @@ def resolve_method_practices(methods, practices, search_dirs, dd=None, index=Non
         for p_name in method_data.get("practiceNames", []):
             if p_name in existing:
                 continue
-            match = dd.resolve_name(p_name, index, prefer_filesystem=True)
+            # A method's members are commonly synced into several directories,
+            # so ambiguity is the normal case here rather than the exception.
+            # Without prefer_canonical every member of a widely-copied document
+            # lands in `unresolved` and the method resolves against nothing.
+            match = dd.resolve_name(p_name, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
+            if match["status"] == "found" and match.get("disambiguated"):
+                print(f"Note: method member '{p_name}' resolved to the authoring "
+                      f"home {match['path']} (also at: "
+                      f"{', '.join(match.get('alternatives', []))})",
+                      file=sys.stderr)
             if match["status"] != "found":
                 unresolved.append({
                     "method": method_name,
@@ -261,17 +381,21 @@ def collect_practice_baselines(practices, baselines, dd, index):
     for _, data in practices:
         bpn = data.get("baselinePracticeName")
         if bpn and bpn not in existing:
-            match = dd.resolve_name(bpn, index, prefer_filesystem=True)
+            match = dd.resolve_name(bpn, index, prefer_filesystem=True,
+                                    prefer_canonical=True)
             if match["status"] == "found":
                 bl_data, err = dd.load_resolved_json(match)
                 if bl_data:
                     existing.add(bpn)
                     result.append((bpn, bl_data))
+            else:
+                print(f"Warning: baseline '{bpn}' not loaded "
+                      f"(status: {match['status']})", file=sys.stderr)
 
     return result
 
 
-def merge_tier(accumulated, entries):
+def merge_tier(accumulated, entries, tracking=None):
     """Merge a list of (name, data) entries onto accumulated using annotated merge."""
     for source_name, data in entries:
         for key in MERGEABLE_ARRAYS:
@@ -283,9 +407,17 @@ def merge_tier(accumulated, entries):
                     accumulated[key] = merge_pattern_groups(
                         acc_items, items, acc_source, source_name
                     )
+                elif key == "patternOrchestrations":
+                    accumulated[key] = merge_pattern_orchestrations(
+                        acc_items, items, acc_source, source_name
+                    )
+                elif key == "assets":
+                    accumulated[key] = merge_assets(
+                        acc_items, items, acc_source, source_name
+                    )
                 else:
                     accumulated[key] = merge_by_name(
-                        acc_items, items, acc_source, source_name
+                        acc_items, items, acc_source, source_name, tracking=tracking
                     )
         accumulated["_merge_source"] = source_name
     return accumulated
@@ -377,16 +509,33 @@ def build_provenance(effective, merge_order, tiers):
             if shared:
                 multi_source_elements[key] = shared
 
-    return {
+    # Record the version each source was merged at, and when. Without this a
+    # consumer cannot tell a current context from one built against a baseline
+    # two major versions ago — and the file silently outranks the baseline the
+    # caller passed explicitly. In this project that has rewritten correct
+    # pinned names onto fuzzy matches while reporting success. Names alone were
+    # never enough; the version is what makes staleness detectable.
+    source_versions = {}
+    for tier in ("baselines", "practices", "methods"):
+        for name, data in tiers[tier]:
+            if isinstance(data, dict) and data.get("version"):
+                source_versions[name] = data["version"]
+
+    provenance = {
         "mergeOrder": merge_order,
         "tiers": {
             "baselines": [name for name, _ in tiers["baselines"]],
             "practices": [name for name, _ in tiers["practices"]],
             "methods": [name for name, _ in tiers["methods"]],
         },
+        "sourceVersions": source_versions,
+        "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "elementSources": element_sources,
         "multiSourceElements": multi_source_elements,
     }
+    if tiers.get("collisions"):
+        provenance["nameCollisions"] = tiers["collisions"]
+    return provenance
 
 
 def resolve_context(file_paths, transitive=False, search_dirs=None):
@@ -427,27 +576,40 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
 
     if tiers["baselines"]:
         tiers["baselines"] = topo_sort_baselines(tiers["baselines"])
+    if tiers["practices"]:
+        tiers["practices"] = topo_sort_practices(tiers["practices"])
+
+    all_docs = tiers["baselines"] + tiers["practices"] + tiers["methods"]
+    tracking = scan_tracking_needs(all_docs)
 
     effective = {}
     merge_order = []
 
-    if tiers["baselines"]:
-        effective = merge_tier(effective, tiers["baselines"])
-        merge_order.extend(name for name, _ in tiers["baselines"])
-
-    if tiers["practices"]:
-        effective = merge_tier(effective, tiers["practices"])
-        merge_order.extend(name for name, _ in tiers["practices"])
-
-    if tiers["methods"]:
-        effective = merge_tier(effective, tiers["methods"])
-        merge_order.extend(name for name, _ in tiers["methods"])
+    for tier_key in ("baselines", "practices", "methods"):
+        if tiers[tier_key]:
+            effective = merge_tier(effective, tiers[tier_key], tracking)
+            merge_order.extend(name for name, _ in tiers[tier_key])
 
     effective.pop("_merge_source", None)
 
     finalize_variants(effective)
 
-    all_docs = tiers["baselines"] + tiers["practices"] + tiers["methods"]
+    # merge_order is the composition's dependency order, which is what both
+    # post-merge passes read: the specificity chain is its reverse, and
+    # suppression precedence is the order itself (merge.md §7.2e, §7.2f).
+    suppression = None
+    if tracking["specificity"]:
+        finalize_specificity(effective, merge_order)
+    if tracking["suppression"]:
+        suppression = finalize_suppression(effective, merge_order)
+
+    # Last, so no earlier pass can leave extension prose on a baseline element
+    # (merge.md §7.4). Runs after suppression so a removed element is not
+    # re-described on its way out.
+    restamped = finalize_baseline_descriptions(effective, tiers["baselines"])
+
+    strip_merge_tracking(effective)
+
     aliases = collect_aliases(all_docs)
     effective = apply_alias_context(effective, aliases)
     if aliases:
@@ -506,10 +668,45 @@ def resolve_context(file_paths, transitive=False, search_dirs=None):
             "personaCount": len(effective.get("personas", [])),
             "outcomeCount": len(effective.get("outcomes", [])),
             "aliasCount": len(aliases),
+            "descriptionsRestamped": restamped,
         },
     }
 
     warnings = []
+    if suppression and (suppression["removed"] or suppression["overridden"]):
+        report["suppression"] = suppression
+        if suppression["removed"]:
+            names = ", ".join(
+                f"{e['path']} (suppressed by {e['suppressedBy']})"
+                for e in suppression["removed"]
+            )
+            warnings.append(f"Elements removed by suppression: {names}.")
+        for entry in suppression["overridden"]:
+            warnings.append(
+                f"'{entry['path']}' stayed in the composition: {entry['requiredBy']} "
+                f"requires it and outranks {entry['suppressedBy']} by declaration "
+                "precedence."
+            )
+        if suppression["danglingReferences"]:
+            detail = ", ".join(
+                f"{d['path']}.{d['property']} → {d['target']}" if d["property"]
+                else f"{d['path']} → {d['target']}"
+                for d in suppression["danglingReferences"]
+            )
+            warnings.append(
+                "References left pointing at a suppressed element: "
+                f"{detail}. Suppressing an element means checking what pointed at it."
+            )
+
+    collisions = tiers.get("collisions", [])
+    if collisions:
+        report["nameCollisions"] = collisions
+        for c in collisions:
+            warnings.append(
+                f"'{c['documentName']}' was supplied at more than one version "
+                f"({', '.join(c['versionsSeen'])}); resolved to {c['selected']}. "
+                "A bundle embedding an older copy of a document is the usual cause."
+            )
     if unresolved_members:
         report["unresolvedMethodPractices"] = unresolved_members
         detail = ", ".join(
@@ -545,6 +742,7 @@ OUTPUT_SCHEMA = {
         "assets": "array — asset definitions",
         "workProducts": "array — practice work products with levels of detail",
         "patterns": "array — practice lifecycle patterns",
+        "patternOrchestrations": "array — orchestrations sequencing whole patterns; stages merged by patternName::relationship::relativeTo.patternName and sorted by seq",
         "personas": "array — personas (name, description, aliases[], competencies[])",
         "personaGroups": "array — persona groups (name, description, personaNames[])",
         "workProductInstances": "array — curated work product instances",
@@ -565,6 +763,10 @@ OUTPUT_SCHEMA = {
                                       "Read this, not the scalar, when deciding practiceDependencyNames: an element "
                                       "declared by two practices keeps only the last in the scalar.",
         "_domainAlias": "string on elements with aliases — the domain-specific name",
+        "specificity": "array on redeclared elements — the accumulated specificity chain, most specific "
+                       "first. Merge output, recomputed per composition; an authored value is discarded.",
+        "_suppressionResolution": "object on an element whose suppression was overridden — "
+                                  "{outcome, requiredBy, suppressedBy}, naming the document that won.",
     },
 }
 
@@ -744,6 +946,8 @@ def main():
                 "methods": [name for name, _ in tiers["methods"]],
             },
         }
+        if tiers.get("collisions"):
+            check_report["nameCollisions"] = tiers["collisions"]
         if args.by_name:
             check_report["resolvedPaths"] = file_paths
         print(json.dumps(check_report, indent=2))

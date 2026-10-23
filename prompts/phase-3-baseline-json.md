@@ -583,41 +583,44 @@ When an element (alpha, activitySpace, etc.) references an asset:
 
 **Add to JSON skeleton.**
 
-### Step 10.5: Build PatternGroups Array
+### Step 10.5: Omit PatternGroups
 
-**Transform mapping guide PatternGroups to JSON structure.**
+**Do NOT emit a `patternGroups` array.** The construct is deprecated as of schema 2.21.0
+and is not used in new work, and the baseline form — canonical categories with empty
+`entries` for extensions to merge into — is the one being retired first, because every
+extension that adopts a group name inherits it from here.
 
-Baselines define canonical pattern group categories with empty entries arrays. Extension practices adopt these groups and populate them with their patterns.
+A new baseline carries no `patternGroups` key at all. Omit it rather than emitting an
+empty array. Existing baselines that declare it keep it; nothing is being migrated.
 
-From mapping guide PatternGroups section:
+Nothing replaces it at this layer. Grouping patterns was a display concern, and the merge
+already stamps `sourcePracticeName` on every pattern, so a consumer can group without the
+baseline publishing a vocabulary.
+
+**Orchestration shells are a different matter.** Patterns that relate in time are a
+`PatternOrchestration`. A baseline defines no patterns, so it sequences none — but where
+Phase 2 Step 10.6a identified a shape the domain recognises, emit the shell: the name, the
+description, and an **empty** `stages` array. Extension practices contribute the stages.
 
 ```json
-{
-  "patternGroups": [
-    {
-      "name": "Core Lifecycles",
-      "description": "Primary lifecycle patterns from each practice — the main journey through each value stream",
-      "entries": [],
-      "seq": 0
-    },
-    {
-      "name": "Maturity Progressions",
-      "description": "Patterns tracking growth along a maturity axis within each practice area",
-      "entries": [],
-      "seq": 1
-    }
-  ]
-}
+"patternOrchestrations": [
+  {
+    "kind": "patternOrchestration",
+    "name": "Adoption Endeavour",
+    "description": "The shape every adoption in this domain follows, from first contact through to steady-state operation.",
+    "stages": []
+  }
+]
 ```
 
-**Quality Checks:**
-- ✓ 3-5 groups (from mapping guide)
-- ✓ Each group has name, description, and `entries: []`
-- ✓ Entries arrays are empty (baselines define categories, extensions populate)
-- ✓ Optional `seq` for group ordering
-- ✓ Optional narratives on groups (same structure as alpha narratives)
+A stage naming a `patternName` in a baseline is a validation error — the reference cannot
+resolve, because the baseline has no patterns. Omit the `patternOrchestrations` key
+entirely when Phase 2 identified no shell; most baselines publish none.
 
-**Add to JSON skeleton.**
+**Quality Check:**
+- ✓ No `patternGroups` key in the baseline JSON
+- ✓ Any `patternOrchestrations` entry has `stages: []` and a description that says what
+  endeavour it is for
 
 ### Step 11: Build PracticeElementAliases Array (if applicable)
 
@@ -710,7 +713,6 @@ Before writing the final JSON file, validate:
   "outcomes": [...],
   "narratives": [...],
   "citations": [...],
-  "patternGroups": [...],
   "assets": [...]
 }
 ```

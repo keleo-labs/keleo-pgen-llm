@@ -76,6 +76,22 @@ Feature: Diagram
       Then only the colour family differs between them
       And the geometry is identical
 
+    Scenario: A spec reproduces the figure published from it
+      Given a spec declaring a palette other than the default
+      When it is re-rendered with no palette argument
+      Then the figure matches the one published from that spec
+
+    Scenario: One folder holds figures in different palettes
+      Given a directory of specs, some declaring a palette and some not
+      When the whole directory is rendered in one run
+      Then each figure uses the palette its own spec declares
+      And a spec declaring none uses the default
+
+    Scenario: An explicit palette argument overrides the spec
+      Given a spec declaring the redhat palette
+      When it is rendered with the navigator palette requested
+      Then the figure uses navigator
+
   Rule: Editability is reported, never assumed
 
     Scenario: A flowchart becomes editable slide shapes

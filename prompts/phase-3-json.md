@@ -320,7 +320,7 @@ Add practice-level or method-level narratives:
   {
     "name": "Practice Intent",
     "description": "Narrative describing practice objectives",
-    "narrativeTypeName": "STAR",
+    "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
     "narrativeContexts": [
       {
         "seq": 1,
@@ -424,7 +424,7 @@ Add alphas array:
       {
         "name": "Context and Rationale",
         "description": "Why this alpha matters",
-        "narrativeTypeName": "Essay",
+        "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
         "narrativeContexts": [...],
         "citationNames": [...]
       }
@@ -714,7 +714,7 @@ Add activities array:
       {
         "name": "How to Perform",
         "description": "Technique guidance",
-        "narrativeTypeName": "Technique",
+        "narrativeTypeName": "<exact NarrativeType.name from the effective context>",
         "narrativeContexts": [...],
         "citationNames": [...]
       }
@@ -749,7 +749,7 @@ Add patterns array:
   {
     "name": "Pattern Name",
     "description": "Single sentence",
-    "narrativeTypeName": "Hero's Journey",  // NOT "narrativeFramework"
+    "narrativeTypeName": "<exact NarrativeType.name from the baseline>",  // NOT "narrativeFramework"
     "patternViews": [  // NOT "views"
       {
         "name": "Phase Name",
@@ -794,6 +794,17 @@ Add patterns array:
             "context": "1-2 sentences"
           }
         ],
+        "loopsBackTo": {  // Optional — ONLY on the view where a cycle closes
+          "patternViewName": "Earlier view of THIS pattern",
+          "description": "What going round again achieves",
+          "condition": {  // A Test — BOTH name and description are required
+            "name": "More increments remain",
+            "description": "When the loop is taken rather than exited",
+            "given": ["the objective is not yet met"],
+            "when": ["this pass completes"],
+            "then": ["the team re-enters the named view"]
+          }
+        },
         "tags": { ... }
       }
     ],
@@ -810,6 +821,8 @@ Add patterns array:
 - Use `patternViews` NOT `views`
 - Use `alphaStates` NOT `alphas`
 - PatternView.seq is REQUIRED
+- **A pattern whose views carry `narrativeContexts` MUST declare `narrativeTypeName` on the pattern itself.** Each context's `narrativeElementName` resolves to an element *inside* that type, so with no type named there is nothing to resolve against and the context cannot be interpreted. The two are only meaningful together: emit both, or neither. Note the pattern's own `narratives[]` entry carries its own `narrativeTypeName` — that one does not satisfy this, because it scopes the narrative, not the views.
+- **`narrativeTypeName` must be an exact, case-sensitive `NarrativeType.name` from the baseline.** Do not shorten it. `Essay` is not `Essay Narrative`, and `Hero's Journey` is not `The Hero's Journey`; a near-miss is a dangling reference, not a close enough match. Read the names out of the effective context rather than recalling them — the short forms are real names in other baselines, so a half-remembered one looks right and resolves against nothing. Every narrative type placeholder in the examples above is a placeholder for this reason.
 - NO `workProducts` property on PatternView — use `workProductLevels` (array of `{workProductName, levelOfDetailName}`) to declare work product LOD objectives per phase
 - activities are string names, not objects
 - **Each alpha MUST target at most 1 state per patternView** — if a phase advances an alpha through multiple states, split into sub-views using `Phase: Sub-step` naming (e.g., "Enable: Train", "Enable: Certify"). Each sub-view gets its own seq, activities, and narrative context.
@@ -826,64 +839,100 @@ Add patterns array:
   }
   ```
 
-#### 3.11.5 Pattern Groups
+#### 3.11.5 Pattern Orchestrations
 
-If the mapping guide defines pattern groups (Step 8.5), add a `patternGroups` array. PatternGroups organize patterns into navigational categories — most useful when a practice has 3+ patterns or a method will compose 10+.
+**Do NOT emit `patternGroups`.** The construct is deprecated as of schema 2.21.0 and is
+not used in new work. It remains valid and still merges, so documents that already
+declare it are left alone — but do not add it to a practice, and do not adopt a
+baseline's canonical group names even where a baseline still declares them. A pure
+classification does not need authoring: the merge stamps `sourcePracticeName` on every
+pattern, so a consumer can group for display without the document carrying the grouping.
+
+Where the mapping guide says how patterns relate **in time** (Step 8.5), emit a
+`patternOrchestrations` array instead. A pattern coordinates work within one aspect; an
+orchestration says which pattern applies when, and on what terms.
 
 ```json
-"patternGroups": [
+"patternOrchestrations": [
   {
-    "name": "Core Lifecycles",
-    "description": "Primary adoption and maturity journeys for each practice area",
-    "seq": 0,
-    "entries": [
-      { "patternName": "Platform Adoption Lifecycle", "seq": 0 },
-      { "patternName": "Team Formation Journey", "seq": 1 },
-      { "patternName": "Value Realization Cycle", "seq": 2 }
-    ],
-    "narratives": [
+    "name": "Adoption Endeavour",
+    "description": "How the adoption patterns layer across the life of an engagement",
+    "narrativeTypeName": "<exact NarrativeType.name from the baseline>",
+    "stages": [
       {
-        "name": "Navigating Core Lifecycles",
-        "description": "How the primary lifecycles relate and when to use each",
-        "narrativeTypeName": "Essay",
-        "narrativeContexts": [
-          {
-            "seq": 1,
-            "narrativeElementName": "Introduction",
-            "context": "Each practice area follows a distinct lifecycle reflecting its primary concern."
-          },
-          {
-            "seq": 2,
-            "narrativeElementName": "Body",
-            "context": "Platform adoption drives technical maturity, team formation builds organizational capability, and value realization tracks business outcomes."
-          },
-          {
-            "seq": 3,
-            "narrativeElementName": "Conclusion",
-            "context": "Start with platform adoption as the foundation, then layer team and value lifecycles as the organization matures."
-          }
-        ],
-        "citationNames": ["..."]
+        "patternName": "Platform Adoption Lifecycle",
+        "seq": 0,
+        "relationship": "sequential",
+        "exitCriteria": {
+          "name": "Platform is serving its first workloads",
+          "description": "The adoption lifecycle is complete when the platform carries real traffic.",
+          "given": ["The platform is deployed"],
+          "when": ["The first production workload is cut over"],
+          "then": ["The platform serves it without manual intervention"]
+        }
+      },
+      {
+        "patternName": "Team Formation Journey",
+        "seq": 0,
+        "relationship": "concurrent",
+        "relativeTo": { "patternName": "Platform Adoption Lifecycle" },
+        "recurrence": "once"
+      },
+      {
+        "patternName": "Value Realization Cycle",
+        "seq": 1,
+        "relationship": "nested",
+        "relativeTo": {
+          "patternName": "Platform Adoption Lifecycle",
+          "viewNames": ["Operate", "Scale"]
+        },
+        "recurrence": "perView"
+      },
+      {
+        "patternName": "Incident Response Lifecycle",
+        "seq": 2,
+        "relationship": "onDemand",
+        "trigger": {
+          "name": "A severity-one incident is declared",
+          "description": "What causes the response pattern to be entered.",
+          "given": ["The platform is in service"],
+          "when": ["Monitoring or a user reports a severity-one failure"],
+          "then": ["The response lifecycle is entered regardless of the current stage"]
+        }
+      },
+      {
+        "orchestrationName": "Project Endeavour",
+        "seq": 3,
+        "relationship": "nested",
+        "relativeTo": { "patternName": "Platform Adoption Lifecycle" },
+        "recurrence": "perView"
       }
-    ],
-    "tags": {
-      "lifecycleTags": ["Adoption"]
-    }
+    ]
   }
 ]
 ```
 
+The last stage **embeds** another orchestration rather than naming a pattern. That places
+the whole sub-endeavour — a programme embedding a project — and keeps the ordering with
+whoever authored it, so a later change there reaches this document without it being
+edited.
+
 **CRITICAL:**
 
-- When adopting baseline-defined groups, use the **exact baseline group name** — this is the merge key for cross-practice composition
-- Only include groups that have patterns assigned — do NOT emit empty baseline groups in extension practices (the baseline already defines them)
-- `patternName` must exactly match a defined `Pattern.name`
-- `seq` on entries provides sort order within the group (0-based)
-- `seq` on the group provides sort order among groups (0-based); alphabetical when absent
-- A pattern should appear in at most one group
-- Ungrouped patterns remain valid — they render in a default section
-- **Narratives:** Include when the mapping guide provides group-level rationale — why these patterns belong together, how they relate, how to navigate between them. Narratives help users understand the group's purpose. Omit if the grouping is self-explanatory.
-- Cross-practice groups merge by canonical name during method composition (entries merge by `patternName`, overlay seq wins)
+- `stages` is REQUIRED. It may be empty **only** in a baseline-published shell; an extension practice's orchestration needs at least one stage
+- Each stage declares **exactly one** of `patternName` or `orchestrationName`, never both and never neither
+- `patternName` must exactly match a `Pattern.name` in scope; `orchestrationName` must match a `PatternOrchestration.name` in scope. Both resolve across the baseline chain and declared dependencies, as every other symbolic link does
+- Embedding must not form a cycle: an orchestration cannot embed itself directly or through a chain
+- `relationship` is REQUIRED on every stage and is **always stated explicitly** — there is no default, because how a stage layers into an endeavour is a modelling decision a reader should never have to infer from silence
+- `relativeTo` is REQUIRED for `concurrent` and `nested`, and names exactly one of a host pattern or a host orchestration; add `viewNames` to scope the stage to particular views of a **pattern** host. `viewNames` against an orchestration host is an error — an orchestration has stages, not views
+- `trigger` is REQUIRED for `onDemand`. That stage has no fixed position — it is entered on recognition, which is what separates a planned phase from a pattern run because circumstances called for it
+- `recurrence` is meaningful only with `concurrent` or `nested`, and `perView` only against a **pattern** host. `perView` restarts the stage for each host view in scope; `once` runs it across the whole span
+- `seq` must be unique among `sequential` stages. For other relationships it is only the anchor point for presentation and may be shared
+- `entryCriteria` is a `Background` — alpha states and work product levels, expressed as everywhere else. `exitCriteria` and `trigger` are `Test` objects, so each needs `name` and `description` alongside its Given/When/Then
+- **A redeclared orchestration is additive.** Where the mapping guide extends an orchestration in scope, emit only the stages this practice contributes. Do **not** restate an inherited stage with a different `seq`, `relationship`, `relativeTo`, `trigger` or `recurrence`, and do not give an added `sequential` stage a `seq` at or below the highest inherited sequential `seq` — both are validation errors. Place contributions `concurrent`, `nested` or `onDemand` against the inherited stages
+- Prefer embedding over placing another document's pattern directly. The latter validates but warns, and the warning names the orchestration to embed instead
+- Do not invent an order the source material does not state. Independent patterns need no orchestration, and patterns named in none remain valid
+- If any stage carries `narrativeContexts`, the orchestration MUST declare `narrativeTypeName` — the same rule, for the same reason, as a pattern and its views
 
 #### 3.11.7 Outcomes
 
@@ -900,10 +949,11 @@ Build the `outcomes` array from the mapping guide's Outcome Mappings section. Ea
         "alphaName": "Alpha Name",
         "metricName": "metric-name",
         "workProductName": "Work Product Name",
-        "recognizedAtStateName": "State Name",
+        "recognizedAtStateName": "Recognition State",
         "forecastWeights": [
           { "stateName": "Earlier State", "weight": 0.3 },
-          { "stateName": "Later State", "weight": 1.0 }
+          { "stateName": "Recognition State", "weight": 1.0 },
+          { "stateName": "State After Recognition", "weight": 1.0 }
         ]
       }
     ],
@@ -936,9 +986,13 @@ Build the `outcomes` array from the mapping guide's Outcome Mappings section. Ea
 - Use `metricContributions` when the outcome tracks a numerical aggregate (revenue, count, capacity) through the alpha evidence chain
 - Use `objectiveContributions` when the outcome tracks lifecycle phase completion (readiness, maturity, compliance) through pattern views
 - Weights represent the probability or proportion of the outcome value recognized at each state/view — earlier states get lower weights, the recognition state gets 1.0
-- For sales-type pipelines: map weights to conversion probability (e.g., Identified=0.05, Qualified=0.25, Validated=0.5, Committed=0.8, Won=1.0)
-- For maturity-type outcomes: map weights to cumulative progress (e.g., initial=0.1, developing=0.3, established=0.6, optimized=0.85, transformational=1.0)
+- **The curve climbs to 1.0 and then holds.** Weights are non-decreasing across the progression, the recognised entry carries 1.0, and every state or view **after** it also carries 1.0. Once a metric is fully recognized it does not become less recognized because the alpha matured further.
+- **The recognised point is not always the last state.** Where the alpha or pattern continues past the point of full recognition — `Won` followed by `Renewing`, `Measured` followed by `Scaled` — do not keep climbing toward a later 1.0. Recognize at the state where the value is actually realized and plateau from there. Setting `recognizedAtStateName` one step before the entry carrying 1.0 is the most common way this goes wrong.
+- For sales-type pipelines: map weights to conversion probability (e.g., Identified=0.05, Qualified=0.25, Validated=0.5, Committed=0.8, Won=1.0, Renewing=1.0 — recognized at `Won`)
+- For maturity-type outcomes: map weights to cumulative progress (e.g., initial=0.1, developing=0.3, established=0.6, optimized=0.85, transformational=1.0 — recognized at `transformational`)
 - Include a weight entry for every state/view where partial recognition is meaningful — states not listed have implicit weight 0
+
+`assess-practice.py` enforces all of this (`check_forecast_monotonicity`). A curve that dips, or a recognised entry below 1.0, is reported there.
 
 **Lifecycle pattern outcome bias:** If the practice has at least one lifecycle pattern, at least one outcome SHOULD use `objectiveContributions` tied to the main lifecycle pattern (broadest alpha coverage). Set `patternName` to the pattern name, `recognizedAtPatternViewName` to the final view, and assign monotonically increasing `forecastWeights` across all views. This is the most natural way to track practice adoption maturity.
 
@@ -1431,7 +1485,12 @@ Names must be imperative verb phrases (actions to take), not past-participle con
 
 ### 16. Pattern View Alpha State Deduplication
 ❌ Wrong: Same alpha appearing multiple times in a single PatternView's `alphaStates`
-✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate
+✅ Right: Each alpha targets at most 1 state per PatternView — deduplicate. Two states of one alpha in a view is a schema error, and it also makes the walk across views look as though it moves backwards, so the ambiguity gets mistaken for an ordering defect. Where a phase genuinely advances an alpha twice, split it into sub-views (`Phase: Sub-step`).
+
+### 16a. Cyclical Patterns
+❌ Wrong: A recurring lifecycle flattened into a one-way sequence, with an alpha dropping back to an earlier state in a later view to suggest the repetition
+❌ Wrong: `loopsBackTo` naming a view in a different pattern, or a view at or after its own `seq`
+✅ Right: `loopsBackTo` on the view where the cycle closes, naming an earlier view of the same pattern, with a `condition` saying when the loop is taken rather than exited. A re-entered view's `alphaStates` are the minimum that must hold on that pass, never a reset — so the states still run forwards
 
 ### 17. Outcomes
 **Missing:** `outcomes` array absent — practices should have 1-3 outcomes describing value delivery

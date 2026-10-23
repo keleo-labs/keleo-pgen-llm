@@ -13,6 +13,12 @@ bundles/*
 !baselines/platform-adoption-essentials/
 baselines/platform-adoption-essentials/*
 !baselines/platform-adoption-essentials/platform-adoption-essentials.json
+# backup-practice.py writes timestamped backups beside the documents it
+# protects. Everywhere else that lands under an already-ignored tree, but
+# deps/ is tracked, so without this a regeneration run would offer its own
+# safety copies up for commit.
+deps/backup-*/
+
 reviews/*
 practice-resources/*
 archive
@@ -34,10 +40,32 @@ runs/*/*
 .claude/settings.local.json
 .claude/settings.json
 .claude/user-config.json
+# Share skills and hooks, but keep agent credentials, preferences and sessions local.
+.agents/*
+!.agents/skills/
+.codex/*
+!.codex/hooks.json
+# Some skill documentation uses the capitalised directory name.
+.Codex/*
+!.Codex/hooks.json
+
+# Local environment secrets and generated Python environments/bytecode.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+*.py[cod]
 .playwright-mcp/
 __pycache__/
 deps/*-cr.json
 .tmp/*
+
+# Output of user-level skills that happen to run from this directory and write
+# beside the project rather than into it. Not project material, and transcripts
+# in particular carry third-party content this repository has no licence to
+# republish.
+transcripts/
 
 # Deck projects scaffolded in-tree (decks are deliverables, not repo artifacts).
 # The deck-foundation skill and its theme are tracked; built output is not.

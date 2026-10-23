@@ -55,7 +55,7 @@ This classifies practices into Tier 1 (baseline-only, can run in parallel) and T
 - Phase 2 prompt: `prompts/phase-2-mapping.md`
 - Semantics sub-documents: `references/semantics/composition.md` (aliasing, hierarchies), `references/semantics/practice-elements.md` (elements, Gherkin), `references/semantics/alphas.md` (alpha semantics), `references/semantics/execution-and-patterns.md` (patterns, outcomes)
 - Baseline: Use effective baseline from Step 0 (or original baseline if no dependencies were resolved). If the effective baseline has `_aliasContext`, use domain aliases for semantic understanding but canonical names in structural references.
-- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only practices whose unique non-baseline alphas are actually referenced).
+- **Parent practice mode:** The effective context (`_effective-context.json`) contains ALL merged elements with `_contributingPracticeName` provenance. Use `_provenance.tiers` to distinguish baseline elements from practice elements. `contributesTo`/`mapsTo` targets should primarily reference practice-sourced alphas using canonical names. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - **Practice summary context:** If practice summaries were generated (Step 2A.5), include the JSON summary in each subagent prompt. This provides alpha names, pattern views, outcomes, dependencies without requiring ad hoc inspection.
 - Process: See generate-method SKILL.md "Step 2: Phase 2 - Mapping" section
 
@@ -119,7 +119,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
 - Schema: `deps/language.schema.json`
-- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (only parent practices whose unique non-baseline alphas are actually referenced).
+- Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 
 **Apply ALL latest validations from generate-method skill:**
@@ -130,6 +130,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 - "Generate the COMPLETE practice JSON. You MUST include ALL element arrays: alphas, workProducts, activities, patterns, personas, personaGroups, citations, outcomes, assets, and narratives."
 - "Only use competency names that exist in the baseline/effective-context. Do NOT invent new competency names."
 - "Preserve the existing version from the source JSON — do NOT set version to 1.0.0."
+- "If the source JSON declares `patternGroups`, copy it across verbatim. The construct is deprecated and new documents do not get one, so the mapping guide will not describe it — but a remap is not a migration, and dropping a group silently breaks every reference to its canonical name. Do not add one to a document that lacks it."
 
 **Post-Phase-3 Completeness Gate (MANDATORY):**
 After each Phase 3 subagent completes, verify element completeness against the backup:
@@ -159,7 +160,7 @@ The mapping guide has clear section headers. Assign sections to parallel subagen
 |----------|----------|---------------|
 | A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
 | B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
-| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternGroups` (entries, narratives) | Mapping guide §Work Products, §Patterns, §Pattern Groups |
+| C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternOrchestrations` (stages, relationships) | Mapping guide §Work Products, §Patterns, §Orchestrations |
 | D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |
 
 **Step 3: Launch parallel subagents**
@@ -169,7 +170,7 @@ Each subagent receives:
 - The schema (`deps/language.schema.json`) — relevant `$defs` only
 - The effective context for cross-reference names (alpha names, activity space names, etc.)
 - Instruction to output ONLY its assigned section(s) as a standalone JSON object
-- **Subagent C (patternGroups):** Must load the baseline's `patternGroups` and adopt existing baseline group names. Novel groups require justification. Use exact baseline group names — they are the merge key for cross-practice composition.
+- **Subagent C (patternGroups):** Copy any `patternGroups` from the source JSON across verbatim and author no new ones — the construct is deprecated, and a remap preserves rather than migrates. Where the mapping guide describes `patternOrchestrations`, emit those: every stage needs an explicit `relationship`, with `relativeTo` for concurrent and nested stages and a `trigger` for onDemand ones. A stage names exactly one of `patternName` or `orchestrationName`; the latter embeds a whole sub-endeavour owned elsewhere. Where the orchestration extends one already in scope, emit only this practice's stages — a remap does not re-place stages the practice does not own, for the same reason it copies `patternGroups` across rather than rewriting them. If the remap seems to need the inherited stages in a different order, that is a different endeavour and belongs in a new orchestration. See `references/orchestration-strategy.md`.
 
 Example subagent output for Subagent A:
 ```json

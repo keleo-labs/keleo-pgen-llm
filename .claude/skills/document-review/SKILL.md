@@ -1,5 +1,7 @@
 ---
 name: document-review
+metadata:
+  version: "1.1.0"
 description: Review a provided document against practice domain knowledge — what's strong, what could be improved, what isn't needed
 triggerPatterns:
   - "review.*document"
@@ -28,6 +30,8 @@ The output is a standalone improvement report, not an annotated copy of the orig
 ---
 
 ## Reporting Foundation
+
+At Step 2, apply [From diagnosis to action](../reporting-foundation/REPORT-FOUNDATION.md#from-diagnosis-to-action-steps-23). Its [shared contract](../reporting-foundation/contract.feature) applies within this report type's agreed scope; use the shared evals in `../reporting-foundation/evals/evals.json`.
 
 This skill builds on the common reporting infrastructure. Load these **on demand**:
 
@@ -71,11 +75,11 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 ---
 
-## Step 0: EnterPlanMode (REQUIRED)
+## Step 0: Planning stage (required)
 
-**MANDATORY FIRST STEP.**
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 
-In plan mode:
+During read-only planning:
 
 1. **Identify the practice context**
    - Which practice, method, baseline, or `.keleo` bundle provides the analytical framework?
@@ -95,9 +99,9 @@ In plan mode:
    - Identify which practice dimensions (alphas/concerns) are relevant to this document type
    - Confirm the assessment scope with the user
 
-**ExitPlanMode** once the user approves the plan.
+**Present the plan and end the turn.** Include required validation and unresolved questions. Continue only after explicit user approval.
 
-**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the reviewed document and any other sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+**After approval, open the report workspace before content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the reviewed document and any other sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
 
 ---
 

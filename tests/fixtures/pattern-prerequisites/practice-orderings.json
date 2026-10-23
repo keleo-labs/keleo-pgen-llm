@@ -1,0 +1,194 @@
+{
+  "kind": "practice",
+  "name": "Pattern Ordering Cases",
+  "version": "1.0.0",
+  "description": "Fixture exercising every ordering the prerequisite checker distinguishes. Not a realistic practice: it is the smallest document that puts an entry view, a loop span, an ambiguous view, a variant-shaped alpha, a genuine inversion and a genuine regression side by side, so each can be told apart from the others.",
+  "baselinePracticeName": "Merge Constructs Baseline",
+  "alphas": [
+    {
+      "name": "Plan",
+      "description": "The plan being worked.",
+      "contributesTo": "Platform",
+      "states": [
+        { "name": "Drafted", "description": "A first cut exists." },
+        {
+          "name": "Agreed",
+          "description": "The plan is signed off.",
+          "background": { "alphaStates": [{ "alphaName": "Signal", "stateName": "Collected" }] }
+        },
+        {
+          "name": "Executing",
+          "description": "The plan is being worked.",
+          "background": { "alphaStates": [{ "alphaName": "Signal", "stateName": "Analysed" }] }
+        },
+        { "name": "Reviewed", "description": "The plan has been looked back on." }
+      ]
+    },
+    {
+      "name": "Signal",
+      "description": "What the endeavour can observe about itself.",
+      "contributesTo": "Platform",
+      "states": [
+        { "name": "Unmonitored", "description": "Nothing is being watched." },
+        { "name": "Collected", "description": "Readings are arriving." },
+        { "name": "Analysed", "description": "Readings have been interpreted." }
+      ]
+    },
+    {
+      "name": "Gate",
+      "description": "A control point the work passes through.",
+      "contributesTo": "Platform",
+      "states": [
+        { "name": "Closed", "description": "The gate is shut." },
+        { "name": "Opening", "description": "The gate is being opened." },
+        {
+          "name": "Open",
+          "description": "The gate is open.",
+          "background": { "alphaStates": [{ "alphaName": "Plan", "stateName": "Executing" }] }
+        }
+      ]
+    },
+    {
+      "name": "Source",
+      "description": "Deliberately modelled badly: these states name kinds of source rather than stages of one, which is what --variant-smell exists to notice.",
+      "contributesTo": "Platform",
+      "states": [
+        { "name": "Static", "description": "A hand-maintained source." },
+        { "name": "Discovered", "description": "A source found by querying a provider." },
+        { "name": "Aggregated", "description": "Several sources combined." }
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "name": "Cadence",
+      "description": "A recurring loop. Everything odd about its ordering is explained by the loop or by the entry view.",
+      "patternViews": [
+        {
+          "name": "Prerequisites",
+          "seq": 0,
+          "description": "Conditions holding before the cadence starts.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Agreed" }]
+        },
+        {
+          "name": "Sense",
+          "seq": 1,
+          "description": "Gather readings.",
+          "alphaStates": [{ "alphaName": "Signal", "stateName": "Collected" }]
+        },
+        {
+          "name": "Act",
+          "seq": 2,
+          "description": "Work the plan.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Executing" }]
+        },
+        {
+          "name": "Measure",
+          "seq": 3,
+          "description": "Interpret what happened.",
+          "alphaStates": [{ "alphaName": "Signal", "stateName": "Analysed" }]
+        },
+        {
+          "name": "Adapt",
+          "seq": 4,
+          "description": "Re-agree the plan for the next lap.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Agreed" }],
+          "loopsBackTo": {
+            "patternViewName": "Sense",
+            "description": "Each lap re-senses before acting again.",
+            "condition": {
+              "name": "More laps remain",
+              "given": ["the objective is not yet met"],
+              "when": ["the review completes"],
+              "then": ["the team re-enters sensing"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Linear",
+      "description": "No loop, so the same shapes are genuine defects.",
+      "patternViews": [
+        {
+          "name": "Start",
+          "seq": 1,
+          "description": "Draft the plan.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Drafted" }]
+        },
+        {
+          "name": "Gate",
+          "seq": 2,
+          "description": "Open the gate before the plan is running.",
+          "alphaStates": [{ "alphaName": "Gate", "stateName": "Open" }]
+        },
+        {
+          "name": "Run",
+          "seq": 3,
+          "description": "Work the plan.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Executing" }]
+        },
+        {
+          "name": "Close",
+          "seq": 4,
+          "description": "Fall back to an agreed plan.",
+          "alphaStates": [{ "alphaName": "Plan", "stateName": "Agreed" }]
+        }
+      ]
+    },
+    {
+      "name": "Ambiguous",
+      "description": "Declares one alpha twice in a view, so the walk only appears to move backwards.",
+      "patternViews": [
+        {
+          "name": "Pick",
+          "seq": 1,
+          "description": "Two kinds of source at once.",
+          "alphaStates": [
+            { "alphaName": "Source", "stateName": "Static" },
+            { "alphaName": "Source", "stateName": "Discovered" }
+          ]
+        },
+        {
+          "name": "Repeat",
+          "seq": 2,
+          "description": "The same state declared twice.",
+          "alphaStates": [
+            { "alphaName": "Source", "stateName": "Aggregated" },
+            { "alphaName": "Source", "stateName": "Aggregated" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Oscillate",
+      "description": "Moves back down an alpha's states repeatedly, with no ambiguity and no loop to explain it.",
+      "patternViews": [
+        {
+          "name": "Up",
+          "seq": 1,
+          "description": "Open.",
+          "alphaStates": [{ "alphaName": "Gate", "stateName": "Open" }]
+        },
+        {
+          "name": "Down",
+          "seq": 2,
+          "description": "Shut again.",
+          "alphaStates": [{ "alphaName": "Gate", "stateName": "Closed" }]
+        },
+        {
+          "name": "Up Again",
+          "seq": 3,
+          "description": "Open again.",
+          "alphaStates": [{ "alphaName": "Gate", "stateName": "Open" }]
+        },
+        {
+          "name": "Down Again",
+          "seq": 4,
+          "description": "Shut again.",
+          "alphaStates": [{ "alphaName": "Gate", "stateName": "Closed" }]
+        }
+      ]
+    }
+  ]
+}

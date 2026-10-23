@@ -52,6 +52,11 @@ Keep: the defect, why it matters, what is expected, how to reproduce where that 
 generic. Drop: where you were when you found it, who asked, which engagement, which
 document.
 
+The opening paragraph is the one that always has to be rewritten rather than redacted. A
+row orients its reader by naming the practice; an issue has to orient by naming the
+component and the job it does. See `drafting.md` for the five moves and `examples.md`
+for the same rows written both ways.
+
 ## The gate
 
 ```bash
@@ -70,10 +75,32 @@ The fifth is the point: `Data Intelligence Node` escaped because the row reports
 *missing* from the corpus, so no harvest could know it. **A row describing something
 absent can name a term the gate cannot know.** Only you cover that.
 
-Single ordinary English words are dropped from the harvest — the corpus names elements
-`Architecture`, `Backlog` and `Benefits`, and blocking those would flag every second
-sentence until the gate was ignored. That is a deliberate narrow false negative bought
-to keep the gate credible.
+Ordinary English is dropped from the harvest, because a gate that fires on normal prose
+is argued with, and a gate that is argued with stops being read for the findings that
+matter. Every false positive is paid for in rewriting rather than fixed once, which is
+what makes them expensive given the rule below against weakening the list to pass one
+draft.
+
+Two cases are dropped. **Single dictionary words**, whatever their capitalisation — the
+corpus names elements `Architecture`, `Backlog` and `Benefits`. And **lowercase
+multi-word phrases** of dictionary words, which are keywords and fragments of prose
+rather than declared names. Title-case phrases stay: `Campaign Measurement Team` is a
+declared element and is exactly the content being withheld. Capitalisation is not what
+makes a term sensitive, but it is a reliable signal of where the term came from.
+
+Both are deliberate narrow false negatives bought to keep the gate credible. Check the
+bargain still holds:
+
+```bash
+python3 utils/issue-sanitiser.py --audit-denylist   # expect zero
+```
+
+A **handle finding whose every occurrence sits inside a code span or fenced block** does
+not block. The identity scanner reads an at-sign followed by a word as a user mention,
+which is also the shape of a JSON-LD keyword, an npm scope, a decorator and a shell
+array expansion. Backticks are your own statement that the token is code. A handle in
+prose still blocks, so the gate keeps the case it exists for — and if you find yourself
+removing backticks to get a draft through, you have inverted the test.
 
 Refresh the denylist when practices have been added:
 

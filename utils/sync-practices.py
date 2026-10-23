@@ -64,12 +64,18 @@ def should_skip_file(path):
     return False
 
 
-def scan_directory(directory):
+def scan_directory(directory, duplicates=None):
     """Return a dict mapping ``name`` -> ``(Path, version, kind)`` for
     every eligible practice/method JSON in *directory*.
+
+    This tool compares directories, never within one, so two files in a single
+    directory holding the same document under different names used to collapse
+    into whichever sorted last — leaving the other to drift unnoticed. Pass
+    ``duplicates`` to collect ``name -> [Path, ...]`` for the collisions.
     """
     directory = Path(directory)
     index = {}
+    seen = {}
     if not directory.is_dir():
         return index
     for f in sorted(directory.glob("*.json")):
@@ -82,7 +88,18 @@ def scan_directory(directory):
         version = data.get("version", "")
         kind = detect_kind(data)
         if name:
+            seen.setdefault(name, []).append((f, version))
             index[name] = (f, version, kind)
+    if duplicates is not None:
+        for name, entries in seen.items():
+            if len(entries) > 1:
+                duplicates.append({
+                    "directory": str(directory),
+                    "name": name,
+                    "files": [
+                        {"file": p.name, "version": v or "(none)"} for p, v in entries
+                    ],
+                })
     return index
 
 
@@ -93,30 +110,49 @@ def scan_directory(directory):
 def sync_practices(source_dir, fix=False):
     """Compare source practices against all other ``practices/*/`` directories.
 
-    Returns a list of result dicts, one per target directory, each containing
-    a list of per-practice action records.
+    Returns ``(results, duplicates)`` — one result dict per target directory,
+    each with a list of per-practice action records, plus any directory found
+    holding one document under two filenames.
     """
     source_dir = Path(source_dir).resolve()
-    practices_root = source_dir.parent  # e.g. <repo>/practices
+    source_root = source_dir.parent  # e.g. <repo>/practices
 
-    if not practices_root.is_dir():
-        print(json.dumps({"error": f"Parent directory does not exist: {practices_root}"}))
+    if not source_root.is_dir():
+        print(json.dumps({"error": f"Parent directory does not exist: {source_root}"}))
         sys.exit(1)
 
-    source_index = scan_directory(source_dir)
+    # Copies of a document do not stay inside the tree it was authored in: a
+    # regenerated baseline in baselines/ commonly has synced copies sitting in
+    # practices/<method>/ so that method directory is self-contained. Deriving
+    # the target root from the source's own parent missed those entirely, and a
+    # stale copy left behind is worse than no copy — resolution goes ambiguous
+    # and tools silently pick the old version.
+    repo_root = source_root.parent
+    target_roots = []
+    for candidate in ("practices", "baselines"):
+        candidate_path = repo_root / candidate
+        if candidate_path.is_dir():
+            target_roots.append(candidate_path)
+    if source_root not in target_roots:
+        target_roots.append(source_root)
+
+    duplicates = []
+    source_index = scan_directory(source_dir, duplicates)
     if not source_index:
         print(json.dumps({"error": f"No eligible practice JSON files found in {source_dir}"}))
         sys.exit(1)
 
     results = []
 
-    for target_dir in sorted(practices_root.iterdir()):
-        if not target_dir.is_dir():
-            continue
-        if target_dir.resolve() == source_dir:
-            continue
+    target_dirs = []
+    for root in target_roots:
+        for entry in sorted(root.iterdir()):
+            if entry.is_dir() and entry.resolve() != source_dir:
+                target_dirs.append(entry)
 
-        target_index = scan_directory(target_dir)
+    for target_dir in target_dirs:
+
+        target_index = scan_directory(target_dir, duplicates)
         if not target_index:
             continue
 
@@ -185,12 +221,29 @@ def sync_practices(source_dir, fix=False):
 
         results.append(dir_result)
 
-    return results
+    return results, duplicates
 
 
 # ---------------------------------------------------------------------------
 # Display
 # ---------------------------------------------------------------------------
+
+def print_duplicates(duplicates):
+    """Report a directory holding one document under two filenames.
+
+    Syncing cannot fix this — it compares directories, and both copies live in
+    the same one. Whichever filename sorts last wins the comparison, so the
+    other drifts silently until something selects it by name.
+    """
+    if not duplicates:
+        return
+    print("Duplicate documents within a directory:\n")
+    for d in duplicates:
+        files = ", ".join(f"{e['file']} ({e['version']})" for e in d["files"])
+        print(f"  ⚠ {d['directory']}/")
+        print(f"    '{d['name']}' is declared by {len(d['files'])} files: {files}")
+    print("\n  Remove the superseded file; sync cannot reconcile two copies in one directory.\n")
+
 
 def print_results(results, source_dir, fix):
     """Print human-readable sync results."""
@@ -264,6 +317,118 @@ def print_results(results, source_dir, fix):
 # Main
 # ---------------------------------------------------------------------------
 
+def sync_embedded_practices(repo_root, fix=False):
+    """Refresh practice objects embedded inside method documents.
+
+    A method document on disk carries its constituent practices inline under
+    `practices`, while each also exists as a standalone file. Only the
+    standalone file is maintained -- every generation and update run writes
+    that one -- so the embedded copy falls behind silently, and anyone reading
+    the method document rather than the practice files gets superseded content
+    with nothing marking it stale. Packaging does not catch it, because the
+    archive is built from the standalone documents.
+
+    Comparison is by document version, newest wins. An embedded copy that is
+    somehow ahead of its standalone source is reported and left alone rather
+    than overwritten: that is a signal someone edited the method directly, and
+    silently discarding it would be the same class of data loss this is here
+    to prevent.
+    """
+    standalone = {}
+    for root_name in ("practices", "baselines"):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob("*/*.json")):
+            if should_skip_file(path):
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if not isinstance(data, dict) or not data.get("name"):
+                continue
+            if data.get("kind") == "method":
+                continue
+            entry = standalone.get(data["name"])
+            version = data.get("version", "0.0.0")
+            if entry is None or parse_semver(version) > parse_semver(entry["version"]):
+                standalone[data["name"]] = {
+                    "path": path, "version": version, "data": data,
+                }
+
+    actions = []
+    for root_name in ("practices",):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.glob("*/*.json")):
+            if should_skip_file(path):
+                continue
+            try:
+                data = json.loads(path.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if not isinstance(data, dict) or data.get("kind") != "method":
+                continue
+            embedded = data.get("practices")
+            if not isinstance(embedded, list) or not embedded:
+                continue
+
+            changed = False
+            for i, practice in enumerate(embedded):
+                if not isinstance(practice, dict):
+                    continue
+                name = practice.get("name")
+                source = standalone.get(name)
+                if not source:
+                    continue
+                embedded_version = practice.get("version", "0.0.0")
+                cmp_embedded = parse_semver(embedded_version)
+                cmp_source = parse_semver(source["version"])
+                if cmp_embedded == cmp_source:
+                    continue
+                record = {
+                    "method": str(path),
+                    "practice": name,
+                    "embeddedVersion": embedded_version,
+                    "sourceVersion": source["version"],
+                    "source": str(source["path"]),
+                }
+                if cmp_embedded > cmp_source:
+                    record["status"] = "embedded-ahead"
+                    actions.append(record)
+                    continue
+                record["status"] = "stale"
+                if fix:
+                    embedded[i] = json.loads(json.dumps(source["data"]))
+                    record["applied"] = True
+                    changed = True
+                actions.append(record)
+
+            if changed and fix:
+                path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+
+    return actions
+
+
+def print_embedded(actions, fix):
+    if not actions:
+        print("\nEmbedded method practices: all in step with their sources.")
+        return
+    print(f"\n=== EMBEDDED METHOD PRACTICES ({len(actions)}) ===")
+    for a in actions:
+        if a["status"] == "embedded-ahead":
+            mark = "AHEAD  "
+            note = " — embedded copy is newer; left alone, reconcile by hand"
+        else:
+            mark = "SYNCED " if a.get("applied") else "STALE  "
+            note = "" if fix else " (dry run)"
+        print(f"  {mark} {a['practice']}: v{a['embeddedVersion']} -> "
+              f"v{a['sourceVersion']}{note}")
+        print(f"          in {a['method']}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Synchronize shared practice files between method directories"
@@ -281,6 +446,10 @@ def main():
         help="After syncing, rebuild affected .keleo bundles via rebuild-keleo.py"
     )
     parser.add_argument(
+        "--no-embedded", action="store_true",
+        help="Skip refreshing practice objects embedded inside method documents"
+    )
+    parser.add_argument(
         "--json", action="store_true",
         help="Output results as JSON"
     )
@@ -291,13 +460,25 @@ def main():
         print(json.dumps({"error": f"Source directory does not exist: {source_dir}"}))
         sys.exit(1)
 
-    results = sync_practices(source_dir, fix=args.fix)
+    results, duplicates = sync_practices(source_dir, fix=args.fix)
+
+    embedded = []
+    if not args.no_embedded:
+        embedded = sync_embedded_practices(
+            source_dir.resolve().parent.parent, fix=args.fix
+        )
 
     if args.json:
-        json.dump(results, sys.stdout, indent=2)
+        json.dump(
+            {"results": results, "duplicates": duplicates, "embedded": embedded},
+            sys.stdout, indent=2,
+        )
         print()
     else:
+        print_duplicates(duplicates)
         print_results(results, source_dir, fix=args.fix)
+        if not args.no_embedded:
+            print_embedded(embedded, fix=args.fix)
 
     # Rebuild bundles if requested and changes were applied
     if args.rebuild_bundles and args.fix:

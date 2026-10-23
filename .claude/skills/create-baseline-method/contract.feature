@@ -19,7 +19,7 @@ Feature: Baseline Practice Creation from Foundational Framework
 
   Scenario: Planning phase is mandatory
     When the skill is invoked
-    Then EnterPlanMode is called before any phase execution
+    Then the read-only planning stage completes before any phase execution
     And the plan assesses baseline appropriateness (vs extension practice)
 
   Scenario: Distillation phase identifies essentials
@@ -65,3 +65,22 @@ Feature: Baseline Practice Creation from Foundational Framework
     When the verification gate runs
     Then it runs before package-keleo.py
     And a baseline built on a failed gate is not packaged
+
+  Scenario: Planning without native mode control
+    Given native Plan mode is unavailable or cannot be switched by the agent
+    When the skill prepares its plan
+    Then it uses read-only inspection to identify affected components, constraints and required validation
+    And it presents the proposed plan and unresolved questions without claiming a mode switch
+    And it ends the turn without changing files or external systems
+
+  Scenario: Clarification does not approve implementation
+    Given a proposed plan awaits explicit user approval
+    When the user answers a scope question without approving the plan
+    Then the skill keeps implementation paused
+    And it creates no workspace, prompt history, download or external update
+
+  Scenario: Approved plan resumes execution
+    Given the user explicitly approves the proposed plan
+    When the skill resumes
+    Then it proceeds with the approved work and required validation
+    And it does not require a native Plan mode control to continue

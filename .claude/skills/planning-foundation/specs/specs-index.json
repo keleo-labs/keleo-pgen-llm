@@ -1,0 +1,87 @@
+{
+  "skill": null,
+  "source": ".claude/skills/planning-foundation/PLANNING-FOUNDATION.md",
+  "features": [
+    "Portable planning approval"
+  ],
+  "scenarios": [
+    {
+      "id": "process-956",
+      "name": "Plan before implementation without mode controls",
+      "feature": "Portable planning approval",
+      "given": [
+        "A skill requires planning and native Plan mode cannot be activated"
+      ],
+      "when": [
+        "The agent prepares its plan using read-only inspection"
+      ],
+      "then": [
+        "It presents affected components, constraints, validation and unresolved questions",
+        "It ends the turn without file or external-system changes or a false mode-switch claim"
+      ],
+      "line": 20,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-957",
+      "name": "Scope answers do not approve implementation",
+      "feature": "Portable planning approval",
+      "given": [
+        "The proposed plan has not been explicitly approved"
+      ],
+      "when": [
+        "The user answers a planning question"
+      ],
+      "then": [
+        "Implementation remains paused and no workspace or provenance is written"
+      ],
+      "line": 26,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-958",
+      "name": "Approval resumes execution",
+      "feature": "Portable planning approval",
+      "given": [
+        "The user explicitly approves the proposed plan"
+      ],
+      "when": [
+        "The agent resumes the skill"
+      ],
+      "then": [
+        "It executes the approved work and validation without requiring native mode controls"
+      ],
+      "line": 31,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-959",
+      "name": "Native mode does not replace approval",
+      "feature": "Portable planning approval",
+      "given": [
+        "Native Plan mode is active but the proposed plan is not approved"
+      ],
+      "when": [
+        "The agent finishes planning"
+      ],
+      "then": [
+        "It ends the turn without implementation or external writes"
+      ],
+      "line": 36,
+      "assess_categories": [],
+      "automatable": false
+    }
+  ],
+  "stats": {
+    "total_scenarios": 4,
+    "total_features": 1,
+    "automatable": 0,
+    "manual_only": 4,
+    "by_category": {
+      "process": 4
+    }
+  }
+}

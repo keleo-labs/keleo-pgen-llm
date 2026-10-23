@@ -1,0 +1,66 @@
+{
+  "kind": "practice",
+  "name": "Edge OpenShift",
+  "description": "Fixture practice: restricted variant that suppresses federation, adds OpenShift specificity, retargets a loop and refines the orchestration.",
+  "version": "1.0.0",
+  "authors": ["Fixture"],
+  "createdAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "baselinePracticeName": "Merge Constructs Baseline",
+  "practiceDependencyNames": ["IDP Delivery"],
+  "assets": [
+    { "name": "Platform Icon", "type": "icon", "format": "image", "url": "https://example.invalid/edge-platform.svg" }
+  ],
+  "personas": [
+    { "name": "Site Reliability Engineer", "description": "Keeps remote sites running." }
+  ],
+  "personaGroups": [
+    { "name": "Platform Team", "description": "Overlay description, discarded.", "personaNames": ["Site Reliability Engineer"] }
+  ],
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "Redeclaration ignored — the baseline owns the definition.",
+      "specificityName": "OpenShift",
+      "specificity": ["Authored", "Chain"],
+      "focusName": "Endeavor",
+      "relatesTo": [
+        { "relationship": "runs on", "alphaName": "Multi-Cluster Federation", "direction": "outgoing" }
+      ],
+      "states": [
+        {
+          "name": "Operational",
+          "seq": 3,
+          "description": "Redeclared state.",
+          "loopsBackTo": {
+            "stateName": "Identified",
+            "description": "An edge site rollout reopens the question of what the platform is for."
+          },
+          "checklist": [
+            { "name": "Edge sites enrolled", "seq": 3, "description": "Remote sites report in." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Multi-Cluster Federation",
+      "description": "Coordination of workloads across independently operated clusters.",
+      "suppressed": true
+    }
+  ],
+  "patterns": [
+    { "name": "Site Rollout", "description": "Bringing an edge site online.", "patternViews": [{ "name": "Enrol", "seq": 1, "description": "Enrolment." }] }
+  ],
+  "patternOrchestrations": [
+    {
+      "name": "Platform Endeavour",
+      "description": "Refinement of the inherited orchestration.",
+      "stages": [
+        { "patternName": "Platform Bootstrap", "seq": 7, "relationship": "sequential", "entryCriteria": "Overridden — first writer keeps it.", "exitCriteria": "A cluster serves traffic." },
+        { "patternName": "Site Rollout", "seq": 2, "relationship": "nested", "recurrence": "perView", "relativeTo": { "patternName": "Steady State" } },
+        { "patternName": "Site Rollout", "seq": 3, "relationship": "onDemand", "trigger": { "name": "New site signed", "description": "A site contract completes.", "when": ["A new site contract completes"] } },
+        { "orchestrationName": "Rollout Endeavour", "seq": 4, "relationship": "nested", "relativeTo": { "patternName": "Steady State" } }
+      ]
+    }
+  ]
+}
