@@ -1,5 +1,7 @@
 ---
 name: method-based-report
+metadata:
+  version: "1.0.0"
 description: Generate plain English reports structured by practice/method narrative frameworks — audience sees domain insight, not Keleo internals
 triggerPatterns:
   - "method.*report"
@@ -66,9 +68,11 @@ Both `gws` and Playwright are content sourcing tools — they help gather subjec
 
 ---
 
-## Step 0: EnterPlanMode (REQUIRED)
+## Step 0: Planning stage (required)
 
-**MANDATORY FIRST STEP.** Before generating any report, you MUST use EnterPlanMode to:
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
+
+During read-only planning:
 
 1. **Identify the practice context**
    - The user must specify a practice, method, baseline, or `.keleo` bundle
@@ -97,9 +101,9 @@ Both `gws` and Playwright are content sourcing tools — they help gather subjec
    - Propose any secondary structures for subsections
    - Confirm the approach with the user before proceeding
 
-**ExitPlanMode** once the user approves the plan.
+**Present the plan and end the turn.** Include required validation and unresolved questions. Continue only after explicit user approval.
 
-**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+**After approval, open the report workspace before content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
 
 ---
 

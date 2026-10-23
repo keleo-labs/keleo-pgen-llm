@@ -42,6 +42,8 @@ grep -roh "@rule:report-[0-9]*" .claude/skills/ | sort -u
 ```markdown
 ---
 name: <skill-name>
+metadata:
+  version: "1.0.0"
 description: <one-line description — what the report is and who it's for>
 triggerPatterns:
   - "<pattern-1>"
@@ -101,20 +103,22 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 ---
 
-## Step 0: EnterPlanMode (REQUIRED)
+## Step 0: Planning stage (required)
 
 <Type-specific planning questions beyond the common ones. What additional input does this report type need?>
 
-In plan mode:
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
+
+During read-only planning:
 
 1. **Identify the practice context** — same as base skill
 2. **Clarify subject and purpose** — <type-specific questions>
 3. **<Type-specific input>** — <what this type uniquely needs>
 4. **Preview the narrative strategy** — using the preferred structures above
 
-**ExitPlanMode** once the user approves the plan.
+**Present the plan and end the turn.** Include affected components, constraints, required validation and unresolved questions. Continue only after explicit user approval.
 
-**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+**After approval, open the report workspace before content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
 
 ---
 

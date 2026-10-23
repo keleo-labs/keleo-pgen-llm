@@ -665,7 +665,7 @@ Use the `/create-baseline-method` skill to create foundational frameworks:
 This skill automates the four-phase baseline creation pipeline:
 
 **1. Planning (MANDATORY):**
-- Enters plan mode automatically
+- Uses read-only planning, then stops for explicit approval before execution
 - Analyzes source materials for baseline appropriateness
 - Identifies potential custom Focuses
 - Creates execution roadmap
@@ -710,7 +710,7 @@ Use the `/generate-method` skill to create practices that extend baselines:
 This skill automates the three-phase pipeline:
 
 **1. Planning (MANDATORY):**
-- Enters plan mode automatically
+- Uses read-only planning, then stops for explicit approval before execution
 - Analyzes source materials
 - Determines Practice vs Method
 - Creates execution roadmap
@@ -755,7 +755,7 @@ The protocol and the agent briefs live in `.claude/skills/verification-foundatio
 | 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
 | Reports — single gate | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style`, plus a `type-specific` verifier for all but `method-based-report` |
 
-The reporting skills have one gate rather than four, because the workflow produces one durable artifact: Steps 1–2 are in-context analysis and Step 0 is already user-gated in plan mode. Their gate sits in `reporting-foundation/REPORT-FOUNDATION.md` → Output (Step 3) and runs before any PDF export or Google Doc publish.
+The reporting skills have one gate rather than four, because the workflow produces one durable artifact: Steps 1–2 are in-context analysis and Step 0 is already gated by explicit user approval in the planning stage. Their gate sits in `reporting-foundation/REPORT-FOUNDATION.md` → Output (Step 3) and runs before any PDF export or Google Doc publish.
 
 Findings are consolidated and gated by `utils/verification-gate.py` (`--phase report` for reports). **Confirmed errors block the phase.** Warnings flow into the user review gate. `update-method` scopes its gates to changed elements only.
 
@@ -873,7 +873,7 @@ Use the `/improve-tooling` skill to create, extend, refactor, or consolidate uti
 
 The skill operates in two modes:
 
-- **Direct invocation**: User requests an improvement. Util changes are applied directly; skill instruction changes go through plan mode for approval.
+- **Direct invocation**: User requests an improvement. Util changes are applied directly; skill instruction changes use a read-only planning stage and stop for explicit approval, with or without native Plan mode.
 - **Mid-execution invocation**: Another skill discovers it needs a mechanical helper that doesn't exist. It invokes `/improve-tooling` via the Skill tool, which auto-proceeds and reports back.
 
 The skill enforces a mechanical-vs-semantic gate: only operations whose input/output is fully determined by rules and data are scriptable. Semantic decisions (meaning, quality, fitness) remain in the LLM layer.

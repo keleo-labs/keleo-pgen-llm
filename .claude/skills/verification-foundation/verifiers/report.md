@@ -5,7 +5,7 @@ Used by all five reporting skills — `method-based-report`, `reference-architec
 
 Reports have **one gate**, not four. The reporting workflow has four steps but only
 one durable artifact: Steps 1–2 produce in-context analysis rather than files, and
-Step 0 is already user-gated in plan mode, so scope and narrative choice are approved
+Step 0 is already gated by explicit user approval in the planning stage, so scope and narrative choice are approved
 before writing starts. There is nothing to verify until Step 3 writes the markdown.
 
 The gate runs **before** any PDF export or Google Doc publish. Publishing a report

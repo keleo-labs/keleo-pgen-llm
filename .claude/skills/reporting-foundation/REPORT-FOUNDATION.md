@@ -1,6 +1,6 @@
 # Report Foundation
 
-**Version:** 1.1.0
+**Version:** 1.2.0
 
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
@@ -21,7 +21,7 @@ reports/<report-slug>/
     <name>.svg                Rendered diagram
 ```
 
-The slug is kebab-case, derived from the report title, and names both the directory and the markdown file inside it. Create the directory at Step 0, before any content is written.
+The slug is kebab-case, derived from the report title, and names both the directory and the markdown file inside it. Create the directory only after the user explicitly approves the Step 0 plan, before any content is written.
 
 Diagram embeds are relative to the markdown — `![alt](assets/<name>.svg)` — so the whole directory can be moved, copied, or handed over intact.
 
@@ -31,7 +31,7 @@ Diagram embeds are relative to the markdown — `![alt](assets/<name>.svg)` — 
 
 Every reporting run records how the report came to exist: the prompt behind it, the practice context that framed it, the narrative decision taken, and what was produced. Use `utils/prompt-history.py` — the same utility the generation skills use — against the report directory.
 
-**Initialise immediately after ExitPlanMode:**
+**Initialise only after explicit approval of the Step 0 plan:**
 
 ```bash
 python3 utils/prompt-history.py reports/<report-slug>/ --init \

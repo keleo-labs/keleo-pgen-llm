@@ -1,5 +1,7 @@
 ---
 name: project-plan
+metadata:
+  version: "1.0.0"
 description: Create high-level project plans, PoC outlines, and implementation roadmaps — with optional SOW generation for T&M consulting engagements
 triggerPatterns:
   - "project.*plan"
@@ -75,11 +77,11 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 ---
 
-## Step 0: EnterPlanMode (REQUIRED)
+## Step 0: Planning stage (required)
 
-**MANDATORY FIRST STEP.**
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 
-In plan mode:
+During read-only planning:
 
 1. **Identify the practice context**
    - Which practice, method, baseline, or `.keleo` bundle provides the domain framework?
@@ -104,9 +106,9 @@ In plan mode:
    - Propose tracks or phases based on the practice's activities and patterns
    - Confirm the approach with the user
 
-**ExitPlanMode** once the user approves the plan.
+**Present the plan and end the turn.** Include required validation and unresolved questions. Continue only after explicit user approval.
 
-**Then open the report workspace, before any content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+**After approval, open the report workspace before content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
 
 ---
 
@@ -217,7 +219,7 @@ must already know what follows it. Two to four sentences. (@rule:report-618)>
 
 ## SOW Sub-Mode
 
-When the user requests a Statement of Work (via trigger pattern, plan mode decision, or explicit request), generate the SOW as either a standalone document or an appendix to the project plan.
+When the user requests a Statement of Work (via trigger pattern, planning-stage decision, or explicit request), generate the SOW as either a standalone document or an appendix to the project plan.
 
 ### SOW Output Structure
 

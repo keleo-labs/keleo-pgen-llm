@@ -1,6 +1,6 @@
 # Skill Specification Standard
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
@@ -251,7 +251,7 @@ A generation skill gates each phase on it: mechanical validation, then the verif
 
 ## 11. Post-Completion Review
 
-After completing the skill workflow OR after completing planning, every skill MUST review the session for improvement opportunities and **apply fixes directly** rather than proposing them to the user.
+After completing the skill workflow, every skill MUST review the session for improvement opportunities and **apply fixes directly** rather than proposing them to the user. If a skill stops after planning to await approval, keep the review read-only and defer fixes, issue drafts and external updates until approval. See [the planning stage](planning-foundation/PLANNING-FOUNDATION.md).
 
 ### 11.1 Utils Remediation (Apply Immediately)
 
@@ -271,6 +271,8 @@ Identify patterns that indicate skill instruction gaps (repeated manual correcti
 ## 12. Remote Bundle Resolution
 
 When a skill cannot resolve a dependency locally (via `discover-dependencies.py`), use the `studio-client.py` utility to download from the keleo-studio-gas remote library.
+
+During a planning stage awaiting approval, report missing dependencies in the plan and defer downloads and cache refreshes until approval.
 
 ### 12.1 Download a Missing Bundle
 

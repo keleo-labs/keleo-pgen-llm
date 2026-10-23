@@ -1,6 +1,6 @@
 # Verification Foundation
 
-**Version:** 1.0.0
+**Version:** 1.0.1
 
 Shared verification protocol for the generation skills — `generate-method`,
 `create-baseline-method`, `update-method`. **This is not a skill.** It is reference
@@ -48,7 +48,7 @@ verifier tokens.
 | `update-method` | Scoped to changed elements only — see §9 |
 | The five reporting skills | One gate, after the report is written — see `verifiers/report.md` |
 
-The reporting skills have one gate rather than several because their workflow produces one durable artifact: Steps 1–2 are in-context analysis, and Step 0 is already user-gated in plan mode. Their mechanical predecessor is `lint-report.py` rather than `eval-skill-output.py`.
+The reporting skills have one gate rather than several because their workflow produces one durable artifact: Steps 1–2 are in-context analysis, and Step 0 is already gated by explicit user approval in the planning stage. Their mechanical predecessor is `lint-report.py` rather than `eval-skill-output.py`.
 
 ---
 

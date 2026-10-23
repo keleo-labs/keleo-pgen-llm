@@ -1,9 +1,16 @@
+---
+name: create-baseline-method
+description: Generate foundational baseline practice JSON from source methodology
+metadata:
+  version: "1.2.0"
+---
+
 # create-baseline-method Skill
 
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.1.0
+**Version:** 1.2.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -66,7 +73,7 @@ This skill orchestrates a 4-phase pipeline:
 
 **BEFORE executing any phase, you MUST:**
 
-1. **Enter Plan Mode** using the EnterPlanMode tool
+1. Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 2. **Analyze source materials** to understand:
    - Domain scope and objectives
    - Natural concern clustering (for Focus identification)
@@ -75,9 +82,9 @@ This skill orchestrates a 4-phase pipeline:
    - Confirm baseline creation approach (vs extension practice)
    - Estimate token requirements per phase
    - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
-4. **Exit Plan Mode** and present plan to user for approval
+4. **Present the plan and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-5. **Initialise prompt history:**
+5. **After approval, initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
      --type baseline --name "<Baseline Name>" \
@@ -104,7 +111,7 @@ This skill orchestrates a 4-phase pipeline:
    If you are resuming a baseline in a new session, re-arm the hooks first:
    `python3 utils/prompt-history.py baselines/<baseline-name>/ --activate`
 
-**Planning ensures:**
+**Planning establishes:**
 - Appropriate baseline vs extension practice decision
 - Token budget management
 - User alignment on scope and approach
