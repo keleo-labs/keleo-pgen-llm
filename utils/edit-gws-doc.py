@@ -36,7 +36,17 @@ Edits file format — a JSON array, applied in order:
     ]
 
 `find` edits are case-sensitive by default; set `"matchCase": false` on an
-edit to fold case. An empty `replace` deletes the matched text.
+edit to fold case. An empty `replace` deletes the matched text. Set `"tab"`
+to a tab's exact title to confine an edit to that tab.
+
+Structural edits — an entry with an `"op"` key — add and remove table rows,
+insert a merged band row, rewrite a cell or paragraph with styled runs,
+re-stripe row shading, insert paragraphs and reorder tabs. They run one at a
+time against a fresh fetch, because each shifts the indices the next relies
+on, and find/replace entries between them are checked and applied at their
+point in the sequence. The operation catalogue and its JSON shapes are in
+`_gws_doc_ops.py`. Run them against a copy: a structural edit that fails
+part-way leaves the document part-edited.
 
 Match strings must not span a paragraph break: the Docs API matches within
 a single text run sequence, and a newline in `find` will never hit. Edit one
@@ -52,6 +62,7 @@ import sys
 from pathlib import Path
 
 from _shared import GWS as GWS_PATH
+from _gws_doc_ops import OPS, Applier, OpError, apply_op, find_tab, tab_id
 TIMEOUT = 120
 
 
@@ -126,20 +137,21 @@ def preflight(edits, text, allow_missing):
     return ok
 
 
-def build_requests(edits):
+def build_requests(edits, document=None):
     """Translate edits into Docs API requests, preserving file order."""
-    return [
-        {
-            "replaceAllText": {
-                "containsText": {
-                    "text": edit["find"],
-                    "matchCase": edit.get("matchCase", True),
-                },
-                "replaceText": edit["replace"],
-            }
+    requests = []
+    for edit in edits:
+        request = {
+            "containsText": {
+                "text": edit["find"],
+                "matchCase": edit.get("matchCase", True),
+            },
+            "replaceText": edit["replace"],
         }
-        for edit in edits
-    ]
+        if edit.get("tab"):
+            request["tabsCriteria"] = {"tabIds": [tab_id(find_tab(document, edit["tab"]))]}
+        requests.append({"replaceAllText": request})
+    return requests
 
 
 def load_edits(path):
@@ -155,6 +167,15 @@ def load_edits(path):
         if not isinstance(edit, dict):
             print(f"ERROR: edit {i} must be an object", file=sys.stderr)
             sys.exit(2)
+        if "op" in edit:
+            if edit["op"] not in OPS:
+                print(f"ERROR: edit {i} has unknown op {edit['op']!r}; "
+                      f"known: {sorted(OPS)}", file=sys.stderr)
+                sys.exit(2)
+            if "tab" not in edit:
+                print(f"ERROR: edit {i} ({edit['op']}) needs a 'tab'", file=sys.stderr)
+                sys.exit(2)
+            continue
         if "find" not in edit or not edit["find"]:
             print(f"ERROR: edit {i} needs a non-empty 'find' field", file=sys.stderr)
             sys.exit(2)
@@ -162,6 +183,60 @@ def load_edits(path):
             print(f"ERROR: edit {i} needs a 'replace' field", file=sys.stderr)
             sys.exit(2)
     return edits
+
+
+def _label(edit):
+    if "op" in edit:
+        anchor = (edit.get("row") or edit.get("after") or edit.get("match")
+                  or edit.get("title") or "")
+        return edit.get("note") or f"{edit['op']} [{edit['tab']}] {str(anchor)[:44]}"
+    return edit.get("note") or edit["find"][:56]
+
+
+def run_sequence(args, edits):
+    """Apply a mixed file of structural and find/replace edits in order.
+
+    Consecutive find/replace entries still go in one batch, but each batch is
+    pre-flighted against the document as it stands at that point, because an
+    earlier structural edit may have created the text it targets.
+    """
+    if args.dry_run:
+        for i, edit in enumerate(edits, 1):
+            print(f"{i:>3}  {_label(edit)}")
+        print(f"\nDry run: {len(edits)} edit(s) validated. Nothing written. "
+              "Structural anchors resolve only at run time — run against a copy.")
+        return
+
+    applier = Applier(args.document_id, run_gws, fetch_document)
+    i = 0
+    while i < len(edits):
+        if "op" in edits[i]:
+            print(f"{i + 1:>3}  {_label(edits[i])}")
+            try:
+                apply_op(edits[i], applier)
+            except (OpError, RuntimeError) as exc:
+                print(f"\nERROR at edit {i + 1}: {exc}\nEdits 1-{i} are applied; "
+                      "the document is part-edited.", file=sys.stderr)
+                sys.exit(1)
+            i += 1
+            continue
+        batch = []
+        while i < len(edits) and "op" not in edits[i]:
+            batch.append(edits[i])
+            i += 1
+        document = applier.refetch()
+        if not preflight(batch, document_text(document), args.allow_missing):
+            print(f"\nERROR: a find/replace before edit {i + 1} matched nothing.",
+                  file=sys.stderr)
+            sys.exit(1)
+        applier(build_requests(batch, document))
+
+    if args.rename:
+        run_gws(["drive", "files", "update",
+                 "--params", json.dumps({"fileId": args.document_id, "fields": "id,name"}),
+                 "--json", json.dumps({"name": args.rename})])
+        print(f"Renamed to: {args.rename}")
+    print(f"\nApplied {len(edits)} edit(s).")
 
 
 def main():
@@ -179,6 +254,10 @@ def main():
     args = parser.parse_args()
 
     edits = load_edits(args.edits)
+
+    if any("op" in e for e in edits):
+        run_sequence(args, edits)
+        return
 
     print(f"Fetching document {args.document_id} ...")
     document = fetch_document(args.document_id)

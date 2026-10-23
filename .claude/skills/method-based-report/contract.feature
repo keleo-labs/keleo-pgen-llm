@@ -53,3 +53,28 @@ Feature: Method-Based Report Generation
     When the verification gate runs
     Then the four base verifiers run
     And type-specific is omitted from --expect
+
+  Scenario: Planning without native mode control
+    Given native Plan mode is unavailable or cannot be switched by the agent
+    When the skill prepares its plan
+    Then it uses read-only inspection to identify affected components, constraints and required validation
+    And it presents the proposed plan and unresolved questions without claiming a mode switch
+    And it ends the turn without changing files or external systems
+
+  Scenario: Clarification does not approve implementation
+    Given a proposed plan awaits explicit user approval
+    When the user answers a scope question without approving the plan
+    Then the skill keeps implementation paused
+    And it creates no workspace, prompt history, download or external update
+
+  Scenario: Approved plan resumes execution
+    Given the user explicitly approves the proposed plan
+    When the skill resumes
+    Then it proceeds with the approved work and required validation
+    And it does not require a native Plan mode control to continue
+
+  Scenario: Shared diagnosis-to-action contract applies
+    Given a report is within this skill's agreed scope
+    When it presents findings and any requested recommendations
+    Then it satisfies the applicable scenarios in reporting-foundation/contract.feature
+    And it preserves this report type's scope and output structure

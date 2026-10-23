@@ -1,0 +1,45 @@
+{
+  "status": "completed",
+  "grading": "Manual semantic review against contract-traced checks after first generation; per-cell grading.json contains concrete evidence.",
+  "comparison": "Current method-based-report and shared foundations versus no installed skill, using Claude CLI default configuration. This is not a Codex-versus-Claude or previous-version-versus-new-version benchmark.",
+  "isolation": {
+    "asserted_before_generation": true,
+    "planted_contaminants_detected": ["CLAUDE.md", ".claude", "memory", "git repository"],
+    "generation_workspaces": "Temporary directories outside git; moved here after generation",
+    "ambient_instruction_files_disabled": true,
+    "auto_memory_disabled": true,
+    "setting_sources": "project,local",
+    "phase_prompts_withheld": true,
+    "arms_interleaved_per_case": true
+  },
+  "metric_definitions": {
+    "mean_pass_rate": "Mean of per-case retained discriminating checks, one per case; all were selected after reviewing outputs. Not an overall quality score or an out-of-sample estimate.",
+    "mean_total_tokens": "CLI input_tokens + output_tokens, excluding cache creation/read tokens; not full context consumption",
+    "mean_duration_ms": "CLI-reported generation duration",
+    "mean_cost_usd": "CLI-reported total_cost_usd"
+  },
+  "byArm": {
+    "with-skill": {"cells": 3, "scored_passes": 3, "scored_total": 3, "mean_pass_rate": 1.0, "all_diagnostic_passes": 9, "all_diagnostic_checks": 12, "mean_total_tokens": 4626, "mean_duration_ms": 50571.667, "mean_cost_usd": 0.3775814},
+    "without-skill": {"cells": 3, "scored_passes": 0, "scored_total": 3, "mean_pass_rate": 0.0, "all_diagnostic_passes": 6, "all_diagnostic_checks": 12, "mean_total_tokens": 3784.333, "mean_duration_ms": 43269, "mean_cost_usd": 0.217013}
+  },
+  "delta_with_minus_without": {"mean_pass_rate": 1.0, "mean_total_tokens": 841.667, "mean_duration_ms": 7302.667, "mean_cost_usd": 0.1605684},
+  "observed_benefits": [
+    "Both action-oriented with-skill outputs name proposed accountable roles for individual decisions; neither baseline output does so consistently.",
+    "The comparison-only with-skill output leaves internal credential applicability unknown; baseline asserts it applies internally."
+  ],
+  "shared_passes_not_scored": "Mechanism explanation, dependency sequencing, comparison-only scope and several uncertainty checks passed in both arms; retained as diagnostics rather than inflating the discriminating score.",
+  "shared_gaps_not_scored": [
+    "Both programme-friction outputs overstate readiness from credential/training evidence.",
+    "The commercial test remains incomplete: with-skill invents contracting/invoicing arrangements; baseline omits relevant costs and responsibilities.",
+    "Both comparison outputs make unsupported assumptions about internal application-support ownership or organisation. These are reachable criteria and real gaps, not invalid assertions."
+  ],
+  "limitations": [
+    "One run per case; three synthetic short reports; no variability estimate or causal proof of a general improvement.",
+    "Checks were authored and selected after outputs, as required by project workflow; confirm on new cases before treating the rates as predictive.",
+    "Whole skill/foundation context differs between arms; the experiment does not isolate the new diagnosis-to-action paragraph.",
+    "The existing harness does not retain raw CLI transcripts, model ID or cache-token counts. Metrics copied from its results.json; outputs and complete input workspaces retained.",
+    "The harness's practice-oriented grades are unsuitable for prose; preserved in results.json and harness-benchmark.json but superseded here. Do not use --rescore without a prose-aware grader, as it will overwrite this semantic aggregate."
+  ],
+  "failed_initial_run": "../20261023-102234/execution-diagnostic.json",
+  "rerun_command": "python3 utils/run-skill-eval.py --evals .claude/skills/reporting-foundation/evals/evals.json --no-prompts --timeout 600"
+}

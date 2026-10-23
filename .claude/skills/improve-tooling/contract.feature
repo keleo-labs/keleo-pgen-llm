@@ -33,7 +33,7 @@ Feature: Improve Tooling
 
   Scenario: Improve skill instructions (direct mode)
     Given the user requests a skill instruction improvement
-    When the skill enters plan mode
+    When the skill prepares a read-only plan
     Then it reads the skill's SKILL.md and contract.feature
     And proposes specific changes with rationale
     And applies changes only after user approval
@@ -57,3 +57,23 @@ Feature: Improve Tooling
     When the script would hardcode practice names or specific data
     Then the skill rejects the request
     And suggests generalizing or handling as a one-off
+
+  Scenario: Planning without native mode control
+    Given a direct request to improve skill instructions
+    And native Plan mode is unavailable or cannot be switched by the agent
+    When the skill prepares its plan
+    Then it uses read-only inspection to identify affected components, constraints and required validation
+    And it presents the proposed plan and unresolved questions without claiming a mode switch
+    And it ends the turn without changing files or external systems
+
+  Scenario: Clarification does not approve implementation
+    Given a proposed plan awaits explicit user approval
+    When the user answers a scope question without approving the plan
+    Then the skill keeps implementation paused
+    And it creates no workspace, prompt history, download or external update
+
+  Scenario: Approved plan resumes execution
+    Given the user explicitly approves the proposed plan
+    When the skill resumes
+    Then it proceeds with the approved work and required validation
+    And it does not require a native Plan mode control to continue

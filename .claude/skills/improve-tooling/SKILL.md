@@ -1,3 +1,10 @@
+---
+name: improve-tooling
+description: Improve skill instructions and reusable utility scripts from feedback or execution needs
+metadata:
+  version: "1.0.0"
+---
+
 # Improve Tooling
 
 Improve skills and utility scripts based on user feedback, session observations, or mid-execution needs. Creates, extends, refactors, or consolidates utils; proposes and applies skill instruction improvements.
@@ -28,7 +35,7 @@ The user explicitly invokes `/improve-tooling` with a request. Examples:
 
 **For util changes**: Assess, implement, verify, and apply directly (mechanical, low risk).
 
-**For skill improvements**: Enter plan mode, propose changes with rationale, apply after user approval.
+**For skill improvements**: Complete the planning stage below before implementation.
 
 ### Mid-Execution Invocation
 
@@ -41,7 +48,7 @@ Mechanical test: <a concrete input→output example proving this is scriptable>
 ```
 
 In mid-execution mode:
-- Do NOT enter plan mode or prompt the user
+- Skip the planning approval stage for mechanical helper work; do not prompt the user
 - Auto-proceed through all phases (per SKILL-STANDARD.md §7.4 Step 4)
 - Return a brief report of what was created/extended so the calling skill can use it immediately
 
@@ -65,7 +72,7 @@ In mid-execution mode:
    | **Extend existing** | An existing script is close but missing a feature | Modify that script |
    | **Create new** | No existing script covers the need | Write a new script in `utils/` |
    | **Refactor/merge** | Overlapping scripts need consolidation | Merge into one, delete originals |
-   | **Improve skill** | Skill instructions need updating (direct mode only) | Enter plan mode, propose changes |
+   | **Improve skill** | Skill instructions need updating (direct mode only) | Complete the planning stage below |
    | **Reject** | The request requires semantic LLM judgment | Explain why and suggest the caller handle it in the LLM layer |
 
 4. **Apply the mechanical-vs-semantic gate** (see below).
@@ -92,13 +99,15 @@ When creating a new script:
 - Add the shebang line: `#!/usr/bin/env python3`
 - Include a docstring with purpose and usage examples
 
-**For skill improvements (direct mode only, requires plan mode approval):**
+**Planning stage for skill improvements (direct mode only):**
 
-1. Enter plan mode with proposed changes
-2. Read the skill's SKILL.md and contract.feature
-3. Identify the specific instruction gap or improvement
-4. Present the change rationale and proposed edits
-5. Apply after user approval via ExitPlanMode
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
+
+1. Read the skill's SKILL.md, contract.feature and affected callers without editing them
+2. Identify the specific instruction gap, constraints and required validation
+3. Present the proposed edits, rationale and unresolved questions
+4. End the turn without changing files or external systems
+5. Apply the proposed edits only after explicit user approval
 6. If Gherkin scenarios changed, re-run `python3 utils/extract-specs.py <SKILL.md>` to regenerate specs
 
 ### Phase 3: Verification

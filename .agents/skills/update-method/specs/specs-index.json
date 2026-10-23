@@ -1,0 +1,259 @@
+{
+  "skill": "update-method",
+  "source": ".claude/skills/update-method/SKILL.md",
+  "features": [
+    "Update Process Integrity"
+  ],
+  "scenarios": [
+    {
+      "id": "process-401",
+      "name": "Assessment before update",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An existing JSON file is provided for update"
+      ],
+      "when": [
+        "The update workflow begins"
+      ],
+      "then": [
+        "assess-practice.py is run first to determine suggestedUpdateMode",
+        "The update mode is auto-fix, remap, light-reanalysis, or full-reanalysis based on assessment output"
+      ],
+      "line": 707,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-402",
+      "name": "Backup before overwrite",
+      "feature": "Update Process Integrity",
+      "given": [
+        "The update will overwrite existing files"
+      ],
+      "when": [
+        "Any mode (auto-fix, remap, light-reanalysis, or full-reanalysis) begins"
+      ],
+      "then": [
+        "backup-practice.py has created a timestamped backup of the directory",
+        "The backup contains all JSON and markdown files"
+      ],
+      "line": 713,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-403",
+      "name": "Auto-fix mode applied when sufficient",
+      "feature": "Update Process Integrity",
+      "given": [
+        "Assessment output shows suggestedUpdateMode is \"auto-fix\""
+      ],
+      "when": [
+        "The update mode is determined"
+      ],
+      "then": [
+        "Fix utilities are run without user interaction",
+        "Re-assessment confirms 0 errors before reporting success"
+      ],
+      "line": 719,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-404",
+      "name": "Dependency resolution before update",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An extension practice is being updated"
+      ],
+      "when": [
+        "Step 0C begins"
+      ],
+      "then": [
+        "discover-dependencies.py resolves all baselinePracticeName and practiceDependencyNames",
+        "Resolved dependencies are confirmed with the user before proceeding"
+      ],
+      "line": 725,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-405",
+      "name": "Content preservation during remap",
+      "feature": "Update Process Integrity",
+      "given": [
+        "The update uses remap mode (Phase 2 \u2192 3)"
+      ],
+      "when": [
+        "Existing content is extracted and remapped"
+      ],
+      "then": [
+        "All valid existing alphas, activities, work products, and narratives are preserved",
+        "Only superseded or invalid content is replaced"
+      ],
+      "line": 731,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-406",
+      "name": "Post-update validation required",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An update has completed (any mode)"
+      ],
+      "when": [
+        "The workflow is finishing"
+      ],
+      "then": [
+        "eval-skill-output.py is run with error_pass_rate checked",
+        "The result is reported to the user with any remaining warnings"
+      ],
+      "line": 737,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-407",
+      "name": "Comparison report after update",
+      "feature": "Update Process Integrity",
+      "given": [
+        "A remap, light-reanalysis, or full-reanalysis update has completed"
+      ],
+      "when": [
+        "The new JSON is generated"
+      ],
+      "then": [
+        "diff-practice-json.py shows what changed vs the original",
+        "The user sees added, removed, and modified elements"
+      ],
+      "line": 743,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-408",
+      "name": "User confirms update mode when auto-fix insufficient",
+      "feature": "Update Process Integrity",
+      "given": [
+        "Assessment shows non-auto-fixable issues"
+      ],
+      "when": [
+        "Step 1B presents mode options"
+      ],
+      "then": [
+        "The user is asked to choose between remap, light-reanalysis, and full-reanalysis",
+        "The recommended mode and reason from assessment are presented"
+      ],
+      "line": 749,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-409",
+      "name": "ChangeRequest generated after update",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An update has modified an existing practice/baseline/method JSON"
+      ],
+      "when": [
+        "The updated JSON differs from the backup version"
+      ],
+      "then": [
+        "generate-change-request.py produces a ChangeRequest JSON",
+        "The ChangeRequest is written to the practice directory",
+        "A Downstream Impact Report is presented to the user listing affected practices"
+      ],
+      "line": 755,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-410",
+      "name": "Downstream impact report presented",
+      "feature": "Update Process Integrity",
+      "given": [
+        "A ChangeRequest has been generated with operations and nameChanges"
+      ],
+      "when": [
+        "discover-dependencies.py --dependents finds downstream practices"
+      ],
+      "then": [
+        "The user is shown each dependent practice name, path, and role",
+        "Each nameChange affecting that dependent is listed",
+        "Each dependent is classified as auto-propagatable or manual remap needed",
+        "The user is told which practices need /update-method remap vs auto-fix"
+      ],
+      "line": 762,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-411",
+      "name": "Downstream auto-propagation requires confirmation",
+      "feature": "Update Process Integrity",
+      "given": [
+        "Downstream dependents have auto-propagatable nameChanges"
+      ],
+      "when": [
+        "apply-change-request.py is invoked"
+      ],
+      "then": [
+        "A dry-run is shown to the user first",
+        "Changes are only applied after user confirms"
+      ],
+      "line": 770,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "process-412",
+      "name": "Content preservation during light reanalysis",
+      "feature": "Update Process Integrity",
+      "given": [
+        "The update uses light reanalysis mode (Phase 1B \u2192 2 \u2192 3)"
+      ],
+      "when": [
+        "Sections are classified as PRESERVE or UPDATE based on user scope"
+      ],
+      "then": [
+        "PRESERVE sections appear verbatim in the updated analysis report",
+        "UPDATE sections retain valid existing entries as baseline",
+        "New content is traceable to source materials or the stated change context"
+      ],
+      "line": 776,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "fidelity-401",
+      "name": "Re-verification is scoped to changed elements",
+      "feature": "Update Process Integrity",
+      "given": [
+        "An update has modified a practice, method or baseline JSON"
+      ],
+      "when": [
+        "The verification gate runs"
+      ],
+      "then": [
+        "diff-practice-json.py has produced the changed-element list",
+        "Each verifier brief is scoped to those elements rather than the whole document",
+        "Only the gates for phases the update touched are run",
+        "Any fix applied in response to a finding is followed by rebundling"
+      ],
+      "line": 783,
+      "assess_categories": [],
+      "automatable": false
+    }
+  ],
+  "stats": {
+    "total_scenarios": 13,
+    "total_features": 1,
+    "automatable": 0,
+    "manual_only": 13,
+    "by_category": {
+      "fidelity": 1,
+      "process": 12
+    }
+  }
+}

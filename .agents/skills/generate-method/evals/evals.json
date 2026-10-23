@@ -1,0 +1,87 @@
+{
+  "skill_name": "generate-method",
+  "baseline_default": "deps/platform-adoption-kernel.json",
+  "schema": "deps/language.schema.json",
+  "evals": [
+    {
+      "id": 1,
+      "name": "horticulture-foundations",
+      "prompt": "Generate a method for horticulture foundations extending Horticulture Essentials.",
+      "expected_output": "Multi-practice method with practices covering plant management, site operations, pest management, etc.",
+      "directory": "practices/horticulture-foundations",
+      "baseline": "baselines/horticulture-essentials/horticulture-essentials.json"
+    },
+    {
+      "id": 2,
+      "name": "red-hat-openshift-foundations",
+      "prompt": "Generate a method for Red Hat OpenShift Foundations extending IDP Essentials.",
+      "expected_output": "Multi-practice method with practices for application development, observability, platform operations, security compliance.",
+      "directory": "practices/red-hat-openshift-foundations",
+      "baseline": "baselines/idp-essentials/idp-essentials.json"
+    },
+    {
+      "id": 3,
+      "name": "red-hat-ansible-foundations",
+      "prompt": "Generate a method for Red Hat Ansible Foundations extending Platform Adoption Essentials.",
+      "expected_output": "Multi-practice method with practices for platform foundation, content management, event-driven operations.",
+      "directory": "practices/red-hat-ansible-foundations",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 4,
+      "name": "team-topologies",
+      "prompt": "Generate a method for Team Topologies extending Platform Adoption Essentials.",
+      "expected_output": "Multi-practice method with practices for team structure, organizational sensing, lifecycle.",
+      "directory": "practices/team-topologies",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 5,
+      "name": "digital-transformation-foundations",
+      "prompt": "Generate a method for digital transformation foundations extending Digital Transformation Essentials.",
+      "expected_output": "Multi-practice method covering digital technology, data, and transformation concerns.",
+      "directory": "practices/digital-transformation-foundations",
+      "baseline": "baselines/digital-transformation-essentials/digital-transformation-essentials.json"
+    },
+    {
+      "id": 6,
+      "name": "partner-essentials",
+      "prompt": "Generate a method for partner essentials extending Partner Ecosystem Essentials.",
+      "expected_output": "Multi-practice method covering partner ecosystem management, demand generation, success planning.",
+      "directory": "practices/partner-essentials",
+      "baseline": "deps/partner-ecosystem-baseline.json"
+    },
+    {
+      "id": 7,
+      "name": "red-hat-openshift-virtualization",
+      "prompt": "Generate a single practice for Red Hat OpenShift Virtualization extending Platform Adoption Essentials.",
+      "expected_output": "Single practice JSON for virtualization workload management.",
+      "directory": "practices/red-hat-openshift-virtualization",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 8,
+      "name": "servitization-transformation",
+      "prompt": "Generate a method for servitization transformation extending Platform Adoption Essentials.",
+      "expected_output": "Multi-practice method covering customer co-created servitization concerns.",
+      "directory": "practices/servitization-transformation",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 9,
+      "name": "mckinsey-7s-framework",
+      "prompt": "Generate a method for McKinsey 7S Framework extending Platform Adoption Essentials.",
+      "expected_output": "Multi-practice method covering organizational alignment through 7S model.",
+      "directory": "practices/mckinsey-7s-framework",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 10,
+      "name": "i-corps-customer-discovery",
+      "prompt": "Generate a practice for I-Corps Customer Discovery extending Platform Adoption Essentials.",
+      "expected_output": "Single practice for customer discovery methodology.",
+      "directory": "practices/i-corps-customer-discovery",
+      "baseline": "deps/platform-adoption-kernel.json"
+    }
+  ]
+}

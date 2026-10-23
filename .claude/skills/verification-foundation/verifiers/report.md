@@ -5,7 +5,7 @@ Used by all five reporting skills — `method-based-report`, `reference-architec
 
 Reports have **one gate**, not four. The reporting workflow has four steps but only
 one durable artifact: Steps 1–2 produce in-context analysis rather than files, and
-Step 0 is already user-gated in plan mode, so scope and narrative choice are approved
+Step 0 is already gated by explicit user approval in the planning stage, so scope and narrative choice are approved
 before writing starts. There is nothing to verify until Step 3 writes the markdown.
 
 The gate runs **before** any PDF export or Google Doc publish. Publishing a report
@@ -53,6 +53,11 @@ python3 utils/lint-report.py {REPORT} --json
 >    *supportable* by what the report has established, and must read as analysis
 >    rather than as established fact.
 > 3. **Invented** — stated as fact, traceable to nothing.
+>
+> For inferred consequences, verify the causal link as well as the cited premise. A
+> credential rule can support an eligibility risk without proving lost capacity.
+> Proposed dates, owners and targets must not read as approved commitments. Apply
+> the existing severity rules to these distinctions; do not demand repeated first-person labels.
 >
 > Separating (2) from (3) is the whole job. A recommendation that follows from the
 > analysis is category 2. A number that appears from nowhere is category 3, however
@@ -174,6 +179,15 @@ ignores the practice it claims to be built on, and nothing else catches that.
 > are `report-600`.
 >
 > **Write your findings** to `{REPORT_DIR}_verification/report-domain-grounding.json`.
+>
+> Also check the shared diagnosis-to-action contract (`report-724`–`report-727`).
+> Priority findings should explain mechanisms and affected participants. Commercial
+> recommendations should test mutual value and name unresolved responsibility or
+> economics questions. In-scope priority actions should address findings, identify
+> roles and success evidence, and resolve blockers before dependent activity.
+> Flag a missing required trace or a contradicted dependency as an error, thin
+> explanation as a warning. Respect informational and comparison-only scope; do not
+> require sales economics or an implementation plan for unrelated reports.
 > Return only your one-line summary.
 
 ---

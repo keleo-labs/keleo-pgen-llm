@@ -1,0 +1,931 @@
+---
+name: create-baseline-method
+description: Generate foundational baseline practice JSON from source methodology
+metadata:
+  version: "1.2.0"
+---
+
+# create-baseline-method Skill
+
+## Metadata
+
+**Name:** create-baseline-method
+**Version:** 1.2.0
+**Description:** Generate foundational baseline practice JSON from source methodology
+**Trigger:** When user provides source methodology for baseline practice creation
+
+## Supporting Standards
+
+`.Codex/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+
+| If you find yourself... | Stop and read |
+|---|---|
+| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 — these are prohibited; use reusable utils instead |
+| Creating or extending a utility script | §7.4 — follow the Utils Self-Extension Protocol |
+| Needing functionality that no existing util covers | §7.4 — create/extend, don't work around it |
+| Finishing the workflow without auditing the session | §11 — Post-Completion Review is mandatory |
+| Working around a defect in a parent baseline or any practice you are reading | §13 — accommodate it, then file it with `/report-issue` |
+| Writing prose rules that have a clear pass/fail criterion | §9 — convert to Gherkin scenarios instead |
+| Adding or modifying Gherkin scenarios in any SKILL.md | §1–6 — rule structure, categories, and triple-duty |
+| Adding a new validation check to assess/validate scripts | §7.2 — follow the Adding New Checks protocol |
+
+**How to read:** `Read .Codex/skills/SKILL-STANDARD.md` — then navigate to the relevant `## N.` heading.
+
+---
+
+## External Dependencies
+
+| Dependency | Required? | Role |
+|---|---|---|
+| Playwright MCP | Optional | Content sourcing from web-based methodology documentation when `WebFetch` fails |
+| Remote bundle repository | Optional | Downloads dependency `.keleo` bundles not available locally (via `studio-client.py`) |
+
+Baselines are foundational — they typically have no upstream practice dependencies. Playwright is only needed when source methodology documentation is on JavaScript-heavy web pages that `WebFetch` cannot render.
+
+---
+
+## Overview
+
+This skill automates the creation of **baseline practice JSON** files - foundational frameworks that define alphas, competencies, activity spaces, and narrative types for a domain. Baseline practices are extended by regular practices (created with `/generate-method`).
+
+**Key Distinction:**
+- **Baseline Practices** (this skill): Define foundational ontology (root alphas, alphaInstances, competencies, focuses, narrativeTypes, activitySpaces)
+- **Extension Practices** (`/generate-method`): Specialize baselines with redeclarations, new alphas (with `contributesTo` or `mapsTo`), activities, workProducts, patterns, and the orchestrations that sequence them
+
+### Alpha Instances in Baselines
+
+Baseline alphas are intentionally broad. **Alpha Instances** illustrate how a broad alpha applies within the baseline's domain without narrowing the alpha itself. See `references/semantics/alphas.md` §6.6 for the full instance vs alias vs new alpha decision framework, naming conventions, and structural examples.
+
+Document instances during Phase 1.5 distillation when mapping concerns to parent alphas.
+
+## Four-Phase Workflow
+
+This skill orchestrates a 4-phase pipeline:
+
+1. **Phase 1: Analysis** - Extract comprehensive methodology structure (~30-50K words)
+2. **Phase 1.5: Distillation** - Identify essential elements and Focus areas (~15-25K words) ****
+3. **Phase 2: Baseline Mapping** - Map distilled essentials to baseline structures (~40-60K words)
+4. **Phase 3: Baseline JSON** - Generate schema-compliant baseline practice JSON
+
+## Critical Process Requirements
+
+### Mandatory Planning Phase
+
+**BEFORE executing any phase, you MUST:**
+
+1. Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
+2. **Analyze source materials** to understand:
+   - Domain scope and objectives
+   - Natural concern clustering (for Focus identification)
+   - Complexity and coverage
+3. **Create execution roadmap**:
+   - Confirm baseline creation approach (vs extension practice)
+   - Estimate token requirements per phase
+   - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
+4. **Present the plan and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
+
+5. **After approval, initialise prompt history:**
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
+     --type baseline --name "<Baseline Name>" \
+     --prompt "<user's original prompt text>"
+   ```
+   Then record each source material identified during planning:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-source \
+     --source-type <file|url|google-doc|google-slides> \
+     --source-path "<path or URL>" --source-desc "<brief description>"
+   ```
+
+   **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
+   user turn and every `AskUserQuestion` exchange in this session is appended to the
+   Interaction Log automatically — you do not need to record those. You DO need to record,
+   manually, any question you put to the user in plain prose (outside `AskUserQuestion`),
+   because the hook captures only the answer:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-interaction \
+     --interaction-label "<context, e.g. 'Focus selection'>" \
+     --interaction-question "<the question you asked>" \
+     --interaction-answer "<the user's reply, verbatim>"
+   ```
+   If you are resuming a baseline in a new session, re-arm the hooks first:
+   `python3 utils/prompt-history.py baselines/<baseline-name>/ --activate`
+
+**Planning establishes:**
+- Appropriate baseline vs extension practice decision
+- Token budget management
+- User alignment on scope and approach
+
+### Baseline Dependency Resolution (Parent Baselines)
+
+**When this step is needed:** When creating a baseline that extends one or more existing baselines (the new baseline will declare `baselinePracticeNames` in its output JSON). This includes when the user explicitly states the baseline extends another, or when it is inferred from the source materials.
+
+**Process:**
+
+1. **Auto-discover parent baselines by name:**
+   If the user indicates this baseline extends other baseline(s) (by providing a name or path):
+   - If user provides a **name** (no `/`, doesn't end in `.json`), resolve it:
+     ```bash
+     python3 utils/discover-dependencies.py --resolve "Parent Baseline Name"
+     ```
+     - `found` → use the resolved path
+     - `not_found` → attempt remote download:
+       ```bash
+       python3 utils/studio-client.py --pull "Parent Baseline Name"
+       ```
+       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
+     - `ambiguous` → present candidates to user
+
+2. **Resolve transitive dependencies in a single step:**
+   For each resolved parent baseline, check for transitive dependencies:
+   ```bash
+   python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive --remote
+   ```
+   This scans `baselines/`, `practices/`, `deps/`, and `bundles/` directories plus the cached remote index, recursively resolving all `baselinePracticeNames` in the chain. For any `not_found` dependencies, attempt `python3 utils/studio-client.py --pull "<name>"` before asking the user.
+
+3. **Confirm all resolved dependencies with user:**
+   Present ALL parent baselines and their transitive deps in a single summary:
+   ```
+   === Dependency Resolution ===
+
+   Parent Baselines:
+     1. [baselinePractice] "<parent-name>"
+        Path: <resolved-path>
+        Transitive:
+          1a. [baselinePractice] "<grandparent-name>"
+              Path: <resolved-path>
+
+   All dependencies resolved. Please confirm or correct:
+   - "ok" to proceed
+   - "1=/correct/path.json" to correct a path
+   ```
+   **Wait for user confirmation before proceeding.**
+
+4. **Create effective context using the unified resolver:**
+   ```bash
+   python3 utils/resolve-context.py \
+     <parent-baseline.json> \
+     [<grandparent-1.json> ...] \
+     --transitive \
+     -o baselines/<name>/_effective-context.json
+   ```
+   The utility classifies and merges all inputs in hierarchy order (root-first for baselines), stamps `_contributingPracticeName` on every element for provenance tracking, and applies `practiceElementAliases` as `_aliasContext` annotations. If a single baseline with no dependencies, it simply annotates the document.
+
+5. **Use effective parent baseline in all phases:**
+   - **Phase 1.5:** Read effective parent to understand inherited elements and their domain terminology
+   - **Phase 2:** Read effective parent to avoid duplicating elements and to use correct cross-references
+   - **Phase 3:** Reference parent elements for cross-reference validation
+
+6. **Record dependencies in prompt history:**
+   For each resolved parent baseline (and transitive deps):
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-dependency \
+     --dep-type baseline --dep-name "<Parent Name>" \
+     --dep-path "<resolved-path>" --dep-version "<version>"
+   ```
+
+**Merging semantics:** `resolve-context.py` uses overlay, name-keyed union (root-first layering). See the utility's `--help` for merge rules. The NEW baseline does NOT need to redeclare all parent elements — it can redeclare (override), add new elements, reference parent elements in `relatesTo`, or define `practiceElementAliases` for its domain.
+
+### Directory Structure
+
+```
+baselines/
+└── <baseline-name>/
+    ├── 00-prompt-history.md         # Session provenance (prompt, interactions, sources, decisions, phases)
+    ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
+    ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
+    ├── 02-mapping-guide.md          # Phase 2 output (~40-60K words)
+    ├── <baseline-name>.json         # Phase 3 output (intermediate)
+    # .keleo package output goes to bundles/<baseline-name>.keleo
+```
+
+### Reference Documents Required
+
+These documents must be readable for all phases:
+
+1. **`references/domain-framework.md`** - Four-perspective analysis (Business, Technology, People, Process)
+2. **`references/semantics/`** — Practice Language semantic guidance (sub-documents):
+   - `semantics/composition.md` — aliasing, alpha hierarchies, dependencies (§4)
+   - `semantics/practice-elements.md` — PracticeElement foundations, Gherkin guidance (§5)
+   - `semantics/alphas.md` — alpha-state semantics, references/instances (§6)
+   - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
+   - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
+3. **`deps/language.schema.json`** - JSON Schema definition
+4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
+5. **`.Codex/skills/verification-foundation/`** — Verification protocol shared with the other generation skills. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach
+
+## Phase 1: Analysis
+
+**Objective:** Extract comprehensive methodology structure from source materials
+
+**Prompt:** `prompts/phase-1-baseline-analysis.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 1: Analysis"
+```
+
+**Process:**
+
+1. **Load Reference Framework**
+   ```
+   Read references/domain-framework.md
+   ```
+
+2. **Read All Source Materials**
+   - PDF documents
+   - Web pages (via URLs)
+   - Markdown files
+   - Technical documentation
+
+3. **Extract Elements** (using four-perspective framework):
+   - **Structured Outcomes** (3-8 candidates with Name, Description, Value Measurement, Related Concerns)
+   - **Concerns** (5-15+ areas of attention) - extract comprehensively
+   - **Progressive States** (5-7 maturity levels per concern)
+   - **Work Products** (artifacts with 3-5 levels of detail)
+   - **Activities** (5-15+ types of work) - extract comprehensively
+   - **Competencies** (required expertise with levels)
+   - **Personas** (roles combining competencies)
+   - **Workflows** (common patterns and lifecycles)
+
+4. **Emphasis on Universality**:
+   - Prefer vendor-neutral terminology
+   - Extract framework-level concepts
+   - Document broadly applicable patterns
+
+**Output:** `baselines/<name>/01-analysis-report.md` (~30-50K words)
+
+**Phase 1 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 1 --summary
+```
+
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 1: Analysis" --phase-output "01-analysis-report.md" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
+Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Analysis
+
+Mechanical validation checks shape, not fidelity. Read
+`.Codex/skills/verification-foundation/verifiers/phase-1.md` and launch its three
+verifiers in a single message.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 1 --gate --summary \
+  --expect source-fidelity,source-coverage,citation-integrity
+```
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 1 Verification Gate".
+
+#### User Review Gate — Analysis
+
+**Present the Phase 1 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1 (Analysis) is complete. The output is at `baselines/<baseline-name>/01-analysis-report.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 1.5 (Distillation)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the analysis report
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 1 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 1 Review Gate" \
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
+   ```
+5. Proceed to Phase 1.5.
+
+## Phase 1.5: Distillation (CRITICAL NEW PHASE)
+
+**Objective:** Distill Phase 1's comprehensive analysis into essential foundational elements
+
+**Prompt:** `prompts/phase-1.5-baseline-distillation.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 1.5: Distillation"
+```
+
+**Process:**
+
+1. **Load Resources**
+   ```
+   Read baselines/<name>/01-analysis-report.md (Phase 1 output)
+   Read references/domain-framework.md
+   Read effective parent baseline (from Baseline Dependency Resolution, if this baseline extends others)
+   ```
+   If the effective parent has `_aliasContext`, review domain aliases to understand inherited elements by their domain-specific names.
+
+2. **Identify Focus Areas** (2-4 high-level groupings):
+   - Analyze Phase 1 concern patterns for natural clustering
+   - Decide: **DEFAULT** (Value, Solution, Endeavor) OR **CUSTOM** focuses
+   - Example custom: Partner Ecosystem → Value, Engagement, Go-to-Market
+   - Document rationale for decision
+
+3. **Distill Essential Concerns** (8-15 foundational concepts):
+   - Review all Phase 1 concerns
+   - Remove practice-specific concerns
+   - Merge similar concerns to higher abstractions
+   - Define universal progressive states (5-7 per concern)
+   - Document relationships (produces, governed by, uses)
+   - **When extending a parent baseline:** Map concerns against parent alphas to determine what is a redeclaration (with domain-specific content) vs. a genuinely new alpha
+   - **Identify Alpha Instances:** Where a parent alpha is broad by design and has multiple well-known domain-specific manifestations, document these as Alpha Instances rather than creating new alphas or narrowing aliases
+
+4. **Distill Activity Types** (6-12 execution boundaries):
+   - Generalize Phase 1 activities to high-level work types
+   - Map to essential concerns (contributesTo)
+   - Identify required competencies
+
+5. **Identify Universal Competencies** (5-10 skill categories):
+   - Extract skill categories (not role titles)
+   - Define 5-level progressions: Basic → Applies → Masters → Adapts → Innovating
+
+6. **Distill Baseline Outcomes** (1-3 universal value propositions with measurement approach):
+   - Reduce Phase 1's 3-8 outcome candidates to 1-3 foundational outcomes
+   - Each outcome captures a universal value proposition for the domain
+   - Define measurement approach for each outcome (how success is observed)
+   - Map outcomes to the essential concerns they depend on
+
+7. **Identify Narrative Frameworks** (3-5 storytelling structures):
+   - Universal frameworks (STAR, Hero's Journey, Three-Act, ABT)
+   - Domain-specific frameworks (if source suggests)
+   - Define narrative elements with howToUse guidance
+
+**Output:** `baselines/<name>/01.5-distilled-essentials.md` (~15-25K words)
+
+**This becomes the PRIMARY input for Phase 2.**
+
+**Phase 1.5 Validation (run before proceeding to Phase 2):**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 1.5 --summary
+```
+
+Record phase completion and distillation decision:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 1.5: Distillation" --phase-output "01.5-distilled-essentials.md" \
+  --phase-validation "<PASS or FAIL summary>"
+python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+  --decision-label "Distillation" \
+  --decision-text "N focuses, M alphas, K activity spaces, J competencies distilled"
+```
+
+Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Distillation
+
+Distillation is where material gets silently dropped and where convenient new concepts
+appear that no source asked for. Read
+`.Codex/skills/verification-foundation/verifiers/phase-1.5.md` and launch its two
+verifiers.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 1.5 --gate --summary \
+  --expect distillation-fidelity,focus-coherence
+```
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 1.5 Verification Gate".
+
+#### User Review Gate — Distillation
+
+**Present the Phase 1.5 output for user review before proceeding.**
+
+1. Inform the user: "Phase 1.5 (Distillation) is complete. The output is at `baselines/<baseline-name>/01.5-distilled-essentials.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 2 (Baseline Mapping)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the distilled essentials
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 1.5 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 1.5 Review Gate" \
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
+   ```
+5. Proceed to Phase 2.
+
+## Phase 2: Baseline Mapping
+
+**Objective:** Map distilled essentials to baseline practice structures
+
+**Prompt:** `prompts/phase-2-baseline-mapping.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 2: Baseline Mapping"
+```
+
+**Process:**
+
+1. **Load Resources**
+   ```
+   Read baselines/<name>/01.5-distilled-essentials.md (PRIMARY SOURCE)
+   Read baselines/<name>/01-analysis-report.md (supporting detail)
+   Read effective parent baseline (from Baseline Dependency Resolution, if this baseline extends others)
+   Read references/semantics/composition.md (aliasing, hierarchies)
+   Read references/semantics/practice-elements.md (elements, Gherkin)
+   Read references/semantics/alphas.md (alpha semantics)
+   Read references/semantics/execution-and-patterns.md (patterns, outcomes)
+   ```
+   If the effective parent has `_aliasContext`, use domain aliases for semantic understanding of inherited elements. The new baseline's elements should use canonical names in structural references (`relatesTo`, etc.).
+
+2. **Map Metadata**:
+   - Name, description, version, authors, keywords
+   - NO baselinePracticeName at root (use `baselinePracticeNames` array if extending other baselines)
+
+3. **Use Identified Focuses** from Phase 1.5:
+   - Validate focus coverage
+   - Refine descriptions if needed
+
+4. **Transform Essential Concerns → Alphas**:
+   - NO `contributesTo` property (baseline alphas are root-level)
+   - REQUIRED `relatesTo` arrays (from Phase 1.5 relationships)
+   - 5-7 states per alpha with checklists (positive/additive items only — achievements to reach, not absences)
+   - Assign to appropriate focus
+   - Optional `background` on states (use sparingly — practice layer adds detailed Gherkin; see semantics/practice-elements.md §5.3.5)
+
+5. **Transform Activity Types → ActivitySpaces**:
+   - Each has `contributesTo` (points to alpha states)
+   - Each has `requiredCompetencies`
+   - Each assigned to a focus
+   - Optional `background` on activity spaces (shared prerequisites; use sparingly in baselines)
+
+6. **Transform Universal Competencies → Competencies**:
+   - Each has exactly 5 competencyLevels
+   - Level numbers: 1, 2, 3, 4, 5
+
+7. **Transform Narrative Frameworks → NarrativeTypes**:
+   - Each has 3-7 narrativeElements
+   - Each element has name, description, howToUse
+
+8. **Create Narratives** (using defined narrative types):
+   - Baseline-level narrative (REQUIRED)
+   - Alpha-level narratives (optional)
+   - ActivitySpace narratives (optional)
+
+9. **Map Citations** (using Citation Standard narrative type)
+
+10. **Map Acknowledgements** (optional — recognize contributors, research groups, or supporting organizations that are not published sources)
+
+11. **Map Distilled Outcomes → Outcome Objects**:
+   - Each outcome from Phase 1.5 becomes an Outcome with `name`, `description`, `measureDescription`
+   - `measureDescription` explains how the outcome's achievement is observed or measured
+   - 1-3 outcomes total (universal value propositions, not practice-specific KPIs)
+
+12. **Define Assets** (icons, diagrams, templates)
+
+**Output:** `baselines/<name>/02-mapping-guide.md` (~40-60K words)
+
+**Phase 2 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --phase 2 --summary
+```
+
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 2: Baseline Mapping" --phase-output "02-mapping-guide.md" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
+Fix any FAIL assertions before proceeding.
+
+#### Verification Gate — Mapping
+
+Read `.Codex/skills/verification-foundation/verifiers/phase-2.md` and launch its four
+verifiers. A baseline has one producing agent, so one verifier set — skip
+`cross-practice-consistency`, which is for methods. Substitute `{REPORT}` with the
+distilled essentials: for a baseline, Phase 2's antecedent is Phase 1.5, not Phase 1.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 2 --gate --summary \
+  --expect source-fidelity,alpha-semantics,coverage,naming-consistency
+```
+
+Two briefs need baseline framing when you pass them through: baseline alphas carry
+`relatesTo` and never `contributesTo` or `mapsTo`, so `alpha-semantics` checks
+relationship meaningfulness and state coherence rather than parent selection.
+
+On exit 1, follow the remediation loop in `VERIFY-FOUNDATION.md` §8. Record the
+verdict with `prompt-history.py --add-decision`, label "Phase 2 Verification Gate".
+
+#### User Review Gate — Mapping
+
+**Present the Phase 2 output for user review before proceeding.**
+
+1. Inform the user: "Phase 2 (Baseline Mapping) is complete. The output is at `baselines/<baseline-name>/02-mapping-guide.md`. Please review it and let me know if you'd like any changes, or confirm to proceed to Phase 3 (Baseline JSON Generation)."
+2. **Wait for user response.** Do not proceed until the user explicitly confirms.
+3. If the user requests changes:
+   - Make the requested edits to the mapping guide
+   - Re-run validation: `python3 utils/eval-skill-output.py baselines/<name>/ --phase 2 --summary`
+   - Present the updated output and ask again
+   - Repeat until the user confirms
+4. Record acceptance:
+   ```bash
+   python3 utils/prompt-history.py baselines/<baseline-name>/ --add-decision \
+     --decision-label "Phase 2 Review Gate" \
+     --decision-text "Accepted after <N> revision rounds. Changes made: <summary, or 'none'>"
+   ```
+5. Proceed to Phase 3.
+
+## Phase 3: Baseline JSON Generation
+
+**Objective:** Generate schema-compliant baseline practice JSON
+
+**Prompt:** `prompts/phase-3-baseline-json.md`
+
+Record phase start:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase "Phase 3: Baseline JSON"
+```
+
+**Process:**
+
+1. **Load Resources**
+   ```
+   Read baselines/<name>/02-mapping-guide.md (PRIMARY SOURCE)
+   Read deps/language.schema.json
+   Read references/semantics/composition.md (aliasing, hierarchies)
+   Read references/semantics/alphas.md (alpha semantics)
+   Read references/semantics/narrative-and-assets.md (narratives, assets)
+   ```
+
+2. **Read schema and baseline metadata** using utility commands (never parse `$comment` manually):
+   ```bash
+   python3 utils/extract-reference-names.py deps/language.schema.json --metadata
+   ```
+   If extending a parent baseline, also extract its version:
+   ```bash
+   python3 utils/extract-reference-names.py <parent-baseline>.json --metadata
+   ```
+
+3. **Generate Baseline JSON Skeleton**:
+   ```json
+   {
+     "kind": "practiceBaseline",
+     "name": "...",
+     "description": "...",
+     "schemaVersion": "1.0.0",
+     "version": "1.0.0",
+     "authors": [...],
+     "keywords": [...]
+   }
+   ```
+   Set `schemaVersion` from the schema `$comment`. Set `version` to `"1.0.0"` (three-part semver). If extending a parent baseline (`baselinePracticeNames`), add `dependencyVersions` with caret range for each parent.
+
+4. **Build Top-Level Arrays**:
+   - **focuses** - From mapping guide (2-4 focuses)
+   - **narrativeTypes** - With narrativeElements (3-5 types)
+   - **competencies** - With competencyLevels (5 levels each)
+   - **alphas** - With relatesTo (NO contributesTo), 5-7 states each
+   - **activitySpaces** - With contributesTo and requiredCompetencies
+   - **narratives** - With narrative contexts
+   - **citations** - Using Citation Standard
+   - **outcomes** - Universal value propositions with measureDescription (1-3)
+   - **assets** - Icons, diagrams, templates
+
+5. **Validate Cross-References**:
+   - All focusName references exist in focuses
+   - All relatesTo.alphaName references exist in alphas
+   - All contributesTo.alphaName/stateName references exist
+   - All requiredCompetencies references exist in competencies
+   - All narrativeTypeName references exist in narrativeTypes
+   - Element-specific narratives embedded on alphas/activitySpaces/competencies (NOT top-level)
+   - All narratives have citationNames arrays referencing relevant citations
+   - No narrative name or description references narrative type template names
+   - Narrative contexts are self-contained — coherent without element headings (element names are authoring scaffolding, not shown to readers)
+
+6. **Write Final JSON**:
+   - Write ONE output file only — do NOT create intermediate fragment files (e.g., `_part1.json`). Write the complete JSON in a single Write call.
+   - For asset definitions, copy the format of an existing asset entry (use `type`, `fontCharacter`, `fontFamily`, `fontWeight` — NOT `format` or `character`).
+   ```
+   Write baselines/<name>/<name>.json
+   ```
+
+7. **Auto-fix common issues before validation:**
+   ```bash
+   python3 utils/fix-common-issues.py baselines/<name>/<name>.json --fix --all
+   ```
+
+8. **Validate with Script**:
+   ```bash
+   # If extending parent baseline(s), pass effective parent for cross-reference validation:
+   python3 utils/validate-baseline-json.py \
+     baselines/<name>/<name>.json \
+     baselines/<name>/_effective-context.json \
+     deps/language.schema.json
+
+   # If standalone (no parents):
+   python3 utils/validate-baseline-json.py \
+     baselines/<name>/<name>.json \
+     deps/language.schema.json
+   ```
+
+**Output:** `baselines/<name>/<name>.json` (schema-compliant)
+
+**Phase 3 Validation:**
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
+```
+For child baselines extending a parent:
+```bash
+python3 utils/eval-skill-output.py baselines/<name>/ \
+  --parent <parent-baseline.json> --schema deps/language.schema.json --summary
+```
+Fix all FAIL assertions with `error` severity. Re-run until `error_pass_rate: 1.0`.
+
+**Verification Gate — Baseline JSON**
+
+The checks above cover the mechanical part. They do not cover the judgement Phase 3
+exercises where the mapping guide is silent. Read
+`.Codex/skills/verification-foundation/verifiers/phase-3.md` and launch its two
+verifiers. Run this **before** packaging — a `.keleo` built on a failed gate has to be
+rebuilt.
+
+```bash
+python3 utils/verification-gate.py baselines/<name>/ --phase 3 --gate --summary \
+  --expect generation-drift,reference-citation-fidelity
+```
+
+Baselines have no `references` array, so `reference-citation-fidelity` covers citations
+and acknowledgements only. On exit 1, follow the remediation loop in
+`VERIFY-FOUNDATION.md` §8. Record the verdict with `prompt-history.py --add-decision`,
+label "Phase 3 Verification Gate".
+
+Record phase completion:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
+  --phase "Phase 3: Baseline JSON" --phase-output "<baseline-name>.json" \
+  --phase-validation "<PASS or FAIL summary>"
+```
+
+**Step 5: Package into .keleo**
+
+After validation passes, package the baseline JSON into a `.keleo` archive. If the baseline has `baselinePracticeName` (extends a parent baseline), resolve transitive dependencies and include all parent baselines:
+```bash
+# Resolve dependencies (if baselinePracticeName is set):
+python3 utils/discover-dependencies.py --resolve-from baselines/<name>/<name>.json --transitive
+
+# Package with all dependencies in topological order (parent baselines first):
+python3 utils/package-keleo.py \
+  --name "<baseline-name>" \
+  --version "1.0.0" \
+  --description "<baseline description>" \
+  --documents [<parent-baseline>.json] \
+              baselines/<name>/<name>.json \
+  -o bundles/<name>.keleo \
+  --verify
+```
+Never use `_effective-context.json` as a document — it is a build artifact, not a distributable document.
+
+**Output:** `bundles/<name>.keleo` (packaged baseline with dependencies, verified inline)
+
+Record deliverables and finalise prompt history:
+```bash
+python3 utils/prompt-history.py baselines/<baseline-name>/ --add-deliverable \
+  --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged baseline bundle"
+python3 utils/prompt-history.py baselines/<baseline-name>/ --finalize
+```
+`--finalize` stands the hooks down — later turns in this session are no longer appended to the
+Interaction Log. If the user reopens the work, run `--activate` before continuing.
+
+**Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
+
+## Token Budget Management
+
+**Estimated Token Requirements:**
+
+| Phase | Reading | Writing | Total |
+|-------|---------|---------|-------|
+| Phase 1 | ~20K | ~40K | ~60K |
+| Phase 1.5 | ~50K | ~20K | ~70K |
+| Phase 2 | ~80K | ~50K | ~130K |
+| Phase 3 | ~50K | ~10K | ~60K |
+| **Total** | **~200K** | **~120K** | **~320K** |
+
+**Phase Compaction:** After each phase, compact context by clearing history and retaining only the current output, next prompt, and reference documents. For multi-practice methods, use the Agent tool for parallel execution.
+
+## Feature: Baseline Structural Integrity
+
+Validates that baseline JSON has correct shape, required top-level sections, and no practice-layer elements.
+
+### Scenario: Baseline kind discriminator (@rule:structural-201)
+- Given: Phase 3 generates a baseline JSON file
+- When: The JSON is validated
+- Then: The `kind` property is "practiceBaseline"
+
+### Scenario: All required baseline sections present (@rule:structural-202)
+- Given: Phase 3 generates a baseline JSON
+- When: The JSON is validated
+- Then: focuses, alphas, activitySpaces, competencies, and narrativeTypes arrays are present and non-empty
+
+### Scenario: No practice-layer elements in baseline (@rule:structural-203)
+- Given: A baseline practice is being generated
+- When: Phase 3 produces the JSON
+- Then: The JSON does NOT contain activities, workProducts, or patterns arrays with content
+- And: These elements belong in extension practices, not baselines
+- And: The JSON does NOT contain a patternGroups key at all, deprecated as of schema 2.21.0
+- And: Any patternOrchestrations entry is a shell with an empty stages array, since a baseline defines no patterns to sequence
+
+### Scenario: Focus count within range (@rule:structural-204)
+- Given: A baseline defines focus areas
+- When: Phase 3 generates the JSON
+- Then: The focuses array contains 2-4 focus definitions
+
+### Scenario: Baseline outcomes structural integrity (@rule:structural-207)
+- Given: A baseline practice JSON with outcomes array
+- Then: Each outcome has name and description
+- And: Each outcome has measureDescription
+- And: Outcomes count is between 1 and 3
+
+### Scenario: Competency level count (@rule:structural-205)
+- Given: A baseline defines competencies
+- When: Phase 3 generates the JSON
+- Then: Each competency has exactly 5 competencyLevels
+
+### Scenario: NarrativeType element count (@rule:structural-206)
+- Given: A baseline defines narrative types
+- When: Phase 3 generates the JSON
+- Then: Each narrativeType has 3-7 narrativeElements with name, description, and howToUse
+
+## Feature: Baseline Alpha Semantics
+
+Validates that baseline alphas are root-level with correct relationship structure.
+
+### Scenario: No contributesTo on baseline alphas (@rule:semantic-201)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha does NOT have a `contributesTo` property
+- And: Baseline alphas are root-level and relate to each other via `relatesTo`
+
+### Scenario: All baseline alphas have relatesTo (@rule:semantic-202)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha has a non-empty `relatesTo` array showing inter-alpha relationships
+
+### Scenario: relatesTo entries have direction (@rule:semantic-203)
+- Given: A baseline alpha has relatesTo entries
+- When: Phase 3 generates the JSON
+- Then: Each relatesTo entry has `relationship`, `alphaName`, and `direction` (outgoing|incoming|mutual)
+
+### Scenario: ActivitySpaces contribute to alpha states (@rule:semantic-204)
+- Given: A baseline defines activitySpaces
+- When: Phase 3 generates the JSON
+- Then: Each activitySpace has a `contributesTo` array referencing alpha states
+- And: Every non-initial alpha state is targeted by at least one activitySpace
+
+### Scenario: Alpha state minimum for baselines (@rule:coverage-201)
+- Given: A baseline alpha is defined
+- When: Phase 3 generates the JSON
+- Then: The alpha has 5-7 states representing progressive maturity
+
+## Feature: Baseline Naming and Quality
+
+Validates naming conventions and content quality for baseline elements.
+
+### Scenario: Vendor-neutral terminology (@rule:naming-201)
+- Given: Phase 1.5 distills essential concerns
+- When: Concerns are named and described
+- Then: Names use vendor-neutral, framework-level language
+- And: Implementation-specific terms (product names, tool names) are generalized
+
+### Scenario: Competency level names follow standard (@rule:naming-202)
+- Given: A baseline defines competencies with levels
+- When: Phase 3 generates the JSON
+- Then: Level names follow the standard progression: Basic, Applies, Masters, Adapts, Innovating
+
+### Scenario: Gherkin structures minimal in baselines (@rule:coverage-202)
+- Given: A baseline practice is being generated
+- When: Phase 3 produces the JSON
+- Then: background, test, and examples properties are used sparingly
+- And: Detailed Gherkin structure is deferred to the practice layer
+
+## Feature: Baseline Process Compliance
+
+Validates that the four-phase baseline pipeline is executed correctly.
+
+### Scenario: Phase 1.5 distillation completed (@rule:process-201)
+- Given: The four-phase baseline pipeline is being executed
+- When: Phase 2 mapping begins
+- Then: 01.5-distilled-essentials.md exists with 8-15 essential concerns and 2-4 focus areas
+
+### Scenario: Distillation uses Phase 1 as input (@rule:process-202)
+- Given: Phase 1.5 distillation begins
+- When: The agent reads source materials
+- Then: 01-analysis-report.md is the primary input, NOT the original source materials directly
+
+### Scenario: Baseline validation run after generation (@rule:process-203)
+- Given: Phase 3 has generated a baseline JSON
+- When: The phase is marked complete
+- Then: validate-baseline-json.py has been run with 0 schema errors
+- And: assess-practice.py confirms 0 error-severity issues
+
+### Scenario: Verification gate precedes each user review gate (@rule:process-204)
+- Given: A baseline phase has completed and passed mechanical validation
+- When: The output is presented to the user for review
+- Then: verification-gate.py has been run for that phase with `--expect` naming every verifier launched
+- And: No blocking error survives reconciliation
+- And: The verdict is recorded in the prompt history as a decision
+
+## Feature: Baseline Source Fidelity
+
+Validates that distilled baseline elements trace to the analysis they were reduced from.
+
+### Scenario: Distilled elements trace to Phase 1 concerns (@rule:fidelity-201)
+- Given: Phase 1.5 has reduced the analysis to essential elements
+- When: The Phase 1.5 verification gate runs
+- Then: Every essential alpha, activity space and competency has an identifiable antecedent in 01-analysis-report.md
+- And: Every substantive Phase 1 concern is absorbed, generalised, or dropped with a stated rationale
+- And: Elements with no Phase 1 antecedent are reported as errors
+
+### Scenario: Focus groupings are justified by the analysis (@rule:fidelity-202)
+- Given: Phase 1.5 has defined 2-4 focus areas
+- When: The focus coherence verifier runs
+- Then: The distillation states why these focuses, grounded in concern patterns from the analysis
+- And: Every distilled alpha is assigned to exactly one focus it fits more naturally than any other
+- And: Use of the default Value/Solution/Endeavor triad is justified against the domain rather than assumed
+
+## Common Pitfalls
+
+### Phase 1 Pitfalls
+
+❌ **Over-filtering**: Extract comprehensively, don't pre-filter. Phase 1.5 distills.
+❌ **Implementation details**: Focus on types of work, not tool-specific steps
+❌ **Creating practice hierarchy**: Baselines are single cohesive frameworks
+❌ **Role-focused competencies**: Extract skill categories, not job titles
+❌ **Citations missing URLs**: Every citation SHOULD have a `url` field — use user-provided URLs, official framework websites, DOI references (`https://doi.org/10.xxxx/xxxxx`) for academic works, or publisher catalog pages. Only omit when no stable public link exists. Never fabricate URLs.
+
+### Phase 1.5 Pitfalls (NEW)
+
+❌ **Too many essential concerns**: If >15, merge more aggressively
+❌ **Practice-specific language**: "AWS Lambda" → "Serverless Compute"
+❌ **Undefined relationships**: Document concern relationships explicitly
+❌ **Unbalanced focuses**: One focus with 2 concerns, another with 10
+❌ **Too many activity types**: If >12, generalize more
+❌ **Missing state coverage**: Every concern state needs ≥1 activity type
+
+### Phase 2 Pitfalls
+
+❌ **Using Phase 1 directly**: Use Phase 1.5 distilled essentials (primary source)
+❌ **Adding contributesTo to alphas**: Baseline alphas are root-level
+❌ **Missing relatesTo**: All alphas should have inter-alpha relationships
+❌ **Incomplete contributesTo coverage**: Every alpha state needs ≥1 activity space
+❌ **Generic narratives**: Element mappings should be substantive
+❌ **Over-using Gherkin structures**: Baselines should keep background/test/examples minimal — the practice layer is the natural place for detailed Gherkin structure (semantics/practice-elements.md §5.3.5)
+
+### Phase 3 Pitfalls
+
+❌ **Missing discriminator**: Forgetting `"kind": "practiceBaseline"`
+❌ **Adding contributesTo to alphas**: They're root-level in baselines
+❌ **Empty relatesTo**: All alphas need relationships
+❌ **Wrong competency level count**: Must be exactly 5 levels
+❌ **Invalid cross-references**: All symbolic names must resolve
+❌ **Trailing commas**: JSON doesn't allow trailing commas
+❌ **Wrong background structure**: `background` must be an object with optional `given`, `alphaStates`, `workProductLevels` arrays — not a string or flat array
+
+## Quality Gates
+
+Run the full eval harness after each phase and at completion:
+
+```bash
+# Phase-specific validation (during workflow)
+python3 utils/eval-skill-output.py baselines/<name>/ --phase <1|1.5|2|3> --summary
+
+# Full validation (at completion)
+python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.schema.json --summary
+```
+
+**Success criteria:** `error_pass_rate: 1.0` on full validation. All 5 files generated in `baselines/<name>/`. Generated baseline usable by `/generate-method` as parent baseline.
+
+## Defects in Content You Read
+
+A baseline run often reads existing documents it is not authoring — a parent baseline
+being extended, practices consulted for how a concern is already modelled. Those are
+inputs. When one is defective, accommodate it (distil around the gap, do not inherit a
+contradiction) and record it rather than silently absorbing it:
+
+```bash
+python3 utils/issue-register.py --add-draft /tmp/keleo-defects-<baseline-slug>.json \
+  --type Issue --summary "<title>" --description "<observed / expected / what you did instead>" \
+  --document "<Document Name>" --document-version <version> --document-kind practiceBaseline \
+  --element "<Element Name>" --element-type <type>
+```
+
+Defects in the baseline **you** are generating are fixed in Phase 3, never filed. File
+the batch once at completion by invoking `report-issue` in mid-execution mode, and report
+the row numbers. Gate and routing: `SKILL-STANDARD.md` §13.
+
+## Skill Invocation
+
+```bash
+/create-baseline-method <source-files-or-urls>
+```

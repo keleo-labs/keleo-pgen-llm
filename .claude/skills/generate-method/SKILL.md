@@ -1,6 +1,8 @@
 ---
 name: generate-method
-version: 1.2.0
+version: 1.3.0
+metadata:
+  version: "1.3.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -55,9 +57,9 @@ The baseline JSON is the only hard requirement — it defines the alphas, compet
 
 ---
 
-## Critical Process: ALWAYS Use EnterPlanMode
+## Critical process: planning before execution
 
-**MANDATORY FIRST STEP:** Before starting ANY phase, you MUST use EnterPlanMode to:
+**MANDATORY FIRST STEP:** Complete the planning stage in Step 0 before starting any phase:
 
 1. Analyze source materials thoroughly
 2. Determine if this is a Practice or Method (multiple practices)
@@ -151,15 +153,15 @@ Use these utilities instead of ad-hoc `python3 -c` scripts for common inspection
 
 ## Execution Workflow
 
-### Step 0: EnterPlanMode (REQUIRED)
+### Step 0: Planning stage (required)
 
-**YOU MUST DO THIS FIRST.**
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
 
-In plan mode:
+During read-only planning:
 
 1. **Read source materials completely**
    - All provided PDFs, URLs, markdown files
-   - Take comprehensive notes
+   - Keep comprehensive notes in the conversation
 
 2. **Identify context sources (baselines, practices, methods, .keleo bundles):**
    - Ask user which baseline, parent practice/method, or `.keleo` bundle(s) to use
@@ -170,11 +172,7 @@ In plan mode:
      ```
      - `found` → use the resolved path
      - `ambiguous` → present candidates to user, let them choose (filesystem entries preferred over bundle copies)
-     - `not_found` → attempt remote download:
-       ```bash
-       python3 utils/studio-client.py --pull "Name Provided By User"
-       ```
-       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
+     - `not_found` → list the missing dependency and proposed `studio-client.py --pull` operation in the plan. Download and re-resolve only after approval; if the pull then fails, ask for a local path.
    - **`.keleo` bundles:** Accepted directly — all documents inside are extracted and classified
    - **Classify all inputs:**
      ```bash
@@ -214,9 +212,9 @@ In plan mode:
    - Expected complexity and size
    - Whether secondary reference research (Step 2.5) will be performed
 
-7. **Exit plan mode** with clear execution roadmap
+7. **Present the execution roadmap and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-8. **Initialise prompt history:**
+8. **After approval, initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --init \
      --type <practice|method> --name "<Practice Name>" \
@@ -791,7 +789,7 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Post-Completion Review (MANDATORY)
 
-**After completing the skill workflow OR after completing planning**, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then:
+If planning is awaiting approval, keep this review read-only and defer all writes. After completing the approved skill workflow, read `.claude/skills/SKILL-STANDARD.md` §11 for the full Post-Completion Review protocol, then:
 
 1. **Content defects (file immediately)**: If any defects in inherited content were drafted, invoke `report-issue` in mid-execution mode with the drafts path and report the row numbers (§13)
 2. **Utils remediation (apply immediately)**: Audit session for inline scripts or workarounds → extend/create utilities

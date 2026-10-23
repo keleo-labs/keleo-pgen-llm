@@ -40,6 +40,22 @@ runs/*/*
 .claude/settings.local.json
 .claude/settings.json
 .claude/user-config.json
+# Share skills and hooks, but keep agent credentials, preferences and sessions local.
+.agents/*
+!.agents/skills/
+.codex/*
+!.codex/hooks.json
+# Some skill documentation uses the capitalised directory name.
+.Codex/*
+!.Codex/hooks.json
+
+# Local environment secrets and generated Python environments/bytecode.
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+*.py[cod]
 .playwright-mcp/
 __pycache__/
 deps/*-cr.json

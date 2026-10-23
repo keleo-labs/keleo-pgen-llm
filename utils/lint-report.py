@@ -435,6 +435,90 @@ DRAMATIC_PHRASES = [
     "nobody tells you", "the dirty secret", "what nobody",
 ]
 
+# Contrast constructions that are individually fine and collectively a tic.
+# Each is the clearest way to say some things; none is the clearest way to say
+# a third of everything. Counted per thousand body words so the threshold
+# travels across report lengths.
+CADENCE_PATTERNS = [
+    (re.compile(r"\brather than\b", re.I), "rather than"),
+    (re.compile(r"\binstead of\b", re.I), "instead of"),
+    (re.compile(r"\bnot\s+\w[\w'-]*\s+but\b", re.I), "not X but Y"),
+    (re.compile(r",\s+not\s+", re.I), "X, not Y"),
+    (re.compile(r"\band not\b", re.I), "X and not Y"),
+]
+
+# Per thousand body words, both calibrated against real failures on the same
+# report. A 4,264-word review carrying 23 instances of "rather than" (5.4 per
+# thousand) was flagged by a human reviewer as having one sentence shape; 4.5
+# catches that with margin. Rewriting it spread the habit across four forms
+# instead of removing it — 39 in 5,668 words, 6.9 per thousand, no single form
+# over 2.1 — and a second reviewer flagged that too. Hence the total, which is
+# the check that survives substitution.
+CADENCE_WARN_PER_KW = 4.5
+CADENCE_TOTAL_WARN_PER_KW = 6.0
+
+# A rate over a handful of hits is noise: two instances in a short section
+# reads as two sentences, not as a habit, however the arithmetic lands. Both
+# the rate and the count have to clear before anything is reported.
+CADENCE_MIN_HITS = 6
+CADENCE_MIN_TOTAL_HITS = 12
+
+# Below this the sample is too small for either signal to mean anything.
+CADENCE_MIN_WORDS = 1200
+
+
+def check_cadence(body_lines, word_count):
+    """Over-repeated sentence constructions (@rule:report-619). Warnings only.
+
+    The register rules name "relentless triads" and contrast-heavy prose as AI
+    tells, but a human reviewer can only catch them by counting, and reviewers
+    reliably miss the second half of a long report. Counting is mechanical, so
+    it belongs here rather than in a verifier brief.
+
+    Prose only: headings, code fences, tables and reference entries are skipped,
+    because a contrast in a heading is governed by RE_CONTRARIAN instead.
+    """
+    findings = []
+    if word_count < CADENCE_MIN_WORDS:
+        return findings
+
+    prose, in_fence = [], False
+    for n, line in enumerate(body_lines, 1):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence or not stripped or stripped.startswith(("#", "|", ">")):
+            continue
+        prose.append((n, stripped))
+
+    scale = word_count / 1000.0
+    total = 0
+    for pattern, label in CADENCE_PATTERNS:
+        hits = [n for n, text in prose for _ in pattern.findall(text)]
+        total += len(hits)
+        rate = len(hits) / scale
+        if len(hits) >= CADENCE_MIN_HITS and rate > CADENCE_WARN_PER_KW:
+            findings.append({
+                "check": "cadence", "severity": "warning", "line": hits[0],
+                "message": (f'"{label}" appears {len(hits)} times in '
+                            f"{word_count} words ({rate:.1f} per thousand) — "
+                            f"at this density it is the prose's default shape; "
+                            f"convert some to plain assertions"),
+            })
+
+    rate = total / scale
+    if total >= CADENCE_MIN_TOTAL_HITS and rate > CADENCE_TOTAL_WARN_PER_KW:
+        findings.append({
+            "check": "cadence", "severity": "warning", "line": 0,
+            "message": (f"{total} contrast constructions in {word_count} words "
+                        f"({rate:.1f} per thousand) across "
+                        f"{len(CADENCE_PATTERNS)} forms — the report argues by "
+                        f"opposition throughout; vary the sentence shape"),
+        })
+    return findings
+
+
 # A bullet with none of these is probably a noun phrase. Deliberately broad:
 # this only ever raises a warning, so over-matching is the safe direction.
 AUXILIARIES = {
@@ -563,6 +647,64 @@ def check_tone(lines, headings):
     return findings
 
 
+_NEUTRAL = (
+    "The account team reviews the transaction and records the outcome against the "
+    "opportunity so the figure reported upward matches the figure held in the system "
+    "of record. That reconciliation happens weekly in most teams and more often at "
+    "quarter end, when the gap between a forecast and a booking is what everyone is "
+    "watching. Where a partner is attached it runs twice, because the partner's own "
+    "system holds a second version of the same transaction. ")
+
+_CONTRAST = (
+    "The control fires on the route rather than on the value. The approval attaches "
+    "to the quote, not to the opportunity. The order advances through the integration "
+    "and not by hand. The contract appears automatically instead of on request. ")
+
+
+def _cadence_fixture(contrast_blocks, neutral_blocks):
+    body = ["# Fixture", "", "## Assessment", ""]
+    for i in range(max(contrast_blocks, neutral_blocks)):
+        if i < contrast_blocks:
+            body += [_CONTRAST, ""]
+        if i < neutral_blocks:
+            body += [_NEUTRAL, ""]
+    return "\n".join(body).splitlines()
+
+
+# (label, contrast blocks, neutral blocks, expect a finding)
+# Case 3 is the one that matters most: a long document with a few contrasts in
+# it must stay silent, or the check punishes prose for using the construction
+# at all. Case 4 sits under CADENCE_MIN_WORDS.
+_CADENCE_SELFTEST_CASES = [
+    ("monotone prose fires", 9, 12, True),
+    ("varied prose stays silent", 1, 20, False),
+    ("a few contrasts in a long report is not a habit", 1, 30, False),
+    ("short document is not sampled", 4, 1, False),
+]
+
+
+def cadence_selftest():
+    """Prove the cadence check fires on what it claims to, and only on that.
+
+    Without this a threshold edit that silenced the check would look identical
+    to a clean report. The check exists because two human reviewers caught a
+    tic the linter missed; a silent regression would put it back.
+    """
+    failures = 0
+    for label, contrast, neutral, want in _CADENCE_SELFTEST_CASES:
+        lines = _cadence_fixture(contrast, neutral)
+        words = sum(len(ln.split()) for ln in lines if not ln.startswith("#"))
+        got = bool(check_cadence(lines, words))
+        mark = "ok" if got == want else "XX"
+        if got != want:
+            failures += 1
+        print(f"{mark} {label}: {words} words, "
+              f"{'fired' if got else 'silent'}, wanted "
+              f"{'fire' if want else 'silence'}")
+    print("cadence selftest:", "pass" if not failures else f"{failures} FAILED")
+    return failures
+
+
 def check_length(word_count, min_words, max_words):
     findings = []
     if min_words is not None and word_count < min_words:
@@ -611,7 +753,7 @@ def check_consistency(docs, terms):
 def main():
     parser = argparse.ArgumentParser(
         description="Lint generated markdown reports against reporting rules")
-    parser.add_argument("report", nargs="+",
+    parser.add_argument("report", nargs="*",
                         help="Path to the markdown report(s)")
     parser.add_argument("--consistent-terms", nargs="+", metavar="TERM",
                         help="Fixed names (play, TDP, tactic, product) that "
@@ -619,10 +761,10 @@ def main():
     parser.add_argument("--checks", nargs="+",
                         choices=["terminology", "citations", "diagrams",
                                  "attribution", "length", "structure",
-                                 "sections", "tone"],
+                                 "sections", "tone", "cadence"],
                         default=["terminology", "citations", "diagrams",
                                  "attribution", "length", "structure",
-                                 "sections", "tone"],
+                                 "sections", "tone", "cadence"],
                         help="Which checks to run (default: all)")
     parser.add_argument("--studio-url", metavar="URL",
                         help="keleo-studio-gas deployment URL attribution links "
@@ -643,7 +785,14 @@ def main():
                         help="Also flag ordinary-English words that are Keleo terms")
     parser.add_argument("--json", action="store_true",
                         help="Emit findings as JSON")
+    parser.add_argument("--selftest", action="store_true",
+                        help="Prove the cadence check fires on what it claims "
+                             "to (no files, no network)")
     args = parser.parse_args()
+    if args.selftest:
+        return 1 if cadence_selftest() else 0
+    if not args.report:
+        parser.error("the following arguments are required: report")
     studio_url = args.studio_url or load_user_config().get("keleoStudioGasUrl")
 
     results, bodies = [], []
@@ -679,6 +828,8 @@ def main():
             findings += check_tone(body_lines, headings)
         if "sections" in args.checks and Path(path).name != PROVENANCE_FILE:
             findings += check_sections(body_lines, args.min_section_words)
+        if "cadence" in args.checks and Path(path).name != PROVENANCE_FILE:
+            findings += check_cadence(body_lines, word_count)
 
         bodies.append((path, body_lines))
         results.append({

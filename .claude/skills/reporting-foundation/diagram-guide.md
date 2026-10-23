@@ -319,6 +319,33 @@ runs scheduled scans". Detail belongs in `sublabel` or in the prose around the d
 **Three to nine nodes.** Below three, prose is clearer. Above nine, split the diagram or raise its
 level of abstraction. A diagram that will not fit is usually a diagram carrying more than one idea.
 
+**Keep it under about 600px wide.** A published report shows every figure at the same width — 468pt
+in a Google Doc, the full body width in a PDF — so the type inside a figure shrinks in proportion to
+how wide the figure is. The engine sets labels at 11px and sublabels at 9px, which means:
+
+| Figure width | Sublabel renders at |
+|---|---|
+| 420px | 10.0pt |
+| 600px | 7.0pt — the practical floor |
+| 1000px | 4.2pt |
+| 1350px | 3.1pt |
+
+Below roughly 7pt a label stops being readable in print, and **resolution cannot fix it** — Google
+Docs re-encodes every image to its display size and ignores PNG density metadata, so a 2× render
+arrives on the page identical to a 1× one. The fix is always narrower, never sharper: cut nodes,
+split the figure, shorten sublabels, or carry the detail in a table instead.
+
+`publish-doc.py` warns on stderr when a figure's smallest type would land below 7pt, naming the file
+and the shrink factor. Check the width before you embed:
+
+```bash
+grep -o 'viewBox="[^"]*"' reports/<slug>/assets/<name>.svg
+```
+
+A `swimlane` with many columns and a `timeline` with five or more phases are the two layouts that
+most often blow the budget. Both have a narrower alternative — fewer lanes, or a `stack` — and a
+coverage claim that needs many columns is usually a table.
+
 **Use `emphasis` sparingly.** One or two `accent` nodes draw the eye to what matters; everything
 accented is nothing accented. `muted` recedes a node that is context rather than subject.
 
