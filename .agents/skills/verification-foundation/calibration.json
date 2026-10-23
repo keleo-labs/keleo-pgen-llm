@@ -1,0 +1,10 @@
+{
+  "calibrations": {
+    "2:source-fidelity": {
+      "passed": true,
+      "briefDigest": "487227e5fee76afa",
+      "at": "2026-10-09T14:41:52+00:00",
+      "fixture": "phase-2/source-fidelity"
+    }
+  }
+}

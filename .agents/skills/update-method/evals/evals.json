@@ -1,0 +1,39 @@
+{
+  "skill_name": "update-method",
+  "baseline_default": "deps/platform-adoption-kernel.json",
+  "schema": "deps/language.schema.json",
+  "evals": [
+    {
+      "id": 1,
+      "name": "red-hat-openshift-foundations",
+      "prompt": "Update red-hat-openshift-foundations to fix quality issues.",
+      "expected_output": "Updated method JSON with reduced error and warning counts compared to pre-update assessment.",
+      "directory": "practices/red-hat-openshift-foundations",
+      "baseline": "baselines/idp-essentials/idp-essentials.json"
+    },
+    {
+      "id": 2,
+      "name": "partner-essentials",
+      "prompt": "Update partner-essentials method to align with latest baseline guidance.",
+      "expected_output": "Updated method JSON with partner ecosystem baseline references corrected.",
+      "directory": "practices/partner-essentials",
+      "baseline": "deps/partner-ecosystem-baseline.json"
+    },
+    {
+      "id": 3,
+      "name": "red-hat-ansible-foundations",
+      "prompt": "Update red-hat-ansible-foundations to fix quality issues.",
+      "expected_output": "Updated method JSON with reduced error and warning counts.",
+      "directory": "practices/red-hat-ansible-foundations",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 4,
+      "name": "horticulture-foundations",
+      "prompt": "Update horticulture-foundations to fix quality issues.",
+      "expected_output": "Updated method JSON with reduced error and warning counts.",
+      "directory": "practices/horticulture-foundations",
+      "baseline": "baselines/horticulture-essentials/horticulture-essentials.json"
+    }
+  ]
+}
