@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json_pair, detect_kind
+__version__ = "1.1.0"
 
 
 # ---------------------------------------------------------------------------
@@ -201,9 +202,11 @@ def sync_practices(source_dir, fix=False):
                 dir_result["actions"].append(action)
 
             elif src_ver == tgt_ver:
+                source_data, _ = load_json_pair(source_path)
+                target_data, _ = load_json_pair(target_path)
                 dir_result["actions"].append({
                     "name": name,
-                    "status": "up_to_date",
+                    "status": "up_to_date" if source_data == target_data else "content_differs",
                     "target_file": target_path.name,
                     "version": target_version,
                 })
@@ -288,6 +291,9 @@ def print_results(results, source_dir, fix):
                 tgt_ver = a["target_version"]
                 print(f"  ⚠ {name}: target {tgt_ver} > source {src_ver} (skipped)")
                 total_target_newer += 1
+
+            elif status == "content_differs":
+                print(f"  ⚠ {name}: same version, content differs (left unchanged; reconcile before syncing)")
 
             elif status == "not_in_source":
                 print(f"  ⚠ {name}: not in source (skipped)")
@@ -386,7 +392,7 @@ def sync_embedded_practices(repo_root, fix=False):
                 embedded_version = practice.get("version", "0.0.0")
                 cmp_embedded = parse_semver(embedded_version)
                 cmp_source = parse_semver(source["version"])
-                if cmp_embedded == cmp_source:
+                if cmp_embedded == cmp_source and practice == source["data"]:
                     continue
                 record = {
                     "method": str(path),
@@ -397,6 +403,10 @@ def sync_embedded_practices(repo_root, fix=False):
                 }
                 if cmp_embedded > cmp_source:
                     record["status"] = "embedded-ahead"
+                    actions.append(record)
+                    continue
+                if cmp_embedded == cmp_source:
+                    record["status"] = "content-differs"
                     actions.append(record)
                     continue
                 record["status"] = "stale"
@@ -418,7 +428,10 @@ def print_embedded(actions, fix):
         return
     print(f"\n=== EMBEDDED METHOD PRACTICES ({len(actions)}) ===")
     for a in actions:
-        if a["status"] == "embedded-ahead":
+        if a["status"] == "content-differs":
+            mark = "DIFFERS"
+            note = " — same version, content differs; left unchanged"
+        elif a["status"] == "embedded-ahead":
             mark = "AHEAD  "
             note = " — embedded copy is newer; left alone, reconcile by hand"
         else:

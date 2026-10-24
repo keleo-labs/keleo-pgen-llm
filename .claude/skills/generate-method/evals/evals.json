@@ -82,6 +82,24 @@
       "expected_output": "Single practice for customer discovery methodology.",
       "directory": "practices/i-corps-customer-discovery",
       "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
+      "id": 11,
+      "name": "composition-outcome",
+      "contract_scenario": "Composition outcome measures orchestration stages",
+      "prompt": "Focused authoring check: write only practices/objective-eval/result.json. Do not run the full generation pipeline. Use the generate-method skill's outcome guidance if available. The JSON root must be a practice named Example, with patterns: [] and one outcome named Completed, measureDescription: Completed delivery stages. Delivery is a declared orchestration with two sequential stages: pattern Start at seq 1 and orchestration Finish at seq 2. Include those stages in patternOrchestrations and write an objective contribution recognising completion at Finish, with 0.3 progress after Start and 1.0 at Finish. Preserve the distinction between patterns and orchestrations. No research or additional elements are needed.",
+      "expected_output": "The composition outcome names Delivery using orchestrationName, references both stage targets with their correct kinds, and uses stageForecastWeights without inventing patterns.",
+      "assertions": ["The contribution uses only the orchestration arm and no pattern is invented", "Composite references retain each stage target kind and weights rise to 1.0 at recognition"],
+      "directory": "practices/objective-eval"
+    },
+    {
+      "id": 12,
+      "name": "pattern-outcome",
+      "contract_scenario": "Existing pattern outcome route remains available",
+      "prompt": "Focused authoring check: write only practices/objective-eval/result.json. Do not run the full generation pipeline. Use generate-method outcome guidance if available. Write a practice named Example with a Delivery pattern whose views are Start at seq 1 and Done at seq 2. Add one outcome named Completed with measureDescription: Completed delivery views and an objective contribution recognising completion at Done with 0.3 progress at Start and 1.0 at Done. No research or additional elements are needed.",
+      "expected_output": "The outcome keeps patternName, recognizedAtPatternViewName and forecastWeights; it introduces no orchestration fields.",
+      "assertions": ["The contribution uses only the pattern arm", "View references resolve and weights rise to 1.0 at recognition"],
+      "directory": "practices/objective-eval"
     }
   ]
 }

@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import get_project_root
 
 DEFAULT_DIRS = ["baselines", "practices", "deps"]
+__version__ = "1.1.0"
 ASSESS = Path(__file__).resolve().parent / "assess-practice.py"
 VALIDATE_PRACTICE = Path(__file__).resolve().parent / "validate-practice-json.py"
 VALIDATE_BASELINE = Path(__file__).resolve().parent / "validate-baseline-json.py"
@@ -134,8 +135,18 @@ def resolve_context(path):
     return args, complete
 
 
+def scan_failure(reason):
+    return [{"severity": "error", "category": "scan-failure", "message": reason}], False
+
+
 def assess(path, schema, resolve=True):
     """Assess one document. Returns (issues, context_complete), or (None, False) on failure."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return scan_failure("document could not be read")
+    if not isinstance(data, dict) or data.get("kind") not in ("practice", "method", "practiceBaseline"):
+        return [], True
     cmd = [sys.executable, str(ASSESS), str(path)]
     context_complete = True
     if resolve:
@@ -145,12 +156,17 @@ def assess(path, schema, resolve=True):
         cmd += ["--schema", str(schema)]
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    except (OSError, subprocess.SubprocessError):
-        return None, False
+    except subprocess.TimeoutExpired:
+        return scan_failure("assessment timed out after 300 seconds")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return scan_failure(f"assessment could not run: {exc}")
     try:
-        return json.loads(out.stdout).get("issues", []), context_complete
+        issues = json.loads(out.stdout).get("issues")
+        if not isinstance(issues, list) or out.returncode not in (0, 1) or (out.returncode == 1 and not issues):
+            return scan_failure(f"assessment failed with exit {out.returncode}")
+        return issues, context_complete
     except (json.JSONDecodeError, AttributeError):
-        return None, False
+        return scan_failure("assessment returned unreadable output")
 
 
 def validate(path, schema):
@@ -173,7 +189,7 @@ def validate(path, schema):
         with open(path, encoding="utf-8") as fh:
             kind = json.load(fh).get("kind")
     except (OSError, json.JSONDecodeError, AttributeError):
-        return None, False
+        return scan_failure("document could not be read")
 
     if kind not in ("practice", "method", "practiceBaseline"):
         # A change request, a working file, a fragment someone left behind.
@@ -191,7 +207,7 @@ def validate(path, schema):
     else:
         # validate-practice.py: <practice> <baseline> <schema> [deps ...]
         if not baselines:
-            return None, False
+            return scan_failure("no baseline could be resolved")
         # Every resolved baseline, not just the nearest. `baselines[1:]` are the
         # ancestors of `baselines[0]`, and the validator takes them as further
         # positional context. Dropping them made this sweep manufacture the very
@@ -204,12 +220,18 @@ def validate(path, schema):
 
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    except (OSError, subprocess.SubprocessError):
-        return None, False
+    except subprocess.TimeoutExpired:
+        return scan_failure("validation timed out after 300 seconds")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return scan_failure(f"validation could not run: {exc}")
     try:
         report = json.loads(out.stdout)
+        if (not isinstance(report, dict) or "errors" not in report
+                or out.returncode not in (0, 1)
+                or (out.returncode == 1 and not report["errors"])):
+            return scan_failure(f"validation failed with exit {out.returncode}")
     except (json.JSONDecodeError, AttributeError):
-        return None, False
+        return scan_failure("validation returned unreadable output")
 
     issues = []
     for severity in ("errors", "warnings"):
@@ -354,6 +376,7 @@ def main():
     results = []
     scanned = 0
     unreadable = []
+    failures = []
     incomplete_context = []
     schema = args.schema or (str(DEFAULT_SCHEMA) if args.validator else None)
     for path in candidate_documents(root, dirs):
@@ -366,6 +389,14 @@ def main():
         rel = str(path.relative_to(root))
         if issues is None:
             unreadable.append(rel)
+            failures.append({"file": rel, "reason": "could not scan document"})
+            continue
+        failed = [i for i in issues if i.get("category") == "scan-failure"]
+        if failed:
+            failures.append({"file": rel, "reason": failed[0]["message"]})
+            if failed[0]["message"] == "document could not be read":
+                unreadable.append(rel)
+            print(f"  scan failed: {rel}: {failed[0]['message']}", file=sys.stderr)
             continue
         matched = []
         for i in issues:
@@ -393,6 +424,8 @@ def main():
 
     summary = {
         "documentsScanned": scanned,
+        "documentsFailed": len(failures),
+        "scanFailures": failures,
         "documentsWithFindings": len(results),
         "totalFindings": sum(r["issueCount"] for r in results),
         "unreadable": unreadable,
@@ -405,7 +438,7 @@ def main():
             print(json.dumps(delta, indent=2))
         else:
             print_comparison(delta)
-        sys.exit(1 if delta["regressed"] else 0)
+        sys.exit(1 if delta["regressed"] or failures else 0)
 
     if args.json:
         print(json.dumps({"summary": summary, "results": results}, indent=2))
@@ -416,11 +449,11 @@ def main():
                 print(f"    [{i.get('severity')}] {i.get('category')}: {i.get('message','')[:150]}")
         print(f"\n--- Scanned {summary['documentsScanned']} document(s); "
               f"{summary['documentsWithFindings']} with findings, "
-              f"{summary['totalFindings']} finding(s) total ---")
+              f"{summary['totalFindings']} finding(s), {len(failures)} failed to scan ---")
         for u in unreadable:
             print(f"  could not assess: {u}", file=sys.stderr)
 
-    sys.exit(1 if results else 0)
+    sys.exit(1 if results or failures else 0)
 
 
 if __name__ == "__main__":

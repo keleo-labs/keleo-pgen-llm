@@ -5,7 +5,7 @@ name: Harness selftest
 # An assertion that can no longer fail silently inflates every eval score, so
 # this runs on every push rather than only before a release.
 #
-# The grader selftest needs deps/platform-adoption-kernel.json (tracked here)
+# The grader selftest uses tests/fixtures/selftest-baseline.json (tracked here)
 # and, for schema:valid, deps/language.schema.json — a symlink into the
 # keleo-language repo, which a runner does not have. The selftest reports that
 # it is running without schema validation rather than failing; everything else

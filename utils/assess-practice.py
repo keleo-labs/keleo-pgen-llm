@@ -39,10 +39,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import (load_json_pair, _context_is_stale,
-                           merge_ancestor_baselines)
+                           merge_ancestor_baselines, merge_pattern_orchestrations,
+                           check_dependency_versions)
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
+__version__ = "1.1.0"
 
 BASELINE_REQUIRED_SECTIONS = [
     "focuses", "activitySpaces", "competencies", "narrativeTypes", "alphas"
@@ -2009,6 +2011,58 @@ def check_keyword_count(data, kind):
     return issues
 
 
+def stage_ref_key(stage):
+    relative = stage.get("relativeTo") or {}
+    return (stage.get("patternName"), stage.get("orchestrationName"),
+            relative.get("patternName"), relative.get("orchestrationName"))
+
+
+def check_stage_outcome(oc, path, orchestrations):
+    """Resolve composite stage references and check the sequential forecast curve."""
+    name = oc["orchestrationName"]
+    issues = []
+
+    def finding(message, suffix, severity="error"):
+        issues.append({"severity": severity, "category": "outcome-refs",
+                       "path": f"{path}.{suffix}", "message": message, "autoFixable": False})
+
+    if name not in orchestrations:
+        finding(f"Unknown orchestration '{name}'", "orchestrationName")
+        return issues
+    stages = {stage_ref_key(s): s for s in orchestrations[name].get("stages", [])}
+    refs = [(oc["recognizedAtStage"], "recognizedAtStage")] if "recognizedAtStage" in oc else []
+    weights = oc.get("stageForecastWeights", [])
+    refs += [(w.get("stage", {}), f"stageForecastWeights[{idx}].stage")
+             for idx, w in enumerate(weights)]
+    for ref, suffix in refs:
+        if stage_ref_key(ref) not in stages:
+            finding(f"Stage reference {ref} not found in orchestration '{name}'", suffix)
+    ordered = sorted(((s.get("seq", 0), stage_ref_key(s)) for s in stages.values()
+                      if s.get("relationship") == "sequential"), key=lambda entry: entry[0])
+    weight_by_stage = {stage_ref_key(w.get("stage", {})): w.get("weight") for w in weights}
+    previous = None
+    for _, key in ordered:
+        weight = weight_by_stage.get(key, 0)
+        if not isinstance(weight, (float, int)):
+            continue
+        if previous is not None and weight < previous:
+            finding(f"Forecast weights decrease in orchestration '{name}'", "stageForecastWeights")
+        previous = weight
+    recognized = oc.get("recognizedAtStage")
+    if recognized and stage_ref_key(recognized) in stages:
+        key = stage_ref_key(recognized)
+        if weights and weight_by_stage.get(key) != 1.0:
+            finding("Recognised stage should carry weight 1.0", "stageForecastWeights", "warning")
+        recognized_seq = stages[key].get("seq")
+        if recognized_seq is not None:
+            for seq, stage_key in ordered:
+                if seq < recognized_seq and weight_by_stage.get(stage_key) == 1.0:
+                    finding("Stage has full weight before recognition", "stageForecastWeights", "warning")
+        if stages[key].get("relationship") == "onDemand":
+            finding("Outcome is recognised at an onDemand stage", "recognizedAtStage", "warning")
+    return issues
+
+
 def check_outcomes(data, kind, baseline_data=None):
     """Check that practices have 1-3 outcomes with measureDescription and valid contributions."""
     issues = []
@@ -2040,17 +2094,25 @@ def check_outcomes(data, kind, baseline_data=None):
     own_pattern_names = set()
     all_pattern_names = set()
     pattern_views_by_pattern = {}
+    orchestrations = []
+    for doc in [baseline_data or {}, data] + (sources if kind == "method" else []):
+        orchestrations = merge_pattern_orchestrations(orchestrations, doc.get("patternOrchestrations", []))
+        for p in doc.get("patterns", []):
+            all_pattern_names.add(p.get("name"))
+            pattern_views_by_pattern.setdefault(p.get("name"), set()).update(
+                v.get("name") for v in p.get("patternViews", []))
+    orchestrations = {o["name"]: o for o in orchestrations}
     for p in (baseline_data or {}).get("patterns", []):
         pname = p.get("name", "")
         if pname:
             all_pattern_names.add(pname)
-            pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
+            pattern_views_by_pattern.setdefault(pname, set()).update(v.get("name") for v in p.get("patternViews", []) if v.get("name"))
     for p in data.get("patterns", []):
         pname = p.get("name", "")
         if pname:
             own_pattern_names.add(pname)
             all_pattern_names.add(pname)
-            pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
+            pattern_views_by_pattern.setdefault(pname, set()).update(v.get("name") for v in p.get("patternViews", []) if v.get("name"))
 
     for source in sources:
         pfx = ""
@@ -2066,7 +2128,7 @@ def check_outcomes(data, kind, baseline_data=None):
                 if pname:
                     own_pattern_names.add(pname)
                     all_pattern_names.add(pname)
-                    pattern_views_by_pattern[pname] = {v.get("name") for v in p.get("patternViews", []) if v.get("name")}
+                    pattern_views_by_pattern.setdefault(pname, set()).update(v.get("name") for v in p.get("patternViews", []) if v.get("name"))
 
         outcomes = source.get("outcomes", [])
         if not outcomes:
@@ -2164,6 +2226,20 @@ def check_outcomes(data, kind, baseline_data=None):
             for oc_idx, oc in enumerate(o.get("objectiveContributions", [])):
                 has_objective = True
                 oc_path = f"{opath}.objectiveContributions[{oc_idx}]"
+                if bool(oc.get("patternName")) == bool(oc.get("orchestrationName")):
+                    issues.append({"severity": "error", "category": "outcome-refs", "path": oc_path,
+                                   "message": "Objective contribution requires exactly one of patternName or orchestrationName",
+                                   "autoFixable": False})
+                    continue
+                if oc.get("orchestrationName"):
+                    if "forecastWeights" in oc or "recognizedAtPatternViewName" in oc:
+                        issues.append({"severity": "error", "category": "outcome-refs", "path": oc_path,
+                                       "message": "Orchestration contribution contains pattern view fields", "autoFixable": False})
+                    issues.extend(check_stage_outcome(oc, oc_path, orchestrations))
+                    continue
+                if "stageForecastWeights" in oc or "recognizedAtStage" in oc:
+                    issues.append({"severity": "error", "category": "outcome-refs", "path": oc_path,
+                                   "message": "Pattern contribution contains orchestration stage fields", "autoFixable": False})
                 pname = oc.get("patternName", "")
                 if not pname:
                     issues.append({
@@ -2375,15 +2451,15 @@ def check_forecast_monotonicity(data, kind, baseline_data=None):
             pfx = f"practice[{source.get('name', '?')}]."
 
         view_order = {}
-        for p in source.get("patterns", []):
+        for p in [p for doc in [baseline_data or {}, data] + sources for p in doc.get("patterns", [])]:
             pname = p.get("name")
             if not pname:
                 continue
-            view_order[pname] = {
+            view_order.setdefault(pname, {}).update({
                 v.get("name"): v.get("seq", idx)
                 for idx, v in enumerate(p.get("patternViews", []))
                 if v.get("name")
-            }
+            })
 
         for o_idx, o in enumerate(source.get("outcomes", [])):
             oname = o.get("name", f"<index {o_idx}>")
@@ -4723,11 +4799,14 @@ def _auto_resolve_deps(data, kind, file_path, existing_parents):
     parents = list(existing_parents or [])
     already_given = set(parents)
     unresolved = []
-    for dep_name in data.get("practiceDependencyNames", []):
+    dependency_names = list(data.get("practiceDependencyNames", []))
+    dependency_names += data.get("practiceNames", []) or []
+    dependency_names += data.get("baselinePracticeNames", []) or []
+    for dep_name in dict.fromkeys(dependency_names):
         result = resolve_name(dep_name, index, prefer_filesystem=True)
         if result["status"] == "found":
             path = result["path"]
-            if "::" not in path and path not in parents:
+            if path not in parents:
                 parents.append(path)
             continue
         # An explicitly passed --parent may already cover this dependency, and
@@ -4785,7 +4864,7 @@ def main():
     name = data.get("name", "<unnamed>")
 
     unresolved_deps = []
-    if kind != "practiceBaseline":
+    if kind != "practiceBaseline" or data.get("baselinePracticeNames"):
         resolved_baseline, resolved_parents, unresolved_deps = _auto_resolve_deps(
             data, kind, file_path, args.parent)
         if not args.baseline:
@@ -4900,7 +4979,8 @@ def main():
     # prerequisites needs the contributions that drops.
     parent_documents = []
 
-    if baseline_data and args.parent:
+    if args.parent:
+        baseline_data = baseline_data or {}
         bl_alpha_set = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
         bl_nt_set = {nt["name"] for nt in baseline_data.get("narrativeTypes", []) if nt.get("name")}
         bl_comp_names = {c["name"] for c in baseline_data.get("competencies", []) if c.get("name")}
@@ -4917,6 +4997,8 @@ def main():
             nonlocal bl_alpha_set, bl_nt_set, bl_comp_names, bl_asp_names
             nonlocal bl_wp_names, bl_persona_names, bl_pg_names, bl_act_names, bl_cit_names
             nonlocal bl_focus_names, bl_pattern_names
+            baseline_data["patternOrchestrations"] = merge_pattern_orchestrations(
+                baseline_data.get("patternOrchestrations", []), source.get("patternOrchestrations", []))
             for focus in source.get("focuses", []):
                 if focus.get("name") and focus["name"] not in bl_focus_names:
                     baseline_data.setdefault("focuses", []).append(focus)
@@ -5006,6 +5088,10 @@ def main():
         all_issues.extend(check_evidence_coverage(data, kind))
 
     all_issues.extend(check_references(data, kind, baseline_data))
+    dependency_documents = [baseline_data or {}] + [doc for _, doc in parent_documents]
+    dependency_documents += data.get("practices", [])
+    for source in [data] + data.get("practices", []):
+        all_issues.extend(check_dependency_versions(source, dependency_documents))
     all_issues.extend(check_outcomes(data, kind, baseline_data))
     all_issues.extend(check_pattern_view_prerequisites(
         data, kind, baseline_data, parent_documents))

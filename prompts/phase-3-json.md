@@ -978,7 +978,9 @@ Build the `outcomes` array from the mapping guide's Outcome Mappings section. Ea
 - All `alphaName` values must match an alpha defined in this practice, baseline, or dependency
 - All `stateName` values must match a state on the referenced alpha
 - Optional `workProductName` on a metricContribution filters which evidencing work product type supplies the metric; when set it must match a WorkProduct.name
-- `patternName` is REQUIRED on every objectiveContribution — it scopes all patternViewName references to views within that pattern (analogous to alphaName on MetricContribution)
+- Every objectiveContribution names exactly one of `patternName` or `orchestrationName`, resolved across the baseline chain, declared dependencies and this document.
+- The pattern arm uses `recognizedAtPatternViewName` and `forecastWeights`. The orchestration arm uses `recognizedAtStage` and `stageForecastWeights: [{stage, weight}]`. Each stage reference names exactly one of `patternName` or `orchestrationName`, plus the exact `relativeTo` host if its placement declares one. Resolve it against the merged orchestration. Keep the arms' fields separate.
+- A composition practice owning the endeavour's shape measures against its orchestration; do not invent a lifecycle pattern. Sequential stage weights never decrease and recognition carries 1.0; concurrent and on-demand stages have no implied sequential order.
 - All `patternViewName` values must match a PatternView.name within the named pattern
 - The `recognizedAtStateName` entry MUST have weight 1.0 in `forecastWeights`
 
@@ -1494,8 +1496,8 @@ Names must be imperative verb phrases (actions to take), not past-participle con
 
 ### 17. Outcomes
 **Missing:** `outcomes` array absent — practices should have 1-3 outcomes describing value delivery
-**Wrong:** Outcome with only `measureDescription` and no contribution mechanism; `metricContributions` referencing non-existent alphas or states; `objectiveContributions` missing `patternName`; empty contribution arrays instead of omitting; `recognizedAt` state without weight 1.0 in forecastWeights
-**Right:** 1-3 outcomes with `measureDescription` plus at least one of `metricContributions` or `objectiveContributions`; every objectiveContribution has `patternName` scoping its view references; valid symbolic references; `recognizedAt` entry has weight 1.0; empty arrays omitted
+**Wrong:** Outcome with only `measureDescription` and no contribution mechanism; invalid symbolic references; an objective contribution with neither or both targets, or fields from both arms; empty contribution arrays; recognition without weight 1.0.
+**Right:** 1-3 outcomes with `measureDescription` plus metric or objective contributions; exactly one objective target scoping its views or merged stages; recognition carries weight 1.0; empty arrays omitted.
 
 ## Text Cleaning
 

@@ -9,6 +9,12 @@ Feature: Practice/Method Update to Latest Guidance
     Given one or more existing practice/method/baseline JSON files are provided
     And the user invokes /update-method
 
+  Scenario: Preserve orchestration outcomes during an update
+    Given a composition practice measures an outcome against orchestration stages
+    When the practice is remapped or regenerated
+    Then the contribution retains orchestrationName and composite stage references
+    And no pattern is invented to satisfy the outcome
+
   Scenario: Auto-fix mode
     Given assess-practice.py recommends suggestedUpdateMode "auto-fix"
     When auto-fix utilities run

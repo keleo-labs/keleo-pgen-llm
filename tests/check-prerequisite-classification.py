@@ -120,9 +120,9 @@ def build_cases():
             lambda f: has(f, "inverted", view="Gate"),
         ),
         (
-            "a prerequisite the pattern never carries is unreached, not inverted",
+            "a prerequisite on an alpha the pattern never carries is external",
             "Linear", {},
-            lambda f: has(f, "unreached", view="Run"),
+            lambda f: has(f, "external", view="Run"),
         ),
         (
             "without a loop a lower state later is a genuine regression",

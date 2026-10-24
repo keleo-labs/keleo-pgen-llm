@@ -1690,16 +1690,17 @@ Each Outcome optionally includes:
   - `workProductName`: optional filter — which work product type carries the metric (must match a WorkProduct.name)
   - `recognizedAtStateName`: the alpha state at which the metric contribution is fully recognized (weight = 1.0)
   - `forecastWeights`: array of `{stateName, weight}` mapping each alpha state to a 0-1 probability weight
-- **objectiveContributions** — when patterns have well-defined views representing lifecycle phases:
-  - `patternName`: the pattern whose views are used to measure progress (REQUIRED — scopes all view references)
+- **objectiveContributions** — select exactly one target, resolved across the baseline chain, declared dependencies and this document:
+  - `patternName`: the pattern whose views are used to measure progress (exclusive with `orchestrationName`)
   - `recognizedAtPatternViewName`: the pattern view at which the objective is fully achieved
   - `forecastWeights`: array of `{patternViewName, weight}` mapping each view to cumulative progress (0-1)
+  - For a practice owning the endeavour's shape, use `orchestrationName`, `recognizedAtStage` and `stageForecastWeights: [{stage, weight}]` instead. A stage reference names exactly one of `patternName` or `orchestrationName`, plus `relativeTo` exactly where that placement declares a host. Resolve against the merged orchestration; do not invent a pattern for a composition practice. Sequential stage weights never decrease and recognition carries 1.0; concurrent and on-demand stages have no implied sequential order.
 
 **Shape of a forecast curve (both contribution kinds):** weights are non-decreasing across the progression, the recognised entry carries 1.0, and every entry after it also carries 1.0. The curve climbs and then plateaus; it never dips.
 
 Where the alpha or pattern continues past the point the value is realized — `Won` then `Renewing`, `Measured` then `Scaled` — recognize at the state where it is realized and hold 1.0 through the rest. Do not reserve 1.0 for the final state and set the recognised point one step below it: that is the most common way this goes wrong, and `assess-practice.py` reports it.
 
-For initial generation, `measureDescription` alone is acceptable — contributions are optional but recommended when the practice defines clear metric chains or lifecycle patterns.
+Every extension outcome needs at least one metric or objective contribution. A baseline outcome may use `measureDescription` alone.
 
 **Lifecycle pattern outcome (STRONGLY RECOMMENDED):** If the practice defines at least one lifecycle pattern (Step 8), at least one outcome SHOULD use `objectiveContributions` tied to the **main lifecycle pattern**. This connects value delivery to lifecycle progression — the most natural way to measure practice adoption maturity.
 

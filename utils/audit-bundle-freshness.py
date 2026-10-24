@@ -53,9 +53,12 @@ from _shared import (  # noqa: E402
     load_all_from_keleo,
     load_json_pair,
     version_sort_key as parse_version,
+    check_dependency_versions,
+    version_satisfies_range,
 )
 
 SOURCE_DIRS = ["deps", "baselines", "practices"]
+__version__ = "1.2.0"
 # practiceBaseline before practice before method, so bundles stay topological
 # and package-keleo's entry-point rule (method, else last) resolves correctly.
 KIND_ORDER = {"practiceBaseline": 0, "practice": 1, "method": 2}
@@ -132,7 +135,8 @@ def audit_bundle(keleo_path, source_index, root):
             elif bundled_tuple > source_tuple:
                 status = "ahead"
             else:
-                status = "current"
+                source_data, error = load_json_pair(root / source_path)
+                status = "content-differs" if error or source_data != doc else "current"
 
         entries.append({
             "document": name,
@@ -143,9 +147,32 @@ def audit_bundle(keleo_path, source_index, root):
             "status": status,
         })
 
+    version_findings = []
+    for doc in documents:
+        for finding in check_dependency_versions(doc, documents):
+            version_findings.append({"document": doc.get("name"), **finding})
+    manifest = read_manifest(keleo_path) or {}
+    for dependency in manifest.get("dependencies", []):
+        name = dependency.get("packageName")
+        candidates = []
+        for candidate in sorted((root / "bundles").glob("*.keleo")):
+            identity = (read_manifest(candidate) or {}).get("package", {})
+            if identity.get("name") == name:
+                candidates.append(identity.get("version", ""))
+        if candidates:
+            constraint = dependency.get("versionRange", "")
+            if any(version_satisfies_range(version, constraint) is True for version in candidates):
+                continue
+            version = max(candidates, key=parse_version)
+            satisfied = version_satisfies_range(version, constraint)
+            if satisfied is not True:
+                version_findings.append({"severity": "warning", "category": "dependency-version",
+                                         "message": f"Package '{name}' at {version}: constraint {constraint} "
+                                                    + ("not satisfied" if satisfied is False else "could not be evaluated")})
     return {
         "bundle": str(keleo_path.relative_to(root)),
         "documents": sorted(entries, key=lambda e: e["document"]),
+        "versionFindings": version_findings,
     }
 
 
@@ -366,6 +393,7 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=
 
 
 STATUS_MARK = {
+    "content-differs": "DIFFERS",
     "stale": "STALE  ",
     "ahead": "AHEAD  ",
     "current": "ok     ",
@@ -384,14 +412,16 @@ def print_report(results, stale_only):
             print(f"  ERROR: {result['error']}\n")
             continue
 
-        stale = [d for d in result["documents"] if d["status"] == "stale"]
-        if stale_only and not stale:
+        stale = [d for d in result["documents"] if d["status"] in ("stale", "content-differs")]
+        if stale_only and not stale and not result.get("versionFindings"):
             continue
         if stale:
             stale_bundles += 1
             total_stale += len(stale)
 
         print(f"=== {result['bundle']} ===")
+        for finding in result.get("versionFindings", []):
+            print(f"  WARNING: {finding['message']}")
         shown = stale if stale_only else result["documents"]
         for doc in shown:
             mark = STATUS_MARK.get(doc["status"], doc["status"])
@@ -415,7 +445,7 @@ def print_report(results, stale_only):
             for bundle in bundles:
                 print(f"    - {bundle}")
 
-    return 1 if total_stale else 0
+    return 1 if total_stale or any(r.get("error") or r.get("versionFindings") for r in results) else 0
 
 
 def main():
@@ -492,7 +522,7 @@ def main():
         else:
             targets = [
                 r for r in results
-                if any(d["status"] == "stale" for d in r["documents"])
+                if any(d["status"] in ("stale", "content-differs") for d in r["documents"])
             ]
         if not targets:
             print("No stale bundles — nothing to rebuild.")
@@ -551,14 +581,14 @@ def main():
 
     if args.json:
         stale = sum(
-            1 for r in results for d in r["documents"] if d["status"] == "stale"
+            1 for r in results for d in r["documents"] if d["status"] in ("stale", "content-differs")
         )
         print(json.dumps({
             "bundlesAudited": len(results),
             "staleDocumentCopies": stale,
             "results": results,
         }, indent=2))
-        return 1 if stale else 0
+        return 1 if stale or any(r.get("error") or r.get("versionFindings") for r in results) else 0
 
     return print_report(results, args.stale_only)
 
