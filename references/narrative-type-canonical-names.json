@@ -44,20 +44,20 @@
 
   {
     "from": "Essay",
-    "to": "Essay",
+    "to": "Essay Narrative",
     "kind": "narrativeType",
-    "note": "NOT a spelling of 'Essay Narrative'. Three elements (Introduction, Body, Conclusion) against four (Introduction, Defining Key Concepts, Presenting Evidence, Conclusion). Folding them needs a mapping for Body, which has no counterpart — a modelling decision, not a rename. 463 references across 20 documents would move with it."
+    "note": "Canonical-name contract 2.0.0: Essay references now fail the standing verification gate. Migrate with retype-narratives.py: Introduction stays Introduction, Body becomes Presenting Evidence, Conclusion stays Conclusion; preserve prose and do not invent Defining Key Concepts content. The name-only reconciler is a verification gate, not a complete migration tool."
   },
   {
     "from": "Hero's Journey",
     "to": "Hero's Journey",
     "kind": "narrativeType",
-    "note": "NOT a spelling of 'The Hero's Journey'. Five elements against four: Challenges & Trials and Transformation have no single counterpart in The Ordeal. Renaming alone would leave every narrativeElementName dangling."
+    "note": "Context-sensitive migration: rename to The Hero's Journey only with an explicit element map covering narratives and pattern views. Challenges & Trials becomes The Ordeal; achieved transformation becomes The Return, while ongoing adaptation may remain The Ordeal. Renaming alone leaves element references dangling."
   },
   {
     "from": "Three-Act Structure",
     "to": "Three-Act Structure",
     "kind": "narrativeType",
-    "note": "NOT a spelling of 'The Three-Act Structure & StoryBrand'. Four unprefixed elements against three 'Act I/II/III' ones, splitting the third act in two. Same framework, different decomposition."
+    "note": "Ambiguous legacy name: the four-element StoryBrand decomposition maps to The Three-Act Structure & StoryBrand, retaining both concluding contexts in Act III. The distinct Problem/Solution/Impact structure is named Three-Act Problem-Solution-Impact. Choose by the defining elements, not by name alone."
   }
 ]

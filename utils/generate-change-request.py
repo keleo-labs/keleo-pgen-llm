@@ -6,6 +6,8 @@ Compares two versions of a practice/baseline/method JSON, detects structural
 changes, and produces a schema-compliant ChangeRequest with operations and
 nameChanges for downstream propagation via apply-change-request.py.
 
+Version 1.0.1 records root composition metadata as well as named elements.
+
 Usage:
     # Generate ChangeRequest (stdout)
     python3 utils/generate-change-request.py old.json new.json
@@ -31,6 +33,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _shared import load_json, detect_kind, get_schema_version
+
+__version__ = "1.0.1"
 
 
 NAMED_SECTIONS = [
@@ -63,11 +67,6 @@ ELEMENT_TYPE_MAP = {
     "patternGroups": "PatternGroup",
     "patternOrchestrations": "PatternOrchestration",
 }
-
-SCALAR_FIELDS = [
-    "version", "description", "baselinePracticeName", "schemaVersion",
-]
-
 
 def _git_user():
     try:
@@ -271,22 +270,17 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
     # failure. Inferred renames are appended and deduplicated below.
     name_changes = list(declared_name_changes or [])
 
-    # --- Scalar root-level changes ---
-    scalar_mods = {}
-    for field in SCALAR_FIELDS:
-        old_val = old_data.get(field)
-        new_val = new_data.get(field)
-        if old_val != new_val:
-            scalar_mods[field] = new_val
-    if scalar_mods:
+    # Named elements have their own operations; composition metadata belongs to the root.
+    root_mods = _diff_fields(old_data, new_data, set(NAMED_SECTIONS) | {"kind"})
+    if root_mods:
         operations.append({
             "operation": "modify",
             "elementType": target_type.replace("practiceBaseline", "PracticeBaseline")
                                       .replace("practice", "Practice")
                                       .replace("method", "Method"),
             "elementName": doc_name,
-            "modifications": scalar_mods,
-            "rationale": _summarize_modifications(scalar_mods),
+            "modifications": root_mods,
+            "rationale": _summarize_modifications(root_mods),
         })
 
     # --- Named array sections ---

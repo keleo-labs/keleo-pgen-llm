@@ -17,7 +17,7 @@ this where the order is not one-to-one.
 Usage:
     # Dry run across the whole document
     python3 utils/retype-narratives.py practice.json --context _effective-context.json \
-        --spec '[{"fromType": "The STAR Format", "toType": "Essay"}]'
+        --spec '[{"fromType": "The STAR Format", "toType": "Essay Narrative"}]'
 
     # Restrict to named elements, and apply
     python3 utils/retype-narratives.py practice.json --context _effective-context.json \
@@ -27,7 +27,7 @@ Spec format (array of operations):
     [
       {
         "fromType": "The STAR Format",
-        "toType": "Essay",
+        "toType": "Essay Narrative",
         "only": ["Workload Migration", "Migration Team"],     # optional element-name filter
         "elementMap": {"Situation": "Introduction"}           # optional explicit relabel
       }
@@ -41,6 +41,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json, load_json_pair
 
+__version__ = "1.1.0"
+
 # Element collections that can carry narratives, with the owning element's name
 # used for the --only filter and for reporting.
 NARRATIVE_HOSTS = [
@@ -50,6 +52,7 @@ NARRATIVE_HOSTS = [
     "personas",
     "personaGroups",
     "patterns",
+    "patternOrchestrations",
     "outcomes",
     "activitySpaces",
     "competencies",
@@ -83,6 +86,10 @@ def iter_narratives(data):
     """
     roots = [data] + [p for p in data.get("practices", []) if isinstance(p, dict)]
     for root in roots:
+        for collection in ("patterns", "patternOrchestrations"):
+            for element in root.get(collection, []) or []:
+                if element.get("narrativeTypeName"):
+                    yield collection, element.get("name", "?"), element
         for narrative in root.get("narratives", []) or []:
             yield "(document)", root.get("name", "?"), narrative
         for collection in NARRATIVE_HOSTS:
@@ -91,6 +98,15 @@ def iter_narratives(data):
                     continue
                 for narrative in element.get("narratives", []) or []:
                     yield collection, element.get("name", "?"), narrative
+
+
+def narrative_contexts(narrative):
+    """Include views/stages governed by a pattern's declared narrative type."""
+    contexts = list(narrative.get("narrativeContexts", []) or [])
+    for collection in ("patternViews", "stages"):
+        for child in narrative.get(collection, []) or []:
+            contexts.extend(child.get("narrativeContexts", []) or [])
+    return contexts
 
 
 def build_element_map(op, narrative, source_elements, target_elements):
@@ -103,11 +119,21 @@ def build_element_map(op, narrative, source_elements, target_elements):
     """
     explicit = op.get("elementMap") or {}
     contexts = sorted(
-        narrative.get("narrativeContexts", []) or [],
+        narrative_contexts(narrative),
         key=lambda c: c.get("seq", 0),
     )
     if not contexts:
         return {}, None
+
+    # View/stage sequences are local to each child, so sorting their combined
+    # contexts cannot establish a meaningful cross-view positional mapping.
+    if "patternViews" in narrative or "stages" in narrative:
+        missing = {c.get("narrativeElementName", "") for c in contexts} - set(explicit)
+        if missing:
+            return None, (
+                "pattern/stage contexts require an explicit elementMap for: "
+                + ", ".join(sorted(missing))
+            )
 
     mapping = {}
     unresolved = []
@@ -119,6 +145,10 @@ def build_element_map(op, narrative, source_elements, target_elements):
             mapping[current] = target_elements[idx]
         else:
             unresolved.append(current)
+
+    invalid = set(mapping.values()) - set(target_elements)
+    if invalid:
+        return None, f"elementMap names undefined target element(s): {', '.join(sorted(invalid))}"
 
     if unresolved:
         return None, (
@@ -169,7 +199,7 @@ def retype(data, spec, narrative_types):
 
             narrative["narrativeTypeName"] = to_type
             relabelled = []
-            for ctx in narrative.get("narrativeContexts", []) or []:
+            for ctx in narrative_contexts(narrative):
                 current = ctx.get("narrativeElementName", "")
                 if current in mapping and mapping[current] != current:
                     ctx["narrativeElementName"] = mapping[current]
@@ -199,6 +229,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("file", help="Practice, method or baseline JSON file")
     parser.add_argument("--context", required=True,
                         help="Context document defining the narrative types "

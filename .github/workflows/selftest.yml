@@ -31,3 +31,15 @@ jobs:
 
       - name: Grader selftest
         run: python3 utils/eval-skill-output.py --selftest
+
+      - name: Dependency version selection regression
+        run: python3 tests/check-versioning.py
+
+      - name: Change-request metadata regression
+        run: python3 tests/check-change-request-metadata.py
+
+      - name: Narrative migration regression
+        run: python3 tests/check-retype-pattern-contexts.py
+
+      - name: Bundle identity regression
+        run: python3 tests/check-bundle-document-kinds.py
