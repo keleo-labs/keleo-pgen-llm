@@ -8,7 +8,7 @@ reintroduce content that was already corrected — wrong aliases, old element
 names, superseded states.
 
 This compares each document embedded in each bundle against the current
-on-disk version of the document with the same name, and reports drift.
+on-disk version of the document with the same name and kind, and reports drift.
 
 Rebuild mode repackages stale bundles from current on-disk sources, bumping
 the manifest version. Documents that exist only inside the bundle (typically
@@ -58,14 +58,14 @@ from _shared import (  # noqa: E402
 )
 
 SOURCE_DIRS = ["deps", "baselines", "practices"]
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 # practiceBaseline before practice before method, so bundles stay topological
 # and package-keleo's entry-point rule (method, else last) resolves correctly.
 KIND_ORDER = {"practiceBaseline": 0, "practice": 1, "method": 2}
 
 
 def build_source_index(root):
-    """Index current on-disk documents by name, keeping the highest version of each."""
+    """Index documents by (name, kind), keeping the highest version of each."""
     index = {}
     for dirname in SOURCE_DIRS:
         search_path = root / dirname
@@ -99,12 +99,24 @@ def build_source_index(root):
                 "kind": detect_kind(data),
                 "path": str(json_file.relative_to(root)),
             }
-            existing = index.get(name)
+            key = (name, candidate["kind"])
+            existing = index.get(key)
             if existing is None or parse_version(candidate["version"]) > parse_version(
                 existing["version"]
             ):
-                index[name] = candidate
+                index[key] = candidate
     return index
+
+
+def source_for(source_index, name, kind=None):
+    """Resolve an exact document identity; never guess across document kinds."""
+    if kind:
+        return source_index.get((name, kind))
+    candidates = [source for (candidate_name, _), source in source_index.items()
+                  if candidate_name == name]
+    if len(candidates) > 1:
+        raise ValueError(f"ambiguous document {name!r}: document kind is required")
+    return candidates[0] if candidates else None
 
 
 def audit_bundle(keleo_path, source_index, root):
@@ -119,7 +131,7 @@ def audit_bundle(keleo_path, source_index, root):
         if not name:
             continue
         bundled_version = doc.get("version", "")
-        source = source_index.get(name)
+        source = source_for(source_index, name, detect_kind(doc))
 
         if source is None:
             status = "no-source"
@@ -199,7 +211,7 @@ def read_manifest(keleo_path):
         return None
 
 
-def stage_bundled_document(keleo_path, document_name, staging_dir):
+def stage_bundled_document(keleo_path, document_entry, staging_dir):
     """Extract a bundle-only document to staging. Returns its path, or None."""
     manifest = read_manifest(keleo_path)
     if not manifest:
@@ -207,7 +219,7 @@ def stage_bundled_document(keleo_path, document_name, staging_dir):
     try:
         with zipfile.ZipFile(keleo_path, "r") as zf:
             for entry in manifest.get("documents", []):
-                if entry.get("documentName") != document_name:
+                if entry.get("path") != document_entry.get("path"):
                     continue
                 zip_path = entry.get("path", "")
                 if zip_path not in zf.namelist():
@@ -283,7 +295,7 @@ def close_over_dependencies(resolved, present, source_index, root):
         depth += 1
         wave = []
         for name in frontier:
-            source = source_index.get(name)
+            source = source_for(source_index, name)
             if source is None:
                 continue
             # Negative rank sorts ahead of the manifest's own documents (0), and a
@@ -312,12 +324,12 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=
         resolved, carried = [], []
         for entry in manifest.get("documents", []):
             name = entry.get("documentName", "")
-            kind = entry.get("documentType", "practice")
-            source = source_index.get(name)
+            kind = entry.get("documentType")
+            source = source_for(source_index, name, kind)
             if source:
                 resolved.append((KIND_ORDER.get(source["kind"], 1), 0, root / source["path"]))
                 continue
-            staged = stage_bundled_document(keleo_path, name, staging)
+            staged = stage_bundled_document(keleo_path, entry, staging)
             if staged is None:
                 return {
                     "bundle": rel, "status": "error",
@@ -381,6 +393,16 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=
                 "message": (proc.stderr or proc.stdout).strip()[:400],
             }
 
+        old_entries = {(e.get("documentName"), e.get("documentType"))
+                       for e in manifest.get("documents", []) if e.get("entryPoint")}
+        rebuilt_manifest = read_manifest(out_tmp) or {}
+        new_entries = {(e.get("documentName"), e.get("documentType"))
+                       for e in rebuilt_manifest.get("documents", []) if e.get("entryPoint")}
+        if old_entries and new_entries != old_entries:
+            return {
+                "bundle": rel, "status": "error",
+                "message": "rebuild would change entry-point document identity; original bundle preserved",
+            }
         shutil.move(str(out_tmp), str(keleo_path))
         return {
             "bundle": rel, "status": "rebuilt",
@@ -388,6 +410,8 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=
             "documents": len(ordered), "carriedOver": carried,
             "addedDependencies": added,
         }
+    except ValueError as exc:
+        return {"bundle": rel, "status": "error", "message": str(exc)}
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
@@ -452,6 +476,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Audit .keleo bundles for stale embedded document copies"
     )
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument(
         "--bundle", action="append",
         help="Audit a specific bundle (repeatable). Default: all bundles/*.keleo",

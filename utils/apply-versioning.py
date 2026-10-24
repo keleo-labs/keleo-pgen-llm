@@ -46,7 +46,10 @@ from utils._shared import (
     increment_version,
     load_json_pair,
     MERGEABLE_ARRAYS,
+    version_sort_key,
 )
+
+__version__ = "1.1.0"
 
 
 def normalize_version(version_str):
@@ -65,7 +68,7 @@ def resolve_dependency_version(dep_name, version_index):
 
 
 def build_version_index(file_paths):
-    """Build name → version mapping from all input files."""
+    """Build name → newest version mapping, independent of scan order."""
     index = {}
     for path in file_paths:
         data, err = load_json_pair(path)
@@ -73,7 +76,9 @@ def build_version_index(file_paths):
             continue
         name = data.get("name", "")
         version = data.get("version", "")
-        if name and version:
+        if name and version and (
+            name not in index or version_sort_key(version) > version_sort_key(index[name])
+        ):
             index[name] = normalize_version(version)
     return index
 
@@ -347,6 +352,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Apply versioning fields to Practice Language JSON documents"
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument(
         "files", nargs="*",
         help="JSON files to update"
