@@ -34,6 +34,15 @@
       "expected_output": "Updated method JSON with reduced error and warning counts.",
       "directory": "practices/horticulture-foundations",
       "baseline": "baselines/horticulture-essentials/horticulture-essentials.json"
+    },
+    {
+      "id": 5,
+      "name": "preserve-stage-outcome",
+      "contract_scenario": "Preserve orchestration outcomes during an update",
+      "prompt": "Focused update check: write only practices/objective-eval/result.json. Do not run the full update pipeline. Use update-method's outcome guidance if available. Start from this practice and change only the outcome description to 'Completed review': {\"kind\":\"practice\",\"name\":\"Example\",\"patterns\":[],\"outcomes\":[{\"name\":\"Completed\",\"description\":\"Old description\",\"measureDescription\":\"Review completion\",\"objectiveContributions\":[{\"orchestrationName\":\"Delivery\",\"recognizedAtStage\":{\"patternName\":\"Review\",\"relativeTo\":{\"orchestrationName\":\"Plan\"}},\"stageForecastWeights\":[{\"stage\":{\"patternName\":\"Review\",\"relativeTo\":{\"orchestrationName\":\"Plan\"}},\"weight\":1.0}]}]}]}. Preserve all other fields exactly. No research or additional elements are needed.",
+      "expected_output": "The new description is applied while orchestrationName, hosted composite stage references and stageForecastWeights remain unchanged; no pattern is invented.",
+      "assertions": ["Only the requested outcome description changes", "The orchestration contribution and relativeTo host survive without an invented pattern"],
+      "directory": "practices/objective-eval"
     }
   ]
 }

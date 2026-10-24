@@ -10,12 +10,54 @@ import os
 import shutil
 import sys
 import zipfile
+from functools import lru_cache
 from collections import OrderedDict
 from pathlib import Path
 
 # Google Workspace CLI. Resolved from PATH so non-Homebrew installs (npm, for
 # example) work; the Homebrew location is only a last-resort fallback.
 GWS = shutil.which("gws") or "/opt/homebrew/bin/gws"
+__version__ = "1.1.0"
+
+
+@lru_cache(maxsize=1)
+def _version_checker():
+    """Reuse the language validator's stateless range rules without loading documents."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "language_version_rules", Path(__file__).parent / "validate-practice-json.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return object.__new__(module.PracticeValidator)
+
+
+def version_satisfies_range(version, constraint):
+    """True/False for supported language ranges; None for unsupported syntax."""
+    return _version_checker()._version_satisfies_range(version, constraint)
+
+
+def check_dependency_versions(data, documents):
+    """Warn on constraints rejected by the resolved version, without changing it."""
+    versions = {d.get("name"): d.get("version", "") for d in documents}
+    issues = []
+    for idx, entry in enumerate(data.get("dependencyVersions", [])):
+        name, constraint = entry.get("documentName"), entry.get("versionRange", "")
+        version = versions.get(name)
+        if not version:
+            continue
+        satisfied = version_satisfies_range(version, constraint)
+        if satisfied is True:
+            continue
+        issues.append({
+            "severity": "warning", "category": "dependency-version",
+            "path": f"dependencyVersions[{idx}]",
+            "message": (f"Dependency '{name}' resolved to {version}, outside {constraint}"
+                        if satisfied is False else
+                        f"Cannot evaluate dependency '{name}' version {version} against {constraint}"),
+            "suggestion": "Review the constraint; apply-versioning.py --refresh-deps --fix refreshes dependencyVersions",
+            "autoFixable": False,
+        })
+    return issues
 
 
 # discover-dependencies.py reports documents that live inside a package as

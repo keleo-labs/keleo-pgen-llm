@@ -1,6 +1,6 @@
 ---
 name: update-method
-version: 1.1.0
+version: 1.2.0
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"
@@ -17,6 +17,10 @@ triggerPatterns:
 # Update Method/Practice Skill
 
 This skill updates existing Practice or Method JSON files to align with the latest generate-method skill guidance, baseline practice updates, and schema changes.
+
+Preserve either objective contribution route during updates: pattern views or
+orchestration stages. Follow generate-method's phase prompts when adding or remapping
+outcomes; a composition practice can measure its orchestration without owning a pattern.
 
 ## Supporting Standards
 

@@ -2,8 +2,8 @@
 """
 Post-Validate Method
 
-Run the full fix-validate pipeline across ALL practice/baseline JSONs in a
-directory in one command. Wraps lint-practice.py for each file, then runs
+Run the full fix-validate pipeline across extension practices in a directory.
+Skip other document kinds and fail visibly on unreadable JSON. Wraps lint-practice.py for each practice, then runs
 cross-practice auditing for methods.
 
 Replaces the manual loop of fix-common-issues + fix-competency-levels +
@@ -47,12 +47,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json
 
 UTILS_DIR = Path(__file__).resolve().parent
+__version__ = "1.0.1"
 SKIP_PREFIXES = ("_",)
 SKIP_NAMES = {"manifest.json"}
 
 
 def discover_practice_jsons(directory):
-    """Find all practice/baseline JSON files in a directory, excluding internal files."""
+    """Classify authored JSON, retaining unreadable inputs as explicit failures."""
     jsons = []
     for f in sorted(directory.glob("*.json")):
         if f.name in SKIP_NAMES:
@@ -61,11 +62,15 @@ def discover_practice_jsons(directory):
             continue
         try:
             data = load_json(f, exit_on_error=False)
+            if not isinstance(data, dict):
+                if data is None:
+                    jsons.append((f, "unreadable"))
+                continue
             kind = data.get("kind", "")
             if kind in ("practice", "practiceBaseline", "method"):
                 jsons.append((f, kind))
-        except Exception:
-            continue
+        except (OSError, ValueError, AttributeError):
+            jsons.append((f, "unreadable"))
     return jsons
 
 
@@ -88,7 +93,7 @@ def run_lint(practice_path, baseline=None, fix=False, max_iterations=3):
         return {
             "practice": str(practice_path),
             "status": "ERROR",
-            "final_errors": -1,
+            "final_errors": 1,
             "one_line": f"ERROR: lint-practice output not parseable: {result.stderr[:200]}",
         }
 
@@ -145,28 +150,24 @@ def main():
         print(json.dumps({"error": f"No practice/baseline JSON files found in {directory}"}))
         sys.exit(2)
 
-    practices_only = [(f, k) for f, k in practice_files if k == "practice"]
-    baselines_found = [(f, k) for f, k in practice_files if k == "practiceBaseline"]
     methods_found = [(f, k) for f, k in practice_files if k == "method"]
 
     results = []
-    all_pass = True
 
     for practice_path, kind in practice_files:
-        if kind == "method":
+        if kind in ("method", "practiceBaseline"):
             continue
 
-        report = run_lint(
-            practice_path,
-            baseline=args.baseline,
-            fix=args.fix,
-            max_iterations=args.max_iterations,
-        )
+        if kind == "unreadable":
+            report = {"practice": str(practice_path), "status": "ERROR",
+                      "final_errors": 1, "one_line": "ERROR: unreadable JSON"}
+        else:
+            report = run_lint(practice_path, baseline=args.baseline, fix=args.fix,
+                              max_iterations=args.max_iterations)
+        if report.get("status") != "PASS" and report.get("final_errors", 0) <= 0:
+            report["final_errors"] = 1
         report["kind"] = kind
         results.append(report)
-
-        if report.get("status") != "PASS":
-            all_pass = False
 
         if args.one_line:
             print(f"  {practice_path.name}: {report.get('one_line', 'UNKNOWN')}")
@@ -183,20 +184,22 @@ def main():
                     baseline_for_audit = str(ec_path)
             if baseline_for_audit:
                 audit_report = run_audit(keleo_path, baseline_for_audit)
-                audit_errors = audit_report.get("error_count", 0)
-                if audit_errors > 0:
-                    all_pass = False
+                audit_errors = audit_report.get("error_count", 0) or int(bool(audit_report.get("error")))
                 if args.one_line:
                     audit_status = "PASS" if audit_errors == 0 else "FAIL"
                     print(f"  cross-practice audit: {audit_status} ({audit_errors} errors)")
 
     total_errors = sum(r.get("final_errors", 0) for r in results if r.get("final_errors", 0) > 0)
+    if audit_report is not None:
+        total_errors += audit_report.get("error_count", 0) or int(bool(audit_report.get("error")))
     total_fixes = sum(len(r.get("fixes_applied", [])) for r in results)
+    all_pass = total_errors == 0
     status = "PASS" if all_pass else "FAIL"
 
     summary = {
         "directory": str(directory),
         "practice_count": len(results),
+        "skipped_file_count": len(list(directory.glob("*.json"))) - len(results),
         "status": status,
         "total_errors": total_errors,
         "total_fix_rounds": total_fixes,

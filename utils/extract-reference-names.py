@@ -581,6 +581,10 @@ def print_outcomes(data):
         if measure:
             print(f"    measure: {measure}")
         for oc in o.get("objectiveContributions", []):
+            if "orchestrationName" in oc:
+                print(f"    objective: {oc['orchestrationName']} -> {oc.get('recognizedAtStage', {})}")
+                print(f"      stage weights: {oc.get('stageForecastWeights', [])}")
+                continue
             pn = oc.get("patternName", "?")
             rpv = oc.get("recognizedAtPatternViewName", "?")
             print(f"    objective: {pn} -> {rpv}")
@@ -966,7 +970,7 @@ def collect_json_output(data, sections, alpha_details=False, alpha_names=None,
                 entry = {
                     "name": o.get("name"),
                     "measureDescription": o.get("measureDescription", ""),
-                    "objectiveContributions": [{
+                    "objectiveContributions": [dict(oc) if "orchestrationName" in oc else {
                         "patternName": oc.get("patternName"),
                         "recognizedAtPatternViewName": oc.get("recognizedAtPatternViewName"),
                         "forecastWeights": [{

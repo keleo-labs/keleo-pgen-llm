@@ -175,6 +175,9 @@ def summarize_outcome(outcome):
     if ocs:
         result["objectiveContributions"] = []
         for oc in ocs:
+            if "orchestrationName" in oc:
+                result["objectiveContributions"].append(dict(oc))
+                continue
             entry = {
                 "patternName": oc.get("patternName"),
                 "recognizedAtPatternViewName": oc.get("recognizedAtPatternViewName"),
@@ -365,6 +368,11 @@ def print_human_readable(summary):
         for o in s["outcomes"]:
             print(f"  {o['name']}")
             for oc in o.get("objectiveContributions", []):
+                if "orchestrationName" in oc:
+                    print(f"    orchestration: {oc['orchestrationName']}")
+                    print(f"    recognizedAtStage: {oc.get('recognizedAtStage')}")
+                    print(f"    stageForecastWeights: {oc.get('stageForecastWeights', [])}")
+                    continue
                 print(f"    pattern: {oc['patternName']}")
                 print(f"    recognizedAt: {oc['recognizedAtPatternViewName']}")
                 if oc.get("forecastWeights"):

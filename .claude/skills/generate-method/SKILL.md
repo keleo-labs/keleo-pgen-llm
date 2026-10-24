@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.3.0
+version: 1.4.0
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -131,6 +131,12 @@ Subagents read these instead of the phase prompts. Each is a self-contained orch
 - **phases/phase-3-skill.md** - JSON generation phase subagent instructions
 
 ### Verification Foundation
+
+For outcomes, use exactly one objective target: a pattern's views or an
+orchestration's stages. A composition practice owning the endeavour's shape measures
+against that orchestration without inventing a pattern. The phase prompts define
+the two shapes and their forecast fields; references resolve across the baseline
+chain, declared dependencies and the document.
 
 `.claude/skills/verification-foundation/` holds the verification protocol shared with
 `create-baseline-method` and `update-method`. Read `VERIFY-FOUNDATION.md` once per

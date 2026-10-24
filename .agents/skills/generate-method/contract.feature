@@ -9,6 +9,19 @@ Feature: Practice Generation from Methodology Documentation
     Given source methodology documentation is provided (URLs, PDFs, or files)
     And the user invokes /generate-method
 
+  Scenario: Composition outcome measures orchestration stages
+    Given a practice owns an orchestration and no lifecycle patterns
+    When its objective outcome is authored
+    Then its contribution names orchestrationName without patternName
+    And stage references resolve against the merged orchestration across dependencies
+    And sequential stage forecast weights never decrease and reach 1.0 at recognition
+
+  Scenario: Existing pattern outcome route remains available
+    Given a practice owns a lifecycle pattern
+    When its objective outcome is authored
+    Then its contribution names patternName without orchestrationName
+    And view references and forecast weights remain scoped to that pattern
+
   Scenario: Single practice generation
     Given the source methodology maps to 3-7 baseline alphas
     And ONE primary alpha is identifiable

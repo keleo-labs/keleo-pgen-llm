@@ -854,9 +854,10 @@ def run_batch_evals(evals_path, eval_id=None):
 
 
 PROJECT_ROOT = UTILS_DIR.parent
+__version__ = "1.0.1"
 FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
 GOOD_FIXTURE = FIXTURE_DIR / "practice-good.json"
-FIXTURE_BASELINE = PROJECT_ROOT / "deps" / "platform-adoption-kernel.json"
+FIXTURE_BASELINE = FIXTURE_DIR / "selftest-baseline.json"
 FIXTURE_SCHEMA = PROJECT_ROOT / "deps" / "language.schema.json"
 
 
@@ -897,8 +898,7 @@ def selftest(verbose=False):
         return 1
     if not FIXTURE_BASELINE.exists():
         print(f"XX missing baseline: {FIXTURE_BASELINE}", file=sys.stderr)
-        print("   deps/ symlinks into ../../keleo-language — see CLAUDE.md, First-Time Setup.",
-              file=sys.stderr)
+        print("   Restore the tracked selftest-baseline.json fixture.", file=sys.stderr)
         return 1
 
     # The schema is a symlink into keleo-language. Where that is not present the
@@ -910,6 +910,7 @@ def selftest(verbose=False):
         print(f"!! {FIXTURE_SCHEMA} not found — running without schema validation")
 
     base = load_json(str(GOOD_FIXTURE), exit_on_error=False)
+    fixture_baseline = load_json(str(FIXTURE_BASELINE), exit_on_error=False)
     mutations = _load_mutations()
     failures = 0
 
@@ -935,6 +936,25 @@ def selftest(verbose=False):
                 continue
             if not clean.get(assertion_id, False):
                 unusable.append((assertion_id, slug, "assertion already fails on the clean fixture"))
+                continue
+            # A valid planted value is a bad test input, not a broken grader.
+            if slug == "invented-narrative-type":
+                names = {n.get("name") for n in fixture_baseline.get("narrativeTypes", [])}
+                valid = mutated["narratives"][0].get("narrativeTypeName") in names
+            elif slug == "invented-activity-space":
+                names = {s.get("name") for s in fixture_baseline.get("activitySpaces", [])}
+                valid = any(a.get("activitySpaceName") in names and a != original
+                            for a, original in zip(mutated["activities"], base["activities"]))
+            elif slug == "invented-competency-level":
+                levels = {c["name"]: {l.get("name") for l in c.get("levels", [])}
+                          for c in fixture_baseline.get("competencies", [])}
+                valid = any(c.get("competencyLevelName") in levels.get(c.get("competencyName"), set())
+                            for a, original in zip(mutated["activities"], base["activities"])
+                            if a != original for c in a.get("recommendedCompetencyLevels", []))
+            else:
+                valid = False
+            if valid:
+                unusable.append((assertion_id, slug, "planted value is valid in the fixture baseline"))
                 continue
             graded = _grade_fixture(mutated, tmp, slug, schema)
             if graded.get(assertion_id, True):

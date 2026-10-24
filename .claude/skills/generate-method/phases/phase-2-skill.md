@@ -541,10 +541,11 @@ Each Outcome optionally includes:
   - `workProductName` (optional filter) must match a WorkProduct.name
   - `recognizedAtStateName` must match a valid state on the named alpha
   - `forecastWeights` array of {stateName, weight} for 0-1 probability
-- **objectiveContributions** -- when patterns have well-defined lifecycle views:
-  - `patternName` REQUIRED -- must match a defined pattern
+- **objectiveContributions** -- select exactly one target across the baseline chain, declared dependencies and this document:
+  - `patternName` -- scopes the pattern arm, exclusive with `orchestrationName`
   - `recognizedAtPatternViewName` must match a view within that pattern
   - `forecastWeights` array of {patternViewName, weight} for cumulative progress
+  - A composition practice can use `orchestrationName`, `recognizedAtStage` and `stageForecastWeights: [{stage, weight}]`. References name the stage's pattern or orchestration plus its exact `relativeTo` host where present. Resolve merged stages and follow `prompts/phase-2-mapping.md` for forecast ordering; do not invent a pattern to measure the endeavour's shape.
 
 **Lifecycle pattern outcome (STRONGLY RECOMMENDED):** If the practice defines lifecycle patterns, at least one outcome SHOULD use `objectiveContributions` tied to the **main lifecycle pattern** (broadest alpha coverage). Set `recognizedAtPatternViewName` to the final view with monotonically increasing forecast weights.
 
@@ -799,7 +800,7 @@ All PracticeElement names must be unique across ALL element types within the pra
 - [ ] Checklist priority: deferrable/supplementary items marked `should`/`could`; essential items have no priority (defaults to `must`)
 - [ ] 1-3 outcomes per practice, each with measureDescription
 - [ ] Outcome metricContribution.alphaName matches valid alpha; workProductName matches valid WP with expectedMetrics
-- [ ] Outcome objectiveContribution.patternName matches valid pattern; recognizedAtPatternViewName matches valid view
+- [ ] Each objective contribution names exactly one pattern or orchestration; views or composite stage references resolve in that target
 - [ ] At least one outcome with objectiveContributions tied to main lifecycle pattern (if practice has lifecycle patterns)
 - [ ] Pattern views: max 1 state per alpha per view; final view includes ALL alphas
 - [ ] Gherkin structures used selectively where verification logic adds value

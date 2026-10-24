@@ -154,6 +154,9 @@ def generate_markdown(data):
             if o.get("objectiveContributions"):
                 oc_parts = []
                 for oc in o["objectiveContributions"]:
+                    if "orchestrationName" in oc:
+                        oc_parts.append(f"{oc['orchestrationName']} → {oc.get('recognizedAtStage', {})}")
+                        continue
                     pn = oc.get("patternName", "")
                     vn = oc.get("recognizedAtPatternViewName", "")
                     if pn and vn:

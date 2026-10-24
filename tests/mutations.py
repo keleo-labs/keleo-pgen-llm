@@ -169,13 +169,13 @@ MUTATIONS = [
         "bref:activityspace", "invented-activity-space",
         "memory: a Phase 3 agent invents an activity space absent from the baseline",
         lambda d: _activity(d, "Run A Guided Onboarding Pilot").__setitem__(
-            "activitySpaceName", "Accelerate Developer Onboarding"),
+            "activitySpaceName", "Selftest Activity Space That No Baseline Defines"),
     ),
     (
         "bref:competency", "invented-competency-level",
         "memory: a Phase 3 agent invents a competency level name",
         lambda d: _activity(d, "Run A Guided Onboarding Pilot")
-            ["recommendedCompetencyLevels"][0].__setitem__("competencyLevelName", "Expert"),
+            ["recommendedCompetencyLevels"][0].__setitem__("competencyLevelName", "Selftest Undefined Competency Level"),
     ),
     (
         "xref:narrative-type", "invented-narrative-type",

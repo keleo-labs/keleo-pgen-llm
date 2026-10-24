@@ -330,7 +330,7 @@ Translate each alpha from the mapping guide.
 - 1-3 outcomes per practice
 - Every outcome MUST have at least one of `metricContributions` or `objectiveContributions`
 - `measureDescription` is always required
-- Every `objectiveContribution` MUST have `patternName`
+- Every `objectiveContribution` names exactly one of `patternName` or `orchestrationName`. The orchestration arm uses `recognizedAtStage` and `stageForecastWeights: [{stage, weight}]`, never view fields. A stage reference names its pattern or orchestration plus the exact `relativeTo` host where present; resolve against merged stages across the baseline chain, dependencies and this document. Follow `prompts/phase-3-json.md` for sequential forecast ordering. A composition practice needs no invented pattern.
 - `recognizedAt` entry MUST have weight 1.0 in forecastWeights
 - Omit empty arrays entirely (not `"metricContributions": []`)
 - At least one outcome SHOULD use `objectiveContributions` tied to the main lifecycle pattern
@@ -615,7 +615,7 @@ These are experience-based gotchas — the most frequent errors observed in Phas
 | 17 | Rephrasing baseline state descriptions | Copy baseline state `name` and `description` VERBATIM |
 | 18 | `relatesTo` on redeclared alphas | Only new alphas get `relatesTo` — redeclarations inherit from baseline |
 | 19 | Outcome without any contribution mechanism | Every outcome needs `metricContributions` or `objectiveContributions` |
-| 20 | `objectiveContribution` missing `patternName` | Required — scopes view references to that pattern |
+| 20 | Objective contribution names neither or both targets | Exactly one of patternName or orchestrationName scopes views or merged stages |
 | 21 | Name collisions across element types | Names must be globally unique — disambiguate with suffixes |
 | 22 | `background` referencing previous state of same alpha | Sequential progression is implicit — only cross-element deps |
 
