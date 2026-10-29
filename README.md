@@ -67,6 +67,13 @@ All reporting skills resolve practice context, extract domain knowledge, and gen
 | **Decision Analysis** | `/decision-analysis` | Trade-off analysis, option weighting, contextual verdicts |
 | **Document Review** | `/document-review` | Review an existing document and recommend improvements |
 
+Team-meeting (`/team-meeting`) adds a shared team briefing with a summary, working
+agreement, last-meeting retrospective, News, discussion agenda and supporting
+analysis. Configure each series under `reports/<series-slug>/series.json`; dated
+subfolders retain each meeting's report and evidence. Signals combine the project
+list at `config/team-meeting/signals.json` with additional series definitions.
+Use `python3 utils/team-meeting.py --help` and the skill's workspace reference.
+
 ### Presentations
 
 Deck skills author **Slidev** markdown and publish to Google Slides and PDF. They share `.claude/skills/deck-foundation/` (pipeline, layouts, conversion constraints, the Red Hat theme and the publishing scripts). By default a deck follows the structure of its source document rather than re-arguing the material.

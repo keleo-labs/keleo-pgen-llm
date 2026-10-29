@@ -1,5 +1,12 @@
 Feature: Evidence-led diagnosis and executable recommendations
-  Shared by all five reporting skills; applies within the agreed report scope.
+  Shared by the reporting suite; applies within the agreed report scope.
+
+  Scenario: Recurring team reports use nested instance workspaces
+    Given a team-meeting series with persistent configuration
+    When an approved meeting instance is prepared
+    Then its report, snapshots and provenance occupy a dated series subfolder
+    And its recurring meeting name is the title, its dated instance is the first heading and Suggested agenda follows immediately
+    And its eight report sections place Acknowledgements before News, News before Reminders and References within final Analysis
 
   @report-724
   Scenario: Diagnosis explains the mechanism
@@ -28,3 +35,19 @@ Feature: Evidence-led diagnosis and executable recommendations
     When the report is written
     Then causal analysis remains within that scope without an unsolicited execution plan
     And prose explains the argument while tables support comparison or execution detail
+
+  @report-728
+  Scenario: A briefing opens with its practical decision
+    Given a briefing has a practical decision and may draw on sources about a successor operating model
+    When the opening is written
+    Then it states the subject's practical purpose and the decision facing the reader directly
+    And it names a successor model early only when the sources establish that relationship
+    And predecessor names and acronym expansions agree with the sources
+
+  @report-729
+  Scenario: Ordered steps and decision questions are easy to scan
+    Given a briefing contains three or more genuinely ordered steps or distinct decision questions
+    When the passage is written
+    Then those steps or questions use a numbered list with a brief introduction
+    And explanation and connected analysis remain in prose
+    And a passage without a genuine sequence or set of distinct questions is not turned into a list merely for formatting

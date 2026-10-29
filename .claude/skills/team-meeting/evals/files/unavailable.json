@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "scope": {
+    "geography": "Region A",
+    "organisationalGrain": "product overlay",
+    "period": "2026-Q4",
+    "fiscalStart": "2026-10-01",
+    "fiscalEnd": "2026-12-31",
+    "actualCutoff": "2026-10-26",
+    "metric": "Booked value",
+    "currency": "USD",
+    "currencyBasis": "plan-rate",
+    "scale": "millions"
+  },
+  "target": {
+    "status": "access-denied",
+    "source": "Synthetic planning access response",
+    "error": "No quota access; target values not supplied."
+  },
+  "actual": {
+    "status": "booked-closed",
+    "refreshedAt": "2026-10-26T06:00:00Z",
+    "source": "Synthetic actuals capture; https://bookings.example.invalid/capture",
+    "fineDetail": [
+      {
+        "scope": "Product A",
+        "actual": 75
+      },
+      {
+        "scope": "Product B",
+        "actual": 65
+      },
+      {
+        "scope": "Product C",
+        "actual": 20
+      },
+      {
+        "scope": "Product D",
+        "actual": 100
+      }
+    ]
+  },
+  "verifiedQuotaViewMapping": {
+    "Product A": [
+      "Product A"
+    ],
+    "Combined View": [
+      "Product A",
+      "Product B",
+      "Product C"
+    ],
+    "Product D": [
+      "Product D"
+    ]
+  },
+  "forecast": {
+    "weightedView": 300,
+    "note": "Planning context, never booked actual."
+  }
+}

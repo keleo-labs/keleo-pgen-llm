@@ -1,6 +1,8 @@
 ---
 name: report-issue
 description: Capture one or more issues, enhancements, or questions from the user and record them in the feedback/issue register for later triage
+metadata:
+  version: "1.0.0"
 triggerPatterns:
   - "report.*issue"
   - "raise.*issue"
@@ -261,10 +263,10 @@ In direct mode, build the drafts file outside the repo (`/tmp/keleo-issues-<time
 ```bash
 python3 utils/issue-register.py --add-draft /tmp/keleo-issues-<timestamp>.json \
   --type Issue --summary "Pattern views repeat the same alpha state" \
-  --description "Every pattern view in the annual rhythm shows Ecosystem Discover at Published..." \
-  --document "EcoTech Sales Foundations" --document-version 1.0.2 --document-kind method \
-  --element "Partner Ecosystem Annual Operating Rhythm" --element-type pattern \
-  --secondary "Ecosystem Discover" --secondary-type alpha
+  --description "Every pattern view in the annual rhythm shows Progress at Published..." \
+  --document "Example Partner Method" --document-version 1.0.2 --document-kind method \
+  --element "Annual Planning Cycle" --element-type pattern \
+  --secondary "Progress" --secondary-type alpha
 ```
 
 Each call validates the draft before writing, so a missing field surfaces immediately. The resulting file is an array of issue objects:
@@ -274,13 +276,13 @@ Each call validates the draft before writing, so a missing field surfaces immedi
   {
     "type": "Issue",
     "summary": "Pattern views repeat the same alpha state",
-    "description": "The annual operating rhythm is the pattern a partner team works through over a year. Each view is one stage of it, and the alpha states a view carries are how a reader tells what that stage moves forward.\n\nEvery view in the pattern shows Ecosystem Discover at Published. The alpha is therefore in the same state at the end of the year as at the start, and the pattern shows no progression at all.\n\nSomeone planning against the rhythm cannot tell which stage advances what, which is the one thing the pattern exists to tell them. It reads as deliberate rather than as an error, so it does not prompt a second look.\n\nExpected: each view carries the state that view actually advances the alpha to.\n\nDetail: all six views are affected in EcoTech Sales Foundations 1.0.2. The same shape appears in two other methods generated from the same mapping guide, so the cause is likely to be upstream of this document. Observed while reviewing the Q3 partner planning material.",
-    "documentName": "EcoTech Sales Foundations",
+    "description": "The annual operating rhythm is the pattern a partner team works through over a year. Each view is one stage of it, and the alpha states a view carries are how a reader tells what that stage moves forward.\n\nEvery view in the pattern shows Progress at Published. The alpha is therefore in the same state at the end of the year as at the start, and the pattern shows no progression at all.\n\nSomeone planning against the rhythm cannot tell which stage advances what, which is the one thing the pattern exists to tell them. It reads as deliberate rather than as an error, so it does not prompt a second look.\n\nExpected: each view carries the state that view actually advances the alpha to.\n\nDetail: all six views are affected in Example Partner Method 1.0.2. The same shape appears in two other methods generated from the same mapping guide, so the cause is likely to be upstream of this document. Observed while reviewing a sample planning document.",
+    "documentName": "Example Partner Method",
     "documentVersion": "1.0.2",
     "documentKind": "method",
-    "selectedElement": "Partner Ecosystem Annual Operating Rhythm",
+    "selectedElement": "Annual Planning Cycle",
     "elementType": "pattern",
-    "secondaryElement": "Ecosystem Discover",
+    "secondaryElement": "Progress",
     "secondaryType": "alpha"
   }
 ]

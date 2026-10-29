@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private team news state",
+  "description": "Version 2.0.0. Series-local source settings and observations. Relative paths resolve from the state file, not the project root. Legacy evidence links are retained as absolute paths. Unknown facts are omitted.",
+  "type": "object",
+  "required": ["version", "mappingPath", "journalPath", "methodPath", "sources", "watchlist", "snapshots", "requestSnapshots", "runs"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": "2.0.0"},
+    "mappingPath": {"$ref": "#/$defs/text"},
+    "journalPath": {"$ref": "#/$defs/text"},
+    "methodPath": {"$ref": "#/$defs/text"},
+    "sources": {
+      "type": "object",
+      "required": ["groupLocalParts", "groupLocalPartContains", "senderEmails", "leaderEmail", "slackChannelIds", "newsReportId", "newsReportUri"],
+      "additionalProperties": false,
+      "properties": {
+        "groupLocalParts": {"$ref": "#/$defs/texts"},
+        "groupLocalPartContains": {"$ref": "#/$defs/texts"},
+        "senderEmails": {"$ref": "#/$defs/texts"},
+        "leaderEmail": {"$ref": "#/$defs/text"},
+        "slackChannelIds": {"$ref": "#/$defs/texts"},
+        "newsReportId": {"type": "string", "pattern": "^[0-9]+$"},
+        "newsReportUri": {"type": "string", "format": "uri"},
+        "leadershipRoster": {
+          "type": "object", "required": ["resolvedAt", "emails", "evidencePath"], "additionalProperties": false,
+          "properties": {
+            "resolvedAt": {"$ref": "#/$defs/time"},
+            "emails": {"$ref": "#/$defs/texts"},
+            "evidencePath": {"$ref": "#/$defs/text"}
+          }
+        }
+      }
+    },
+    "watchlist": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["key", "type", "name", "aliases", "references", "relevance", "retained", "retentionReason"], "additionalProperties": false,
+        "properties": {
+          "key": {"$ref": "#/$defs/text"},
+          "type": {"enum": ["customer", "partner", "opportunity"]},
+          "name": {"$ref": "#/$defs/text"},
+          "aliases": {"$ref": "#/$defs/texts"},
+          "references": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/reference"}},
+          "relevance": {"$ref": "#/$defs/text"},
+          "retained": {"type": "boolean"},
+          "retentionReason": {"enum": ["recent-reference", "unresolved-action", "verified-active-opportunity", "archived"]},
+          "record": {
+            "type": "object", "required": ["id", "uri", "verifiedAt"], "additionalProperties": false,
+            "properties": {"id": {"$ref": "#/$defs/text"}, "uri": {"type": "string", "format": "uri"}, "verifiedAt": {"$ref": "#/$defs/time"}}
+          },
+          "lastSuccessfulSnapshotId": {"$ref": "#/$defs/text"}
+        }
+      }
+    },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "entityKey", "recordId", "observedAt", "facts", "evidencePaths", "reviewNote"], "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "#/$defs/text"},
+          "entityKey": {"$ref": "#/$defs/text"},
+          "recordId": {"$ref": "#/$defs/text"},
+          "observedAt": {"$ref": "#/$defs/time"},
+          "facts": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "required": ["field", "value", "source", "sourceUri"], "additionalProperties": false,
+              "properties": {
+                "field": {"enum": ["account", "partnerInvolvement", "opportunityNumber", "priorities", "stage", "amount", "closeDate", "products", "owner", "risks", "milestones"]},
+                "value": {"oneOf": [{"$ref": "#/$defs/text"}, {"$ref": "#/$defs/texts"}, {"$ref": "#/$defs/amount"}]},
+                "source": {"enum": ["sales-assistant", "dataverse"]},
+                "sourceUri": {"type": "string", "format": "uri"},
+                "changedAt": {"$ref": "#/$defs/time"}
+              },
+              "allOf": [
+                {"if": {"properties": {"field": {"const": "amount"}}}, "then": {"properties": {"value": {"$ref": "#/$defs/amount"}}}, "else": {"properties": {"value": {"oneOf": [{"$ref": "#/$defs/text"}, {"$ref": "#/$defs/texts"}]}}}}
+              ]
+            }
+          },
+          "evidencePaths": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+          "reviewNote": {"$ref": "#/$defs/text"}
+        }
+      }
+    },
+    "requestSnapshots": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["sheetId", "rowId", "observedAt", "digest", "evidencePath"], "additionalProperties": false,
+        "properties": {
+          "sheetId": {"$ref": "#/$defs/text"}, "rowId": {"$ref": "#/$defs/text"},
+          "observedAt": {"$ref": "#/$defs/time"}, "digest": {"$ref": "#/$defs/text"}, "evidencePath": {"$ref": "#/$defs/text"}
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id", "series", "windowStart", "windowEnd", "checkedAt", "coverage", "pendingChecks"], "additionalProperties": false,
+        "properties": {
+          "id": {"$ref": "#/$defs/text"}, "series": {"$ref": "#/$defs/text"},
+          "windowStart": {"$ref": "#/$defs/time"}, "windowEnd": {"$ref": "#/$defs/time"}, "checkedAt": {"$ref": "#/$defs/time"},
+          "coverage": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["source", "status", "pagesRead", "evidencePaths", "gaps"], "additionalProperties": false,
+              "properties": {
+                "source": {"enum": ["email", "dataverse-people", "linked-material", "slack", "smartsheet", "sales-assistant", "dataverse-opportunities"]},
+                "status": {"enum": ["complete", "partial", "unavailable"]},
+                "pagesRead": {"type": "integer", "minimum": 0},
+                "evidencePaths": {"$ref": "#/$defs/texts"}, "gaps": {"$ref": "#/$defs/texts"}
+              }
+            }
+          },
+          "pendingChecks": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["entityKeys", "threadTs", "status", "clarificationSent"], "additionalProperties": false,
+              "properties": {
+                "entityKeys": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/text"}},
+                "threadTs": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+                "status": {"enum": ["pending", "authentication-required", "answered", "no-reply"]},
+                "clarificationSent": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "texts": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/text"}},
+    "time": {"type": "string", "format": "date-time"},
+    "reference": {
+      "type": "object", "required": ["path", "date"], "additionalProperties": false,
+      "properties": {"path": {"$ref": "#/$defs/text"}, "date": {"type": "string", "format": "date"}}
+    },
+    "amount": {
+      "type": "object", "required": ["value", "currency", "basis"], "additionalProperties": false,
+      "properties": {
+        "value": {"type": "number"}, "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+        "basis": {"enum": ["ACV", "ARR", "TCV", "opportunity-amount"]}
+      }
+    }
+  }
+}

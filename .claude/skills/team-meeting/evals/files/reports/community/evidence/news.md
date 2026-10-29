@@ -1,0 +1,1 @@
+2026-10-24 council notice: the accessible library room is booked by another group on 2026-11-06. An upstairs room is offered, but it has no lift. A remote session is possible; no accessibility consultation has been completed.

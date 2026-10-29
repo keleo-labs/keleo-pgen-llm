@@ -1,7 +1,16 @@
 # Report Verifier Briefs
 
-Used by all five reporting skills — `method-based-report`, `reference-architecture`,
-`project-plan`, `decision-analysis`, `document-review`.
+Used by the reporting suite, including `team-meeting` 4.0.0. For team-meeting,
+REPORT_DIR is the dated instance directory and REPORT is its report.md. Its
+References heading is level three under Analysis. The eight fixed sections are
+intentional: assess narrative logic within them, rather than requiring narrative
+element names as the top-level headings.
+
+When team quota views are configured, type-specific verification also checks the
+product-quota-attainment comparison: locked/final target revision, matched fiscal
+period, product/organisational grain, metric and currency. Missing comparisons stay
+unavailable; overlapping views are not summed and weighted forecasts are not booked
+actuals. The finer product breakdown remains available below the quota view.
 
 Reports have **one gate**, not four. The reporting workflow has four steps but only
 one durable artifact: Steps 1–2 produce in-context analysis rather than files, and
@@ -221,6 +230,13 @@ Run at **low effort**.
 > - **Bullets where prose belongs.** Lists are for three or more parallel items, steps
 >   or checklists. Analysis belongs in short paragraphs of two to three sentences on a
 >   single point.
+> - **Dense briefing enumerations.** Flag three or more genuinely ordered steps or
+>   distinct decision questions buried in a paragraph when numbering would make the
+>   choice easier to scan. Do not flag connected analysis merely because it mentions
+>   several factors.
+> - **Unclear briefing opening.** Flag an opening that obscures the practical purpose
+>   or decision. Check any claimed successor model and predecessor acronym expansions
+>   against the supplied sources; report unsupported naming as a source-fidelity issue.
 > - **AI tells** — scene-setting openers, relentless triads, "it's not just X, it's Y",
 >   hedged non-claims, a summary sentence closing every section.
 > - **Pronoun drift** — "you" for the reader, "I" for the author, "we" only where you
@@ -243,6 +259,7 @@ everywhere.
 | Skill | What this verifier checks |
 |---|---|
 | `method-based-report` | No additional concern — **skip this verifier** and omit it from `--expect` |
+| `team-meeting` | The recurring meeting name is the document title, the dated instance is the first heading and Suggested agenda follows immediately; exactly eight ordered report sections put Acknowledgements before News and News before Reminders; distinct items use parallel APA 7 bullets, with one acknowledgement per bullet; News starts with a bulleted index and matching detail subsections, covers the relevant signal candidates without an arbitrary item cap and explains supported implications and alternatives; Reminders separates general actions and deadlines from news without invented obligations; Suggested agenda has a summary list followed by matching subsections; ordinary discussion subsections use evidence, why, intended outcome and proposed participants in briefing bullets, while Acknowledgements and Reminders subsections contain only their respective item bullets without those labels; every section and link is team-safe; unknown outcomes stay unknown and proposed owners remain uncommitted; inherited and series signals have provenance and coverage; no assumptions from one series leak into another |
 | `reference-architecture` | Options are genuinely distinct rather than variations of one design; each is evaluated against the stated evaluation framework, not a different one per option; sizing figures and capacity numbers are sourced rather than silently estimated |
 | `project-plan` | Every estimate traces to a stated assumption; the assumptions are listed, not implied; where a SOW is produced, its scope matches the activities and deliverables in the plan and does not quietly widen or narrow them |
 | `decision-analysis` | Options receive balanced depth — no option is strawmanned by thin treatment; stated trade-offs are real rather than token weaknesses on a favoured option; the verdict follows from the analysis rather than the analysis being arranged to reach a predetermined verdict |

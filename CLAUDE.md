@@ -768,6 +768,7 @@ The reporting system is modular — a shared foundation (`.claude/skills/reporti
 | Skill | Command | Purpose |
 |-------|---------|---------|
 | General-purpose report | `/method-based-report` | Any report type not covered by a specialised skill |
+| Team meeting | `/team-meeting` | Shared recurring team briefing, retrospective, News, agenda and supporting analysis |
 | Reference architecture | `/reference-architecture` | Topology, component selection, evaluation frameworks, sizing |
 | Project plan | `/project-plan` | Project plans, PoC outlines, SOW generation (T&M) |
 | Decision analysis | `/decision-analysis` | Trade-off analysis, weighing options, contextual verdicts |

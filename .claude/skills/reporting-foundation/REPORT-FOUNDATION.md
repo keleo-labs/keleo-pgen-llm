@@ -1,6 +1,6 @@
 # Report Foundation
 
-**Version:** 1.3.0
+**Version:** 4.0.0
 
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
@@ -9,6 +9,21 @@ Common workflow, rules, and conventions shared by all reporting skills. **Load l
 ## Report Workspace (Step 0)
 
 Every report owns a directory under `reports/`, mirroring how a practice owns `practices/<name>/`. Everything the report produces lives inside it:
+
+**Recurring team-meeting specialization:** the series owns
+`reports/<series-slug>/series.json`, context and its signal journal. Each meeting
+owns a nested `YYYY-MM-DD-HHmm/` workspace with `report.md`, configuration/context
+snapshots, prompt history, evidence, assets and verification. Pass that instance
+directory to the existing provenance and verification utilities. Project-wide
+signals are additive with series signals; see team-meeting's workspace reference.
+Its recurring meeting name is the title, the dated instance is the first
+heading, and Suggested agenda is the first of eight fixed sections. Narratives
+work within those sections, with Acknowledgements before News and News before
+Reminders. News and agenda summaries lead into detailed subsections, and
+separate items use APA 7 bullets. Earlier team-meeting reports retain their
+historical layouts; new reports use team-meeting 4.0.0 and its checker. References and practice
+attribution sit under Analysis, with `### References` last. Other report types
+retain the layout below.
 
 ```
 reports/<report-slug>/
@@ -250,6 +265,7 @@ Organization Name. (Year). *Title of work*. URL
 - Use active voice and concrete language
 - Distinguish sourced facts, analytical judgement and proposed actions at the point of use. Own material inferences with natural phrasing such as "I assess" or "This suggests", without repeating a disclaimer in every paragraph. Cite the premises and qualify uncertainty; a documented eligibility rule does not by itself prove a future capacity loss. Label proposed owners, dates and targets as proposals rather than approved commitments.
 - Avoid jargon, acronyms, and technical terms without explanation
+- Open a briefing with the subject's practical purpose and the decision the reader needs to make. If the sources establish that a current operating model replaces earlier ones, name it early and verify the predecessor names and acronym expansions before using them.
 - NO references to Keleo, Practice Language, alphas, states, activity spaces, work products, narrative types, baselines, or any schema constructs
 - The practice provides the *structure and knowledge* — it should be invisible in the output
 
@@ -343,6 +359,8 @@ Verify with `python3 utils/lint-report.py <report>.md --checks diagrams`.
 ---
 
 ## Report Structure (Step 3)
+
+Use a numbered list when three or more steps have a genuine order, or when three or more distinct questions guide a decision. Introduce the list briefly, then explain implications in prose. Keep connected analysis in short paragraphs rather than forcing it into a list for visual consistency.
 
 ```markdown
 # <Report Title>
@@ -672,6 +690,20 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - When: the report is written
 - Then: causal analysis remains within that scope without an unsolicited execution plan
 - And: prose explains the argument while tables support comparison or execution detail
+
+#### Scenario: A briefing opens with its practical decision (@rule:report-728)
+- Given: a briefing has a practical decision and may draw on sources about a successor operating model
+- When: the opening is written
+- Then: it states the subject's practical purpose and the decision facing the reader directly
+- And: it names a successor model early only when the sources establish that relationship
+- And: predecessor names and acronym expansions agree with the sources
+
+#### Scenario: Ordered steps and decision questions are easy to scan (@rule:report-729)
+- Given: a briefing contains three or more genuinely ordered steps or distinct decision questions
+- When: the passage is written
+- Then: those steps or questions use a numbered list with a brief introduction
+- And: explanation and connected analysis remain in prose
+- And: a passage without a genuine sequence or set of distinct questions is not turned into a list merely for formatting
 
 These rules are checked by verification agents, not by a script — no tool can tell whether a claim is true. The briefs live in `.claude/skills/verification-foundation/verifiers/report.md`.
 

@@ -768,6 +768,7 @@ The reporting system is modular — a shared foundation (`.Codex/skills/reportin
 | Skill | Command | Purpose |
 |-------|---------|---------|
 | General-purpose report | `/method-based-report` | Any report type not covered by a specialised skill |
+| Team meeting | `/team-meeting` | Shared recurring team briefing, retrospective, News, agenda and supporting analysis |
 | Reference architecture | `/reference-architecture` | Topology, component selection, evaluation frameworks, sizing |
 | Project plan | `/project-plan` | Project plans, PoC outlines, SOW generation (T&M) |
 | Decision analysis | `/decision-analysis` | Trade-off analysis, weighing options, contextual verdicts |
@@ -785,6 +786,12 @@ All reporting skills follow the same workflow:
 Reports use narrative types from the baseline (Report Narrative, Essay Narrative, STAR, SDLC, etc.) to organise content, and practice domain knowledge to inform the analysis — but present everything in plain English with no Keleo terminology.
 
 **Output Location**: `reports/<report-slug>/` (git-ignored — ephemeral deliverables). Each report owns a directory holding `00-prompt-history.md`, `<report-slug>.md`, any PDF export, and an `assets/` folder for diagram specs and rendered SVGs — mirroring how a practice owns `practices/<name>/`. Flat reports from before this convention are migrated by `python3 utils/migrate-report-layout.py --fix`.
+
+Team-meeting uses `reports/<series-slug>/series.json` for persistent context and
+`reports/<series-slug>/<YYYY-MM-DD-HHmm>/report.md` for each instance. Project
+signals at `config/team-meeting/signals.json` apply to every series; series signals
+can only add IDs. The series owns its merged context and independent journal.
+Use `python3 utils/team-meeting.py --help` for validation, preparation and migration.
 
 **Extending**: To add a new report type, see `.Codex/skills/reporting-foundation/extension-template.md` for the step-by-step guide and SKILL.md template.
 

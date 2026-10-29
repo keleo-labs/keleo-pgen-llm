@@ -1,7 +1,7 @@
 {
   "skill_name": "method-based-report",
-  "version": "1.0.0",
-  "evaluation_scope": "Shared reporting-foundation contract; synthetic source-controlled short-output cases. Qualitative grading required; the existing harness mechanical grader is designed for practices and is not the semantic verdict. Assertions were added after the first paired outputs in runs/20261023-102333. Only discriminating checks remain in assertions; shared passes and shared gaps are retained as unscored diagnostic_checks. This post-hoc small sample cannot establish a general pass-rate uplift.",
+  "version": "1.1.0",
+  "evaluation_scope": "Shared reporting-foundation contract; synthetic source-controlled short-output cases. Qualitative grading required; the existing harness mechanical grader is designed for practices and is not the semantic verdict. Assertions for cases 1–3 were added after the first paired outputs in runs/20261023-102333. Cases 4–5 await successful paired outputs before assertions are added. Only discriminating checks remain in assertions; shared passes and shared gaps are retained as unscored diagnostic_checks. This post-hoc small sample cannot establish a general pass-rate uplift.",
   "evals": [
     {
       "id": 1,
@@ -60,6 +60,28 @@
         {"scenario": "Diagnosis explains the mechanism", "check": "Separates unknown provider compliance, cost and service performance from established coverage and scope facts.", "first_run": "both_pass"},
         {"scenario": "Diagnosis explains the mechanism", "check": "Does not treat the internal organisational structure or ownership of application support as established when not supplied.", "first_run": "both_fail_observed_gap"}
       ]
+    },
+    {
+      "id": 4,
+      "name": "briefing-sequence-and-questions",
+      "contract_scenarios": [
+        "A briefing opens with its practical decision",
+        "Ordered steps and decision questions are easy to scan"
+      ],
+      "prompt": "Write a 350–500 word briefing for a partner manager using only these synthetic facts. The current Joint Account Plan (JAP) replaces the Partner Strategy Plan (PSP) and Territory Engagement Plan (TEP). The practical decision is whether to commit to one joint pursuit this quarter. Work has three dependent steps: agree an account outcome, select a joint offer, then assign a pursuit owner. Before commitment, answer four separate questions: Is the customer outcome evidenced? Can both parties deliver the offer? Who owns the next customer conversation? What evidence will show progress? Explain what happens if readiness is incomplete. Save reports/eval/report.md. Scope is this briefing section only: no external research, diagrams, publishing, planning gate or additional agents. If reporting guidance is installed, read and apply its briefing opening, list guidance and shared contract.",
+      "expected_output": "Opens with the purpose and decision; accurately names the current plan and predecessor expansions; makes the ordered steps and four distinct questions easy to scan while keeping explanation in prose.",
+      "directory": "reports/eval"
+    },
+    {
+      "id": 5,
+      "name": "briefing-connected-prose",
+      "contract_scenarios": [
+        "A briefing opens with its practical decision",
+        "Ordered steps and decision questions are easy to scan"
+      ],
+      "prompt": "Write a 300–450 word explanatory briefing for a service director using only these synthetic facts. The decision is whether the proposed service is ready for a limited customer discussion. Its delivery promise depends on support capacity and an unresolved escalation agreement with a provider. Demand is plausible because two customers have asked about the service, but neither has agreed a scope. These facts form one connected readiness argument, not a staged process or a set of separate qualifying questions. Explain what is known, what remains uncertain and what the director can decide now. Save reports/eval/report.md. Scope is this briefing section only: no external research, diagrams, publishing, planning gate or additional agents. If reporting guidance is installed, read and apply its briefing opening, list guidance and shared contract.",
+      "expected_output": "Opens with the purpose and decision, then explains the connected readiness argument in prose without inventing a sequence or numbered questions.",
+      "directory": "reports/eval"
     }
   ]
 }

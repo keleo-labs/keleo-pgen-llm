@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:keleo:team-meeting:signals:1.0.0",
+  "title": "Project team-meeting signals 1.0.0",
+  "type": "object",
+  "required": ["version", "signals"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": "1.0.0"},
+    "signals": {"type": "array", "items": {"$ref": "#/$defs/signal"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "signal": {
+      "type": "object",
+      "required": ["id", "recipe"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "recipe": {"$ref": "#/$defs/text"},
+        "settings": {"type": "object"},
+        "fixturePath": {"$ref": "#/$defs/text"},
+        "statePath": {"$ref": "#/$defs/text"},
+        "mappingPath": {"$ref": "#/$defs/text"},
+        "recipePath": {"$ref": "#/$defs/text"}
+      }
+    }
+  }
+}

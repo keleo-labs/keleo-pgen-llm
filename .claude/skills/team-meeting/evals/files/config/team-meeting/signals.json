@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "signals": [
+    {
+      "id": "global-policy",
+      "recipe": "fixture",
+      "fixturePath": "global-news.md"
+    }
+  ]
+}

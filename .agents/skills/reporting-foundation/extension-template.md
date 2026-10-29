@@ -24,7 +24,8 @@ How to create a new specialised reporting skill that builds on the shared report
 | decision-analysis | 660–679 |
 | document-review | 680–699 |
 | method-based-report (type-specific) | 700–719 |
-| Reserved | 740–799 |
+| team-meeting | 740–759 |
+| Reserved | 760–799 |
 
 The foundation holds two blocks because 600–619 filled up. Its verification rules
 (720–727) took the next free block rather than spilling into 620–639, which

@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "mappingPath": "fixture.mapping.json",
+  "journalPath": "fixture.journal.json",
+  "methodPath": "fixture.method.json",
+  "sources": {
+    "groupLocalParts": ["cloud-strategy"], "groupLocalPartContains": ["announcements"],
+    "senderEmails": ["lead@example.com"], "leaderEmail": "director@example.com",
+    "slackChannelIds": ["C_FIXTURE"], "newsReportId": "123", "newsReportUri": "https://example.com/report/123"
+  },
+  "watchlist": [{
+    "key": "opp:O30", "type": "opportunity", "name": "Fabrikam onboarding", "aliases": [],
+    "references": [{"path": "https://example.com/notes/weekly", "date": "2026-10-12"}],
+    "relevance": "Specialist support", "retained": true, "retentionReason": "recent-reference",
+    "record": {"id": "O30", "uri": "https://example.com/sales/O30", "verifiedAt": "2026-10-12T09:00:00Z"},
+    "lastSuccessfulSnapshotId": "O30-old"
+  }],
+  "snapshots": [{
+    "id": "O30-old", "entityKey": "opp:O30", "recordId": "O30", "observedAt": "2026-10-12T09:00:00Z",
+    "facts": [{"field": "amount", "value": {"value": 100000, "currency": "USD", "basis": "ACV"}, "source": "sales-assistant", "sourceUri": "https://example.com/sales/O30"}],
+    "evidencePaths": ["evidence/old/answer.md"], "reviewNote": "This reply is automated; review AI-generated content."
+  }],
+  "requestSnapshots": [],
+  "runs": [{
+    "id": "fixture-run", "series": "Fixture Weekly", "windowStart": "2026-10-19T09:00:00Z", "windowEnd": "2026-10-24T09:00:00Z", "checkedAt": "2026-10-24T09:00:00Z",
+    "coverage": [{"source": "sales-assistant", "status": "partial", "pagesRead": 0, "evidencePaths": [], "gaps": ["Waiting for final reply"]}],
+    "pendingChecks": [{"entityKeys": ["opp:O30"], "threadTs": "1792828800.100003", "status": "pending", "clarificationSent": false}]
+  }]
+}

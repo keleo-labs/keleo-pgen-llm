@@ -45,6 +45,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _shared import load_user_config
 
+__version__ = "1.1.1"
+
 # Terms that have no innocent reading in a plain-English report.
 LEAK_TERMS = [
     "alpha", "alphas", "activityspace", "activity space", "activity spaces",
@@ -80,8 +82,10 @@ RE_CITE_NARRATIVE = re.compile(
 RE_CITE_NARRATIVE_LINKED = re.compile(
     r"\[([A-Z][\w.&'-]*(?:\s+(?:&|and|et|al\.|[A-Z][\w.&'-]*))*)\s+"
     r"\((\d{4}[a-z]?)\)\]\([^()\s]*\)")
+# Linked APA citations may have no publication date.
+RE_CITE_UNDATED = re.compile(r"\[([^()\[\]]+?),\s*(n\.d\.(?:-[a-z])?)\]\([^()\s]*\)")
 # Reference entry: "Author, A., & Other, B. (2024a). *Title*. ..."
-RE_REF_ENTRY = re.compile(r"^(.+?)\.?\s*\((\d{4}[a-z]?)\)\.\s")
+RE_REF_ENTRY = re.compile(r"^(.+?)\.?\s*\((\d{4}[a-z]?|n\.d\.(?:-[a-z])?)(?:, [^)]*)?\)\.\s")
 
 RE_HEADING = re.compile(r"^(#{1,3})\s+(.*)$")
 
@@ -109,6 +113,8 @@ def surnames(author_text):
     ("Naikwadi, S., & Kulari, V. B.") and in-text form ("Naikwadi & Kulari").
     """
     text = author_text.replace(" and ", " & ").strip()
+    if re.search(r"\s+et al\.?$", text, re.IGNORECASE):
+        return (re.sub(r"\s+et al\.?$", "", text, flags=re.IGNORECASE).casefold(), "et al")
     names = []
     for chunk in re.split(r"\s*&\s*|;\s*", text):
         chunk = chunk.strip().rstrip(",.")
@@ -126,10 +132,11 @@ def surnames(author_text):
 def parse_sections(lines):
     """Split the document into (body_lines, reference_lines).
 
-    Everything from the ## References heading onward is the reference section.
+    Everything from a level-two or level-three References heading onward is
+    the reference section. Team briefings nest it under their final Analysis.
     """
     for i, line in enumerate(lines):
-        if re.match(r"^##\s+References\s*$", line.strip(), re.IGNORECASE):
+        if re.match(r"^#{2,3}\s+References\s*$", line.strip(), re.IGNORECASE):
             return lines[:i], lines[i + 1:]
     return lines, []
 
@@ -138,7 +145,7 @@ def find_in_text_citations(body_lines):
     """Return {(surnames, year): [line numbers]} for in-text citations."""
     cites = {}
     for n, line in enumerate(body_lines, 1):
-        for pattern in (RE_CITE_PAREN, RE_CITE_LINKED, RE_CITE_NARRATIVE,
+        for pattern in (RE_CITE_PAREN, RE_CITE_LINKED, RE_CITE_UNDATED, RE_CITE_NARRATIVE,
                         RE_CITE_NARRATIVE_LINKED):
             for match in pattern.finditer(line):
                 author, year = match.group(1), match.group(2)
@@ -154,6 +161,7 @@ def find_reference_entries(ref_lines, offset):
     refs = {}
     for n, line in enumerate(ref_lines, offset + 1):
         stripped = line.strip()
+        stripped = re.sub(r"^[-*]\s+", "", stripped)
         if not stripped or stripped.startswith(("#", "-", "*", "|", ">")):
             continue
         match = RE_REF_ENTRY.match(stripped)
@@ -185,6 +193,8 @@ def check_terminology(lines, strict):
             continue
         if in_code:
             continue
+        # Link destinations are metadata; inspect the displayed prose only.
+        line = RE_MD_LINK.sub(lambda match: match.group(1), line)
         for pattern, term, severity in patterns:
             if pattern.search(line):
                 findings.append({
@@ -281,9 +291,14 @@ def check_caption(lines, image_line, target):
 
 def check_citations(cites, refs, min_count, max_count):
     """Check bidirectional in-text <-> reference-list correspondence."""
+    def matches(cite, ref):
+        return cite == ref or (cite[1] == ref[1] and len(cite[0]) == 2
+                              and cite[0][-1] == "et al" and len(ref[0]) >= 2
+                              and cite[0][0] == ref[0][0])
+
     findings = []
     for key, line_numbers in sorted(cites.items()):
-        if key not in refs:
+        if not any(matches(key, ref) for ref in refs):
             findings.append({
                 "check": "citations", "severity": "error",
                 "line": line_numbers[0],
@@ -291,7 +306,7 @@ def check_citations(cites, refs, min_count, max_count):
                             f"## References"),
             })
     for key, line_number in sorted(refs.items(), key=lambda kv: kv[1]):
-        if key not in cites:
+        if not any(matches(cite, key) for cite in cites):
             findings.append({
                 "check": "citations", "severity": "error", "line": line_number,
                 "message": (f"reference entry ({_label(key)}) is never cited "

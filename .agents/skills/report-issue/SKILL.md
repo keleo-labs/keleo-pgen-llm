@@ -1,6 +1,8 @@
 ---
 name: report-issue
 description: Capture one or more issues, enhancements, or questions from the user and record them in the feedback/issue register for later triage
+metadata:
+  version: "1.0.0"
 triggerPatterns:
   - "report.*issue"
   - "raise.*issue"
@@ -82,9 +84,9 @@ Do not emit any other commentary in this mode. The calling skill owns the conver
 
 ## Supporting Standards
 
-**How a row is written is governed by `.Codex/skills/feedback-foundation/drafting.md`** — the same file that governs the issues published from these rows. Read it before Step 1, along with `examples.md` beside it on your first run. This skill does not restate the structure; it declares only what is specific to capture.
+**How a row is written is governed by `.claude/skills/feedback-foundation/drafting.md`** — the same file that governs the issues published from these rows. Read it before Step 1, along with `examples.md` beside it on your first run. This skill does not restate the structure; it declares only what is specific to capture.
 
-`.Codex/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+`.claude/skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
 
 | If you find yourself... | Stop and read |
 |---|---|
@@ -100,7 +102,7 @@ Do not emit any other commentary in this mode. The calling skill owns the conver
 | Dependency | Required? | Role |
 |---|---|---|
 | `gws` CLI | Yes | Reads and writes the Google Sheets register (wrapped by `utils/issue-register.py`) |
-| `.Codex/user-config.json` | Yes | Stores the register spreadsheet ID and the reporter's email (git-ignored, per-user) |
+| `.claude/user-config.json` | Yes | Stores the register spreadsheet ID and the reporter's email (git-ignored, per-user) |
 | Remote bundle repository | Optional | Resolves document version/kind when the reported document isn't available locally |
 
 For Google Workspace specifics (invocation patterns, auth, schema discovery), use the **`gws` skill** rather than reconstructing commands here. Everything this skill needs from Sheets is already wrapped by `utils/issue-register.py`.
@@ -111,7 +113,7 @@ For Google Workspace specifics (invocation patterns, auth, schema discovery), us
 
 ### Register
 
-The register spreadsheet is shared with `/plan-from-feedback` and read from `.Codex/user-config.json` (`issueRegisterSpreadsheetId`, falling back to `issueRegisterUrl`).
+The register spreadsheet is shared with `/plan-from-feedback` and read from `.claude/user-config.json` (`issueRegisterSpreadsheetId`, falling back to `issueRegisterUrl`).
 
 Confirm the register is reachable and inspect its shape:
 
@@ -119,15 +121,15 @@ Confirm the register is reachable and inspect its shape:
 python3 utils/issue-register.py --schema
 ```
 
-If no register is configured, the utility says so. Ask the user for the register URL with AskUserQuestion and save it to `.Codex/user-config.json` as `issueRegisterUrl` + `issueRegisterSpreadsheetId` — the same keys `/plan-from-feedback` uses. Do not create a second config entry.
+If no register is configured, the utility says so. Ask the user for the register URL with AskUserQuestion and save it to `.claude/user-config.json` as `issueRegisterUrl` + `issueRegisterSpreadsheetId` — the same keys `/plan-from-feedback` uses. Do not create a second config entry.
 
 ### Reporter Email
 
 Every register row carries the reporter's email so triage can follow up.
 
-1. Read `issueReporterEmail` from `.Codex/user-config.json`
+1. Read `issueReporterEmail` from `.claude/user-config.json`
 2. If absent, propose the local git identity (`git config user.email`) via AskUserQuestion
-3. Save the confirmed address as `issueReporterEmail` in `.Codex/user-config.json`
+3. Save the confirmed address as `issueReporterEmail` in `.claude/user-config.json`
 
 Ask once, then reuse it silently on later runs.
 
@@ -147,7 +149,7 @@ The user may report one issue or several in a single message. Treat each distinc
 
 ### Writing the description
 
-Follow the five moves in `.Codex/skills/feedback-foundation/drafting.md` — where this
+Follow the five moves in `.claude/skills/feedback-foundation/drafting.md` — where this
 sits, what happens or what you cannot do today, why it matters, what would close it, and
 the detail. A row written that way publishes cleanly later; a row that opens on an
 element name has to be rescued by whoever publishes it.
@@ -261,10 +263,10 @@ In direct mode, build the drafts file outside the repo (`/tmp/keleo-issues-<time
 ```bash
 python3 utils/issue-register.py --add-draft /tmp/keleo-issues-<timestamp>.json \
   --type Issue --summary "Pattern views repeat the same alpha state" \
-  --description "Every pattern view in the annual rhythm shows Ecosystem Discover at Published..." \
-  --document "EcoTech Sales Foundations" --document-version 1.0.2 --document-kind method \
-  --element "Partner Ecosystem Annual Operating Rhythm" --element-type pattern \
-  --secondary "Ecosystem Discover" --secondary-type alpha
+  --description "Every pattern view in the annual rhythm shows Progress at Published..." \
+  --document "Example Partner Method" --document-version 1.0.2 --document-kind method \
+  --element "Annual Planning Cycle" --element-type pattern \
+  --secondary "Progress" --secondary-type alpha
 ```
 
 Each call validates the draft before writing, so a missing field surfaces immediately. The resulting file is an array of issue objects:
@@ -274,13 +276,13 @@ Each call validates the draft before writing, so a missing field surfaces immedi
   {
     "type": "Issue",
     "summary": "Pattern views repeat the same alpha state",
-    "description": "The annual operating rhythm is the pattern a partner team works through over a year. Each view is one stage of it, and the alpha states a view carries are how a reader tells what that stage moves forward.\n\nEvery view in the pattern shows Ecosystem Discover at Published. The alpha is therefore in the same state at the end of the year as at the start, and the pattern shows no progression at all.\n\nSomeone planning against the rhythm cannot tell which stage advances what, which is the one thing the pattern exists to tell them. It reads as deliberate rather than as an error, so it does not prompt a second look.\n\nExpected: each view carries the state that view actually advances the alpha to.\n\nDetail: all six views are affected in EcoTech Sales Foundations 1.0.2. The same shape appears in two other methods generated from the same mapping guide, so the cause is likely to be upstream of this document. Observed while reviewing the Q3 partner planning material.",
-    "documentName": "EcoTech Sales Foundations",
+    "description": "The annual operating rhythm is the pattern a partner team works through over a year. Each view is one stage of it, and the alpha states a view carries are how a reader tells what that stage moves forward.\n\nEvery view in the pattern shows Progress at Published. The alpha is therefore in the same state at the end of the year as at the start, and the pattern shows no progression at all.\n\nSomeone planning against the rhythm cannot tell which stage advances what, which is the one thing the pattern exists to tell them. It reads as deliberate rather than as an error, so it does not prompt a second look.\n\nExpected: each view carries the state that view actually advances the alpha to.\n\nDetail: all six views are affected in Example Partner Method 1.0.2. The same shape appears in two other methods generated from the same mapping guide, so the cause is likely to be upstream of this document. Observed while reviewing a sample planning document.",
+    "documentName": "Example Partner Method",
     "documentVersion": "1.0.2",
     "documentKind": "method",
-    "selectedElement": "Partner Ecosystem Annual Operating Rhythm",
+    "selectedElement": "Annual Planning Cycle",
     "elementType": "pattern",
-    "secondaryElement": "Ecosystem Discover",
+    "secondaryElement": "Progress",
     "secondaryType": "alpha"
   }
 ]

@@ -2,6 +2,51 @@
 
 Scripts for validating, inspecting, fixing, and assembling Practice Language JSON files.
 
+## Team meeting utilities
+
+`team-meeting.py` 4.0.0 resolves additive project/series signals, validates optional
+quota-view configuration in series format 1.1 and preserves version 1.0 inputs. It validates the
+versioned schemas, prepares immutable instance snapshots and migrates legacy
+team-call settings. `prepare` and `migrate` default to dry-run; `--fix` applies.
+`check-report` checks the meeting title, dated first heading and agenda-first
+eight-section layout; `self-test` covers the mechanical contract. It reuses
+`resolve-context.py` for practice merging.
+
+`check-team-news.py` 2.0.0 validates a supplied series-local state file, including
+identities, timestamps, coverage and links. Version 2 resolves relative paths
+from the state file; migrate version 1 with team-meeting's migration command.
+`collect-news-mail.py` 2.1.0 retains header matching, pagination, resumable cache
+and evidence/error output; supply `--state` explicitly instead of relying on a
+workspace-specific default. Use `--all-candidates --query '<topic query>'` for
+topic-only collection without a sender/group filter. Requests are spaced by one
+second, and body progress is cached every 100 messages for resumable quota recovery.
+Existing codex-claw utilities remain for old evidence.
+
+These validators reuse the `keleo-validate` virtualenv through `skill_venv.py`,
+the shared skill environment helper vendored from codex-claw's python-env skill.
+It honours XDG_DATA_HOME and never installs into the system interpreter.
+`lint-report.py` 1.1.1 accepts nested `### References`, bulleted APA entries with
+full dates, linked undated citations and `et al.` matches. Terminology checks
+inspect link labels rather than destination paths. Regression coverage:
+`python3 tests/check-team-meeting.py`.
+
+```bash
+python3 utils/team-meeting.py --help
+python3 utils/team-meeting.py self-test
+python3 utils/check-team-news.py --self-test
+python3 utils/collect-news-mail.py --self-test
+```
+
+`run-skill-eval.py` 1.1.0 preserves its existing CLI and adds explicit
+`--project-root`, `--skill-dir`, `--inputs`, `--runs-dir` and `--grader` arguments
+for controlled reporting fixtures. An explicit package contains one discovered
+skill and its supporting documents. Inputs cannot traverse outside the chosen
+root. The runner checks isolation, retains raw CLI responses, timing and grading,
+and counts cached input tokens. The team-meeting cases live in the skill's
+evals/evals.json, with synthetic project fixtures under evals/files/; the retained
+benchmark workspace documents dependency packaging and reproduction. Model evals
+do not replace mechanical tests or report verification.
+
 ## Prerequisites
 
 **Required:** Python 3.9+ (standard library only — no pip packages), `keleo-language` repo at `../../keleo-language/` (provides schema, validators, and semantic references via symlinks)
@@ -213,6 +258,7 @@ For decks that live only in Google Slides — no local Slidev source, or a sourc
 | `derive-diagram.py` | Derive diagram specs from the semantic graph a practice already carries, so a report's figures come out of the effective context rather than being hand-transcribed from it. Emits specs only — `render-diagram.py` renders them, and the spec is the artifact worth keeping. `--list` first: it reports the focuses, the alphas ranked by relationship count (the best seeds), the patterns with their phase sequence, and the work products. One view per structural relation in the language: `concern-map` (`flow` — alphas and their `relatesTo` verbs, clustered by focus), `concern-hub` (`hub` — one alpha and everything touching it; usually reads better than a seeded concern-map, which strings out into a chain), `capability-tree` (`flow` — the `contributesTo`/`mapsTo` rollup, where `--seed` names a root and `--depth` counts generations), `journey` (`timeline` — a pattern's views by `seq`), `maturity` (`stack` — one alpha's states, most mature on top), `evidence-map` (`flow` — work products and the concerns they serve, via `contributesToAlphaNames`, with `partOf` as cluster groups), `pattern-matrix` (`matrix` — alphas by pattern view, cell is the target state, empty cell is the finding), `outcome-chain` (`flow` — `Outcome.metricContributions`/`objectiveContributions` as a chain from the work product carrying the metric, through the concern and the state at which it counts, to the outcome), `role-map` (`flow` — `PersonaGroup` membership and nesting), `competency-matrix` (`matrix` — competencies by level, cell is that level's rubric text). `State.contributesToState`, `LevelOfDetail.contributesTo` and `Activity.ledBy` carry structure too but are not derived — no context here populates them. Every edge runs declaring alpha → target with the verb verbatim, because a relationship verb is phrased from the alpha that declares it and reads as nonsense inverted; `direction` chooses between the two reciprocal phrasings rather than orienting the line, preferring the active one. Scope with `--seed`/`--depth`, `--focus`, `--practice`. Three guards: `--max-nodes` (default 9, counting `--instance` expansion) refuses a hairball and names the best seeds; past ~1.8 edges per node a layered flow collapses into a column and stops drawing edges where they belong, so it refuses and points at `concern-hub` unless `--allow-dense` is passed; and three or more labelled edges meeting at one node trigger a crowding note naming that node (`--no-edge-labels` is usually the answer). `--instance "Alpha=Name,Name"` splits one node into named instances each inheriting its edges — for a subject with a production and a DR platform — with inter-instance edges added to the emitted spec by hand. Exits 1 on an unresolvable name or a budget overflow | `python3 utils/derive-diagram.py <context>.json --list` <br> `python3 utils/derive-diagram.py <context>.json --view concern-hub --seed "<Alpha>" --out-dir reports/<slug>/assets/ --name <stem>` <br> `python3 utils/derive-diagram.py <context>.json --view journey --pattern "<Pattern>" --stdout` |
 | `render-diagram.py` | Thin wrapper over the shared engine in `.claude/skills/diagram-foundation/` (a vendored copy of `~/.claude/skills/diagram-foundation/` — fix upstream, re-copy down). Renders a declarative spec into styled SVG for embedding in a markdown report. Eight native layouts: `flow` (layered boxes and directed edges, `LR`/`TB`, nestable cluster groups — topologies, pipelines, process flows), `stack` (vertical tiers — layer models, maturity stacks), `timeline` (sequential phase bands with arrows — roadmaps, adoption journeys), `hub` (centre node with satellites on an ellipse — relationship maps, fan-out), `matrix` (grid with row and column headers — capability heat maps, Zachman, coverage audits), `wardley` (value-chain / evolution grid — build versus buy), `swimlane` (lanes of steps with handoffs — who does what, in order), `canvas` (Event Storming wall). A `.mmd` spec — YAML frontmatter plus Mermaid source — adds C4, ERD, sequence, class and state diagrams; `render: scene` lets Mermaid lay a flowchart out and redraws it in house shapes, anything else keeps Mermaid's picture themed to the palette. Needs `npx` on PATH for the Mermaid routes. Nodes accept `shape`, `emphasis` and a semantic `role`; edges accept `dash` and `arrow`. Visual language is lifted from the keleo-studio-gas navigator diagrams, so reports, the studio UI and the deck theme read as one system; restyle via the `THEME` dict rather than per-diagram. `title` and `description` are metadata only — they become `<title>` and `<desc>`/`aria-label`, never drawn, because the heading above the diagram in the report already names it. Labels are native `<text>` with wrapping done in-module (a `foreignObject` does not render when an SVG loads through a markdown `<img>`) and every diagram paints an opaque background so dark-theme pages do not swallow the text. `--dir` renders every spec in a directory beside itself — one call per report. Exits 1 on an unknown layout, duplicate node id, dangling edge endpoint, or unknown group/emphasis | `python3 utils/render-diagram.py <spec>.json [-o <out>.svg] [--stdout]` <br> `python3 utils/render-diagram.py --dir reports/<report-slug>/assets/` <br> `python3 utils/render-diagram.py --spec-help` |
 | `preview-diagram.py` | Rasterise rendered diagrams to PNG so they can be eyeballed for defects a validator cannot see — labels clipped to an ellipsis, edge labels colliding, cluster rects overlapping. `--report` reads the markdown and rasterises every SVG it embeds, which is the form a reporting skill wants at the end of Step 3; `--dir` and a bare path cover the other cases. Sizes each raster from the SVG's own viewBox and stretches it to the viewport in a wrapper page, so the whole diagram is in frame at a legible scale whatever its aspect. **Do not substitute macOS `qlmanage -t`** — it fits to width on a square canvas, so a tall diagram is silently cropped and a broken diagram reads as a clean one. Finds a browser from Playwright's bundled Chromium, `chromium`/`chrome` on PATH, or Google Chrome on macOS, and prints per-platform install guidance when none is present | `python3 utils/preview-diagram.py --report reports/<report-slug>/<report-slug>.md` <br> `python3 utils/preview-diagram.py --dir reports/<report-slug>/assets/` <br> `python3 utils/preview-diagram.py <diagram>.svg [-o <dir>] [--width 1100]` |
+| `prepare-markdown-images.js` | Make a Markdown file self-contained for Google Docs import by inlining local images as data URIs and rasterising SVG to page-width PNG with an installed `sharp` package. Set `NODE_PATH` if `sharp` is supplied by a bundled runtime. | `NODE_PATH=<node_modules> node utils/prepare-markdown-images.js input.md output.md` |
 
 ## URL & Reference Resolution
 
