@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+Read `AGENTS-ALL.md` for shared project guidance. The project skills Cursor should use are the thin entrypoints in `.agents/skills/`; their full workflows are in `skills/`. Cursor's project hook is `.cursor/hooks.json`. A question asked through Cursor's UI must be recorded explicitly with `utils/prompt-history.py --add-interaction` when a prompt history is active, because Cursor does not expose a compatible question-response hook.

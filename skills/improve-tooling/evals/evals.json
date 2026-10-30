@@ -1,0 +1,15 @@
+{
+  "skill_name": "improve-tooling",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Improve report-issue so it handles one more status consistently in Claude, Cursor and Codex.",
+      "expected_output": "The shared behavior changes in skills/report-issue, its contract and evals are updated, and vendor wrappers pass the parity check."
+    },
+    {
+      "id": 2,
+      "prompt": "Claude Code needs a different question tool for the report-issue skill. Keep the other agents as they are.",
+      "expected_output": "The tool mapping changes in the Claude adapter only, while the canonical report-issue workflow remains vendor neutral."
+    }
+  ]
+}

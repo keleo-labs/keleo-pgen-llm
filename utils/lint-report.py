@@ -784,7 +784,7 @@ def main():
     parser.add_argument("--studio-url", metavar="URL",
                         help="keleo-studio-gas deployment URL attribution links "
                              "must point at (default: keleoStudioGasUrl from "
-                             ".claude/user-config.json)")
+                             "config/user-config.json)")
     parser.add_argument("--min-words", type=int,
                         help="Lower bound of the target word band")
     parser.add_argument("--max-words", type=int,

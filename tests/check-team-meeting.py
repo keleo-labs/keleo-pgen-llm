@@ -41,9 +41,9 @@ class ReferencesTests(unittest.TestCase):
             self.assertFalse([f for f in lint.check_citations(cites, refs, 0, 15) if f["severity"] == "error"])
 
     def test_registered_type_and_contract(self):
-        verifier = (ROOT / ".agents/skills/verification-foundation/verifiers/report.md").read_text()
+        verifier = (ROOT / "skills/verification-foundation/verifiers/report.md").read_text()
         self.assertIn("| `team-meeting` |", verifier)
-        contract = (ROOT / ".agents/skills/team-meeting/contract.feature").read_text()
+        contract = (ROOT / "skills/team-meeting/contract.feature").read_text()
         self.assertIn("Inherit and add signals", contract)
         self.assertIn("Keep all sections suitable for the team", contract)
         self.assertIn("Brief acknowledgements and reminders directly", contract)

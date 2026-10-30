@@ -51,7 +51,7 @@ def local_path(value, declaring_file):
 
 def validate(value, schema_name, project_root=ROOT):
     from jsonschema import Draft202012Validator, FormatChecker
-    schema_dir = Path(project_root) / ".agents/skills/team-meeting/references"
+    schema_dir = Path(project_root) / "skills/team-meeting/references"
     schema = read_json(schema_dir / schema_name)
     if schema_name == "series.schema.json":
         signal_schema = read_json(schema_dir / "signals.schema.json")
@@ -238,7 +238,7 @@ def migrate(workspace, fix=False, project_root=ROOT):
         members.append({"name": anchor.group(1), "email": anchor.group(2), "role": "Team manager", "responsibilities": []})
     report_fields, _ = markdown_fields(text, "team-1-2-1")
     slugs = [re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") for title in titles]
-    refs = project_root / ".agents/skills/team-meeting/references"
+    refs = project_root / "skills/team-meeting/references"
     result = []
     for index, (title, slug) in enumerate(zip(titles, slugs)):
         destination = project_root / "reports" / slug
@@ -310,10 +310,10 @@ class WorkspaceTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
-        shutil.copytree(ROOT / ".agents/skills/team-meeting/references", self.root / ".agents/skills/team-meeting/references")
+        shutil.copytree(ROOT / "skills/team-meeting/references", self.root / "skills/team-meeting/references")
         write_json(self.root / "config/team-meeting/signals.json", {"version": CONFIG_VERSION, "signals": [{"id": "global", "recipe": "local", "fixturePath": "global.md"}]})
         self.series = self.root / "reports/service/series.json"
-        self.config = read_json(ROOT / ".agents/skills/team-meeting/references/example-series.json")
+        self.config = read_json(ROOT / "skills/team-meeting/references/example-series.json")
         write_json(self.series, self.config)
         write_json(self.series.parent / "context/merged-practice.json", {"name": "Service", "version": VERSION})
 

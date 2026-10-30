@@ -16,7 +16,7 @@ import unittest
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = ROOT / ".agents/skills/team-meeting/references/news-state.schema.json"
+SCHEMA = ROOT / "skills/team-meeting/references/news-state.schema.json"
 
 
 def timestamp(value):
@@ -99,7 +99,7 @@ def check_state(state):
 
 class NewsStateTests(unittest.TestCase):
     def setUp(self):
-        self.state = json.loads((ROOT / ".agents/skills/team-meeting/evals/files/news-state.json").read_text())
+        self.state = json.loads((ROOT / "skills/team-meeting/evals/files/news-state.json").read_text())
 
     def test_valid_state_and_schema(self):
         self.assertEqual(check_state(self.state), [])

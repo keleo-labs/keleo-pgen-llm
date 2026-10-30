@@ -128,19 +128,22 @@ def prepare_cell(workdir: Path, arm: str, skill_name: str, inputs=SHARED_INPUTS)
         (workdir / name).mkdir(exist_ok=True)
 
     if arm == "with-skill":
-        src = SKILL_DIR or PROJECT_ROOT / ".claude" / "skills" / skill_name
+        src = SKILL_DIR or PROJECT_ROOT / "skills" / skill_name
         if not src.exists():
             raise FileNotFoundError(f"no such skill: {src}")
-        dest = workdir / ".claude" / "skills" / skill_name
+        dest = workdir / "skills" / skill_name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dest, symlinks=False,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        entry = workdir / ".claude" / "skills" / skill_name
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.symlink_to(dest, target_is_directory=True)
         # Supporting foundations the skill reads at runtime.
         for foundation in (() if SKILL_DIR else ("verification-foundation", "reporting-foundation",
                            "deck-foundation", "diagram-foundation")):
-            fsrc = PROJECT_ROOT / ".claude" / "skills" / foundation
+            fsrc = PROJECT_ROOT / "skills" / foundation
             if fsrc.exists():
-                shutil.copytree(fsrc, workdir / ".claude" / "skills" / foundation,
+                shutil.copytree(fsrc, workdir / "skills" / foundation,
                                 symlinks=False,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return workdir

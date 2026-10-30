@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-FOUNDATION = PROJECT_ROOT / ".claude" / "skills" / "verification-foundation"
+FOUNDATION = PROJECT_ROOT / "skills" / "verification-foundation"
 VERIFIERS_DIR = FOUNDATION / "verifiers"
 CALIBRATION_FILE = FOUNDATION / "calibration.json"
 FIXTURES = PROJECT_ROOT / "tests" / "calibration"

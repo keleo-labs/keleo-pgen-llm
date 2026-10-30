@@ -34,14 +34,14 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-ENGINE = REPO / ".claude" / "skills" / "diagram-foundation" / "scripts"
+ENGINE = REPO / "skills" / "diagram-foundation" / "scripts"
 sys.path.insert(0, str(ENGINE))
 
 try:
     from diagram import svg_aspect
 except ImportError:
     print(f"Error: diagram engine missing at {ENGINE}\n"
-          f"Re-copy it from ~/.claude/skills/diagram-foundation/",
+          "Restore it from the repository's canonical skills tree.",
           file=sys.stderr)
     sys.exit(1)
 

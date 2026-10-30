@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "vendors": [
+    {
+      "name": "Codex",
+      "skillsDir": ".agents/skills",
+      "instructions": "AGENTS.md",
+      "hooks": ".codex/hooks.json"
+    },
+    {
+      "name": "Claude Code",
+      "skillsDir": ".claude/skills",
+      "instructions": "CLAUDE.md",
+      "hooks": ".claude/settings.json"
+    },
+    {
+      "name": "Cursor",
+      "skillsDir": null,
+      "instructions": ".cursor/rules/project-agent.mdc",
+      "hooks": ".cursor/hooks.json"
+    }
+  ]
+}

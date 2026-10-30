@@ -11,7 +11,7 @@ export const meta = {
 
 // Opt-in deep run of the Phase 2 verification gate. The generation skills run
 // the same briefs inline via the Agent tool as a blocking gate — see
-// .claude/skills/verification-foundation/VERIFY-FOUNDATION.md. Use this
+// skills/verification-foundation/VERIFY-FOUNDATION.md. Use this
 // workflow to re-verify an existing mapping guide outside a generation run.
 
 const FINDINGS_SCHEMA = {
@@ -72,7 +72,7 @@ const parsedArgs = typeof args === 'string' ? JSON.parse(args) : (args || {})
 const mappingGuide = parsedArgs.mappingGuide
 const baseline = parsedArgs.baseline || ''
 const analysisReport = parsedArgs.analysisReport || ''
-const specs = parsedArgs.specs || '.claude/skills/generate-method/specs/specs-index.json'
+const specs = parsedArgs.specs || 'skills/generate-method/specs/specs-index.json'
 const parents = parsedArgs.parents || []
 
 if (!mappingGuide) {
@@ -116,11 +116,11 @@ const parentInfo = parents.length > 0
 // The briefs live in the verification foundation, shared with the generation
 // skills, so the opt-in deep run and the skills' default inline run check the
 // same things. Inlining them here let the two drift.
-const BRIEFS = '.claude/skills/verification-foundation/verifiers/phase-2.md'
+const BRIEFS = 'skills/verification-foundation/verifiers/phase-2.md'
 
 const verifierBrief = (name) => `Read ${BRIEFS} and follow the brief under the heading
 for the \`${name}\` verifier, exactly as written. Also read
-.claude/skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
+skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
 findings contract and severity calibration.
 
 **Substitutions for this run:**

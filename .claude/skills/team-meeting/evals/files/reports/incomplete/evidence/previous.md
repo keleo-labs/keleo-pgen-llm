@@ -1,1 +1,0 @@
-Held 2026-10-19. Alex accepted an action to clarify escalation ownership with the weekend service. No later outcome is recorded. A repeatable incident checklist helped handover. Proposed incident drill owner: Morgan, who has not accepted. The team did not agree measurable objectives.

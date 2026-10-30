@@ -1,1 +1,0 @@
-Held 2026-10-19. Jo's large-print reading session was attended by six people. Jo shared a reusable invitation. Kim accepted an action to ask about the accessible entrance; no response is recorded. The team agreed that room allocation needs a shared decision. Routine book returns are up to date.

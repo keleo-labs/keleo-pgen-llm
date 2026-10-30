@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "python3 utils/prompt-history.py --hook user-prompt"
+      }
+    ]
+  }
+}

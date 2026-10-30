@@ -103,11 +103,11 @@ phase('Verify')
 const practiceData = JSON.stringify(scanResult.practices, null, 2)
 
 // The brief is shared with the generation skills' Phase 2 gate so the two
-// cannot drift — see .claude/skills/verification-foundation/.
-const verified = await agent(`Read .claude/skills/verification-foundation/verifiers/phase-2.md
+// cannot drift — see skills/verification-foundation/.
+const verified = await agent(`Read skills/verification-foundation/verifiers/phase-2.md
 and follow the brief under the heading for the \`cross-practice-consistency\` verifier,
 exactly as written. Also read
-.claude/skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
+skills/verification-foundation/VERIFY-FOUNDATION.md sections 4 and 5 for the
 findings contract and severity calibration.
 
 The practices have already been scanned, so work from the data below rather than

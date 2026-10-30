@@ -188,7 +188,7 @@ def get_spreadsheet_id(override=None):
         sid = extract_spreadsheet_id(config["issueRegisterUrl"])
     if not sid:
         fail("No issue register configured. Pass --spreadsheet <URL-or-ID> or set "
-             "issueRegisterSpreadsheetId in .claude/user-config.json.")
+             "issueRegisterSpreadsheetId in config/user-config.json.")
     return sid
 
 
@@ -831,7 +831,7 @@ def main():
                            "does not yet carry, and widen the table range")
 
     parser.add_argument("--spreadsheet", metavar="URL_OR_ID",
-                        help="Override the register from .claude/user-config.json")
+                        help="Override the register from config/user-config.json")
     parser.add_argument("--status", metavar="STATUS",
                         help="Filter --list by status (e.g. New, Resolved)")
     parser.add_argument("--limit", type=int, help="Show only the last N rows with --list")

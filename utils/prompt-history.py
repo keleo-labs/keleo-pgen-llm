@@ -58,11 +58,14 @@ Usage:
 
 import argparse
 import contextlib
+import fcntl
+import hashlib
 import io
 import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timezone
 
 HISTORY_FILENAME = "00-prompt-history.md"
@@ -489,13 +492,15 @@ def _render_answer(tool_response):
         answers = tool_response.get("answers")
         if isinstance(answers, dict):
             if len(answers) == 1:  # the question is already recorded above
-                return next(iter(answers.values()))
-            return "\n".join(f"{q} → {a}" for q, a in answers.items())
+                return _render_answer(next(iter(answers.values())))
+            return "\n".join(f"{q} → {_render_answer(a)}" for q, a in answers.items())
+        if isinstance(answers, list):
+            return _render_answer(answers)
         for key in ("text", "content", "result"):
             if isinstance(tool_response.get(key), str):
                 return tool_response[key]
     if isinstance(tool_response, list):
-        texts = [b.get("text", "") for b in tool_response if isinstance(b, dict)]
+        texts = [b if isinstance(b, str) else b.get("text", "") for b in tool_response if isinstance(b, (str, dict))]
         if any(texts):
             return "\n".join(t for t in texts if t)
     return json.dumps(tool_response, ensure_ascii=False)
@@ -506,7 +511,7 @@ def _ask_user_question_exchange(payload):
     tool_input = payload.get("tool_input") or {}
     questions = tool_input.get("questions") or []
     asked = "\n".join(
-        q.get("question", "") for q in questions if isinstance(q, dict) and q.get("question")
+        q.get("question") or q.get("title", "") for q in questions if isinstance(q, dict)
     )
     return asked or "(question text unavailable)", _render_answer(payload.get("tool_response"))
 
@@ -518,35 +523,55 @@ def cmd_hook(args):
     except (ValueError, OSError):
         return
 
+    if not isinstance(payload, dict):
+        return
+
     directory = _read_active()
     if directory is None:
         return  # no generation session is live
 
     # Bind the pointer to the first session that fires, so a concurrent session
     # in this project does not leak its prompts into someone else's history.
-    session_id = payload.get("session_id")
+    session_id = payload.get("session_id") or payload.get("conversation_id")
+    if not session_id:
+        return  # A hook without identity cannot safely use the shared active pointer.
     try:
-        with open(POINTER_PATH, "r", encoding="utf-8") as f:
+        with open(POINTER_PATH, "r+", encoding="utf-8") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
             pointer = json.load(f)
+            bound = pointer.get("sessionId")
+            if bound and bound != session_id:
+                return
+
+            if args.hook == "user-prompt":
+                prompt = (payload.get("prompt") or "").strip()
+                if not prompt:
+                    return
+                label, asked, answered = "User input", None, prompt
+            elif str(payload.get("tool_name", "")).split(".")[-1] in {"AskUserQuestion", "request_user_input", "request_user_input_async"}:
+                asked, answered = _ask_user_question_exchange(payload)
+                label = "Question"
+            else:
+                return
+
+            fingerprint = hashlib.sha256(
+                json.dumps([session_id, args.hook, asked, answered], ensure_ascii=False).encode()
+            ).hexdigest()
+            last = pointer.get("lastHook", {})
+            now = time.time()
+            generation = payload.get("generation_id")
+            same_turn = not generation or not last.get("generation") or generation == last["generation"]
+            if same_turn and last.get("fingerprint") == fingerprint and now - last.get("at", 0) < 3:
+                return  # Cursor can also run the Claude project hook for the same event.
+
+            _record_interaction(directory, label, asked, answered)
+            pointer["sessionId"] = session_id
+            pointer["lastHook"] = {"fingerprint": fingerprint, "at": now, "generation": generation}
+            f.seek(0)
+            json.dump(pointer, f, indent=2)
+            f.truncate()
     except (OSError, ValueError):
         return
-    bound = pointer.get("sessionId")
-    if bound is None and session_id:
-        pointer["sessionId"] = session_id
-        with open(POINTER_PATH, "w", encoding="utf-8") as f:
-            json.dump(pointer, f, indent=2)
-    elif bound and session_id and bound != session_id:
-        return
-
-    if args.hook == "user-prompt":
-        prompt = (payload.get("prompt") or "").strip()
-        if prompt:
-            _record_interaction(directory, "User input", None, prompt)
-    elif args.hook == "tool":
-        if payload.get("tool_name") != "AskUserQuestion":
-            return
-        asked, answered = _ask_user_question_exchange(payload)
-        _record_interaction(directory, "Question", asked, answered)
 
 
 def main():
