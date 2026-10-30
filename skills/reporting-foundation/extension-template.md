@@ -1,0 +1,186 @@
+# Reporting Skill Extension Guide
+
+How to create a new specialised reporting skill that builds on the shared reporting foundation.
+
+---
+
+## Checklist
+
+1. **Choose a name** — kebab-case, describes the report type (e.g., `risk-assessment`, `migration-plan`)
+2. **Allocate a rule ID range** — 20-number block within 600–799 (see current allocation below). If 600–799 is full, use 1000+
+3. **Create the directory** — `skills/<name>/` with `SKILL.md`, `contract.feature`, and `evals/` directory
+4. **Write the SKILL.md** — follow the template below
+5. **Register** — add the skill to `AGENTS-ALL.md`, then regenerate vendor entrypoints
+6. **Add trigger patterns** — in the SKILL.md frontmatter
+7. **Declare the type-specific verifier** — add a row to the per-type table in `skills/verification-foundation/verifiers/report.md`, and a Verification section to the SKILL.md pointing at it (see Design Decisions below)
+
+### Current Rule ID Allocation (600–799)
+
+| Owner | Range |
+|-------|-------|
+| Shared foundation (REPORT-FOUNDATION.md) | 600–619, **720–739** |
+| reference-architecture | 620–639 |
+| project-plan | 640–659 |
+| decision-analysis | 660–679 |
+| document-review | 680–699 |
+| method-based-report (type-specific) | 700–719 |
+| team-meeting | 740–759 |
+| Reserved | 760–799 |
+
+The foundation holds two blocks because 600–619 filled up. Its verification rules
+(720–727) took the next free block rather than spilling into 620–639, which
+`reference-architecture` already uses up to 624. **Check actual usage before claiming a
+range** — this table has been wrong before:
+
+```bash
+grep -roh "@rule:report-[0-9]*" skills/ | sort -u
+```
+
+---
+
+## SKILL.md Template
+
+```markdown
+---
+name: <skill-name>
+metadata:
+  version: "1.0.0"
+description: <one-line description — what the report is and who it's for>
+triggerPatterns:
+  - "<pattern-1>"
+  - "<pattern-2>"
+---
+
+# <Skill Name> Skill
+
+<2–3 sentence purpose statement. What kind of report this produces, when to use it, and what makes it distinct from the general-purpose method-based-report.>
+
+## Workflow Overview
+
+Apply REPORT-FOUNDATION's "From diagnosis to action" section at Steps 2–3 and its shared `contract.feature` within the agreed report scope.
+
+**Step 0: Plan** → <type-specific planning focus>
+**Step 1: Load Context** → Resolve practice/method into effective context
+**Step 2: Analyze & Select** → Extract domain knowledge, select narrative structures
+**Step 3: Generate Report** → Write report using type-specific structure
+
+---
+
+## Reporting Foundation
+
+This skill builds on the common reporting infrastructure. Load these **on demand**:
+
+| Document | Load at | What it provides |
+|---|---|---|
+| `skills/reporting-foundation/REPORT-FOUNDATION.md` | Steps 0–3 | Report workspace layout, session provenance, context resolution, domain extraction, citations, voice/tone, output format, shared rules |
+| `skills/reporting-foundation/narrative-guide.md` | Step 0 and Step 2 | Narrative selection and element-to-heading mappings |
+
+---
+
+## Supporting Standards
+
+`skills/SKILL-STANDARD.md` defines cross-cutting standards for all skills. **Do not read it upfront** — read the relevant section when a trigger fires:
+
+| If you find yourself... | Stop and read |
+|---|---|
+| Writing `python3 -c`, `bash -c`, heredocs, or any ad-hoc inline script | §7 |
+| Creating or extending a utility script | §7.4 |
+| Finishing the workflow without auditing the session | §11 |
+
+---
+
+## External Dependencies
+
+<Same table as method-based-report — adjust if this type has additional dependencies.>
+
+---
+
+## Preferred Narrative Structures
+
+<Which primary and secondary narrative types suit this report type. Reference narrative-guide.md for the full mapping table.>
+
+| Context | Primary | Secondary |
+|---|---|---|
+| <default case> | <type> | <type> |
+| <variant case> | <type> | <type> |
+
+---
+
+## Step 0: Planning stage (required)
+
+<Type-specific planning questions beyond the common ones. What additional input does this report type need?>
+
+Read [the planning stage](../planning-foundation/PLANNING-FOUNDATION.md) before proceeding. Inspect sources read-only, present the plan and unresolved questions, then end the turn without writes. Implement only after explicit user approval, even when native Plan mode is unavailable; do not claim a mode switch.
+
+During read-only planning:
+
+1. **Identify the practice context** — same as base skill
+2. **Clarify subject and purpose** — <type-specific questions>
+3. **<Type-specific input>** — <what this type uniquely needs>
+4. **Preview the narrative strategy** — using the preferred structures above
+
+**Present the plan and end the turn.** Include affected components, constraints, required validation and unresolved questions. Continue only after explicit user approval.
+
+**After approval, open the report workspace before content work begins:** derive the kebab-case slug from the agreed title, create `reports/<report-slug>/`, initialise the prompt history, and record the sources identified during planning. See `reporting-foundation/REPORT-FOUNDATION.md` → Report Workspace and Session Provenance. `--init` arms the interaction hooks, so do it before the next exchange with the user.
+
+---
+
+## Steps 1–3: Execution
+
+Steps 1–2 follow `reporting-foundation/REPORT-FOUNDATION.md`.
+
+Step 3 writes to `reports/<report-slug>/<report-slug>.md`, with diagram specs and SVGs in
+`reports/<report-slug>/assets/`, using this structure:
+
+```markdown
+# <Title>
+
+## <Section 1>
+...
+## <Section N>
+## References
+```
+
+<Describe each section's purpose and what practice knowledge feeds into it.>
+
+---
+
+## Type-Specific Content Rules
+
+<Any content generation rules unique to this type — tables that must be present, specific section requirements, formatting conventions.>
+
+---
+
+## Feature: <Type Name> Report Quality
+
+### Scenario: <Rule description> (@rule:report-NNN)
+- Given: <precondition>
+- When: <action>
+- Then: <outcome>
+
+<Add 3–6 Gherkin rules specific to this report type.>
+
+---
+
+## Post-Completion
+
+Record the report — and any PDF or published Google Doc URL — as deliverables, then `--finalize` the prompt history (REPORT-FOUNDATION → Session Provenance).
+
+Then perform the Post-Completion Review per SKILL-STANDARD.md §11.
+```
+
+---
+
+## Design Decisions for New Types
+
+When designing a new reporting skill, decide:
+
+1. **What makes this distinct from `/method-based-report`?** If the answer is just "different narrative type selection", it probably doesn't need a separate skill — the base skill's planning step handles that. A separate skill is warranted when the report type has a distinct output structure, unique input requirements, or type-specific content rules.
+
+2. **What input does the user provide beyond practice context?** Each specialised skill exists because it needs something the base skill doesn't ask for (a document to review, technology constraints, a question to analyse, project objectives).
+
+3. **What output structure is mandatory?** Specialised skills define a fixed output skeleton. This is their main value — users know what they'll get. The base skill's output structure is flexible.
+
+4. **Which Gherkin rules encode type-specific quality?** These rules distinguish the specialised skill from the base. They should be verifiable and specific (not just "report is good").
+
+5. **What does this type's verification gate need beyond the base four?** Every reporting skill inherits lint plus the verification gate from REPORT-FOUNDATION → Output (Step 3), with `source-fidelity`, `citation-integrity`, `domain-grounding` and `register-and-style`. Most types also warrant a `type-specific` verifier. Ask what this report type gets *wrong* in a way the base four would not catch — a decision analysis arranged to reach a predetermined verdict, a plan whose estimates rest on unstated assumptions — and add a row for it to the per-type table in `skills/verification-foundation/verifiers/report.md`. If the honest answer is nothing, say so in the skill's Verification section and omit `type-specific` from `--expect`, as `method-based-report` does.

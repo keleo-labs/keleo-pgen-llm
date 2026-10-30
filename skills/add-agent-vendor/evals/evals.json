@@ -1,0 +1,20 @@
+{
+  "skill_name": "add-agent-vendor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Add support for a new CLI agent whose docs say it discovers .newagent/skills and has a prompt-submit hook.",
+      "expected_output": "The agent gets a vendor profile, thin skill wrappers, an instruction entrypoint, a prompt-history hook adapter and fixture checks. Canonical skills remain in skills/."
+    },
+    {
+      "id": 2,
+      "prompt": "Can we make Agent X work here? It already reads .agents/skills, but I don't know whether it has hooks.",
+      "expected_output": "The agent checks primary documentation, reuses .agents/skills without duplicate wrappers, and documents or implements only verified hook capabilities."
+    },
+    {
+      "id": 3,
+      "prompt": "Add a vendor that cannot expose question and answer events.",
+      "expected_output": "Support is added for available capabilities and the manual prompt-history interaction command is documented for missing question events."
+    }
+  ]
+}

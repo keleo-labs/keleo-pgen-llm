@@ -1,0 +1,1 @@
+{"session_id":"session-a","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which baseline?"}]},"tool_response":{"answers":{"baseline":"Platform"}}}

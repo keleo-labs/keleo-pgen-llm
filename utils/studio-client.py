@@ -198,7 +198,7 @@ def cmd_configure(url=None, token=None):
     config["keleoStudioGasUrl"] = url
     config["keleoStudioGasToken"] = token
     save_user_config(config)
-    print(f"Saved to .claude/user-config.json")
+    print(f"Saved to config/user-config.json")
 
     # A new deployment serves a different library; the caches no longer apply.
     if url_changed:

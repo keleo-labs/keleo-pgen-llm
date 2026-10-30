@@ -60,7 +60,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+__version__ = "1.1.0"
 RUNS_DIR = PROJECT_ROOT / "runs"
+SKILL_DIR = None
+GRADER = None
 
 ARMS = ("with-skill", "without-skill")
 
@@ -100,7 +103,7 @@ NONINTERACTIVE_PREAMBLE = (
 
 # Anything here in a without-skill workspace means the arm is not actually
 # running without the skill, and the measured delta is meaningless.
-CONTAMINANTS = ("CLAUDE.md", ".claude", "AGENTS.md", ".cursor", "memory")
+CONTAMINANTS = ("CLAUDE.md", ".claude", "AGENTS.md", ".agents", ".codex", ".cursor", "memory")
 
 
 def _copy_inputs(dest: Path, inputs=SHARED_INPUTS):
@@ -125,19 +128,22 @@ def prepare_cell(workdir: Path, arm: str, skill_name: str, inputs=SHARED_INPUTS)
         (workdir / name).mkdir(exist_ok=True)
 
     if arm == "with-skill":
-        src = PROJECT_ROOT / ".claude" / "skills" / skill_name
+        src = SKILL_DIR or PROJECT_ROOT / "skills" / skill_name
         if not src.exists():
             raise FileNotFoundError(f"no such skill: {src}")
-        dest = workdir / ".claude" / "skills" / skill_name
+        dest = workdir / "skills" / skill_name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(src, dest, symlinks=False,
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        entry = workdir / ".claude" / "skills" / skill_name
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.symlink_to(dest, target_is_directory=True)
         # Supporting foundations the skill reads at runtime.
-        for foundation in ("verification-foundation", "reporting-foundation",
-                           "deck-foundation", "diagram-foundation"):
-            fsrc = PROJECT_ROOT / ".claude" / "skills" / foundation
+        for foundation in (() if SKILL_DIR else ("verification-foundation", "reporting-foundation",
+                           "deck-foundation", "diagram-foundation")):
+            fsrc = PROJECT_ROOT / "skills" / foundation
             if fsrc.exists():
-                shutil.copytree(fsrc, workdir / ".claude" / "skills" / foundation,
+                shutil.copytree(fsrc, workdir / "skills" / foundation,
                                 symlinks=False,
                                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return workdir
@@ -185,9 +191,15 @@ def run_cell(workdir: Path, prompt: str, arm: str, timeout: int, dry_run: bool):
                 "env": {k: env[k] for k in ISOLATION_ENV}, "cwd": str(workdir)}
 
     started = time.time()
-    proc = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True,
-                          text=True, timeout=timeout)
+    try:
+        proc = subprocess.run(cmd, cwd=workdir, env=env, capture_output=True,
+                              text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        return {"error": "CLI timed out", "duration_ms": int((time.time() - started) * 1000),
+                "total_tokens": None, "timeout_seconds": timeout}
     duration_ms = int((time.time() - started) * 1000)
+    (workdir / "session.json").write_text(proc.stdout, encoding="utf-8")
+    (workdir / "session.stderr").write_text(proc.stderr, encoding="utf-8")
 
     try:
         payload = json.loads(proc.stdout)
@@ -202,7 +214,8 @@ def run_cell(workdir: Path, prompt: str, arm: str, timeout: int, dry_run: bool):
         "num_turns": payload.get("num_turns"),
         "input_tokens": usage.get("input_tokens"),
         "output_tokens": usage.get("output_tokens"),
-        "total_tokens": (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0),
+        "total_tokens": sum(usage.get(key) or 0 for key in
+                            ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")),
         "is_error": payload.get("is_error", False),
         "returncode": proc.returncode,
     }
@@ -219,7 +232,7 @@ def grade_cell(workdir: Path, case: dict):
             return {"error": "no output directory produced"}
         target = candidates[0]
 
-    cmd = ["python3", str(PROJECT_ROOT / "utils" / "eval-skill-output.py"), str(target)]
+    cmd = ["python3", str(GRADER or PROJECT_ROOT / "utils" / "eval-skill-output.py"), str(target)]
     if case.get("baseline"):
         baseline = PROJECT_ROOT / case["baseline"]
         if baseline.exists():
@@ -240,9 +253,9 @@ def aggregate(cells):
     summary = {}
     for arm, group in by_arm.items():
         rates = [c["grading"]["summary"]["pass_rate"] for c in group
-                 if c.get("grading", {}).get("summary")]
+                 if c.get("grading", {}).get("summary", {}).get("pass_rate") is not None]
         errs = [c["grading"]["summary"]["error_pass_rate"] for c in group
-                if c.get("grading", {}).get("summary")]
+                if c.get("grading", {}).get("summary", {}).get("error_pass_rate") is not None]
         toks = [c["metrics"]["total_tokens"] for c in group
                 if c.get("metrics", {}).get("total_tokens")]
         durs = [c["metrics"]["duration_ms"] for c in group
@@ -254,7 +267,9 @@ def aggregate(cells):
             "mean_pass_rate": round(statistics.mean(rates), 3) if rates else None,
             "mean_error_pass_rate": round(statistics.mean(errs), 3) if errs else None,
             "median_total_tokens": int(statistics.median(toks)) if toks else None,
+            "mean_total_tokens": round(statistics.mean(toks), 1) if toks else None,
             "median_duration_ms": int(statistics.median(durs)) if durs else None,
+            "mean_duration_ms": round(statistics.mean(durs), 1) if durs else None,
             "median_cost_usd": round(statistics.median(costs), 4) if costs else None,
         }
 
@@ -262,7 +277,7 @@ def aggregate(cells):
     a, b = summary.get("with-skill"), summary.get("without-skill")
     if a and b:
         for key in ("mean_pass_rate", "mean_error_pass_rate",
-                    "median_total_tokens", "median_duration_ms", "median_cost_usd"):
+                    "median_total_tokens", "median_duration_ms", "mean_total_tokens", "mean_duration_ms", "median_cost_usd"):
             if a.get(key) is not None and b.get(key) is not None:
                 delta[key] = round(a[key] - b[key], 4)
     return {"byArm": summary, "delta": delta}
@@ -289,7 +304,7 @@ def selftest():
         root = Path(tmp)
 
         for arm in ARMS:
-            cell = prepare_cell(root / arm, arm, "generate-method")
+            cell = prepare_cell(root / arm, arm, SKILL_DIR.name if SKILL_DIR else "generate-method", () if SKILL_DIR else SHARED_INPUTS)
             problems = check_isolation(cell, arm)
             if problems:
                 for p in problems:
@@ -299,24 +314,25 @@ def selftest():
                 print(f"ok {arm}: no contamination in the prepared workspace")
 
         without = root / "without-skill"
-        if (without / "deps").exists() and (without / "references").exists():
+        if SKILL_DIR or ((without / "deps").exists() and (without / "references").exists()):
             print("ok without-skill still has the inputs a run resolves against")
         else:
             print("XX without-skill is missing deps/ or references/")
             failures += 1
 
         schema = without / "deps" / "language.schema.json"
-        if schema.exists() and schema.stat().st_size > 0:
+        if SKILL_DIR or (schema.exists() and schema.stat().st_size > 0):
             print("ok symlinked inputs were materialised, not copied as dangling links")
         else:
             print("XX deps/language.schema.json did not survive the copy")
             failures += 1
 
         with_skill = root / "with-skill" / ".claude" / "skills"
-        if (with_skill / "generate-method").exists():
+        test_skill = SKILL_DIR.name if SKILL_DIR else "generate-method"
+        if (with_skill / test_skill).exists():
             others = [p.name for p in with_skill.iterdir()
                       if p.is_dir() and not p.name.endswith("-foundation")]
-            if others == ["generate-method"]:
+            if others == [test_skill]:
                 print("ok with-skill carries exactly one skill under test")
             else:
                 print(f"XX with-skill carries extra skills: {others}")
@@ -335,9 +351,9 @@ def selftest():
 
         # A check that cannot fail proves nothing, so plant each contaminant in
         # turn and require the checker to object.
-        for planted in ("CLAUDE.md", ".claude", "memory"):
+        for planted in CONTAMINANTS:
             probe = root / f"probe-{planted.strip('.')}"
-            prepare_cell(probe, "without-skill", "generate-method")
+            prepare_cell(probe, "without-skill", test_skill, ())
             target = probe / planted
             if planted.endswith(".md"):
                 target.write_text("ambient instructions", encoding="utf-8")
@@ -352,7 +368,7 @@ def selftest():
         # And a cell inside a git repo must be refused, because Claude Code
         # shows the model recent commit messages there.
         gitprobe = root / "probe-git"
-        prepare_cell(gitprobe, "without-skill", "generate-method")
+        prepare_cell(gitprobe, "without-skill", test_skill, ())
         (gitprobe / ".git").mkdir()
         if any("git repo" in p for p in check_isolation(gitprobe, "without-skill")):
             print("ok a cell inside a git repo is detected")
@@ -379,6 +395,7 @@ def rescore(run_dir):
         workdir = Path(cell["workdir"])
         if workdir.is_dir():
             cell["grading"] = grade_cell(workdir, cell["case"])
+            (workdir / "grading.json").write_text(json.dumps(cell["grading"], indent=2) + "\n", encoding="utf-8")
 
     out = {**previous, "cells": cells, "aggregate": aggregate(cells), "rescored": True}
     results_path.write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8")
@@ -390,6 +407,7 @@ def rescore(run_dir):
 
 
 def main():
+    global PROJECT_ROOT, RUNS_DIR, SKILL_DIR, GRADER
     parser = argparse.ArgumentParser(
         description="Run skill eval cases with and without the skill, in isolated workspaces")
     parser.add_argument("--evals", help="Path to an evals.json")
@@ -407,7 +425,20 @@ def main():
     parser.add_argument("--selftest", action="store_true",
                         help="Prove the isolation holds (no API, no cost)")
     parser.add_argument("--rescore", help="Re-grade kept workspaces from a run dir (no API)")
+    parser.add_argument("--project-root", type=Path, help="Root containing controlled shared inputs")
+    parser.add_argument("--skill-dir", type=Path, help="Explicit skill under test; copy exactly this skill")
+    parser.add_argument("--runs-dir", type=Path, help="Directory retaining paired workspaces")
+    parser.add_argument("--inputs", help="Comma-separated project-relative shared input directories")
+    parser.add_argument("--grader", type=Path, help="Offline JSON grader accepting an output directory")
     args = parser.parse_args()
+    if args.project_root:
+        PROJECT_ROOT = args.project_root.resolve()
+    RUNS_DIR = (args.runs_dir or PROJECT_ROOT / "runs").resolve()
+    SKILL_DIR = args.skill_dir.resolve() if args.skill_dir else None
+    GRADER = args.grader.resolve() if args.grader else None
+    inputs = tuple(args.inputs.split(",")) if args.inputs is not None else (SHARED_INPUTS_NO_PROMPTS if args.no_prompts else SHARED_INPUTS)
+    if any(Path(name).is_absolute() or ".." in Path(name).parts for name in inputs):
+        parser.error("--inputs must contain project-relative directories without parent traversal")
 
     if args.selftest:
         sys.exit(selftest())
@@ -425,6 +456,8 @@ def main():
     if not cases:
         sys.exit("no matching eval cases")
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
+    if any(arm not in ARMS for arm in arms):
+        parser.error("unknown arm")
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     run_dir = RUNS_DIR / stamp
@@ -444,7 +477,7 @@ def main():
                 try:
                     cell_dir = prepare_cell(
                         staging / "ws", arm, skill_name,
-                        SHARED_INPUTS_NO_PROMPTS if args.no_prompts else SHARED_INPUTS)
+                        inputs)
                     problems = check_isolation(cell_dir, arm)
                     if problems:
                         for p in problems:
@@ -466,6 +499,8 @@ def main():
                         "workdir": str(kept), "metrics": metrics,
                         "grading": grade_cell(kept, case),
                     })
+                    (kept / "timing.json").write_text(json.dumps(metrics, indent=2) + "\n", encoding="utf-8")
+                    (kept / "grading.json").write_text(json.dumps(cells[-1]["grading"], indent=2) + "\n", encoding="utf-8")
                     print(f"  done in {metrics.get('duration_ms', 0) / 1000:.0f}s", flush=True)
                 finally:
                     shutil.rmtree(staging, ignore_errors=True)

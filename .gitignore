@@ -38,8 +38,10 @@ runs/*/*
 
 
 .claude/settings.local.json
-.claude/settings.json
+# Project hooks in .claude/settings.json are tracked; local permissions stay private.
 .claude/user-config.json
+.claude/settings.previous.json
+config/user-config.json
 # Share skills and hooks, but keep agent credentials, preferences and sessions local.
 .agents/*
 !.agents/skills/

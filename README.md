@@ -14,11 +14,28 @@ The system operates across two capability areas:
 
 ### Prerequisites
 
-- **Claude Code** — [CLI, desktop app, or web](https://claude.ai/code)
+- **An agent with this local checkout** — Claude Code, Cursor or Codex/ChatGPT
 - **Python 3.9+** — Validation and utility scripts (standard library only, no pip packages)
 - **keleo-language repo** — Cloned at `../../keleo-language/` relative to this project root
 
 ### Setup
+
+Shared workflows live in `skills/`. Claude Code discovers thin adapters in
+`.claude/skills/`; Codex discovers them in `.agents/skills/`. Cursor uses the
+`.agents/skills/` adapters and `.cursor/rules/`. In Cursor Settings → Rules,
+Skills and Subagents, turn off third-party skill discovery so Claude's adapters
+do not appear again. Project prompt-history hooks are tracked for all three
+agents. Keep private configuration in `config/user-config.json` and local agent
+settings; both are ignored by Git. Run `python3 utils/vendor-skills.py --check`
+after changing a skill.
+
+To migrate an older checkout, edit canonical skills in `skills/`, then run
+`python3 utils/vendor-skills.py --fix`. The utility now generates adapters from
+the repository; its former home-directory sync and `--target`/`--only` options
+have been removed. Existing private `.claude/user-config.json` is still read
+when `config/user-config.json` is absent; subsequent saves use the shared path.
+Use `/add-agent-vendor` to add another runtime. Vendor-specific per-skill
+instructions belong in `adapter.md` beside its generated entrypoint.
 
 ```bash
 # 1. Clone keleo-language alongside this repo
@@ -67,9 +84,16 @@ All reporting skills resolve practice context, extract domain knowledge, and gen
 | **Decision Analysis** | `/decision-analysis` | Trade-off analysis, option weighting, contextual verdicts |
 | **Document Review** | `/document-review` | Review an existing document and recommend improvements |
 
+Team-meeting (`/team-meeting`) adds a shared team briefing with a summary, working
+agreement, last-meeting retrospective, News, discussion agenda and supporting
+analysis. Configure each series under `reports/<series-slug>/series.json`; dated
+subfolders retain each meeting's report and evidence. Signals combine the project
+list at `config/team-meeting/signals.json` with additional series definitions.
+Use `python3 utils/team-meeting.py --help` and the skill's workspace reference.
+
 ### Presentations
 
-Deck skills author **Slidev** markdown and publish to Google Slides and PDF. They share `.claude/skills/deck-foundation/` (pipeline, layouts, conversion constraints, the Red Hat theme and the publishing scripts). By default a deck follows the structure of its source document rather than re-arguing the material.
+Deck skills author **Slidev** markdown and publish to Google Slides and PDF. They share `skills/deck-foundation/` (pipeline, layouts, conversion constraints, the Red Hat theme and the publishing scripts). By default a deck follows the structure of its source document rather than re-arguing the material.
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
@@ -77,7 +101,7 @@ Deck skills author **Slidev** markdown and publish to Google Slides and PDF. The
 | **Pitch Deck** | `/pitch-deck` | Value propositions, partner/GSI pitches, solution proposals, business cases |
 | **Exec Readout** | `/exec-readout` | Status reports, findings, review outcomes, programme updates |
 
-Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` CLI (Drive upload). See `.claude/skills/deck-foundation/DECK-FOUNDATION.md`.
+Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` CLI (Drive upload). See `skills/deck-foundation/DECK-FOUNDATION.md`.
 
 ### System Improvement
 
@@ -87,7 +111,7 @@ Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` C
 | **Plan from Feedback** | `/plan-from-feedback` | Triage issues from a feedback register, plan and execute fixes across practice, skill, and schema layers |
 | **Improve Tooling** | `/improve-tooling` | Create, extend, or consolidate utility scripts; improve skill instructions |
 
-`/report-issue` and `/plan-from-feedback` are two ends of the same register: the first files rows (input columns, Status `New`), the second triages them and writes back the resolution. Both share the register configured in `.claude/user-config.json`.
+`/report-issue` and `/plan-from-feedback` are two ends of the same register: the first files rows (input columns, Status `New`), the second triages them and writes back the resolution. Both share the register configured in `config/user-config.json`.
 
 ## Pipeline Architecture
 
@@ -139,7 +163,7 @@ Nothing is packaged or uploaded before those pass. The `.keleo` archive is the s
 | 3 — JSON generation | `generation-drift`, `reference-citation-fidelity` |
 | Reports — single gate | `source-fidelity`, `citation-integrity`, `domain-grounding`, `register-and-style` |
 
-The protocol and the per-phase agent briefs live in [`.claude/skills/verification-foundation/`](.claude/skills/verification-foundation/). Findings are consolidated by `utils/verification-gate.py`. The gate costs real tokens — roughly 12 verifier agents for a single practice, 30 for a four-practice method — so `VERIFY-FOUNDATION.md` §11 sets the sampling, concurrency and effort controls that keep it proportionate.
+The protocol and the per-phase agent briefs live in [`skills/verification-foundation/`](skills/verification-foundation/). Findings are consolidated by `utils/verification-gate.py`. The gate costs real tokens — roughly 12 verifier agents for a single practice, 30 for a four-practice method — so `VERIFY-FOUNDATION.md` §11 sets the sampling, concurrency and effort controls that keep it proportionate.
 
 ### Output Packaging
 
@@ -149,7 +173,10 @@ All skills produce `.keleo` packages — ZIP archives containing a manifest, Pra
 
 ```
 keleo-pgen-llm/
-├── .claude/skills/           # Skill definitions (14 skills + reporting and deck foundations)
+├── skills/                   # Canonical skills and shared foundations
+├── .agents/skills/           # Codex and Cursor skill entrypoints
+├── .claude/skills/           # Claude Code skill entrypoints
+├── .cursor/                  # Cursor instructions and hooks
 ├── deps/                     # Symlinks to keleo-language (schema, baseline JSONs)
 ├── references/               # Domain framework, semantic guidance, assessment rubrics
 ├── prompts/                  # Phase-specific prompt templates
@@ -158,7 +185,7 @@ keleo-pgen-llm/
 ├── bundles/                  # Packaged .keleo output
 ├── reports/                  # Generated reports (git-ignored)
 ├── utils/                    # ~80 Python utility scripts (validation, packaging, transforms)
-└── CLAUDE.md                 # Full technical documentation
+└── AGENTS-ALL.md             # Shared project guidance
 ```
 
 ### Key Dependencies (symlinked from keleo-language)
@@ -204,8 +231,8 @@ python3 utils/studio-client.py --upload bundles/<name>.keleo
 
 ## Learn More
 
-- **[CLAUDE.md](CLAUDE.md)** — Full technical documentation: architecture, schema rules, framework concepts, constraints
-- **`.claude/skills/*/SKILL.md`** — Individual skill implementation details
+- **[AGENTS-ALL.md](AGENTS-ALL.md)** — Shared technical guidance: architecture, schema rules, framework concepts and constraints
+- **`skills/*/SKILL.md`** — Individual skill implementation details
 - **`references/`** — Domain framework, semantic guidance, assessment rubrics
 - **`prompts/`** — Phase-specific prompt templates
 - **[keleo-language](https://github.com/keleo-labs/keleo-language)** — The Practice Language schema and semantics, including the constraint model this pipeline validates against

@@ -28,7 +28,7 @@ Usage:
     python3 utils/eval-skill-output.py practices/<name>/ --phase 3
 
     # Batch eval from evals.json
-    python3 utils/eval-skill-output.py --evals .claude/skills/generate-method/evals/evals.json
+    python3 utils/eval-skill-output.py --evals skills/generate-method/evals/evals.json
 """
 import argparse
 import json

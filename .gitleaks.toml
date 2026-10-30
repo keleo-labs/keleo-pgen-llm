@@ -30,6 +30,8 @@ tags = ["pii"]
   regexes = [
     # Documentation placeholders.
     '''@example\.(com|org|net)\b''',
+    # Reserved test domain used in skill evaluation fixtures.
+    '''@example\.invalid\b''',
     '''@(yourdomain|domain|company|acme)\.''',
     # Package manifest and commit trailer fields, not correspondence.
     '''\bnoreply@''',

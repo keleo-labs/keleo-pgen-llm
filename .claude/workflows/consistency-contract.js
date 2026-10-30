@@ -44,9 +44,9 @@ const CONSISTENCY_SCHEMA = {
 }
 
 const SKILLS = [
-  { name: 'generate-method', path: '.claude/skills/generate-method', specs: '.claude/skills/generate-method/specs/specs-index.json' },
-  { name: 'create-baseline-method', path: '.claude/skills/create-baseline-method', specs: '.claude/skills/create-baseline-method/specs/specs-index.json' },
-  { name: 'update-method', path: '.claude/skills/update-method', specs: '.claude/skills/update-method/specs/specs-index.json' },
+  { name: 'generate-method', path: 'skills/generate-method', specs: 'skills/generate-method/specs/specs-index.json' },
+  { name: 'create-baseline-method', path: 'skills/create-baseline-method', specs: 'skills/create-baseline-method/specs/specs-index.json' },
+  { name: 'update-method', path: 'skills/update-method', specs: 'skills/update-method/specs/specs-index.json' },
 ]
 
 phase('Extract')

@@ -7,19 +7,19 @@ Given/When/Then steps. Outputs structured JSON for use by the eval harness
 
 Usage:
     # Extract specs from a skill
-    python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md
+    python3 utils/extract-specs.py skills/generate-method/SKILL.md
 
     # Write to specific output path
-    python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md \
-      -o .claude/skills/generate-method/specs/specs-index.json
+    python3 utils/extract-specs.py skills/generate-method/SKILL.md \
+      -o skills/generate-method/specs/specs-index.json
 
     # Include stats
-    python3 utils/extract-specs.py .claude/skills/generate-method/SKILL.md --stats
+    python3 utils/extract-specs.py skills/generate-method/SKILL.md --stats
 
     # Read an index back and list the rules no script can check, for a
     # verification agent's brief
     python3 utils/extract-specs.py \
-      --list-manual .claude/skills/generate-method/specs/specs-index.json
+      --list-manual skills/generate-method/specs/specs-index.json
 """
 
 import argparse

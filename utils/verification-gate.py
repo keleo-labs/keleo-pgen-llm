@@ -378,7 +378,7 @@ def calibration_warnings(phase, verifier_names):
     hostile -- but the reviewer should know which verifiers are unproven.
     See utils/calibrate-verifiers.py.
     """
-    state_path = (Path(__file__).resolve().parent.parent / ".claude" / "skills" /
+    state_path = (Path(__file__).resolve().parent.parent / "skills" /
                   "verification-foundation" / "calibration.json")
     if not state_path.exists():
         return []
