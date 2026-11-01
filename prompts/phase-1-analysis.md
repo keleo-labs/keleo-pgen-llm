@@ -49,6 +49,9 @@ Read `references/domain-framework.md` to understand the four-perspective analysi
 ### Step 2: Read Source Materials
 
 Read ALL provided source materials completely:
+
+- When a local source catalog exists, record section IDs beside original source
+  locations for evidence used in the analysis. Keep the full source review.
 - PDF documents
 - Web pages (via URLs)
 - Markdown files

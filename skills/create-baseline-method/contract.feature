@@ -5,6 +5,13 @@
 
 Feature: Baseline Practice Creation from Foundational Framework
 
+  Scenario: Baseline catalogs remain local
+    Given source materials are used to create a baseline
+    When the verified baseline is packaged
+    Then shared source snapshots and a local baseline element index exist
+    And citations remain in the baseline JSON
+    And neither catalog is included in the .keleo bundle
+
   Background:
     Given source methodology documentation for a foundational framework
     And the user invokes /create-baseline-method

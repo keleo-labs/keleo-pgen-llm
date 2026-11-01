@@ -47,7 +47,14 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from utils._shared import detect_kind, get_schema_version, load_json
+from utils._shared import detect_kind, get_schema_version, load_json as _load_json
+
+
+def load_json(path):
+    document = _load_json(path)
+    if ("source" in document and "sections" in document) or ("practice" in document and "elements" in document):
+        raise SystemExit("ERROR: Catalogs are local authoring metadata and cannot be packaged")
+    return document
 
 
 def dedup_by_name(items):

@@ -2,7 +2,7 @@
 name: create-baseline-method
 description: Generate foundational baseline practice JSON from source methodology
 metadata:
-  version: "1.2.1"
+  version: "1.3.0"
 ---
 
 # create-baseline-method Skill
@@ -10,7 +10,7 @@ metadata:
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.2.0
+**Version:** 1.3.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -96,6 +96,11 @@ This skill orchestrates a 4-phase pipeline:
      --source-type <file|url|google-doc|google-slides> \
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
+
+   Add each source to the shared local catalog with `python3 utils/catalog.py add-source
+   "<path-or-URL>"`. Use `toc`, `search` and `show` to find sections, while retaining
+   the full initial source review. Record section IDs with source locations in the
+   analysis and mapping outputs. Catalog any later research source as well.
 
    **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
    user turn and every `the agent's question tool` exchange in this session is appended to the
@@ -669,6 +674,20 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
 ```
 
 **Step 5: Package into .keleo**
+
+After the final JSON passes verification, write `baselines/<name>/catalog-links.json`
+as a JSON object from element JSON Pointers to arrays of supporting source section
+IDs. Link only evidence actually used. Use `python3 utils/catalog.py
+outline-practice baselines/<name>/<name>.json` to list valid pointers, then build
+and validate the local practice catalog:
+
+```bash
+python3 utils/catalog.py build-practice baselines/<name>/<name>.json --links baselines/<name>/catalog-links.json
+python3 ../keleo-language/validate/validate-catalog.py baselines/<name>/practice-catalog.json --practice baselines/<name>/<name>.json --source-workspace source-catalogs --require-fresh
+```
+
+Resolve stale sources before using them for new claims. Keep both catalogs outside
+the `.keleo` package; citations remain in the baseline JSON.
 
 After validation passes, package the baseline JSON into a `.keleo` archive. If the baseline has `baselinePracticeName` (extends a parent baseline), resolve transitive dependencies and include all parent baselines:
 ```bash
