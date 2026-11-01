@@ -5,6 +5,13 @@
 
 Feature: Practice/Method Update to Latest Guidance
 
+  Scenario: Changed element links use current source evidence
+    Given a practice has a local catalog with earlier source links
+    When a source-based update adds new claims
+    Then new source links resolve to current snapshots
+    And the practice catalog is rebuilt for the updated JSON digest
+    And unchanged source history remains available
+
   Background:
     Given one or more existing practice/method/baseline JSON files are provided
     And the user invokes /update-method

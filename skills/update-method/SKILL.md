@@ -1,6 +1,6 @@
 ---
 name: update-method
-version: 1.2.1
+version: 1.3.0
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"
@@ -471,6 +471,25 @@ python3 utils/eval-skill-output.py baselines/<name>/ --schema deps/language.sche
 ```
 
 **Expected result:** `error_pass_rate: 1.0`. Warning assertions are advisory — address where practical.
+
+### Local catalog refresh
+
+Before source-based changes, use `python3 utils/catalog.py toc` and `search` to
+locate relevant snapshots; refresh each source used for a new claim with
+`add-source`. Retain stale snapshots for historical context, but verify the
+current source before relying on it. After final JSON validation, update the
+practice or baseline workspace's `catalog-links.json` for changed elements and
+rebuild its local practice catalog:
+
+```bash
+python3 utils/catalog.py build-practice <updated-file>.json --links <workspace>/catalog-links.json
+python3 ../keleo-language/validate/validate-catalog.py <workspace>/practice-catalog.json --practice <updated-file>.json --source-workspace source-catalogs
+```
+
+For full or light reanalysis and new reference research, add every new source to
+the shared catalog. Check new section links against fresh snapshots. Preserve
+unchanged links and keep both catalogs out of the rebundled package. For a method,
+catalog each changed constituent practice, not the method root.
 
 ### Citation URL Validation
 

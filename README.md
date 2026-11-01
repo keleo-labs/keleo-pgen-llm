@@ -115,6 +115,24 @@ Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` C
 
 ## Pipeline Architecture
 
+### Local research catalogs
+
+Generation keeps two local authoring indexes. `source-catalogs/` holds reusable,
+versioned source snapshots with section text and locators. Each generated practice
+or baseline workspace holds `practice-catalog.json`, an index of its elements and
+their supporting source sections. Run `python3 utils/catalog.py --help` to add a
+source, inspect its outline or search sections, then build and check a practice
+catalog. A changed or unreachable source remains available as a stale snapshot;
+verify a current source before using it for a new claim. Both catalogs are ignored
+by Git and excluded from `.keleo` packages. Citations and references remain in
+the practice JSON.
+
+This section-based navigation takes its cue from [Kumar et al., *STAIR:
+STructure Aware Information Retriever* (2026)](https://arxiv.org/html/2609.03874v1).
+Their reported results concern a fine-tuned retriever on the SearchTome benchmark;
+this project uses document structure for local lookup and does not reproduce that
+model or claim its retrieval accuracy.
+
 ### Extension Practices (3-phase)
 
 ```

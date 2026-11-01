@@ -5,6 +5,14 @@
 
 Feature: Practice Generation from Methodology Documentation
 
+  Scenario: Local catalogs retain evidence without changing the bundle
+    Given source materials are used to generate a practice
+    When the verified practice JSON is complete
+    Then each used source has a shared local section snapshot
+    And the practice workspace has an index of named elements and supporting sections
+    And citations remain in the practice JSON
+    And neither catalog is included in the .keleo bundle
+
   Background:
     Given source methodology documentation is provided (URLs, PDFs, or files)
     And the user invokes /generate-method

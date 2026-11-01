@@ -21,6 +21,7 @@ deps/backup-*/
 
 reviews/*
 practice-resources/*
+source-catalogs/*
 archive
 
 # Kept A/B eval workspaces from run-skill-eval.py. Preserved on purpose so a
