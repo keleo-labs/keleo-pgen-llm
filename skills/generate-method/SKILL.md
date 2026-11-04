@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.4.2
+version: 1.5.1
 metadata:
-  version: "1.4.2"
+  version: "1.5.1"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -232,6 +232,12 @@ During read-only planning:
      --source-type <file|url|google-doc|google-slides> \
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
+
+   Add each source to the shared local catalog with `python3 utils/catalog.py add-source
+   "<path-or-URL>"`. Use `toc`, `search` and `show` to locate sections; Phase 1 still
+   reads every supplied source for coverage. Add each secondary research source from
+   Step 2.5 in the same way. Record catalog section IDs alongside the corresponding
+   source locations in Phase 1 and carry them through Phase 2 mapping.
 
    **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
    user turn and every `the agent's question tool` exchange in this session is appended to the
@@ -670,6 +676,22 @@ remediation loop in `VERIFY-FOUNDATION.md` §8 on exit 1, then record the verdic
    Present a Downstream Impact Report. See `update-method` SKILL.md for the full report format.
 
 7. **Record deliverables and finalise prompt history:**
+   After the final JSON passes verification, write `<workspace>/catalog-links.json`
+   as a JSON object mapping element JSON Pointers to arrays of supporting source
+   section IDs recorded in the mapping guide. Link only sections actually used;
+   leave elements without source evidence unlinked. Use `python3 utils/catalog.py
+   outline-practice practices/<name>/<name>.json` to list pointers. Then run:
+
+   ```bash
+   python3 utils/catalog.py build-practice practices/<name>/<name>.json --links practices/<name>/catalog-links.json
+   python3 ../keleo-language/validate/validate-catalog.py practices/<name>/practice-catalog.json --practice practices/<name>/<name>.json --source-workspace source-catalogs --require-fresh
+   ```
+
+   Resolve stale sources before using them for new claims. The catalog remains
+   local metadata; pass only Practice Language JSON to `package-keleo.py`.
+   For a multi-practice method, repeat for each constituent practice JSON;
+   do not catalog the method root as a practice.
+
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --add-deliverable \
      --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged practice bundle"

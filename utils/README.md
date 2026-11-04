@@ -2,6 +2,14 @@
 
 Scripts for validating, inspecting, fixing, and assembling Practice Language JSON files.
 
+`catalog.py` 1.0.0 stores extracted source sections in the ignored
+`source-catalogs/` workspace and builds a `practice-catalog.json` beside a
+generated practice or baseline. Use `add-source`, `toc`, `search`, `show`,
+`outline-practice`, `build-practice`, `check-practice` and `search-practices`; pass `--links` to
+`build-practice` with a JSON object mapping element JSON Pointers to source
+section IDs. The companion `keleo-language/validate/validate-catalog.py` checks
+schemas, source links and artifact freshness. Run `python3 tests/check-catalogs.py`.
+
 ## Team meeting utilities
 
 `team-meeting.py` 4.0.0 resolves additive project/series signals, validates optional

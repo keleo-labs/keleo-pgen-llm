@@ -60,6 +60,9 @@ You will classify all extracted content through these four lenses.
 
 Read ALL provided source materials completely. No skimming, no sampling. For each source:
 
+- Consult `source-catalogs/` where available and record each used section ID
+  beside its original page, heading or URL. The catalog does not replace source review.
+
 - Extract concepts organized by the four perspectives
 - Note exact terminology used (preserve source language; aliasing happens in Phase 2)
 - Record page numbers, section references, and URLs for citations
