@@ -2,7 +2,7 @@
 name: create-baseline-method
 description: Generate foundational baseline practice JSON from source methodology
 metadata:
-  version: "1.2.1"
+  version: "1.2.2"
 ---
 
 # create-baseline-method Skill
@@ -10,7 +10,7 @@ metadata:
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.2.0
+**Version:** 1.2.2
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -210,7 +210,7 @@ These documents must be readable for all phases:
    - `semantics/alphas.md` — alpha-state semantics, references/instances (§6)
    - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
-3. **`deps/language.schema.json`** - JSON Schema definition
+3. **`deps/schemas/`** - Modular JSON Schema source; use `utils/query-schema.py` for individual definitions
 4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
 5. **`skills/verification-foundation/`** — Verification protocol shared with the other generation skills. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach
 
@@ -553,7 +553,7 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
 1. **Load Resources**
    ```
    Read baselines/<name>/02-mapping-guide.md (PRIMARY SOURCE)
-   Read deps/language.schema.json
+   Read deps/schemas/practice.schema.json and relevant shared definitions in deps/schemas/common.schema.json
    Read references/semantics/composition.md (aliasing, hierarchies)
    Read references/semantics/alphas.md (alpha semantics)
    Read references/semantics/narrative-and-assets.md (narratives, assets)

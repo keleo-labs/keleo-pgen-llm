@@ -1,6 +1,6 @@
 ---
 name: update-method
-version: 1.2.1
+version: 1.2.2
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"

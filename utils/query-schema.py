@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Query Practice Language schema definitions.
-
-Extracts and displays $defs type definitions from language.schema.json.
-Auto-discovers the schema at deps/language.schema.json relative to the
-project root.
+"""Query Practice Language schema definitions from the modular source.
 
 Usage:
     python3 utils/query-schema.py Method
@@ -19,9 +15,10 @@ from pathlib import Path
 
 
 def find_schema():
-    """Auto-discover language.schema.json relative to this script."""
+    """Auto-discover the modular entry point, then the compatibility schema."""
     script_dir = Path(__file__).resolve().parent
     candidates = [
+        script_dir.parent / "deps" / "schemas" / "language.schema.json",
         script_dir.parent / "deps" / "language.schema.json",
         script_dir / "language.schema.json",
     ]
@@ -31,18 +28,43 @@ def find_schema():
     return None
 
 
-def resolve_ref(schema, ref):
-    """Resolve a $ref string to the target definition."""
-    if not ref.startswith("#/"):
+def resolve_ref(schema, ref, schema_path):
+    """Resolve a local or sibling-module definition reference."""
+    file_name, _, pointer = ref.partition("#")
+    if file_name:
+        module_path = schema_path.parent / file_name
+        if not module_path.is_file():
+            return None
+        schema = json.loads(module_path.read_text(encoding="utf-8"))
+        schema_path = module_path
+    if not pointer.startswith("/"):
         return None
-    parts = ref.lstrip("#/").split("/")
     target = schema
+    parts = pointer[1:].split("/")
     for part in parts:
         if isinstance(target, dict):
             target = target.get(part)
         else:
             return None
-    return target
+    return target, schema, schema_path
+
+
+def inherited_properties(definition, schema, schema_path):
+    """Collect properties and required fields through allOf inheritance."""
+    properties = dict(definition.get("properties", {}))
+    required = set(definition.get("required", []))
+    for part in definition.get("allOf", []):
+        if "$ref" in part:
+            resolved = resolve_ref(schema, part["$ref"], schema_path)
+            if not resolved:
+                continue
+            parent, parent_schema, parent_path = resolved
+            parent_properties, parent_required = inherited_properties(parent, parent_schema, parent_path)
+        else:
+            parent_properties, parent_required = inherited_properties(part, schema, schema_path)
+        properties = {**parent_properties, **properties}
+        required.update(parent_required)
+    return properties, required
 
 
 def format_type(prop, schema):
@@ -76,7 +98,7 @@ def format_type(prop, schema):
     return t or "?"
 
 
-def display_definition(name, defn, schema, show_properties=False, as_json=False):
+def display_definition(name, defn, schema, schema_path, show_properties=False, as_json=False):
     """Display a single schema definition."""
     if as_json:
         print(json.dumps({name: defn}, indent=2))
@@ -95,21 +117,10 @@ def display_definition(name, defn, schema, show_properties=False, as_json=False)
         print(f"  Values: {', '.join(repr(v) for v in defn['enum'])}")
         return
 
-    props = defn.get("properties", {})
-    required = set(defn.get("required", []))
-
-    if "allOf" in defn:
-        for part in defn["allOf"]:
-            if "$ref" in part:
-                ref_name = part["$ref"].split("/")[-1]
-                resolved = resolve_ref(schema, part["$ref"])
-                if resolved:
-                    props = {**resolved.get("properties", {}), **props}
-                    required = required | set(resolved.get("required", []))
-                print(f"  Extends: {ref_name}")
-            elif "properties" in part:
-                props = {**props, **part["properties"]}
-                required = required | set(part.get("required", []))
+    props, required = inherited_properties(defn, schema, schema_path)
+    for part in defn.get("allOf", []):
+        if "$ref" in part:
+            print(f"  Extends: {part['$ref'].split('/')[-1]}")
 
     if not props:
         return
@@ -156,7 +167,16 @@ def main():
     with open(schema_path) as f:
         schema = json.load(f)
 
-    defs = schema.get("$defs", {})
+    defs = dict(schema.get("$defs", {}))
+    owners = {name: (schema, schema_path) for name in defs}
+    if schema_path.name == "language.schema.json" and schema_path.parent.name == "schemas":
+        for module_path in sorted(schema_path.parent.glob("*.schema.json")):
+            if module_path == schema_path:
+                continue
+            module = json.loads(module_path.read_text(encoding="utf-8"))
+            for name, definition in module.get("$defs", {}).items():
+                defs[name] = definition
+                owners[name] = (module, module_path)
     if not defs:
         print("Error: No $defs found in schema.", file=sys.stderr)
         sys.exit(1)
@@ -185,7 +205,8 @@ def main():
                   file=sys.stderr)
         sys.exit(1)
 
-    display_definition(args.type_name, defs[args.type_name], schema,
+    owner, owner_path = owners[args.type_name]
+    display_definition(args.type_name, defs[args.type_name], owner, owner_path,
                        show_properties=args.properties, as_json=args.json)
 
 

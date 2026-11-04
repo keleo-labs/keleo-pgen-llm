@@ -1,6 +1,6 @@
 # AGENTS-ALL.md
 
-Version: 1.0.0. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
+Version: 1.0.1. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
 
 ## Project Overview
 
@@ -16,7 +16,7 @@ Extension practices analyze source methodologies (e.g., AWS Well-Architected, SA
 ### Required
 
 - **Python 3.9+** — All utility scripts, validation, and the code generation pipeline are Python-based. No third-party pip packages are needed — the project uses only the Python standard library.
-- **`keleo-language` repo** — The Practice Language specification provides the JSON Schema definition, validation scripts, and semantic reference documentation. Six symlinks in `deps/`, `references/`, and `utils/` point into this repo. Must be cloned at `../../keleo-language/` relative to this project root.
+- **`keleo-language` repo** — The Practice Language specification provides modular JSON Schema sources, a generated compatibility schema, validation scripts and semantic reference documentation. Symlinks in `deps/`, `references/` and `utils/` point into this repo. Clone it at `../keleo-language/` relative to this project root.
 
 ### Optional — Content Sourcing
 
@@ -61,7 +61,7 @@ Required only by the deck skills (`/slide-deck`, `/pitch-deck`, `/exec-readout`)
 
 ```bash
 # 1. Clone keleo-language alongside this repo
-git clone <repo-url> ../../keleo-language
+git clone <repo-url> ../keleo-language
 
 # 2. Verify symlinks resolve
 ls -la deps/ references/
@@ -137,6 +137,7 @@ keleo-pgen-llm/
 │           └── contract.feature
 ├── deps/                                   # Consumed dependencies (tracked)
 │   ├── language.schema.json               # JSON Schema definition (symlink to keleo-language)
+│   ├── schemas/                           # Modular schema sources (symlink to keleo-language)
 │   ├── platform-adoption-kernel.json      # Symlink to baselines/platform-adoption-essentials/
 │   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
 ├── references/                             # Analysis framework documentation
@@ -320,7 +321,8 @@ Content is analyzed through four lenses defined in the Resource Assessment Frame
 
 Inputs the library resolves against.
 
-- `deps/language.schema.json` - JSON Schema definition (symlink to keleo-language)
+- `deps/schemas/language.schema.json` - Modular entry point; inspect the relevant sibling module for definitions
+- `deps/language.schema.json` - Generated compatibility schema for existing validators and `$defs` consumers
 - `deps/platform-adoption-kernel.json` - Platform Adoption Essentials (symlink to `baselines/platform-adoption-essentials/`)
 - `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
 
@@ -579,13 +581,13 @@ Optional `acknowledgements` array on Practice, PracticeBaseline, and Method. Rec
 Optional `references` array on Practice and PracticeInMethod (NOT on PracticeBaseline or Method). Contains `AlphaInstance` objects — curated external content illustrating alphas at specific states. Every reference MUST have at least one `links` entry. See `references/semantics/alphas.md` §6.6 for naming conventions, instance naming, merge rules, and two-level link architecture.
 
 ### Assets
-Visual assets use `AssetReference` objects (`{assetName, type}`) on elements, resolved against a top-level `assets` array. Types: `icon`, `illustrative`, `template`, `diagram`. Asset formats: `font-character`, `image`, `diagram`, `template` (with `path`/`url`/`dataUri`). See `deps/language.schema.json` `$defs/Asset` and `$defs/AssetReference` for schema.
+Visual assets use `AssetReference` objects (`{assetName, type}`) on elements, resolved against a top-level `assets` array. Types: `icon`, `illustrative`, `template`, `diagram`. Asset formats: `font-character`, `image`, `diagram`, `template` (with `path`/`url`/`dataUri`). See `deps/schemas/common.schema.json` `$defs/Asset` and `$defs/AssetReference` for schema.
 
 ### `.keleo` Packaging
 
 All skills output `.keleo` packages as their primary deliverable. A `.keleo` file is a ZIP archive (MIME: `application/vnd.keleo.package+zip`) containing:
 
-- **`manifest.json`** — Package manifest conforming to `language.schema.json#/$defs/PackageManifest`
+- **`manifest.json`** — Package manifest conforming to `deps/schemas/manifest.schema.json#/$defs/PackageManifest` (also available at `deps/language.schema.json#/$defs/PackageManifest` for existing consumers)
 - **`documents/`** — Flat directory of Practice Language JSON files (baselines, practices, methods)
 - **`assets/`** — Optional directory for file-based assets (diagrams, templates, icons)
 
@@ -604,11 +606,12 @@ See `references/semantics/project-tracking.md` §12 and `references/semantics/ch
 
 ## Dependencies
 
-See [Prerequisites & External Dependencies](#prerequisites--external-dependencies) for full setup instructions. The `keleo-language` repository must be present at `../../keleo-language/`. The following symlinks depend on it:
+See [Prerequisites & External Dependencies](#prerequisites--external-dependencies) for full setup instructions. The `keleo-language` repository must be present at `../keleo-language/`. The following symlinks depend on it:
 
 | Symlink | Target in keleo-language |
 |---------|------------------------|
 | `deps/language.schema.json` | `language.schema.json` |
+| `deps/schemas/` | `schemas/` (modular sources and separate authoring catalogs) |
 | `references/domain-framework.md` | `references/domain-framework.md` |
 | `references/semantics.md` | `references/semantics.md` |
 | `references/semantics/` | `references/semantics/` (directory) |
