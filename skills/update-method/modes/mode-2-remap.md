@@ -118,7 +118,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
-- Schema: `deps/language.schema.json`
+- Schema source: relevant definitions in `deps/schemas/` (use `utils/query-schema.py`); validation uses `deps/language.schema.json`
 - Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 
@@ -167,7 +167,7 @@ The mapping guide has clear section headers. Assign sections to parallel subagen
 
 Each subagent receives:
 - Its section(s) of the mapping guide
-- The schema (`deps/language.schema.json`) — relevant `$defs` only
+- The relevant definitions from `deps/schemas/` (use `utils/query-schema.py`)
 - The effective context for cross-reference names (alpha names, activity space names, etc.)
 - Instruction to output ONLY its assigned section(s) as a standalone JSON object
 - **Subagent C (patternGroups):** Copy any `patternGroups` from the source JSON across verbatim and author no new ones — the construct is deprecated, and a remap preserves rather than migrates. Where the mapping guide describes `patternOrchestrations`, emit those: every stage needs an explicit `relationship`, with `relativeTo` for concurrent and nested stages and a `trigger` for onDemand ones. A stage names exactly one of `patternName` or `orchestrationName`; the latter embeds a whole sub-endeavour owned elsewhere. Where the orchestration extends one already in scope, emit only this practice's stages — a remap does not re-place stages the practice does not own, for the same reason it copies `patternGroups` across rather than rewriting them. If the remap seems to need the inherited stages in a different order, that is a different endeavour and belongs in a new orchestration. See `references/orchestration-strategy.md`.

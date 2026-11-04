@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.5.0
+version: 1.5.1
 metadata:
-  version: "1.5.0"
+  version: "1.5.1"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -119,7 +119,7 @@ This skill relies on reference documents (READ via Read tool, NOT embedded):
    - `semantics/work-products.md` — work product rules (§7)
    - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
-3. **deps/language.schema.json** - JSON Schema definition
+3. **deps/schemas/** - Modular JSON Schema source; use `utils/query-schema.py` for individual definitions
 4. **Baseline Practice JSON** - User-provided (e.g., `deps/platform-adoption-kernel.json`)
 
 ### Phase Skill Documents
@@ -354,7 +354,7 @@ The main agent handles: Step 0 (planning), Step 0.5 (context resolution), Step 1
 Each phase is **stateless** and **file-driven**:
 - Phase 1 reads: source materials, domain-framework.md
 - Phase 2 reads: 01-analysis-report.md, effective context JSON, semantics sub-documents
-- Phase 3 reads: 02-mapping-guide.md, effective context JSON, language.schema.json
+- Phase 3 reads: 02-mapping-guide.md, effective context JSON and the relevant modules in `deps/schemas/`
 
 No conversational context required — only file contents.
 
@@ -723,7 +723,7 @@ This skill does NOT embed domain knowledge. Instead:
 
 - **Phase 1:** Reads `references/domain-framework.md` for perspectives
 - **Phase 2:** Reads semantics sub-documents for mapping rules
-- **Phase 3:** Reads `deps/language.schema.json` for structure
+- **Phase 3:** Reads the relevant `deps/schemas/` modules for structure
 - **All phases:** Read phase skills in `phases/` for orchestration
 
 Phase skills point to reference documents — they don't duplicate them. If a reference document changes, phase skills pick up the change automatically.

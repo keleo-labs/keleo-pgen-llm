@@ -210,7 +210,8 @@ keleo-pgen-llm/
 
 | File | Purpose |
 |------|---------|
-| `deps/language.schema.json` | Practice Language JSON Schema |
+| `deps/schemas/` | Modular Practice Language schema sources and separate catalog schemas |
+| `deps/language.schema.json` | Generated compatibility schema for existing validators |
 | `deps/platform-adoption-kernel.json` | Platform Adoption Essentials baseline |
 | `deps/partner-ecosystem-baseline.json` | Partner Ecosystem Essentials baseline |
 | `references/semantics.md` | Semantic guidance hub (indexes sub-documents) |
