@@ -275,9 +275,7 @@ def generate_change_request(old_data, new_data, author, status, note_text, schem
     if root_mods:
         operations.append({
             "operation": "modify",
-            "elementType": target_type.replace("practiceBaseline", "PracticeBaseline")
-                                      .replace("practice", "Practice")
-                                      .replace("method", "Method"),
+            "elementType": {"practiceBaseline": "Practice", "practice": "Practice", "method": "Method"}[target_type],
             "elementName": doc_name,
             "modifications": root_mods,
             "rationale": _summarize_modifications(root_mods),

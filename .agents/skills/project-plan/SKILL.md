@@ -1,7 +1,7 @@
 ---
 name: project-plan
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Create high-level project plans, PoC outlines, and implementation roadmaps — with optional SOW generation for T&M consulting engagements
 triggerPatterns:
   - "project.*plan"

@@ -7,6 +7,43 @@ Feature: Diagram
     Given the diagram-foundation engine is available
     And the method catalogue lists each method with its audience and route
 
+  Rule: Keleo practice diagrams preserve their source semantics
+
+    Scenario Outline: The seven Studio diagram forms have reproducible routes
+      Given a Keleo practice document with <relation>
+      When the skill produces a <diagram> diagram
+      Then it uses the corresponding Keleo route from methods/keleo.md
+      And it keeps the practice JSON available to regenerate the SVG
+
+      Examples:
+        | diagram               | relation                       |
+        | practice dependency   | declared practice dependencies |
+        | orchestration         | pattern orchestration stages   |
+        | practice pattern      | pattern views and alpha states |
+        | alpha concern overview| focus and alpha hierarchy      |
+        | activity overview     | activity spaces and activities |
+        | alpha state           | ordered states and loopsBackTo |
+        | alpha relationship    | relatesTo relationships        |
+
+    Scenario: State loops and orchestration placement remain visible
+      Given a practice declares a guarded alpha state loop and concurrent orchestration stages
+      When both diagrams are rendered
+      Then the state figure shows its return path and guard
+      And the orchestration figure preserves relative stage placement
+
+    Scenario: Practice pattern phases retain their decisions and maturity targets
+      Given a pattern has ordered views, alpha state targets, narrative contexts and a guarded return loop
+      When the skill renders its practice pattern diagram
+      Then the figure shows phases against the concerns they advance
+      And it includes the phase notes, maturity states and guarded return path
+
+    Scenario: A split practice pattern keeps its cross-panel return visible
+      Given a practice pattern is split into consecutive panels for a portrait report
+      And a later phase loops back to a phase in an earlier panel
+      When the panels are rendered
+      Then each title names its part number
+      And the later panel shows a guarded arrow to the named phase and earlier part
+
   Rule: The method is chosen deliberately, and the choice is stated
 
     Scenario: The method is named before anything is drawn

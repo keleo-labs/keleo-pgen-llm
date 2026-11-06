@@ -1,7 +1,7 @@
 ---
 name: reference-architecture
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Create reference architecture documents — topology, component selection, evaluation frameworks, sizing guidance, and deployment recommendations
 triggerPatterns:
   - "reference.*architecture"
@@ -57,7 +57,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Optional | Extract content from Google Slides/Docs with architecture diagrams or requirements |
+| Codex `gws` skill and Google Workspace MCP | Optional | Read Google Slides/Docs with architecture diagrams or requirements |
 | Playwright MCP | Optional | Load vendor documentation, product pages, or technical references |
 | Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice isn't available locally |
 

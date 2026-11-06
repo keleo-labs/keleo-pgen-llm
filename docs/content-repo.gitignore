@@ -1,0 +1,8 @@
+.DS_Store
+**/backup-*/
+**/_*
+**/lint*.json
+**/*practice-catalog.json
+**/.published-docs.json
+*.pdf
+*.keleo

@@ -183,6 +183,8 @@ Translate each alpha from the mapping guide.
 - Add checklists ONLY to states the mapping guide explicitly enriches
 - Unenriched states: include with empty `"checklist": []`
 
+For each new `contributesTo` alpha, include its target alpha in this practice's `alphas` (redeclaration if inherited). Preserve all target states and existing `background` content; add each child state as `{ "alphaName": "<child>", "stateName": "<state>" }` in the `background.alphaStates` of the target state whose progress it gates. Merge references into existing arrays instead of replacing them. `contributesToState` on the child remains optional and does not replace this parent-side mapping.
+
 **Checklist items** (on alpha states AND work product LODs — same schema type):
 - Objects `{name, description, seq}`, NEVER strings
 - `name`: imperative verb phrase ("Define key metrics" not "Metrics defined")

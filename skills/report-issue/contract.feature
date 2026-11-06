@@ -27,6 +27,12 @@ Feature: Report Issue
     Then the user is prompted for the register URL
     And the ID is saved under the same keys plan-from-feedback reads
 
+  Scenario: Register access uses Google Workspace MCP
+    Given the global Codex GWS skill is available
+    When the skill reads or writes the register
+    Then it uses the skill's Sheets MCP tools
+    And written rows are read back before success is reported
+
   # --- Invocation modes ---
 
   Scenario: Mid-execution invocation skips capture

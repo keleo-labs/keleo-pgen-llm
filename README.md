@@ -46,6 +46,9 @@ ls -la deps/ references/
 
 # 3. (Optional) Configure remote bundle repository
 python3 utils/studio-client.py --configure
+
+# 4. Mount selected private content repositories, if configured
+python3 utils/content-repos.py mount --fix
 ```
 
 ### Verify
@@ -54,6 +57,8 @@ python3 utils/studio-client.py --configure
 python3 utils/validate-practice-json.py --help
 python3 utils/assess-practice.py --help
 ```
+
+To version selected practices, baselines, or reports outside this code repo, follow [the content repository guide](docs/content-repos.md). A fresh checkout needs the configured baseline content mounted before commands that read it.
 
 ## Skills
 
@@ -101,7 +106,7 @@ Deck skills author **Slidev** markdown and publish to Google Slides and PDF. The
 | **Pitch Deck** | `/pitch-deck` | Value propositions, partner/GSI pitches, solution proposals, business cases |
 | **Exec Readout** | `/exec-readout` | Status reports, findings, review outcomes, programme updates |
 
-Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` CLI (Drive upload). See `skills/deck-foundation/DECK-FOUNDATION.md`.
+Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the global Codex `gws` skill backed by Google Workspace MCP (Drive import). See `skills/deck-foundation/DECK-FOUNDATION.md`.
 
 ### System Improvement
 
@@ -110,6 +115,7 @@ Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` C
 | **Report Issue** | `/report-issue` | Record issues, enhancements, or questions in the feedback register for later triage |
 | **Plan from Feedback** | `/plan-from-feedback` | Triage issues from a feedback register, plan and execute fixes across practice, skill, and schema layers |
 | **Improve Tooling** | `/improve-tooling` | Create, extend, or consolidate utility scripts; improve skill instructions |
+| **Content Repos** | `/content-repos` | Create and manage separate git repositories for selected practices, baselines, and reports |
 
 `/report-issue` and `/plan-from-feedback` are two ends of the same register: the first files rows (input columns, Status `New`), the second triages them and writes back the resolution. Both share the register configured in `config/user-config.json`.
 
@@ -201,19 +207,19 @@ keleo-pgen-llm/
 ├── practices/                # Extension practice outputs (per-practice subdirectories)
 ├── baselines/                # Baseline practice outputs (per-baseline subdirectories)
 ├── bundles/                  # Packaged .keleo output
-├── reports/                  # Generated reports (git-ignored)
+├── reports/                  # Generated reports (local or mounted from a content repo)
 ├── utils/                    # ~80 Python utility scripts (validation, packaging, transforms)
 └── AGENTS-ALL.md             # Shared project guidance
 ```
 
-### Key Dependencies (symlinked from keleo-language)
+### Key dependencies
 
 | File | Purpose |
 |------|---------|
 | `deps/schemas/` | Modular Practice Language schema sources and separate catalog schemas |
 | `deps/language.schema.json` | Generated compatibility schema for existing validators |
-| `deps/platform-adoption-kernel.json` | Platform Adoption Essentials baseline |
-| `deps/partner-ecosystem-baseline.json` | Partner Ecosystem Essentials baseline |
+| `deps/platform-adoption-kernel.json` | Compatibility link to the mounted Platform Adoption baseline |
+| `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` | Partner Ecosystem Essentials baseline in a mounted content repo |
 | `references/semantics.md` | Semantic guidance hub (indexes sub-documents) |
 | `references/domain-framework.md` | Enterprise architecture analysis framework |
 

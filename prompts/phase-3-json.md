@@ -435,6 +435,7 @@ Add alphas array:
 **CRITICAL:**
 
 - New alphas MUST have `contributesTo` OR `mapsTo` (NO FLOATING ALPHAS). Both may coexist on the same alpha but must reference different targets.
+- For each new `contributesTo` alpha, include its target alpha in this practice's `alphas`. Redeclare inherited targets with all original states and Background prerequisites intact. Add every child state as an `{alphaName, stateName}` prerequisite in a meaningful target state `background.alphaStates`, merging with existing prerequisites. A child-side `contributesToState` alone does not satisfy this rule.
 - **`mapsTo` alphas**: States MUST exactly match the target alpha (same names, same sequence). Use for IS-A variants.
 - **relatesTo ONLY on new alphas**: Do NOT add relatesTo to baseline alpha redeclarations
   - Redeclarations inherit baseline relationships automatically

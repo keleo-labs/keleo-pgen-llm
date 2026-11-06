@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "repositories": [
+    {
+      "name": "core",
+      "path": "../keleo-content-core",
+      "items": {
+        "practices": [],
+        "baselines": [
+          "platform-adoption-essentials"
+        ],
+        "reports": []
+      }
+    },
+    {
+      "name": "red-hat-sales-essentials",
+      "path": "../keleo-content-red-hat-sales-essentials",
+      "items": {
+        "practices": [
+          "buying-program-qualification",
+          "commercial-deal-governance",
+          "crm-foundations",
+          "ecotech-sales-foundations",
+          "ecotech-sales-specialists",
+          "marketplace-deal-qualification",
+          "meddpicc-qualification",
+          "multiply-rhel",
+          "nonstandard-order-and-subscription-change",
+          "partner-account-planning",
+          "partner-demand-generation",
+          "partner-ecosystem-excellence",
+          "partner-go-to-market-framework",
+          "partner-meddpicc-qualification",
+          "partner-success-planning",
+          "partner-transaction-eligibility",
+          "red-hat-customer-account-planning",
+          "red-hat-ecosystem",
+          "red-hat-ecosystem-managed-partner",
+          "red-hat-partner-ecosystem-foundations",
+          "red-hat-sales-plays",
+          "rhel-campaign",
+          "sales-play-framework",
+          "tech-sales-portfolio",
+          "technical-engagement-planning"
+        ],
+        "baselines": [
+          "red-hat-sales-essentials",
+          "partner-ecosystem-essentials"
+        ],
+        "reports": []
+      }
+    }
+  ]
+}

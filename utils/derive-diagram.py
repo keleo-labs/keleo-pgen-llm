@@ -45,8 +45,13 @@ from _shared import load_json  # noqa: E402
 # The engine's own guidance: below three a diagram is worse than prose, above
 # nine it is a hairball. Scoping flags exist to get under this, not to raise it.
 DEFAULT_MAX_NODES = 9
+VERSION = "1.1.0"
 
 VIEWS = {
+    "practice-dependency": "flow — practice, method and baseline dependencies",
+    "concern-overview": "flow — alpha hierarchy grouped by focus",
+    "activity-overview": "flow — activity spaces and their activities grouped by focus",
+    "alpha-relationship": "hub — one alpha and its relatesTo relationships",
     "concern-map": "flow — alphas and their relatesTo verbs, grouped by focus",
     "concern-hub": "hub — one seed alpha surrounded by what it relates to",
     "capability-tree": "flow — contributesTo / mapsTo specialisation rollup",
@@ -437,6 +442,7 @@ def view_concern_hub(data, alphas, all_edges, args):
         if not target or target == centre["name"]:
             continue
         satellite = {"label": target}
+        satellite["direction"] = rel.get("direction", "outgoing")
         if rel.get("relationship") and not args.no_edge_labels:
             satellite["edgeLabel"] = rel["relationship"]
         satellites.append(satellite)
@@ -448,6 +454,9 @@ def view_concern_hub(data, alphas, all_edges, args):
         for rel in alpha.get("relatesTo", []) or []:
             if rel.get("alphaName") == centre["name"]:
                 satellite = {"label": alpha["name"]}
+                satellite["direction"] = ("incoming" if rel.get("direction") == "outgoing"
+                                          else "outgoing" if rel.get("direction") == "incoming"
+                                          else "mutual")
                 if rel.get("relationship") and not args.no_edge_labels:
                     satellite["edgeLabel"] = rel["relationship"]
                 satellites.append(satellite)
@@ -574,6 +583,143 @@ def view_capability_tree(data, alphas, all_edges, args):
             "description": args.description or
             "Specialised concerns and the broader concerns they roll up into.",
             "nodes": nodes, "edges": edges}
+
+
+def view_practice_dependency(data, alphas, all_edges, args):
+    """Studio's dependency tree from the root and any supplied library documents."""
+    root = data.get("name")
+    if not root:
+        die("document has no name for a dependency diagram.")
+    def dependencies(doc):
+        kind = doc.get("kind")
+        field = {"practiceBaseline": "baselinePracticeNames",
+                 "practice": "practiceDependencyNames",
+                 "method": "practiceNames"}.get(kind)
+        if not field:
+            die(f"{doc.get('name', '(unnamed)')!r} is not a practiceBaseline, practice or method.")
+        names = list(doc.get(field, []) or [])
+        if kind in ("practice", "method") and doc.get("baselinePracticeName"):
+            names.insert(0, doc["baselinePracticeName"])
+        if kind == "method":
+            names.extend(p["name"] if isinstance(p, dict) else p
+                         for p in doc.get("practices", []) or [])
+        return list(dict.fromkeys(name for name in names if name))
+
+    library = {root: data}
+    for path in args.dependency_doc:
+        doc = load_json(path)
+        name = doc.get("name")
+        if not name:
+            die(f"dependency document {path!r} has no name.")
+        if name in library and library[name] != doc:
+            die(f"conflicting dependency documents named {name!r}.")
+        library[name] = doc
+    names, links, seen = [root], [], set()
+    queue = deque([root])
+    while queue:
+        name = queue.popleft()
+        if name in seen:
+            continue
+        seen.add(name)
+        for child in dependencies(library[name]):
+            if child == name:
+                die(f"{name!r} declares itself as a dependency.")
+            links.append((name, child))
+            if child not in names:
+                names.append(child)
+            if child in library and child not in seen:
+                queue.append(child)
+    if not links:
+        die(f"{root!r} declares no dependencies.")
+    enforce_budget(len(names), args.max_nodes, alphas, all_edges)
+    taken = set()
+    ids = {name: slug(name, taken) for name in names}
+    return {"layout": "flow", "direction": args.direction,
+            "title": args.title or f"{root} dependencies",
+            "description": args.description or
+            f"Dependencies reachable from {root} in the supplied documents.",
+            "nodes": [{"id": ids[name], "label": name,
+                       **({"emphasis": "accent"} if name == root else {})}
+                      for name in names],
+            "edges": [{"from": ids[parent], "to": ids[child]}
+                      for parent, child in links]}
+
+
+def view_activity_overview(data, alphas, all_edges, args):
+    """Studio's focus -> activity space -> activity hierarchy."""
+    spaces = [s for s in data.get("activitySpaces", []) or []
+              if not args.focus or s.get("focusName", "").lower() in
+              {f.lower() for f in args.focus}]
+    if not spaces:
+        die("no activity spaces in scope.")
+    taken, nodes, edges, groups = set(), [], [], {}
+    for space in spaces:
+        focus = space.get("focusName")
+        sid = slug(space["name"], taken)
+        node = {"id": sid, "label": space["name"], "emphasis": "accent"}
+        if focus:
+            gid = slug(focus)
+            node["group"] = gid
+            groups[gid] = {"id": gid, "label": focus}
+        nodes.append(node)
+        for activity in space.get("activities", []) or []:
+            aid = slug(activity["name"], taken)
+            child = {"id": aid, "label": activity["name"]}
+            if focus:
+                child["group"] = gid
+            nodes.append(child)
+            edges.append({"from": sid, "to": aid})
+    enforce_budget(len(nodes), args.max_nodes, alphas, all_edges)
+    spec = {"layout": "flow", "direction": args.direction,
+            "title": args.title or title_for(data, "activity overview", args),
+            "description": args.description or
+            "Activity spaces and their activities, grouped by focus.",
+            "nodes": nodes, "edges": edges}
+    if len(groups) > 1:
+        spec["groups"] = list(groups.values())
+    else:
+        for node in nodes:
+            node.pop("group", None)
+    return spec
+
+
+def view_concern_overview(data, alphas, all_edges, args):
+    """Studio's focus-grouped alpha hierarchy, including standalone roots."""
+    scoped = [a for a in alphas if not args.focus or
+              a.get("focusName", "").lower() in {f.lower() for f in args.focus}]
+    if not scoped:
+        die("no alphas in scope.")
+    enforce_budget(len(scoped), args.max_nodes, alphas, all_edges)
+    taken, ids, nodes, groups = set(), {}, [], {}
+    for alpha in scoped:
+        name = alpha["name"]
+        ids[name] = slug(name, taken)
+        node = {"id": ids[name], "label": name}
+        focus = alpha.get("focusName")
+        if focus:
+            gid = slug(focus)
+            node["group"] = gid
+            groups[gid] = {"id": gid, "label": focus}
+        nodes.append(node)
+    edges = []
+    for alpha in scoped:
+        for field, label in (("contributesTo", "contributes to"),
+                             ("mapsTo", "maps to")):
+            parent = alpha.get(field)
+            if parent in ids:
+                edges.append({"from": ids[alpha["name"]], "to": ids[parent],
+                              "label": label})
+    spec = {"layout": "flow", "direction": args.direction,
+            "title": args.title or title_for(data, "concern overview", args),
+            "description": args.description or
+            "Alpha hierarchy by focus; arrows distinguish contributesTo from mapsTo.",
+            "nodes": nodes, "edges": edges}
+    if len(groups) > 1:
+        spec["groups"] = list(groups.values())
+    else:
+        for node in nodes:
+            node.pop("group", None)
+    return spec
 
 
 def view_journey(data, alphas, all_edges, args):
@@ -921,6 +1067,10 @@ def view_competency_matrix(data, alphas, all_edges, args):
 
 
 BUILDERS = {
+    "practice-dependency": view_practice_dependency,
+    "concern-overview": view_concern_overview,
+    "activity-overview": view_activity_overview,
+    "alpha-relationship": view_concern_hub,
     "concern-map": view_concern_map,
     "concern-hub": view_concern_hub,
     "capability-tree": view_capability_tree,
@@ -957,6 +1107,31 @@ def report_list(data, alphas, edges):
     out = []
     out.append(f"{data.get('name', '(unnamed)')} "
                f"[{data.get('kind', 'unknown')} {data.get('version', '')}]".strip())
+    out.append("")
+
+    kind = data.get("kind")
+    field = {"practiceBaseline": "baselinePracticeNames",
+             "practice": "practiceDependencyNames",
+             "method": "practiceNames"}.get(kind)
+    if field:
+        direct = list(data.get(field, []) or [])
+        if kind in ("practice", "method") and data.get("baselinePracticeName"):
+            direct.insert(0, data["baselinePracticeName"])
+        out.append(f"Direct dependencies ({len(direct)}) — feeds --view practice-dependency")
+        for name in direct[:12]:
+            out.append(f"  {name}")
+        out.append("")
+
+    spaces = data.get("activitySpaces", []) or []
+    out.append(f"Activity spaces ({len(spaces)}) — feeds --view activity-overview")
+    for space in spaces[:12]:
+        out.append(f"  {space.get('focusName', '(none)')}: {space.get('name')}")
+    out.append("")
+
+    orchestrations = data.get("patternOrchestrations", []) or []
+    out.append(f"Orchestrations ({len(orchestrations)}) — use the copied Studio renderer")
+    for orchestration in orchestrations[:12]:
+        out.append(f"  {orchestration.get('name')}")
     out.append("")
 
     focuses = Counter(a.get("focusName", "(none)") for a in alphas)
@@ -1076,9 +1251,10 @@ def main():
     parser = argparse.ArgumentParser(
         description="Derive diagram specs from a practice's semantic graph.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Views:\n" + "\n".join(f"  {k:<19}{v}" for k, v in VIEWS.items()))
+        epilog="Views:\n" + "\n".join(f"  {k:<21}{v}" for k, v in VIEWS.items()))
     parser.add_argument("context", nargs="?",
                         help="Effective context, practice, baseline or method JSON")
+    parser.add_argument("--version", action="version", version=VERSION)
     parser.add_argument("--list", action="store_true",
                         help="Print what is derivable from this context and exit")
     parser.add_argument("--view", choices=sorted(VIEWS),
@@ -1104,6 +1280,8 @@ def main():
     scope.add_argument("--competency", action="append", metavar="NAME",
                        help="Competency to draw, repeatable "
                             "(competency-matrix)")
+    scope.add_argument("--dependency-doc", action="append", default=[], metavar="JSON",
+                       help="Additional practice or baseline JSON for transitive dependency diagrams")
     scope.add_argument("--max-nodes", type=int, default=DEFAULT_MAX_NODES,
                        help=f"Node budget (default {DEFAULT_MAX_NODES})")
 
@@ -1146,7 +1324,7 @@ def main():
 
     data = load_json(args.context)
     alphas = flatten_alphas(data)
-    if not alphas:
+    if not alphas and args.view not in ("practice-dependency", "activity-overview") and not args.list:
         die(f"{args.context} declares no alphas.",
             hint="Resolve an effective context first: "
                  "python3 utils/resolve-context.py --by-name \"<Practice>\" "

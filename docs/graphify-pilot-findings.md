@@ -1,0 +1,19 @@
+## Graphify pilot findings
+
+The isolated pilot did not show a token or time benefit for repository tool navigation, and Graphify's local code-only path did not retrieve practice content. Keep the current utility documentation and STAIR catalogs in use. Feedback register row 204 is closed as Declined: this evaluation will not continue.
+
+### What was tested
+
+Graphify 0.9.103 ran in a temporary virtual environment against copies of `utils/`, `tests/` and `skills/`. Creating the environment and installing the package took about 13 seconds; its code-only build then took about 3.4 seconds, scanned 202 code files and produced 2,971 nodes and 6,781 edges. It skipped 91 documentation files, including skill instructions. An incremental update after changing one copied Python file took 4.35 seconds. These timings are single local runs, not performance distributions.
+
+One matched, read-only Codex task asked each route to find the utility for upstream and downstream practice dependencies, name its CLI flags and identify a test. Both routes found `utils/discover-dependencies.py` and a relevant test. Ordinary search consumed 217,281 input tokens (181,760 cached) and 947 output tokens; Graphify-first search consumed 423,639 input tokens (383,744 cached) and 1,722 output tokens. Excluding cached input, the Graphify route consumed 39,895 input tokens against 35,521 for search, an increase of about 12%. Task wall time was approximately 65 seconds against 40 seconds, excluding Graphify installation and graph build. The Graphify agent needed several subsequent `rg` searches to verify the result, so the graph did not replace source inspection in this task. A preliminary run was excluded because the search agent accidentally scanned the generated `graph.json` file.
+
+Graphify's `affected source_catalogs` query found three callers inside `utils/catalog.py` but omitted the call through `catalog.source_catalogs` in `tests/check-catalogs.py`. This illustrates why a graph path is a lead for inspection, not proof that every caller or test was found. The code-only graph had no nodes from `skills/report-issue/SKILL.md`; the skill-to-utility relationship was present in the file and found with text search. Graphify [documents](https://docs.graphify.com/open-source/features/documents-and-media) that a model-backed semantic pass is needed for Markdown.
+
+For content, a second code-only build scanned a copy of the Project Essentials baseline, Scrum Foundations and its three dependency practices, plus one report. It produced zero nodes and zero edges: the five JSON files yielded no symbols and the Markdown report was skipped. The existing `discover-dependencies.py --resolve-from ... --transitive` command returned the four declared baseline and practice dependencies. The STAIR catalog found the "Resolve a Shared Dependency" activity, its source section and a fresh status in Adaptive Coordination and Governance; `validate-catalog.py --require-fresh` passed. Only one current practice catalog is available locally, so this corpus cannot support a complete cross-practice evidence comparison yet.
+
+### Decision
+
+Do not add Graphify to production agent instructions or tool management on these results. The measured code-navigation task missed the agreed 20% token reduction and 10% time limit. Code-only Graphify cannot replace STAIR for this content. The project will not continue the broader pilot.
+
+Automatic approval review rejected the attempted `claude-cli` semantic extraction because it would send nonpublic copied skill and utility documentation to Claude. No document indexing ran, so this report does not measure Graphify's semantic retrieval. Graphify's own [provider guide](https://docs.graphify.com/open-source/configuration/llm-providers) describes the distinction between local code parsing and model-backed document extraction.

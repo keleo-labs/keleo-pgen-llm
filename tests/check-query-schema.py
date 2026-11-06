@@ -24,9 +24,10 @@ class QuerySchemaTests(unittest.TestCase):
         self.assertIn("Extends: PracticeElement", alpha)
         self.assertIn("* name: string", alpha)
         self.assertIn("* focusName: string", alpha)
-        baseline = self.query("PracticeBaseline")
-        self.assertIn("* name: string", baseline)
-        self.assertIn("* alphas: [Alpha]", baseline)
+        practice = self.query("Practice")
+        self.assertIn("* name: string", practice)
+        self.assertIn("kind: enum(", practice)
+        self.assertIn("alphas: [Alpha]", practice)
 
     def test_compatibility_schema_remains_queryable(self):
         legacy = self.query("Alpha", "--schema", "deps/language.schema.json")

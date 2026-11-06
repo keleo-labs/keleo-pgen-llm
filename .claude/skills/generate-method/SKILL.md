@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.5.1
+version: 1.9.0
 metadata:
-  version: "1.5.1"
+  version: "1.9.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"

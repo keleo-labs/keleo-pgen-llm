@@ -1,6 +1,6 @@
 # Report Foundation
 
-**Version:** 4.0.0
+**Version:** 4.5.0
 
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
@@ -27,6 +27,7 @@ retain the layout below.
 
 ```
 reports/<report-slug>/
+  README.md                   Guide to the report and supporting files
   00-prompt-history.md        Session provenance (see Session Provenance below)
   <report-slug>.md            The report
   <report-slug>.pdf           Exports, when produced
@@ -37,6 +38,8 @@ reports/<report-slug>/
 ```
 
 The slug is kebab-case, derived from the report title, and names both the directory and the markdown file inside it. Create the directory only after the user explicitly approves the Step 0 plan, before any content is written.
+
+After approval and before creating a report workspace that should be versioned, choose its private content repository and run `python3 utils/content-repos.py add <repo> reports <report-slug> --fix`. Existing report directories are imported with a retained local backup. For a recurring team meeting, mount the series directory before creating its first instance. See `docs/content-repos.md`.
 
 Diagram embeds are relative to the markdown — `![alt](assets/<name>.svg)` — so the whole directory can be moved, copied, or handed over intact.
 
@@ -354,6 +357,8 @@ reaches the reader unnamed:
 Read `reporting-foundation/diagram-guide.md` for layout and method selection, how many figures a
 report should carry, deriving them from the practice graph, drawing a subject's **instances** rather
 than the practice's types (a platform with DR has two platforms), and how to write a good spec.
+For a report about the practice structure itself, the guide links the six Keleo
+Studio diagram forms and their commands.
 Verify with `python3 utils/lint-report.py <report>.md --checks diagrams`.
 
 ---
@@ -507,6 +512,9 @@ If any content defects were drafted (see Content Defects above), file them now �
 `report-issue` in mid-execution mode with the drafts path, before closing provenance.
 
 Then close the session provenance: record the markdown (and any PDF or published Doc URL) with `--add-deliverable`, and `--finalize`.
+Run `python3 utils/write-workspace-readmes.py reports/<report-slug>/ --fix` after
+finalizing provenance. The README links the report, prompt history and other
+authored files present; an existing hand-written README is preserved.
 
 Tell the user:
 1. The report directory, and what is in it
@@ -567,8 +575,8 @@ When a report draws on multiple practices, methods, or baselines:
 3. **No forking for extraction:** Each effective context JSON contains all elements at the top level (personas, alphas, activities, patterns, etc.). Read the data directly — do not spawn subagents for data that is already structured in the JSON.
 
 4. **External reference documents:** When the user provides Google Workspace URLs as supplementary context:
-   - **Google Docs:** Use `gws drive files export` to fetch as plain text. Write the export to a file within the current working directory (gws sandboxes output paths). Clean up after use.
-   - **Google Slides:** Use `python3 utils/extract-gws-slides.py <presentation-id> -o /tmp/slides-content.md` to extract slide content as structured markdown. The presentation ID is the long alphanumeric string in the URL path.
+   - **Google Docs:** Load the global Codex `gws` skill and read with `get_doc_as_markdown`.
+   - **Google Slides:** Load the global Codex `gws` skill and read with `get_presentation`, including speaker notes when relevant.
 
 ### Primary + Supplementary Contexts
 
@@ -645,7 +653,7 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - Given: a reporting skill generates a report
 - When: the output is written
 - Then: the report lives at `reports/<report-slug>/<report-slug>.md`
-- And: its diagram specs and rendered SVGs live in `reports/<report-slug>/assets/`
+- And: its diagram specs or copied practice source JSON and rendered SVGs live in `reports/<report-slug>/assets/`
 - And: every embedded diagram path is relative to the markdown and resolves
 
 #### Scenario: Session provenance is recorded and closed (@rule:report-614)
@@ -655,6 +663,13 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - And: it records the user's prompt, each practice/method resolved as a dependency, and the narrative strategy decision
 - And: it lists the report as a deliverable
 - And: the session is finalized
+
+#### Scenario: The report workspace has a navigable README (@rule:report-731)
+- Given: a report and its supporting files have been written
+- When: the reporting run is finalized
+- Then: `reports/<report-slug>/README.md` links the report and prompt history where present
+- And: it links additional authored files that exist
+- And: an existing hand-written README is preserved
 
 #### Scenario: Report is linted and verified before handover (@rule:report-723)
 - Given: a report has been written to its workspace
@@ -732,12 +747,19 @@ These rules are checked by verification agents, not by a script — no tool can 
 
 ### Feature: Diagrams
 
+#### Scenario: Practice pattern figures retain phase decisions (@rule:report-730)
+- Given: a report explains a Keleo practice pattern with phase conditions, maturity targets or a guarded return
+- When: the report illustrates that pattern
+- Then: it uses the Studio practice pattern renderer from retained practice JSON
+- And: a portrait layout may show consecutive, numbered parts while keeping the full rendered pattern available
+- And: a guarded return to an earlier part remains visible and names its target phase
+
 #### Scenario: Diagrams are rendered SVG, not ASCII art (@rule:report-611)
 - Given: a report needs a diagram
 - When: the diagram is produced
-- Then: it is generated by `utils/render-diagram.py` from a JSON spec kept beside the output
+- Then: it is generated by `utils/render-diagram.py` from a JSON spec kept beside the output, or by a copied Keleo Studio renderer from the practice JSON
 - And: no fenced code block in the report contains box-drawing or ASCII box-art characters
-- And: the spec carries content and structure only, never colours, fonts, or sizes
+- And: a native spec carries content and structure only, never colours, fonts, or sizes
 
 #### Scenario: Embedded diagrams are reachable and described (@rule:report-612)
 - Given: a report embeds a diagram

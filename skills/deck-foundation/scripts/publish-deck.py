@@ -286,6 +286,7 @@ def main() -> int:
     try:
         if args.pptx_only:
             target = args.output or workdir / f"{args.source.stem}.pptx"
+            build_diagrams(args.source, workdir)
             path = export_pptx(args.source, target)
             print(f"built {path}")
             return 0

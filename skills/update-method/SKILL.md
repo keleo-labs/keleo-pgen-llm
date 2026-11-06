@@ -1,6 +1,6 @@
 ---
 name: update-method
-version: 1.3.1
+version: 1.4.0
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"
@@ -17,6 +17,8 @@ triggerPatterns:
 # Update Method/Practice Skill
 
 This skill updates existing Practice or Method JSON files to align with the latest generate-method skill guidance, baseline practice updates, and schema changes.
+
+In remap and reanalysis modes, apply generate-method's child-to-parent state Background rule to every `contributesTo` alpha. Preserve existing target-state prerequisites while adding child-state references. Reference-only and auto-fix modes do not remap alpha structure.
 
 Preserve either objective contribution route during updates: pattern views or
 orchestration stages. Follow generate-method's phase prompts when adding or remapping

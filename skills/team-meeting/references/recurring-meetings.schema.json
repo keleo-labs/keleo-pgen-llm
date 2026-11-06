@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:keleo:team-meeting:recurring-meetings:1.0.0",
+  "title": "Recurring meeting registry 1.0.0",
+  "type": "object",
+  "required": ["version", "meetings"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": "1.0.0"},
+    "meetings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "seriesPath", "latestReportPath"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "seriesPath": {"type": "string", "pattern": "^reports/[^/]+/series\\.json$"},
+          "latestReportPath": {
+            "oneOf": [
+              {"type": "null"},
+              {"type": "string", "pattern": "^reports/[^/]+/[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}/report\\.md$"}
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 ---
 name: decision-analysis
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Structured trade-off analysis for architectural, strategic, or technical decisions — balanced options evaluation with contextual verdicts
 triggerPatterns:
   - "analyze.*question"

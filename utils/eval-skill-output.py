@@ -104,6 +104,7 @@ ASSESS_CATEGORY_MAP = {
     "qual:narrative-uniqueness": ("narrative-uniqueness",),
     "rel:mapsto-naming": ("mapsto-naming",),
     "rel:contributes-to-state": ("contributes-to-state",),
+    "rel:contributes-to-background": ("contributes-to-background",),
     "qual:narrative-structure": ("narrative-structure",),
     "qual:description-length": ("description-length",),
     "qual:activity-distinctness": ("activity-name-distinctness",),
@@ -167,7 +168,7 @@ ERROR_ASSERTIONS = {
     "xref:pattern", "xref:citation", "xref:narrative-type",
     "bref:focus", "bref:alpha", "bref:activityspace", "bref:competency",
     "bref:narrativetype", "bref:alias",
-    "rel:contributes-to-state",
+    "rel:contributes-to-state", "rel:contributes-to-background",
     "schema:valid", "schema:baseline-refs", "schema:integrity",
     "xref:outcome-refs",
     # Newly surfaced. Error severity mirrors how assess-practice.py grades them:
@@ -255,6 +256,7 @@ ASSERTION_TEXTS = {
     "qual:narrative-uniqueness": "No duplicate narrative names",
     "rel:mapsto-naming": "mapsTo variant names omit parent type",
     "rel:contributes-to-state": "contributesToState references valid parent states",
+    "rel:contributes-to-background": "Every contributesTo child state gates a redeclared parent state",
     "qual:narrative-structure": "Narratives have narrativeTypeName and narrativeContexts",
     "qual:description-length": "Descriptions within word limits",
     "qual:activity-distinctness": "Activity names differ from ActivitySpace names",
@@ -854,7 +856,7 @@ def run_batch_evals(evals_path, eval_id=None):
 
 
 PROJECT_ROOT = UTILS_DIR.parent
-__version__ = "1.0.1"
+__version__ = "1.1.0"
 FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
 GOOD_FIXTURE = FIXTURE_DIR / "practice-good.json"
 FIXTURE_BASELINE = FIXTURE_DIR / "selftest-baseline.json"

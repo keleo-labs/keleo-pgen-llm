@@ -2,7 +2,7 @@
 name: plan-from-feedback
 description: Publish register issues to project trackers, then resolve keleo-pgen-llm issues — skills, prompts and utilities from the public tracker, practice content from the register
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 triggerPatterns:
   - "plan.*feedback"
   - "feedback.*plan"

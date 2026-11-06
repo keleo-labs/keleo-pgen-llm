@@ -5,6 +5,12 @@
 
 Feature: Baseline Practice Creation from Foundational Framework
 
+  Scenario: Selected baseline lives in its content repository
+    Given a content repository is configured for the new baseline
+    When the approved baseline workspace is created
+    Then baselines/<name>/ is a mount into that repository
+    And the authored baseline files are written there
+
   Scenario: Baseline catalogs remain local
     Given source materials are used to create a baseline
     When the verified baseline is packaged
@@ -23,6 +29,19 @@ Feature: Baseline Practice Creation from Foundational Framework
     And baselines/<name>/02-mapping-guide.md exists (~40-60K words)
     And bundles/<name>.keleo exists and passes --verify
     And validate-baseline-json.py reports 0 schema errors
+
+  Scenario: Completed baseline workspace has a navigable README
+    Given baseline generation has produced its authored files
+    When the workspace is finalized
+    Then baselines/<name>/README.md links the baseline JSON and each existing phase document
+    And it links prompt history and additional authored files that exist
+    And an existing hand-written README is preserved
+
+  Scenario: Baseline README links parent baseline folders
+    Given the baseline JSON declares a parent baseline
+    When the workspace README is written
+    Then a Dependencies subsection under Main file links its parent baseline folder
+    And each model link shows its declared version and schemaVersion
 
   Scenario: Planning phase is mandatory
     When the skill is invoked

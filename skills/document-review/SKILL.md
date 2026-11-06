@@ -1,7 +1,7 @@
 ---
 name: document-review
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Review a provided document against practice domain knowledge — what's strong, what could be improved, what isn't needed
 triggerPatterns:
   - "review.*document"
@@ -60,7 +60,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Optional | Extract content from Google Slides/Docs when the document to review is a Google Workspace file |
+| Codex `gws` skill and Google Workspace MCP | Optional | Read Google Slides/Docs when the document to review is a Google Workspace file |
 | Playwright MCP | Optional | Load web-hosted documents or pages for review |
 | Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice isn't available locally |
 
@@ -110,7 +110,7 @@ During read-only planning:
 After loading the practice context (Step 1 per REPORT-FOUNDATION.md), ingest the document:
 
 - **Local file:** Read the file directly
-- **Google Docs/Slides:** Use `gws drive files export <file-id> --mime text/plain` to extract text content
+- **Google Docs/Slides:** Load the global Codex `gws` skill; use `get_doc_as_markdown` for Docs and `get_presentation` for Slides
 - **Web URL:** Use a web fetch tool first; fall back to Playwright if access fails
 - **Pasted content:** Work directly with the provided text
 

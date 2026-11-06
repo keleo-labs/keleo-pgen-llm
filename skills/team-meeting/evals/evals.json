@@ -27,6 +27,10 @@
           "scenario": "Preserve instance evidence"
         },
         {
+          "name": "Recurring meeting registry lists the series and latest verified report",
+          "scenario": "Keep the recurring meeting registry current"
+        },
+        {
           "name": "Acknowledgements celebrates evidenced contributions before News",
           "scenario": "Celebrate evidenced contributions"
         },
@@ -303,6 +307,48 @@
       "contract_scenarios": [
         "Retrieve Google Workspace signals through GWS",
         "Disclose incomplete collection"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "requested-google-doc-layout",
+      "prompt": "A verified recurring team meeting report is in evals/files/meeting-doc.md. The user requests a Google Doc version. Live Google Workspace access is disabled for this eval, so write outputs/tab-plan.json describing the exact ordered tabs and their complete Markdown content for publication; do not call external services. Preserve all sections and links, and date the News and Analysis headings inside their tabs.",
+      "expected_output": "A four-tab publication plan for Briefing, News, Reminders and Analysis, in that order. The Briefing tab starts with the meeting title, date and agenda and retains the summary, working guidance, retrospective and acknowledgements. News and Analysis headings identify 26 October 2026. Every source link and all report text remain present once, with no single Tab 1 fallback.",
+      "files": [
+        "evals/files/meeting-doc.md"
+      ],
+      "assertions": [
+        {
+          "id": "ordered_meeting_tabs",
+          "rule": "report-762",
+          "text": "The plan contains four tabs named Briefing, News, Reminders and Analysis in that order, with all eight report sections assigned once."
+        },
+        {
+          "id": "dated_news_analysis",
+          "rule": "report-762",
+          "text": "News and Analysis headings each identify 26 October 2026 while retaining their original content."
+        },
+        {
+          "id": "source_link_preserved",
+          "rule": "report-762",
+          "text": "The https://example.com/source link is retained in the News content and References."
+        }
+      ],
+      "contract_scenarios": [
+        "Publish a requested Google Doc in meeting tabs"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "recognition-boundary",
+      "prompt": "Prepare only an Acknowledgements section and a short News context paragraph for a shared 9 November team briefing. The review quarter is October–December and the previous held call was 12 October. Use these synthetic source records; do not access external services or ask questions. Newsletter log: Nora submitted a Rome field report on 8 October, published at https://example.com/rome (row https://example.com/row15); Ravi submitted a price brief on 29 October, published at https://example.com/price but its claims are not verified for News (row https://example.com/row16); Jules submitted a workshop account on 30 October, published at https://example.com/workshop (row https://example.com/row17); Tessa, an author outside the team roster, submitted a partner case on 30 October, published at https://example.com/case (row https://example.com/row18). A fifth article by Sam was published on 2 November at https://example.com/requests but has no matching submission row. Peer feedback: Priya thanked Alex for shaping a migration clinic at https://example.com/thanks. In a team sync, Alex reported 100 event leads, Nora reported three interested companies, and Victor reported a partner agreement and three interested webinar customers at https://example.com/sync; no independent outcome verification is available. Keep source status and dates clear. Write reports/recognition-check/report.md with the two requested sections only.",
+      "expected_output": "Four newsletter submissions are thanked, including Ravi's deferred article, Tessa outside the team roster and Nora's earlier-quarter contribution. Sam is separately thanked for the in-window publication without assigning a submission date. Alex is thanked for Priya's recognition, with the reported event figures only qualified context in News. Victor's self-report does not become an acknowledgement. Submitted, published and verified outcomes remain distinct.",
+      "directory": "reports/recognition-check",
+      "contract_scenarios": [
+        "Keep self-reported activity in progress context",
+        "Thank every shareable newsletter submission",
+        "Thank a published article without a submission record",
+        "Put related reports in context of evidenced praise"
       ]
     }
   ]

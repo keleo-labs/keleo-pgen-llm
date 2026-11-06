@@ -374,7 +374,7 @@ Create "Assets" section listing all identified visual artifacts:
 
 ### Step 4: Map Concerns to Alphas
 
-**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclaration (enriching baseline alphas with additional checklists) is appropriate only when the content is genuinely universal — applicable to all practices that touch that alpha, not just this one. If you find yourself redeclaring more than 1-2 baseline alphas, verify each redeclaration passes the combinability test.
+**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclare each `contributesTo` target to map child states through its state Backgrounds; this structural redeclaration is required. Apply the combinability test only to optional checklist enrichment of a baseline alpha.
 
 For EACH concern from Phase 1, apply the **Redeclaration vs Specialization vs Variant Mapping Decision Framework** (semantics/composition.md §4.4):
 
@@ -522,6 +522,8 @@ Narrative: [variant-specific narrative]
 | Mutually exclusive with | `contributesTo` | `mapsTo` |
 
 **State-Level Parent Mapping (`contributesToState`):**
+
+For every new `contributesTo` alpha, also redeclare its target alpha in this practice. Preserve the target's existing states and Background prerequisites. Map **every** child state to a semantically appropriate target state by adding `{alphaName: <child alpha>, stateName: <child state>}` to that target state's `background.alphaStates`. This makes the child progression an explicit prerequisite for parent progress; `contributesToState` on the child alone does not do this. Do not force a reference onto every target state when only some milestones depend on the child.
 
 When a new alpha has `contributesTo` or `mapsTo`, individual states can optionally declare which parent alpha state they contribute to via `contributesToState`. For `contributesTo` alphas, this creates fine-grained contribution tracking. For `mapsTo` alphas, this takes on equivalence semantics (states map 1:1 to parent states).
 

@@ -123,6 +123,8 @@ def _stroke_attrs(item):
     marker = _MARKER_ID.get("open" if arrow == "crowsfoot" else arrow)
     if marker:
         out += f' marker-end="url(#{marker})"'
+    if item.get("startArrow"):
+        out += f' marker-start="url(#{_MARKER_ID[item["startArrow"]]})"'
     return out
 
 
@@ -176,6 +178,8 @@ def _marker_defs(scene):
             continue
         arrow = item.get("arrow", "arrow")
         wanted.add("open" if arrow == "crowsfoot" else arrow)
+        if item.get("startArrow"):
+            wanted.add(item["startArrow"])
 
     colour = THEME["edge_arrow"]
     shapes = {
@@ -190,7 +194,7 @@ def _marker_defs(scene):
             continue
         out += [
             f'    <marker id="{_MARKER_ID[name]}" markerWidth="8" '
-            'markerHeight="6" refX="8" refY="3" orient="auto">',
+            'markerHeight="6" refX="8" refY="3" orient="auto-start-reverse">',
             f"      {shapes[name]}",
             "    </marker>",
         ]

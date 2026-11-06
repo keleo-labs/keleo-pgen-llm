@@ -2,7 +2,7 @@
 name: create-baseline-method
 description: Generate foundational baseline practice JSON from source methodology
 metadata:
-  version: "1.3.1"
+  version: "1.6.0"
 ---
 
 # create-baseline-method Skill
@@ -10,7 +10,7 @@ metadata:
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.3.1
+**Version:** 1.6.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -84,7 +84,9 @@ This skill orchestrates a 4-phase pipeline:
    - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
 4. **Present the plan and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-5. **After approval, initialise prompt history:**
+5. **After approval, choose the content repository:** If this baseline should be versioned, run `python3 utils/content-repos.py add <repo> baselines <baseline-name> --fix` before creating its workspace. If the directory already exists, this imports it and keeps a local backup. See `docs/content-repos.md`.
+
+6. **Initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
      --type baseline --name "<Baseline Name>" \
@@ -97,8 +99,12 @@ This skill orchestrates a 4-phase pipeline:
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
 
-   Add each source to the shared local catalog with `python3 utils/catalog.py add-source
-   "<path-or-URL>"`. Use `toc`, `search` and `show` to find sections, while retaining
+   For a Google Workspace URL, load the global Codex `gws` skill, read the source
+   through MCP and save its content as a local Markdown snapshot. Add that snapshot
+   to the shared local catalog with `python3 utils/catalog.py add-source
+   "<local-path>"`; retain the original URL in prompt history. For other sources,
+   pass their local path or URL to the catalog directly. Use `toc`, `search` and
+   `show` to find sections, while retaining
    the full initial source review. Record section IDs with source locations in the
    analysis and mapping outputs. Catalog any later research source as well.
 
@@ -196,6 +202,7 @@ This skill orchestrates a 4-phase pipeline:
 ```
 baselines/
 └── <baseline-name>/
+    ├── README.md                    # Navigable guide to the authored files
     ├── 00-prompt-history.md         # Session provenance (prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
     ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
@@ -713,9 +720,14 @@ Record deliverables and finalise prompt history:
 python3 utils/prompt-history.py baselines/<baseline-name>/ --add-deliverable \
   --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged baseline bundle"
 python3 utils/prompt-history.py baselines/<baseline-name>/ --finalize
+python3 utils/write-workspace-readmes.py baselines/<baseline-name>/ --fix
 ```
 `--finalize` stands the hooks down — later turns in this session are no longer appended to the
 Interaction Log. If the user reopens the work, run `--activate` before continuing.
+The README links the baseline JSON, phase documents, prompt history and any other
+authored files present. Its Main file section links any parent baseline folders
+declared by the JSON and shows each model's version and schema version. An
+existing hand-written README is preserved.
 
 **Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
 

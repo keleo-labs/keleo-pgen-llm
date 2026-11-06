@@ -1,6 +1,6 @@
 # Diagram Foundation
 
-Version: 1.3.0
+Version: 1.6.0
 
 Shared diagram engine. A spec goes in; an SVG for a markdown report or native
 Google Slides shapes for a deck comes out. Not a skill — a foundation, like
@@ -15,6 +15,11 @@ slide), and `keleo-pgen-llm`, which vendors a copy.
 methods, their audiences, and which of them this engine produces.
 `references/visual-language.md` is the shape, connector and colour vocabulary
 every route draws from.
+
+Keleo Studio's orchestration and alpha state flow forms use the copied static
+renderers in `scripts/keleo/`. They consume a practice document directly and
+emit SVG; see `references/methods/keleo.md`. The other four Keleo forms use
+native specs from `utils/derive-diagram.py`.
 
 ## Why a spec and not an SVG
 

@@ -58,7 +58,7 @@ from _shared import (  # noqa: E402
 )
 
 SOURCE_DIRS = ["deps", "baselines", "practices"]
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 # practiceBaseline before practice before method, so bundles stay topological
 # and package-keleo's entry-point rule (method, else last) resolves correctly.
 KIND_ORDER = {"practiceBaseline": 0, "practice": 1, "method": 2}
@@ -308,7 +308,34 @@ def close_over_dependencies(resolved, present, source_index, root):
         resolved.extend(wave)
 
 
-def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=False):
+def refresh_carried_dependencies(staged, manifest, source_index):
+    """Refresh a bundle-only method's dependency constraints from its documents."""
+    data, error = load_json_pair(staged)
+    if error or not isinstance(data, dict) or detect_kind(data) != "method":
+        return False
+    types = {entry.get("documentName"): entry.get("documentType")
+             for entry in manifest.get("documents", []) if entry.get("documentName")}
+    changed = False
+    for dependency in data.get("dependencyVersions", []):
+        name = dependency.get("documentName")
+        source = source_for(source_index, name, types.get(name)) if name else None
+        if source is None or not source.get("version"):
+            continue
+        current = dependency.get("versionRange", "")
+        if version_satisfies_range(source["version"], current) is True:
+            continue
+        dependency["versionRange"] = "^" + source["version"]
+        changed = True
+    if changed:
+        data["version"] = bump_version(data.get("version", "1.0.0"), "major")
+        with staged.open("w", encoding="utf-8") as stream:
+            json.dump(data, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+    return changed
+
+
+def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes,
+                   reclose=False, refresh_carried_deps=False):
     """Repackage one bundle from current on-disk sources. Returns a result dict."""
     rel = str(keleo_path.relative_to(root))
     manifest = read_manifest(keleo_path)
@@ -336,6 +363,8 @@ def rebuild_bundle(keleo_path, source_index, root, bump, apply_changes, reclose=
                     "message": f"cannot resolve document {name!r}",
                 }
             carried.append(name)
+            if refresh_carried_deps:
+                refresh_carried_dependencies(staged, manifest, source_index)
             resolved.append((KIND_ORDER.get(kind, 1), 0, staged))
 
         present = manifest_document_names(manifest)
@@ -501,6 +530,10 @@ def main():
              "the bundle was built",
     )
     parser.add_argument(
+        "--refresh-carried-deps", action="store_true",
+        help="Refresh dependency ranges in bundle-only method documents and bump their major version",
+    )
+    parser.add_argument(
         "--bump", choices=["patch", "minor", "major", "none"], default="patch",
         help="Manifest version bump applied on rebuild (default: patch)",
     )
@@ -576,7 +609,8 @@ def main():
         for result in targets:
             keleo_path = root / result["bundle"]
             outcome = rebuild_bundle(
-                keleo_path, source_index, root, args.bump, args.fix, args.reclose
+                keleo_path, source_index, root, args.bump, args.fix, args.reclose,
+                args.refresh_carried_deps
             )
             outcomes.append(outcome)
             if args.json:

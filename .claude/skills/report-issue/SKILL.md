@@ -2,7 +2,7 @@
 name: report-issue
 description: Capture one or more issues, enhancements, or questions from the user and record them in the feedback/issue register for later triage
 metadata:
-  version: "1.0.1"
+  version: "1.0.2"
 triggerPatterns:
   - "report.*issue"
   - "raise.*issue"

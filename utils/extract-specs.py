@@ -29,7 +29,7 @@ import re
 import sys
 from pathlib import Path
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -67,6 +67,7 @@ ASSESS_CATEGORY_BRIDGE = {
     "semantic-009": ["contributes-to-state"],
     "semantic-010": ["mapsto-naming"],
     "semantic-011": ["baseline-ref-focus", "baseline-ref-alpha", "baseline-ref-activityspace", "baseline-ref-competency", "baseline-ref-narrativetype"],
+    "semantic-012": ["contributes-to-background"],
     "naming-001": ["description-length"],
     "naming-002": ["checklist-quality", "checklist-polarity"],
     "naming-003": ["uniqueness"],

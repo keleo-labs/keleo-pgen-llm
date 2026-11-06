@@ -5,6 +5,12 @@
 
 Feature: Practice Generation from Methodology Documentation
 
+  Scenario: Selected practice lives in its content repository
+    Given a content repository is configured for the new practice
+    When the approved practice workspace is created
+    Then practices/<name>/ is a mount into that repository
+    And the authored practice files are written there
+
   Scenario: Local catalogs retain evidence without changing the bundle
     Given source materials are used to generate a practice
     When the verified practice JSON is complete
@@ -40,6 +46,33 @@ Feature: Practice Generation from Methodology Documentation
     And the .keleo package contains baseline + practice documents
     And validate-practice-json.py reports 0 schema errors
     And assess-practice.py reports 0 error-severity issues
+
+  Scenario: Child alpha states gate their contributesTo parent
+    Given a new alpha contributesTo an existing alpha
+    When the practice is generated
+    Then the practice redeclares the parent with its states intact
+    And each child state appears in a meaningful parent state background as an alphaStates prerequisite
+    And existing background prerequisites remain present
+
+  Scenario: Completed practice or method workspace has a navigable README
+    Given generation has produced its authored files
+    When the workspace is finalized
+    Then practices/<name>/README.md links the primary practice or method JSON
+    And it links each existing phase document, prompt history and additional authored files
+    And an existing hand-written README is preserved
+
+  Scenario: Practice README links declared dependency folders
+    Given the practice JSON declares a baseline and practice dependencies
+    When the workspace README is written
+    Then a Dependencies subsection under Main file links each resolved dependency folder
+    And each model link shows its declared version and schemaVersion
+
+  Scenario: Method README lists constituent practices
+    Given a method JSON names practices inside and outside its workspace
+    When the workspace README is written
+    Then a Practices subsection under Main file links every named practice
+    And a Baselines subsection links the method's baseline ancestry
+    And the method, practice and baseline links show their declared versions and schemaVersions
 
   Scenario: Method generation (multi-practice)
     Given the source methodology maps to 8+ baseline alphas

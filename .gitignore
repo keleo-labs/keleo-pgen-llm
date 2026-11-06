@@ -7,12 +7,7 @@ practices/*
 baselines/*
 bundles/*
 
-# Exception: Platform Adoption Essentials is the definitive baseline the
-# library resolves against, not regenerable output, so it is tracked. Only
-# the document itself — its phase reports and backups stay ignored.
-!baselines/platform-adoption-essentials/
-baselines/platform-adoption-essentials/*
-!baselines/platform-adoption-essentials/platform-adoption-essentials.json
+# Selected baselines live in independent content repositories.
 # backup-practice.py writes timestamped backups beside the documents it
 # protects. Everywhere else that lands under an already-ignored tree, but
 # deps/ is tracked, so without this a regeneration run would offer its own
@@ -43,6 +38,8 @@ runs/*/*
 .claude/user-config.json
 .claude/settings.previous.json
 config/user-config.json
+config/content-repos.json
+content-import-backups/
 # Share skills and hooks, but keep agent credentials, preferences and sessions local.
 .agents/*
 !.agents/skills/

@@ -158,7 +158,7 @@ The mapping guide has clear section headers. Assign sections to parallel subagen
 
 | Subagent | Sections | Key Reference |
 |----------|----------|---------------|
-| A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo) | Mapping guide §Alpha Definitions |
+| A: Alphas | `alphas` (states, checklists, narratives, relatesTo/contributesTo, target redeclarations and child-state Background mappings) | Mapping guide §Alpha Definitions |
 | B: Activities | `activities` (contributesTo, worksOn, competencies, narratives) | Mapping guide §Activity Definitions |
 | C: Work Products + Patterns | `workProducts` (LODs, contributesTo, contributesToAlphaNames), `patterns` (views, alphaStates), `patternOrchestrations` (stages, relationships) | Mapping guide §Work Products, §Patterns, §Orchestrations |
 | D: Metadata + Secondary | `narratives`, `citations`, `assets`, `practiceElementAliases`, `personas`, `personaGroups`, `keywords`, `tags` | Mapping guide §Metadata |

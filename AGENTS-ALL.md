@@ -1,6 +1,11 @@
 # AGENTS-ALL.md
 
-Version: 1.0.1. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
+Version: 2.2.0. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
+
+Version 2 replaces Codex `gws` CLI instructions with the global Codex `gws`
+skill and Google Workspace MCP. Existing standalone CLI utilities remain
+available for callers outside Codex; Codex workflows use MCP for Workspace
+reads and writes.
 
 ## Project Overview
 
@@ -22,7 +27,7 @@ Extension practices analyze source methodologies (e.g., AWS Well-Architected, SA
 
 These tools support the research and content extraction phases of the pipeline, where skills need to access external methodology documentation, presentations, spreadsheets, or web content.
 
-- **`gws` CLI** — Google Workspace command-line interface for reading Google Sheets (issue registers), extracting Google Slides content (methodology presentations), and downloading files from Google Drive. Path: `/opt/homebrew/bin/gws`. Without it, content must be provided as local files.
+- **Codex `gws` skill and Google Workspace MCP** — Use the global Codex skill for Google Sheets, Docs, Slides, Drive, Gmail and Calendar. Read and write through its MCP tools. If they are unavailable, follow the skill's connection guidance; do not substitute the retired `gws` CLI in a Codex workflow.
 - **Playwright MCP server** — Browser automation for extracting content from JavaScript-heavy web pages. When `WebFetch` fails (auth walls, client-side rendering), Playwright loads the page in a real browser. Configured at user level, not project level.
 
 ### Optional — Remote Bundle Repository
@@ -50,7 +55,7 @@ Required only by the deck skills (`/slide-deck`, `/pitch-deck`, `/exec-readout`)
 
 - **Node.js 18+** — Slidev is installed per deck project by `new-deck.py` (`npx slidev`). No global install needed.
 - **Playwright chromium** — Required by Slidev's `pptx-editable` export. `new-deck.py` installs it into the deck project.
-- **`gws` CLI** — Uploads the .pptx to Drive for conversion to Google Slides, and renders the published deck for review. Without it, decks can still be exported locally to PDF and PNG.
+- **Google Workspace MCP** — Publishes the exported .pptx through Drive, then reads the converted Slides deck for review. The local Slidev export still works without Workspace access.
 
 ### Optional — Convenience Tools
 
@@ -72,7 +77,10 @@ python3 --version   # 3.9+
 # 4. (Optional) Configure remote bundle repository access
 python3 utils/studio-client.py --configure
 
-# 5. Test the toolchain
+# 5. Mount selected private content repositories, if configured
+python3 utils/content-repos.py mount --fix
+
+# 6. Test the toolchain
 python3 utils/validate-practice-json.py --help
 python3 utils/assess-practice.py --help
 ```
@@ -104,6 +112,9 @@ keleo-pgen-llm/
 │       │   └── SKILL.md
 │       ├── document-review/              # Document review + improvement guidance
 │       │   └── SKILL.md
+│       ├── content-repos/                # Separate git repositories for authored content
+│       │   ├── SKILL.md
+│       │   └── contract.feature
 │       ├── report-issue/                # Issue register capture skill (files issues)
 │       │   ├── SKILL.md
 │       │   └── contract.feature
@@ -138,8 +149,7 @@ keleo-pgen-llm/
 ├── deps/                                   # Consumed dependencies (tracked)
 │   ├── language.schema.json               # JSON Schema definition (symlink to keleo-language)
 │   ├── schemas/                           # Modular schema sources (symlink to keleo-language)
-│   ├── platform-adoption-kernel.json      # Symlink to baselines/platform-adoption-essentials/
-│   └── partner-ecosystem-baseline.json    # Baseline framework (Partner Ecosystem)
+│   └── platform-adoption-kernel.json      # Symlink to mounted baselines/platform-adoption-essentials/
 ├── references/                             # Analysis framework documentation
 │   ├── domain-framework.md
 │   ├── semantics.md                       # Hub document (index to sub-documents)
@@ -175,7 +185,7 @@ keleo-pgen-llm/
 │       ├── 01.5-distilled-essentials.md   # Distillation phase
 │       ├── 02-mapping-guide.md
 │       └── <baseline-name>.json           # Intermediate baseline JSON
-├── reports/                                # Generated reports output (git-ignored contents)
+├── reports/                                # Generated reports output (local or mounted from a content repo)
 │   └── <report-slug>/                     # One workspace per report
 │       ├── 00-prompt-history.md           # Session provenance
 │       ├── <report-slug>.md               # Plain English report
@@ -324,15 +334,14 @@ Inputs the library resolves against.
 - `deps/schemas/language.schema.json` - Modular entry point; inspect the relevant sibling module for definitions
 - `deps/language.schema.json` - Generated compatibility schema for existing validators and `$defs` consumers
 - `deps/platform-adoption-kernel.json` - Platform Adoption Essentials (symlink to `baselines/platform-adoption-essentials/`)
-- `deps/partner-ecosystem-baseline.json` - Partner Ecosystem Essentials baseline framework
+- `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` - Current Partner Ecosystem Essentials baseline in a content repository
 
 **Where the definitive Platform Adoption Essentials lives.** The document
 itself is `baselines/platform-adoption-essentials/platform-adoption-essentials.json`;
 `deps/platform-adoption-kernel.json` is a symlink to it, kept so existing
-references to the `deps/` path continue to resolve. `baselines/*` is otherwise
-git-ignored as regenerable `/create-baseline-method` output, so `.gitignore`
-carries an explicit exception for this one document — its phase reports and
-backups stay ignored.
+references to the `deps/` path continue to resolve. The baseline itself lives
+in a separate content repository and must be mounted before use. Configure
+selected content repositories as described in `docs/content-repos.md`.
 
 Other copies of this baseline exist outside the project (keleo-studio serves
 one from `web/public/examples/` for its practice-author page). Those are
@@ -784,7 +793,7 @@ All reporting skills follow the same workflow:
 
 Reports use narrative types from the baseline (Report Narrative, Essay Narrative, STAR, SDLC, etc.) to organise content, and practice domain knowledge to inform the analysis — but present everything in plain English with no Keleo terminology.
 
-**Output Location**: `reports/<report-slug>/` (git-ignored — ephemeral deliverables). Each report owns a directory holding `00-prompt-history.md`, `<report-slug>.md`, any PDF export, and an `assets/` folder for diagram specs and rendered SVGs — mirroring how a practice owns `practices/<name>/`. Flat reports from before this convention are migrated by `python3 utils/migrate-report-layout.py --fix`.
+**Output Location**: `reports/<report-slug>/`. Each report owns a directory holding `00-prompt-history.md`, `<report-slug>.md`, any PDF export, and an `assets/` folder for diagram specs and rendered SVGs — mirroring how a practice owns `practices/<name>/`. Selected report directories can be mounted from private content repositories; other reports remain git-ignored local deliverables. Flat reports from before this convention are migrated by `python3 utils/migrate-report-layout.py --fix`.
 
 Team-meeting uses `reports/<series-slug>/series.json` for persistent context and
 `reports/<series-slug>/<YYYY-MM-DD-HHmm>/report.md` for each instance. Project
@@ -817,8 +826,8 @@ All three skills follow the same workflow:
 2. **Scaffold** — `python3 skills/deck-foundation/scripts/new-deck.py <dir> --title "…"` copies the theme and installs Slidev + Playwright
 3. **Structure** — **If there is a source document, the deck follows its structure** (DECK-FOUNDATION §2.1). Narrative shapes from `narrative-guide.md` apply only when there is no source document, or when the user accepts a proposed reshape
 4. **Write** — Slide titles as assertions first; every content slide carries a `sources` citation band and speaker notes derived from the source's prose (§5)
-5. **Publish** — `python3 skills/deck-foundation/scripts/publish-deck.py slides.md --name "…" --pdf --review`
-6. **Review** — Read the rendered PNGs of the **published** deck. Google Slides sets text slightly wider than Chromium, so overflow defects are invisible in the local render
+5. **Publish** — Export locally with `python3 skills/deck-foundation/scripts/publish-deck.py slides.md --pptx-only`, then use the global `gws` skill and Google Workspace MCP to import the .pptx as Google Slides and export PDF when requested
+6. **Review** — Inspect the published deck through Google Workspace MCP. Check the final Slides rendering because its text layout can differ from the local export
 
 **Output Location**: wherever the deck project was scaffolded (conventionally outside the repo — decks are deliverables, not practice artifacts). `bundles/` and `reports/` are not used.
 
@@ -843,7 +852,7 @@ The skill is the reciprocal of `/plan-from-feedback` — it fills the register's
 3. **Checks** — Validates the drafts and flags near-duplicates of existing register rows
 4. **Appends** — Writes the rows with Status "New" after user confirmation
 
-Register access is wrapped by `utils/issue-register.py` (gws CLI). The skill is defined in `skills/report-issue/SKILL.md`, with its behavioural contract in `contract.feature`.
+Register access in Codex uses the global `gws` skill and Google Workspace MCP. `utils/issue-register.py` remains available for offline draft validation and non-Codex CLI use. The skill is defined in `skills/report-issue/SKILL.md`, with its behavioural contract in `contract.feature`.
 
 **Automatic filing from other skills.** Any skill consuming practice, method, or baseline content it did not author in that run follows `SKILL-STANDARD.md` §13: accommodate the defect, deliver the artifact, and file what it worked around. Defects are drafted at the point of discovery with `issue-register.py --add-draft` and filed as one batch at handover, by invoking `report-issue` in **mid-execution mode** — which skips capture and appends without a confirmation round, since the run itself is the authorisation. Validation failures and duplicates of open rows are skipped rather than filed, and the skill reports every row number it wrote. This covers the generation skills (defects in the baseline or dependencies), `update-method` (defects left standing outside the chosen mode), `plan-from-feedback` (defects no row covers), and the five reporting skills.
 

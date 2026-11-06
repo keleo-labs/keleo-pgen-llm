@@ -106,6 +106,12 @@ MUTATIONS = [
             "contributesToState", "Partially Available"),
     ),
     (
+        "rel:contributes-to-background", "unmapped-child-state",
+        "a child state no longer gates its contributesTo parent",
+        lambda d: _alpha(d, "Platform Consumption Interface")["states"][2]["background"]
+        ["alphaStates"].clear(),
+    ),
+    (
         "rel:mapsto-naming", "variant-repeats-parent",
         "memory: a mapsTo variant name repeats the parent type, which IS-A makes redundant",
         lambda d: _rename_alpha(d, "Developer Workspace", "Developer Workspace Platform Asset"),

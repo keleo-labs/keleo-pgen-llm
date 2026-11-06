@@ -17,7 +17,7 @@ Feature: Document Review
   Scenario: Google Slides deck review
     Given the document is a Google Slides URL
     When the skill ingests the document
-    Then content is extracted via gws CLI
+    Then content is read through the global Codex GWS skill and Google Workspace MCP
     And slide-level references appear in the review findings
 
   Scenario: Report workspace and provenance

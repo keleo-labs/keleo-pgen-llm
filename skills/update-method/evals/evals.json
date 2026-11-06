@@ -4,6 +4,16 @@
   "schema": "deps/language.schema.json",
   "evals": [
     {
+      "id": "restore-child-background-mapping",
+      "contract_scenario": "Structural updates restore child-to-parent state prerequisites",
+      "name": "restore-child-background-mapping",
+      "prompt": "Focused remap check: using deps/platform-adoption-kernel.json, write practices/child-background-eval/result.json from this incomplete draft: {\"kind\":\"practice\",\"name\":\"Child Background Eval\",\"baselinePracticeName\":\"Platform Adoption Essentials\",\"alphas\":[{\"name\":\"Platform Onboarding\",\"contributesTo\":\"Platform Consumption Interface\",\"states\":[{\"name\":\"Piloted\",\"seq\":1},{\"name\":\"Standardised\",\"seq\":2},{\"name\":\"Self Served\",\"seq\":3}]}]}. Repair the alpha mapping only; no research is needed.",
+      "expected_output": "The remapped practice redeclares the target alpha, retains all of its original states and prerequisites, and adds parent Background references for every child state.",
+      "assertions": ["The target alpha appears in the practice", "Each child state appears in a parent Background alphaStates reference", "Inherited Background prerequisites remain"],
+      "directory": "practices/child-background-eval",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
       "id": 1,
       "name": "red-hat-openshift-foundations",
       "prompt": "Update red-hat-openshift-foundations to fix quality issues.",
@@ -17,7 +27,7 @@
       "prompt": "Update partner-essentials method to align with latest baseline guidance.",
       "expected_output": "Updated method JSON with partner ecosystem baseline references corrected.",
       "directory": "practices/partner-essentials",
-      "baseline": "deps/partner-ecosystem-baseline.json"
+      "baseline": "baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json"
     },
     {
       "id": 3,

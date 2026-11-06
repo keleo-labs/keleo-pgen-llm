@@ -39,6 +39,13 @@ Feature: Practice/Method Update to Latest Guidance
     And diff-practice-json.py shows what changed vs original
     And version is bumped (minor)
 
+  Scenario: Structural updates restore child-to-parent state prerequisites
+    Given a practice has a new alpha that contributesTo an existing alpha
+    When the practice is remapped or reanalysed
+    Then the target alpha is redeclared with its original states intact
+    And each child state is referenced by a meaningful parent state background
+    And existing background prerequisites remain present
+
   Scenario: Full reanalysis mode (Phase 1 → 2 → 3)
     Given assess-practice.py recommends suggestedUpdateMode "full-reanalysis"
     And user provides source materials

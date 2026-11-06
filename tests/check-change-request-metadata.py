@@ -37,6 +37,7 @@ def main():
             old, new, "Test", "draft", "", ROOT / "deps/language.schema.json"
         )
         root = next(op for op in change["operations"] if op["operation"] == "modify")
+        assert root["elementType"] == ("Method" if kind == "method" else "Practice")
         expected = {key: new.get(key) for key in (
             "name", "version", member_field, "dependencyVersions", "updatedAt", "keywords"
         )}

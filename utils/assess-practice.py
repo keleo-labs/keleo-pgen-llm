@@ -44,7 +44,7 @@ from utils._shared import (load_json_pair, _context_is_stale,
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 BASELINE_REQUIRED_SECTIONS = [
     "focuses", "activitySpaces", "competencies", "narrativeTypes", "alphas"
@@ -1644,6 +1644,8 @@ def check_description_length(data, kind):
 
         for etype in ("alphas", "workProducts", "activities", "patterns", "personas"):
             for elem in source.get(etype, []):
+                if etype == "alphas" and kind != "practiceBaseline" and not (elem.get("contributesTo") or elem.get("mapsTo")):
+                    continue  # Inherited descriptions must be preserved verbatim.
                 desc = elem.get("description", "")
                 if desc:
                     total_element += 1
@@ -3621,6 +3623,56 @@ def check_redeclaration_compliance(data, baseline_data, kind):
     return issues
 
 
+def check_contributes_to_backgrounds(data, baseline_data, kind):
+    """Require each specialization state to gate a state of its declared parent."""
+    issues = []
+    inherited = {a.get("name"): a for a in (baseline_data or {}).get("alphas", [])}
+    sources = data.get("practices", []) if kind == "method" else [data]
+    for source in sources:
+        alphas = {a.get("name"): a for a in source.get("alphas", [])}
+        for child in source.get("alphas", []):
+            parent_name = child.get("contributesTo")
+            if not parent_name:
+                continue
+            parent = alphas.get(parent_name)
+            path = f"alphas[{child.get('name', '?')}]"
+            if not parent:
+                issues.append({
+                    "severity": "error", "category": "contributes-to-background",
+                    "path": path, "message": f"contributesTo target '{parent_name}' must be redeclared in this practice",
+                    "autoFixable": False,
+                })
+                continue
+            mapped = {
+                ref.get("stateName")
+                for state in parent.get("states", [])
+                for ref in state.get("background", {}).get("alphaStates", [])
+                if ref.get("alphaName") == child.get("name")
+            }
+            for state in child.get("states", []):
+                if state.get("name") not in mapped:
+                    issues.append({
+                        "severity": "error", "category": "contributes-to-background",
+                        "path": f"{path}.states[{state.get('name', '?')}]",
+                        "message": f"State must appear in a '{parent_name}' state background.alphaStates",
+                        "autoFixable": False,
+                    })
+            original = inherited.get(parent_name)
+            if original:
+                original_states = {s.get("name"): s for s in original.get("states", [])}
+                for state in parent.get("states", []):
+                    old = original_states.get(state.get("name"), {})
+                    for field, values in old.get("background", {}).items():
+                        if any(value not in state.get("background", {}).get(field, []) for value in values):
+                            issues.append({
+                                "severity": "error", "category": "contributes-to-background",
+                                "path": f"alphas[{parent_name}].states[{state.get('name', '?')}].background.{field}",
+                                "message": "Redeclaration removed an inherited Background prerequisite",
+                                "autoFixable": False,
+                            })
+    return issues
+
+
 def check_gherkin_coverage(data, kind):
     """Check Gherkin-inspired property usage and structural correctness."""
     issues = []
@@ -4316,7 +4368,10 @@ def check_pattern_alpha_coverage(data, kind):
         if kind == "method" and source is not data:
             pfx = f"practice[{source.get('name', '?')}]."
 
-        alpha_names = {a["name"] for a in source.get("alphas", []) if a.get("name")}
+        alpha_names = {
+            a["name"] for a in source.get("alphas", []) if a.get("name")
+            and (kind == "practiceBaseline" or a.get("contributesTo") or a.get("mapsTo"))
+        }
         if len(alpha_names) < 2:
             continue
 
@@ -5071,6 +5126,7 @@ def main():
     all_issues.extend(check_partof_mapsto_candidates(data, kind, baseline_data))
     all_issues.extend(check_missing_partof_candidates(data, kind, baseline_data))
     all_issues.extend(check_contributes_to_state_validity(data, kind, baseline_data))
+    all_issues.extend(check_contributes_to_backgrounds(data, baseline_data, kind))
     all_issues.extend(check_activity_name_distinctness(data, kind, baseline_data))
     all_issues.extend(check_alias_isolation(data, kind))
 

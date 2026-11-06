@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.5.1
+version: 1.9.0
 metadata:
-  version: "1.5.1"
+  version: "1.9.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -80,6 +80,7 @@ All generated outputs for a practice go in `practices/<practice-name>/`:
 ```text
 practices/
 └── <practice-name>/
+    ├── README.md                   (Navigable guide to the authored files)
     ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Phase 1 output, ~30-50K words)
     ├── 02-mapping-guide.md         (Phase 2 output, scales with alpha count: ~5-6K words/alpha)
@@ -94,6 +95,7 @@ For methods with multiple practices:
 ```text
 practices/
 └── <method-name>/
+    ├── README.md                   (Navigable guide to the authored files)
     ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Covers all practices)
     ├── 02-mapping-guide.md         (Maps all practices)
@@ -220,7 +222,9 @@ During read-only planning:
 
 7. **Present the execution roadmap and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-8. **After approval, initialise prompt history:**
+8. **After approval, choose the content repository:** If this practice or method should be versioned, run `python3 utils/content-repos.py add <repo> practices <practice-name> --fix` before creating its workspace. If the directory already exists, this imports it and keeps a local backup. See `docs/content-repos.md`.
+
+9. **Initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --init \
      --type <practice|method> --name "<Practice Name>" \
@@ -233,8 +237,12 @@ During read-only planning:
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
 
-   Add each source to the shared local catalog with `python3 utils/catalog.py add-source
-   "<path-or-URL>"`. Use `toc`, `search` and `show` to locate sections; Phase 1 still
+   For a Google Workspace URL, load the global Codex `gws` skill, read the source
+   through MCP and save its content as a local Markdown snapshot. Add that snapshot
+   to the shared local catalog with `python3 utils/catalog.py add-source
+   "<local-path>"`; retain the original URL in prompt history. For other sources,
+   pass their local path or URL to the catalog directly. Use `toc`, `search` and
+   `show` to locate sections; Phase 1 still
    reads every supplied source for coverage. Add each secondary research source from
    Step 2.5 in the same way. Record catalog section IDs alongside the corresponding
    source locations in Phase 1 and carry them through Phase 2 mapping.
@@ -696,9 +704,16 @@ remediation loop in `VERIFY-FOUNDATION.md` §8 on exit 1, then record the verdic
    python3 utils/prompt-history.py practices/<practice-name>/ --add-deliverable \
      --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged practice bundle"
    python3 utils/prompt-history.py practices/<practice-name>/ --finalize
+   python3 utils/write-workspace-readmes.py practices/<practice-name>/ --fix
    ```
    `--finalize` stands the hooks down — later turns in this session are no longer appended to
    the Interaction Log. If the user reopens the work, run `--activate` before continuing.
+   The README links the practice or method JSON, phase documents, prompt history
+   and any other authored files present. For methods, its Main file section
+   lists every named practice and its baseline ancestry, including models in
+   other folders. For practices, it links declared baseline and practice
+   dependency folders. Model links show the model and schema versions. An
+   existing hand-written README is preserved.
 
 ---
 
@@ -793,11 +808,12 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Final Deliverables
 
-1. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, interactions, sources, decisions, phases)
-2. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
-3. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
-4. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
-5. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
+1. **`practices/<name>/README.md`** — Guide to the authored workspace
+2. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, interactions, sources, decisions, phases)
+3. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
+4. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
+5. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
+6. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
 
 ### Assets
 
@@ -896,7 +912,7 @@ python3 utils/extract-specs.py skills/generate-method/SKILL.md --stats
 - Given: An alpha name matches a baseline or parent practice alpha
 - When: The alpha is included in the practice JSON
 - Then: The alpha has neither `contributesTo` nor `mapsTo`
-- Then: Only practice-specific checklists, narratives, and Gherkin guidance are added
+- Then: Only additive practice-specific guidance and cross-alpha Background prerequisites are added
 
 ### Scenario: Competency level names match baseline exactly (@rule:semantic-006)
 - Given: An activity or persona references a competency level
@@ -919,6 +935,13 @@ python3 utils/extract-specs.py skills/generate-method/SKILL.md --stats
 - Given: A state on a new alpha declares `contributesToState`
 - When: The state JSON is generated
 - Then: The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`
+
+### Scenario: contributesTo child states gate parent states (@rule:semantic-012)
+- Given: A new alpha contributesTo another alpha in the effective context
+- When: The practice's alpha mapping is generated or remapped
+- Then: The practice redeclares the target alpha with its existing states intact
+- Then: Every new child state appears in a meaningful target state `background.alphaStates` as `{alphaName, stateName}`
+- Then: Existing background prerequisites are preserved
 
 ### Scenario: Baseline references are case-sensitive (@rule:semantic-011)
 - Given: The practice references baseline elements (alphas, focuses, activitySpaces, competencies)

@@ -439,6 +439,33 @@
         }
       ],
       "kind": "alpha"
+    },
+    {
+      "name": "Platform Consumption Interface",
+      "description": "The means by which consumers discover, access, and consume platform capabilities, including developer portals, service catalogs, CLI tools, APIs, SDKs, documentation hubs, golden path templates, and self-service workflows that abstract the underlying platform complexity and provide a developer-friendly consumption experience.",
+      "focusName": "Solution",
+      "states": [
+        {"name": "Envisioned", "description": "The desired interface is conceptualized.", "seq": 1, "checklist": []},
+        {"name": "Scoped", "description": "Interface capabilities are defined.", "seq": 2, "checklist": []},
+        {"name": "Available", "description": "The interface is accessible.", "seq": 3, "background": {"alphaStates": [{"alphaName": "Platform Onboarding", "stateName": "Piloted"}]}, "checklist": []},
+        {"name": "Self Service", "description": "Consumers can independently use the interface.", "seq": 4, "background": {"alphaStates": [{"alphaName": "Platform Onboarding", "stateName": "Standardised"}]}, "checklist": []},
+        {"name": "Optimized", "description": "The interface dynamically adapts based on deep user telemetry, providing a frictionless, self-service experience that actively minimizes developer cognitive load.", "seq": 5, "background": {"alphaStates": [{"alphaName": "Platform Onboarding", "stateName": "Self Served"}]}, "checklist": []}
+      ],
+      "kind": "alpha"
+    },
+    {
+      "name": "Requirements",
+      "description": "The capabilities, features, and constraints the platform must satisfy.",
+      "focusName": "Solution",
+      "states": [
+        {"name": "Conceived", "description": "The need for a specific asset is identified.", "seq": 1, "background": {"alphaStates": [{"alphaName": "Onboarding Readiness", "stateName": "Stated"}]}, "checklist": []},
+        {"name": "Bounded", "description": "The scope of the requirements is defined.", "seq": 2, "background": {"alphaStates": [{"alphaName": "Onboarding Readiness", "stateName": "Checkable"}]}, "checklist": []},
+        {"name": "Coherent", "description": "Requirements are clear, consistent, and logical.", "seq": 3, "checklist": []},
+        {"name": "Acceptable", "description": "Stakeholders agree the requirements meet their needs.", "seq": 4, "background": {"alphaStates": [{"alphaName": "Onboarding Readiness", "stateName": "Enforced"}]}, "checklist": []},
+        {"name": "Addressed", "description": "The platform satisfies the established requirements.", "seq": 5, "checklist": []},
+        {"name": "Fulfilled", "description": "All requirements are successfully delivered and operational.", "seq": 6, "checklist": []}
+      ],
+      "kind": "alpha"
     }
   ],
   "workProducts": [

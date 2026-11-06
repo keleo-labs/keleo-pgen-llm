@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "meetings": [
+    {
+      "name": "All Hands - EcoTech Specialists Monthly/Quarterly Progress",
+      "seriesPath": "reports/all-hands-ecotech-specialists-monthly-quarterly-progress/series.json",
+      "latestReportPath": "reports/all-hands-ecotech-specialists-monthly-quarterly-progress/2026-11-09-1000/report.md"
+    },
+    {
+      "name": "EcoTech Sales Specialist Team weekly sync",
+      "seriesPath": "reports/ecotech-sales-specialist-team-weekly-sync/series.json",
+      "latestReportPath": "reports/ecotech-sales-specialist-team-weekly-sync/2026-10-26-1000/report.md"
+    },
+    {
+      "name": "EMEA-AI Ecosystem Specialists",
+      "seriesPath": "reports/emea-ai-ecosystem-specialists/series.json",
+      "latestReportPath": "reports/emea-ai-ecosystem-specialists/2026-10-27-1500/report.md"
+    },
+    {
+      "name": "EMEA EcoTech & Friends Coffee Corner",
+      "seriesPath": "reports/emea-ecotech-friends-coffee-corner/series.json",
+      "latestReportPath": "reports/emea-ecotech-friends-coffee-corner/2026-10-30-1000/report.md"
+    },
+    {
+      "name": "EMEA EcoTech OpenShift Global Sync",
+      "seriesPath": "reports/emea-ecotech-openshift-global-sync/series.json",
+      "latestReportPath": "reports/emea-ecotech-openshift-global-sync/2026-10-28-1315/report.md"
+    },
+    {
+      "name": "OCP V - EMEA Ecosystem Sync",
+      "seriesPath": "reports/ocp-v-emea-ecosystem-sync/series.json",
+      "latestReportPath": "reports/ocp-v-emea-ecosystem-sync/2026-10-27-1530/report.md"
+    },
+    {
+      "name": "Sovereign / cloud extensions recurring sync",
+      "seriesPath": "reports/sovereign-cloud-extensions-recurring-sync/series.json",
+      "latestReportPath": "reports/sovereign-cloud-extensions-recurring-sync/2026-10-30-1230/report.md"
+    },
+    {
+      "name": "Team Tools Governance & Change Management (Request for Assistance, etc)",
+      "seriesPath": "reports/team-tools-governance-change-management/series.json",
+      "latestReportPath": "reports/team-tools-governance-change-management/2026-10-29-1300/report.md"
+    }
+  ]
+}
