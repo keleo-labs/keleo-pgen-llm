@@ -4,10 +4,20 @@
   "schema": "deps/language.schema.json",
   "evals": [
     {
+      "id": "child-background-mapping",
+      "contract_scenario": "Child alpha states gate their contributesTo parent",
+      "name": "child-background-mapping",
+      "prompt": "Focused authoring check: using deps/platform-adoption-kernel.json, create practices/child-background-eval/result.json for a small practice with a new alpha called Platform Onboarding that contributesTo Platform Consumption Interface. Give the new alpha three progressive states. Write only the JSON; no research is needed.",
+      "expected_output": "The target alpha is redeclared with all original states, each new child state is referenced in a parent state background, and inherited background prerequisites survive.",
+      "assertions": ["Every child state is referenced by a target state background.alphaStates entry", "All original target states and Background prerequisites are retained"],
+      "directory": "practices/child-background-eval",
+      "baseline": "deps/platform-adoption-kernel.json"
+    },
+    {
       "id": 1,
       "name": "horticulture-foundations",
       "prompt": "Generate a method for horticulture foundations extending Horticulture Essentials.",
-      "expected_output": "Multi-practice method with practices covering plant management, site operations, pest management, etc.",
+      "expected_output": "Multi-practice method with practices covering plant management, site operations, pest management, etc., and a README linking the method JSON, all named practices including external folders, inherited baselines, phase documents and prompt history, with model and schema versions.",
       "directory": "practices/horticulture-foundations",
       "baseline": "baselines/horticulture-essentials/horticulture-essentials.json"
     },
@@ -49,7 +59,7 @@
       "prompt": "Generate a method for partner essentials extending Partner Ecosystem Essentials.",
       "expected_output": "Multi-practice method covering partner ecosystem management, demand generation, success planning.",
       "directory": "practices/partner-essentials",
-      "baseline": "deps/partner-ecosystem-baseline.json"
+      "baseline": "baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json"
     },
     {
       "id": 7,

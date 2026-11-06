@@ -261,7 +261,7 @@ def scene_requests(scene, page_id, box, prefix="dg"):
                 requests.append({"updateLineProperties": {
                     "objectId": leg_id,
                     "fields": "lineFill.solidFill.color,lineFill.solidFill.alpha,"
-                              "weight,endArrow,dashStyle",
+                              "weight,startArrow,endArrow,dashStyle",
                     "lineProperties": {
                         "lineFill": {"solidFill": {"color": {"rgbColor": colour},
                                                    "alpha": alpha}},
@@ -271,6 +271,8 @@ def scene_requests(scene, page_id, box, prefix="dg"):
                         "endArrow": (END_ARROW.get(item.get("arrow", "arrow"),
                                                    "FILL_ARROW")
                                      if last else "NONE"),
+                        "startArrow": (END_ARROW.get(item.get("startArrow"), "NONE")
+                                       if leg == 0 else "NONE"),
                         "dashStyle": DASH_STYLE.get(item.get("dash", "solid"),
                                                     "SOLID"),
                     },

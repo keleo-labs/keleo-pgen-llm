@@ -1,6 +1,32 @@
 Feature: Evidence-led diagnosis and executable recommendations
   Shared by the reporting suite; applies within the agreed report scope.
 
+  Scenario: Selected report lives in its content repository
+    Given a private content repository is configured for the new report
+    When the approved report workspace is created
+    Then reports/<report-slug>/ is a mount into that repository
+    And the authored report and its source assets are written there
+
+  Scenario: Completed report workspace has a navigable README
+    Given a report and its supporting files have been written
+    When the reporting run is finalized
+    Then reports/<report-slug>/README.md links the report and prompt history where present
+    And it links additional authored files that exist
+    And an existing hand-written README is preserved
+
+  Scenario: A report about a Keleo practice uses the relevant Studio diagram form
+    Given a report section explains practice dependencies, orchestration, patterns, concerns, activities, alpha states or alpha relationships
+    When the section needs a structural figure
+    Then the author selects the matching Keleo route from the diagram method page
+    And the figure is rendered as SVG from a retained practice JSON or derived spec
+
+  Scenario: A practice pattern figure preserves phase decisions
+    Given the report explains a pattern with phase conditions, maturity targets or a guarded return
+    When the report illustrates the pattern
+    Then it uses the Studio practice pattern renderer from retained practice JSON
+    And a portrait layout may show numbered phase parts while keeping the full figure available
+    And a guarded return to an earlier part remains visible and names its target phase
+
   Scenario: Recurring team reports use nested instance workspaces
     Given a team-meeting series with persistent configuration
     When an approved meeting instance is prepared

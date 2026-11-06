@@ -36,7 +36,7 @@ You have access to the following resources via the Read tool:
 
 4. **Example Baselines** (for reference)
    - `deps/platform-adoption-kernel.json` (default Value/Solution/Endeavor focuses)
-   - `deps/partner-ecosystem-baseline.json` (custom Value/Engagement/Go-to-Market focuses)
+   - `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` (custom Value/Engagement/Go-to-Market focuses)
 
 ## Tool Call Guidelines
 

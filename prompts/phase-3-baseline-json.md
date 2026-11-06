@@ -26,10 +26,9 @@ You have access to the following resources via the Read tool:
    - Complete mapping specification
    - Read this as PRIMARY source for JSON generation
 
-2. **deps/language.schema.json** (JSON Schema)
-   - Authoritative schema definition
-   - Defines structure, required fields, types
-   - READ THIS to understand exact JSON structure
+2. **deps/schemas/** (modular JSON Schema source)
+   - `practice.schema.json` defines baselines; `common.schema.json` defines shared elements
+   - Read the relevant module or use `python3 utils/query-schema.py <TypeName>` for exact properties and required fields
 
 3. **Semantic Guidance** (sub-documents in `references/semantics/`)
    - `references/semantics/practice-elements.md` — PracticeElement foundations, tags, checklists (§5)
@@ -39,7 +38,7 @@ You have access to the following resources via the Read tool:
 
 4. **Example Baseline JSONs** (for reference)
    - `deps/platform-adoption-kernel.json`
-   - `deps/partner-ecosystem-baseline.json`
+   - `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json`
    - Read to understand baseline structure patterns
 
 ## Tool Call Guidelines
@@ -56,8 +55,8 @@ When running Bash commands, use **simple single-command calls** that match auto-
    - This is your PRIMARY source for content
    - Review all mapped elements completely
 
-2. **Read `deps/language.schema.json`**
-   - Understand exact schema structure
+2. **Read the relevant module in `deps/schemas/`**
+   - Start with `practice.schema.json`; consult `common.schema.json` for shared definitions
    - Note required vs optional properties
    - Understand property types (string, array, object)
    - Understand symbolic references vs embedded objects
@@ -69,7 +68,7 @@ When running Bash commands, use **simple single-command calls** that match auto-
 
 4. **Read example baselines** (optional, for structure reference)
    - `deps/platform-adoption-kernel.json`
-   - `deps/partner-ecosystem-baseline.json`
+   - `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json`
 
 ### Step 2: Generate Baseline JSON Skeleton
 

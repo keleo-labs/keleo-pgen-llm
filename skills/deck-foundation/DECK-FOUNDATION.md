@@ -1,6 +1,6 @@
 # Deck Foundation
 
-Version: 3.1.0
+Version: 3.1.1
 
 > **3.0.0 changes the voice.** A slide now carries complete sentences and
 > stands on its own without a speaker; notes add depth rather than supplying
@@ -30,8 +30,10 @@ slides.md  ──slidev export──▶  .pptx  ──Drive upload──▶  Goo
           (pptx-editable)            (convert on import)
 ```
 
-`publish-deck.py` runs the whole chain. There is no direct Slidev → Google
-Slides export; the pptx hop is required, which is why §4's constraints exist.
+`publish-deck.py --pptx-only` builds the editable PowerPoint file. Load the
+global Codex `gws` skill to import it through Google Workspace MCP, then read
+the resulting Slides deck and export PDF when requested. There is no direct
+Slidev → Google Slides export, so the pptx hop is required.
 
 ## 2. Workflow
 
@@ -42,25 +44,15 @@ Slides export; the pptx hop is required, which is why §4's constraints exist.
 | 3. Structure | **If there is a source document, derive the spine from it (§2.1).** Otherwise choose a narrative shape from `narrative-guide.md`. Either way, write the slide titles *first*, as a sequence of assertions, and check they read as an argument on their own. |
 | 4. Write | Fill slides using the layouts in §3 and the rules in `slide-grammar.md`. Carry each slide's citations in `sources` and write its speaker notes as you go (§5). |
 | 5. Lint | `lint-deck.py slides.md` — missing or duplicated titles, bodies over the column budget, slides whose notes outweigh them, fragment bullets. Clear it before publishing. |
-| 6. Publish | `publish-deck.py slides.md --name "…" --pdf --review` |
+| 6. Publish | `publish-deck.py slides.md --pptx-only`, then import through Google Workspace MCP. |
 | 7. Review | Render and **look at every slide** (§7). Fix what reads badly. Never report a deck as done without this. |
 
 Step 7 is not optional. Layout problems are invisible in markdown and obvious
 in a thumbnail.
 
-Steps 6 and 7 cycle: publishing is how you find the layout defects, so expect
-several rounds. Drive cannot replace a deck in place, so each round uploads a
-new file — `publish-deck.py` records the ID it created in
-`<workdir>/.published.json` and trashes it on the next run, which is what
-stops the cycle filling Drive with near-identical decks. Two consequences
-worth knowing:
-
-- **The URL changes every publish.** Give the user the link from the final
-  run, not an earlier one.
-- **Deleting the build directory loses the thread.** The next publish then
-  has nothing to supersede and leaves the previous deck behind. `--prune`
-  cleans that up by matching on deck name; `--keep-previous` opts out of
-  replacement entirely when you want the versions kept.
+Steps 6 and 7 cycle while layout defects are fixed. Record the ID of each
+imported deck so the final link points to the version you reviewed. Do not
+delete earlier versions unless the user requested cleanup.
 
 ### 2.1 Working from a source document
 
@@ -391,11 +383,15 @@ rejected.
 ## 7. Visual review
 
 ```bash
-python3 scripts/publish-deck.py slides.md --name "…" --pdf --review
-python3 scripts/review-deck.py <presentationId> --out /tmp/deck-review
+python3 scripts/publish-deck.py slides.md --pptx-only
 ```
 
-Then **Read the PNGs**. Check each slide for:
+Load the global Codex `gws` skill. Import the exported .pptx into Drive as
+Google Slides, then read the published presentation through the Workspace MCP
+tools. Export a PDF when requested. Review the final Slides rendering; use a
+local PNG export for layout inspection when the connector cannot render slides.
+
+Inspect every slide in the published deck, using PNG renders when available. Check for:
 
 - Text overflowing or colliding with another element
 - Dead space concentrated at one edge rather than distributed
@@ -411,14 +407,14 @@ To iterate on design only, skip the upload: `npx slidev export slides.md
 | Script | Purpose |
 |--------|---------|
 | `new-deck.py` | Scaffold a deck project against a brand theme |
-| `publish-deck.py` | Build diagrams → export → upload → convert → upgrade diagrams → PDF, trashing the version it replaces |
+| `publish-deck.py` | Build diagrams and export an editable .pptx with `--pptx-only`; its online modes are legacy CLI workflows |
 | `build-diagrams.py` | Fit each referenced diagram spec to the slide and render it to PNG; writes `build/diagrams.json` |
-| `upgrade-diagrams.py` | Replace published diagram pictures with native Slides shapes. Runs from `publish-deck.py`; skips rather than fails |
+| `upgrade-diagrams.py` | Legacy CLI helper for native Slides shapes; use Slides MCP edits for Codex publication |
 | `lint-deck.py` | Check a deck's markdown before publishing: titles, body budgets, slide/notes balance, fragment bullets, citations |
-| `review-deck.py` | Render a published deck to local PNGs |
+| `review-deck.py` | Legacy CLI renderer for published decks |
 | `inspect-template.py` | Assess a .pptx as a branding donor |
 | `slides-template.py` | Map a Google Slides template's layouts to semantic roles |
-| `gwsclient.py` | `gws` CLI wrapper (module, not a command) |
+| `gwsclient.py` | Legacy `gws` CLI wrapper for standalone scripts |
 | `templatecache.py` | Shared template-cache access (module) |
 
 Needing a mechanical helper that does not exist means writing or extending one

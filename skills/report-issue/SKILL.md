@@ -2,7 +2,7 @@
 name: report-issue
 description: Capture one or more issues, enhancements, or questions from the user and record them in the feedback/issue register for later triage
 metadata:
-  version: "1.0.1"
+  version: "1.0.2"
 triggerPatterns:
   - "report.*issue"
   - "raise.*issue"
@@ -101,11 +101,14 @@ Do not emit any other commentary in this mode. The calling skill owns the conver
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Yes | Reads and writes the Google Sheets register (wrapped by `utils/issue-register.py`) |
+| Codex `gws` skill and Google Workspace MCP | Yes | Reads and writes the Google Sheets register |
 | `config/user-config.json` | Yes | Stores the register spreadsheet ID and the reporter's email (git-ignored, per-user) |
 | Remote bundle repository | Optional | Resolves document version/kind when the reported document isn't available locally |
 
-For Google Workspace specifics (invocation patterns, auth, schema discovery), use the **`gws` skill** rather than reconstructing commands here. Everything this skill needs from Sheets is already wrapped by `utils/issue-register.py`.
+Load the global Codex **`gws` skill** for Workspace operations. Use its MCP
+tools for sheet metadata, row reads and writes. `utils/issue-register.py`
+still validates and accumulates drafts offline; its online modes use the
+retired CLI and are not part of the Codex workflow.
 
 ---
 
@@ -115,13 +118,11 @@ For Google Workspace specifics (invocation patterns, auth, schema discovery), us
 
 The register spreadsheet is shared with `/plan-from-feedback` and read from `config/user-config.json` (`issueRegisterSpreadsheetId`, falling back to `issueRegisterUrl`).
 
-Confirm the register is reachable and inspect its shape:
-
-```bash
-python3 utils/issue-register.py --schema
-```
-
-If no register is configured, the utility says so. Ask the user for the register URL with the agent's question tool and save it to `config/user-config.json` as `issueRegisterUrl` + `issueRegisterSpreadsheetId` — the same keys `/plan-from-feedback` uses. Do not create a second config entry.
+Confirm the register is reachable with `get_spreadsheet_info` and inspect its
+table columns. If no register is configured or supplied in the conversation,
+ask the user for its URL and save it to `config/user-config.json` as
+`issueRegisterUrl` and `issueRegisterSpreadsheetId` — the same keys
+`/plan-from-feedback` uses. Do not create a second config entry.
 
 ### Reporter Email
 
@@ -294,8 +295,10 @@ Validate and check for duplicates:
 
 ```bash
 python3 utils/issue-register.py --validate /tmp/keleo-issues-<timestamp>.json
-python3 utils/issue-register.py --check-duplicates /tmp/keleo-issues-<timestamp>.json
 ```
+
+Read the current register rows with `read_sheet_values` and compare summaries
+and document names for near-duplicates. Include closed rows.
 
 Fix every validation **error** before proceeding. Act on **warnings** — an over-long summary or an unknown element type means the capture needs tightening, not overriding.
 
@@ -321,17 +324,12 @@ In direct mode: the register is shared with other people. **Always show the user
 
 Present the drafts as a compact table (Type, Summary, Document, Element) plus the full description text for each, then confirm.
 
-Preview the exact rows if the user wants to see them as the register will:
-
-```bash
-python3 utils/issue-register.py --append /tmp/keleo-issues-<timestamp>.json --dry-run
-```
-
-On confirmation:
-
-```bash
-python3 utils/issue-register.py --append /tmp/keleo-issues-<timestamp>.json
-```
+Preview the exact values and target row numbers from the table's current end
+row. On confirmation, append through the Sheets MCP edit tool. Build each row
+using the existing register column order and set Status to `New`; read the
+written rows back before reporting success. If the MCP connector cannot extend
+the structured table, stop and report that capability gap instead of writing
+outside the table.
 
 Report back the row numbers written and the register URL. Mention that `/plan-from-feedback` picks up rows with Status New on its next run.
 
@@ -340,7 +338,7 @@ Report back the row numbers written and the register URL. Mention that `/plan-fr
 ## Error Handling
 
 - **No register configured**: Ask for the URL via the agent's question tool, save it to user-config, and continue.
-- **Google auth expired**: `issue-register.py` detects auth failures and reports them. Ask the user to run `gws auth status`, then `! gws auth login` interactively — you cannot complete this for them.
+- **Google auth expired or MCP tools missing**: Follow the global `gws` skill's connection and login guidance, then retry a read-only call before any write.
 - **Append fails**: Report the drafts to the user in the conversation so nothing is lost, and keep the scratch JSON file so the append can be retried without recapturing.
 - **Document can't be resolved**: File the issue with the document name as given and blank version/kind. A locatable issue with partial metadata beats no issue.
 - **User reports something already fixed locally**: Say so and ask whether they still want it recorded — an already-fixed problem may still warrant a register entry if the fix isn't released.

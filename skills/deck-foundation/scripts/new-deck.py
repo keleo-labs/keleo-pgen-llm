@@ -160,7 +160,8 @@ def main() -> int:
     print(f"  theme    {theme_src.name} (copied)")
     print(f"  edit     {slides}")
     print(f"  preview  cd {project} && npx slidev")
-    print(f"  publish  python3 {publish} {slides.name} --name {args.title!r} --pdf")
+    print(f"  export   python3 {publish} {slides.name} --pptx-only")
+    print("  publish  import the .pptx with the Codex gws skill and Google Workspace MCP")
     return 0
 
 

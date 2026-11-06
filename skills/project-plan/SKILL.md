@@ -1,7 +1,7 @@
 ---
 name: project-plan
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Create high-level project plans, PoC outlines, and implementation roadmaps — with optional SOW generation for T&M consulting engagements
 triggerPatterns:
   - "project.*plan"
@@ -62,7 +62,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Optional | Extract requirements from Google Docs/Sheets; export plan as PDF |
+| Codex `gws` skill and Google Workspace MCP | Optional | Read requirements from Google Docs/Sheets and export a plan when requested |
 | Playwright MCP | Optional | Load customer-facing requirements or engagement briefs from web |
 | Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice isn't available locally |
 

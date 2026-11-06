@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.4.1
+version: 1.9.0
 metadata:
-  version: "1.4.1"
+  version: "1.9.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -80,6 +80,7 @@ All generated outputs for a practice go in `practices/<practice-name>/`:
 ```text
 practices/
 └── <practice-name>/
+    ├── README.md                   (Navigable guide to the authored files)
     ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Phase 1 output, ~30-50K words)
     ├── 02-mapping-guide.md         (Phase 2 output, scales with alpha count: ~5-6K words/alpha)
@@ -94,6 +95,7 @@ For methods with multiple practices:
 ```text
 practices/
 └── <method-name>/
+    ├── README.md                   (Navigable guide to the authored files)
     ├── 00-prompt-history.md        (Session provenance: prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md       (Covers all practices)
     ├── 02-mapping-guide.md         (Maps all practices)
@@ -119,7 +121,7 @@ This skill relies on reference documents (READ via Read tool, NOT embedded):
    - `semantics/work-products.md` — work product rules (§7)
    - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
-3. **deps/language.schema.json** - JSON Schema definition
+3. **deps/schemas/** - Modular JSON Schema source; use `utils/query-schema.py` for individual definitions
 4. **Baseline Practice JSON** - User-provided (e.g., `deps/platform-adoption-kernel.json`)
 
 ### Phase Skill Documents
@@ -220,7 +222,9 @@ During read-only planning:
 
 7. **Present the execution roadmap and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-8. **After approval, initialise prompt history:**
+8. **After approval, choose the content repository:** If this practice or method should be versioned, run `python3 utils/content-repos.py add <repo> practices <practice-name> --fix` before creating its workspace. If the directory already exists, this imports it and keeps a local backup. See `docs/content-repos.md`.
+
+9. **Initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --init \
      --type <practice|method> --name "<Practice Name>" \
@@ -232,6 +236,16 @@ During read-only planning:
      --source-type <file|url|google-doc|google-slides> \
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
+
+   For a Google Workspace URL, load the global Codex `gws` skill, read the source
+   through MCP and save its content as a local Markdown snapshot. Add that snapshot
+   to the shared local catalog with `python3 utils/catalog.py add-source
+   "<local-path>"`; retain the original URL in prompt history. For other sources,
+   pass their local path or URL to the catalog directly. Use `toc`, `search` and
+   `show` to locate sections; Phase 1 still
+   reads every supplied source for coverage. Add each secondary research source from
+   Step 2.5 in the same way. Record catalog section IDs alongside the corresponding
+   source locations in Phase 1 and carry them through Phase 2 mapping.
 
    **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
    user turn and every `the agent's question tool` exchange in this session is appended to the
@@ -348,7 +362,7 @@ The main agent handles: Step 0 (planning), Step 0.5 (context resolution), Step 1
 Each phase is **stateless** and **file-driven**:
 - Phase 1 reads: source materials, domain-framework.md
 - Phase 2 reads: 01-analysis-report.md, effective context JSON, semantics sub-documents
-- Phase 3 reads: 02-mapping-guide.md, effective context JSON, language.schema.json
+- Phase 3 reads: 02-mapping-guide.md, effective context JSON and the relevant modules in `deps/schemas/`
 
 No conversational context required — only file contents.
 
@@ -670,13 +684,36 @@ remediation loop in `VERIFY-FOUNDATION.md` §8 on exit 1, then record the verdic
    Present a Downstream Impact Report. See `update-method` SKILL.md for the full report format.
 
 7. **Record deliverables and finalise prompt history:**
+   After the final JSON passes verification, write `<workspace>/catalog-links.json`
+   as a JSON object mapping element JSON Pointers to arrays of supporting source
+   section IDs recorded in the mapping guide. Link only sections actually used;
+   leave elements without source evidence unlinked. Use `python3 utils/catalog.py
+   outline-practice practices/<name>/<name>.json` to list pointers. Then run:
+
+   ```bash
+   python3 utils/catalog.py build-practice practices/<name>/<name>.json --links practices/<name>/catalog-links.json
+   python3 ../keleo-language/validate/validate-catalog.py practices/<name>/practice-catalog.json --practice practices/<name>/<name>.json --source-workspace source-catalogs --require-fresh
+   ```
+
+   Resolve stale sources before using them for new claims. The catalog remains
+   local metadata; pass only Practice Language JSON to `package-keleo.py`.
+   For a multi-practice method, repeat for each constituent practice JSON;
+   do not catalog the method root as a practice.
+
    ```bash
    python3 utils/prompt-history.py practices/<practice-name>/ --add-deliverable \
      --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged practice bundle"
    python3 utils/prompt-history.py practices/<practice-name>/ --finalize
+   python3 utils/write-workspace-readmes.py practices/<practice-name>/ --fix
    ```
    `--finalize` stands the hooks down — later turns in this session are no longer appended to
    the Interaction Log. If the user reopens the work, run `--activate` before continuing.
+   The README links the practice or method JSON, phase documents, prompt history
+   and any other authored files present. For methods, its Main file section
+   lists every named practice and its baseline ancestry, including models in
+   other folders. For practices, it links declared baseline and practice
+   dependency folders. Model links show the model and schema versions. An
+   existing hand-written README is preserved.
 
 ---
 
@@ -701,7 +738,7 @@ This skill does NOT embed domain knowledge. Instead:
 
 - **Phase 1:** Reads `references/domain-framework.md` for perspectives
 - **Phase 2:** Reads semantics sub-documents for mapping rules
-- **Phase 3:** Reads `deps/language.schema.json` for structure
+- **Phase 3:** Reads the relevant `deps/schemas/` modules for structure
 - **All phases:** Read phase skills in `phases/` for orchestration
 
 Phase skills point to reference documents — they don't duplicate them. If a reference document changes, phase skills pick up the change automatically.
@@ -771,11 +808,12 @@ Full delineation strategy with worked examples: `references/practice-method-stra
 
 ## Final Deliverables
 
-1. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, interactions, sources, decisions, phases)
-2. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
-3. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
-4. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
-5. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
+1. **`practices/<name>/README.md`** — Guide to the authored workspace
+2. **`practices/<name>/00-prompt-history.md`** — Session provenance (prompt, interactions, sources, decisions, phases)
+3. **`practices/<name>/01-analysis-report.md`** — Complete structured analysis (~30-50K words)
+4. **`practices/<name>/02-mapping-guide.md`** — Complete mapping specification
+5. **`bundles/<name>.keleo`** — `.keleo` package (primary deliverable)
+6. **`practices/<name>/<practice-name>.json`** — Individual practice JSONs (intermediate)
 
 ### Assets
 
@@ -874,7 +912,7 @@ python3 utils/extract-specs.py skills/generate-method/SKILL.md --stats
 - Given: An alpha name matches a baseline or parent practice alpha
 - When: The alpha is included in the practice JSON
 - Then: The alpha has neither `contributesTo` nor `mapsTo`
-- Then: Only practice-specific checklists, narratives, and Gherkin guidance are added
+- Then: Only additive practice-specific guidance and cross-alpha Background prerequisites are added
 
 ### Scenario: Competency level names match baseline exactly (@rule:semantic-006)
 - Given: An activity or persona references a competency level
@@ -897,6 +935,13 @@ python3 utils/extract-specs.py skills/generate-method/SKILL.md --stats
 - Given: A state on a new alpha declares `contributesToState`
 - When: The state JSON is generated
 - Then: The `contributesToState` value is a valid state name on the parent alpha referenced by `contributesTo` or `mapsTo`
+
+### Scenario: contributesTo child states gate parent states (@rule:semantic-012)
+- Given: A new alpha contributesTo another alpha in the effective context
+- When: The practice's alpha mapping is generated or remapped
+- Then: The practice redeclares the target alpha with its existing states intact
+- Then: Every new child state appears in a meaningful target state `background.alphaStates` as `{alphaName, stateName}`
+- Then: Existing background prerequisites are preserved
 
 ### Scenario: Baseline references are case-sensitive (@rule:semantic-011)
 - Given: The practice references baseline elements (alphas, focuses, activitySpaces, competencies)

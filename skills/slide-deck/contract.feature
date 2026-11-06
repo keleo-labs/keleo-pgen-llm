@@ -5,7 +5,7 @@ Feature: Slide Deck
 
   Background:
     Given the deck-foundation scripts and theme are installed
-    And Node 18+ and the gws CLI are available
+    And Node 18+ and Google Workspace MCP are available
 
   Scenario: Deck from a subject and source material
     Given a subject and at least one source document

@@ -3,6 +3,16 @@
 Series configuration format version: 1.1.0; version 1.0.0 series remain valid.
 Project signal configuration stays 1.0.0. Resolve a series before collecting evidence:
 
+The version 1.0.0 recurring meeting registry is
+`config/team-meeting/recurring-meetings.json`. It lists each configured series by
+calendar title, with project-relative `seriesPath` and `latestReportPath` fields.
+Only reports with a passing verification verdict count as latest reports.
+A missing report is represented by null. A schedule can read `seriesPath`, then
+use that series' calendar selector and timezone to find the next occurrence.
+The registry does not itself define a polling cadence or start a run. Refresh it
+after a report passes verification with `python3 utils/team-meeting.py
+sync-registry --fix`; the command is a dry run without `--fix`.
+
 ```bash
 python3 utils/team-meeting.py resolve reports/<series-slug>/series.json
 python3 utils/team-meeting.py prepare reports/<series-slug>/series.json --at 2026-10-26T09:00:00+00:00

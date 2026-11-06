@@ -84,5 +84,18 @@ class Portability(unittest.TestCase):
             with self.assertRaises(ValueError):
                 vendors.sync("../outside", True)
 
+    def test_content_repo_skill_entrypoints_and_evals(self):
+        skill = ROOT / "skills/content-repos"
+        source = (skill / "SKILL.md").read_text()
+        for directory in (".agents/skills", ".claude/skills"):
+            expected = vendors.wrapper("content-repos", source, directory)
+            self.assertEqual((ROOT / directory / "content-repos/SKILL.md").read_text(), expected)
+        contract = (skill / "contract.feature").read_text()
+        cases = json.loads((skill / "evals/evals.json").read_text())["evals"]
+        self.assertEqual(len(cases), 3)
+        for case in cases:
+            for scenario in case["contract_scenarios"]:
+                self.assertIn(f"Scenario: {scenario}", contract)
+
 if __name__ == "__main__":
     unittest.main()

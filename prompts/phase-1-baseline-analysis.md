@@ -47,6 +47,9 @@ When running Bash commands, use **simple single-command calls** that match auto-
 
 **Follow the complete Phase 1 analysis instructions from `prompts/phase-1-analysis.md` with these additional guidelines:**
 
+Carry source catalog section IDs and their original locators into the baseline
+analysis so later mapping can link generated elements to the source snapshots.
+
 ### Universal Terminology Guidelines
 
 When extracting elements, prefer general terms over specific implementations:

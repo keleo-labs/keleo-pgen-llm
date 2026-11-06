@@ -5,7 +5,7 @@ description: >-
   historical meetings, objectives and team and individual roles. Use for recurring
   team meetings, weekly syncs and team progress calls with a persistent series folder.
 metadata:
-  version: "5.1.1"
+  version: "6.0.0"
 ---
 
 ## Team meeting
@@ -44,6 +44,8 @@ configuration and practice context into the dated instance directory. Initialise
 `prompt-history.py <instance-dir> --init --type report` there before content work.
 Record actual sources, dependencies, versions and narrative decisions, then
 deliverables and `--finalize`, as the reporting foundation requires.
+After creating a new series configuration, run `python3 utils/team-meeting.py
+sync-registry --fix` so it is available to schedules before its first report.
 
 ### Collect and analyse
 
@@ -51,11 +53,9 @@ Use only configured sources and connectors; local fixtures replace their live
 sources. Generic teams need no Red Hat commercial systems. Read optional
 recipes only when selected. Credentials stay in connector configuration.
 For Google Calendar, Gmail, Drive, Docs and Slides, load the global **gws**
-skill and use its CLI to retrieve source content. Do not take control of a
-browser or screen-scrape Google Workspace as a substitute: the CLI provides
-structured records that can be checked and cited. A sandbox-only Keychain or
-certificate error warrants a retry with approved host access before marking
-GWS unavailable. If GWS still cannot authenticate or retrieve a source, record
+skill and use its Google Workspace MCP tools to retrieve source content. If
+the tools are missing or authentication fails, follow that skill's connection
+guidance. If GWS still cannot retrieve a source, record
 its coverage as unavailable, report the concrete failure and continue with
 other evidence; ask the user to restore GWS access before treating that Google
 source as reviewed.
@@ -153,8 +153,18 @@ References and Practices used are level-three subsections of Analysis.
    that person by the evidence; sharing a lesson does not establish who delivered
    the underlying work. Keep private assessments and sensitive personal
    details out; distinguish request completion, technical success and commercial
-   success. If no suitable evidence was found, state the coverage limit without
-   inventing praise or implying the team had no successes.
+   success. A person's own report of activity or a possible result is progress
+   evidence, not recognition by itself; use it in News or Analysis unless a
+   separate source confirms the outcome or thanks the contributor. When a
+   configured newsletter log exists, thank every distinct, shareable submission
+   in the review period, even if its article is deferred from News. Cite the
+   submission record and published article when available, and distinguish
+   submitted from published. Also thank an in-period publication with no
+   matching submission record, without assigning it a submission date.
+   Related self-reported detail may add context to
+   independently evidenced praise without becoming the reason for praise. If
+   no suitable evidence was found, state the coverage limit without inventing
+   praise or implying the team had no successes.
 6. **News** — source evidence → changed assumption → affected role → consequence
    → question or possible action. An inferred assumption is a hypothesis, never
    an unrecorded belief or decision attributed to the team. Include only material developments relevant to
@@ -194,8 +204,46 @@ not replacement of these headings by a framework's element names.
 
 Run `verification-gate.py <instance-dir> --phase report --gate --summary --expect
 source-fidelity,citation-integrity,domain-grounding,register-and-style,type-specific`.
-Resolve confirmed errors before handover. No export or publication is implied.
+Resolve confirmed errors before handover. When the user requests a Google Doc,
+apply the global **google-doc** skill after the gate. Publish the recurring briefing
+as ordered tabs: Briefing (title, dated instance and sections through
+Acknowledgements), News, Reminders and Analysis. Keep each section's content and
+links. Use `python3 utils/team-meeting.py doc-tabs <report.md>` for the exact tab
+bodies; it dates the News and Analysis headings. Populate fresh tabs, since
+replacing an imported tab can retain its old list formatting. Verify tab order,
+headings, links and spacing in the published Doc. A direct single-tab Markdown
+import does not satisfy this layout. When revising an existing Doc, keep its URL.
+No export or publication is implied without a user request.
+After a new report passes the gate, run `python3 utils/team-meeting.py
+sync-registry --fix` so schedule readers see its series and latest report path.
+The registry includes configured series without reports; its paths are relative
+to the project root. Do not update it for an unverified draft.
 Perform SKILL-STANDARD's post-completion review. Report only checks actually run.
+
+### Migration from version 5
+
+Version 6 narrows Acknowledgements to independently evidenced recognition,
+verified outcomes and shareable newsletter submissions. In existing drafts,
+move self-reported activity without corroborating praise or results to News or
+Analysis. Reconcile the configured submission log so every distinct in-period
+submission is thanked, whether or not its article becomes News. Thank separately
+for an in-period publication with no matching submission row; keep submitted
+and published states distinct. Report layout and series configuration formats
+are unchanged.
+
+### Migration from version 5.2
+
+Version 5.3 adds the recurring meeting registry at
+`config/team-meeting/recurring-meetings.json`. Run `sync-registry --fix` once to
+index existing series, then after each newly verified report. Schedules can
+read `seriesPath` and use that series' calendar configuration to find the next
+meeting; `latestReportPath` is null until a report exists.
+
+### Migration from version 5.1
+
+Version 5.2 adds an explicit Google Doc handoff when publication is requested.
+Existing Markdown reports keep their layout. Published single-tab briefs can be
+reorganised into the ordered tabs without changing their source Markdown.
 
 ### Migration from version 5.0
 

@@ -1,0 +1,348 @@
+{
+  "kind": "method",
+  "name": "Enterprise Delivery Endeavour",
+  "description": "A mock method used to prototype the pattern orchestration diagram. Diagram-only: it carries patterns, pattern views and orchestrations, and deliberately omits the alpha state models a schema-valid document would require.",
+  "version": "0.1.0",
+  "schemaVersion": "3.1.0",
+  "authors": ["keleo-studio-gas prototype"],
+  "createdAt": "2026-10-14",
+  "updatedAt": "2026-10-14",
+
+  "narrativeTypes": [
+    {
+      "kind": "narrativeType",
+      "name": "STAR",
+      "description": "Situation, Task, Action, Result.",
+      "narrativeElements": [
+        { "kind": "narrativeElement", "name": "Situation", "seq": 1, "description": "The circumstances the endeavour starts from." },
+        { "kind": "narrativeElement", "name": "Task", "seq": 2, "description": "What has to be achieved." },
+        { "kind": "narrativeElement", "name": "Action", "seq": 3, "description": "What is actually done." },
+        { "kind": "narrativeElement", "name": "Result", "seq": 4, "description": "What changed as a consequence." }
+      ]
+    }
+  ],
+
+  "patterns": [
+    {
+      "kind": "pattern",
+      "name": "Programme Shaping",
+      "description": "Turning an intent into a funded, mandated programme.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Mandate", "seq": 1, "description": "Sponsorship and authority are established." },
+        { "kind": "patternView", "name": "Business Case", "seq": 2, "description": "The investment is justified and sized." },
+        { "kind": "patternView", "name": "Mobilisation", "seq": 3, "description": "Teams, funding and governance are stood up." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Milestone Plan",
+      "description": "The delivery spine of the programme, as four service-assessment phases.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Discovery", "seq": 1, "description": "Understand the problem before committing to a solution." },
+        { "kind": "patternView", "name": "Alpha", "seq": 2, "description": "Prove the risky parts with throwaway work." },
+        { "kind": "patternView", "name": "Beta", "seq": 3, "description": "Build the real thing and run it with real users." },
+        { "kind": "patternView", "name": "Live", "seq": 4, "description": "Operate at full scale and keep improving." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Sprint",
+      "description": "The team's delivery cycle, repeating until the phase objective is met.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Plan", "seq": 1, "description": "Agree the sprint goal and the work that serves it." },
+        { "kind": "patternView", "name": "Build", "seq": 2, "description": "Produce a potentially releasable increment." },
+        { "kind": "patternView", "name": "Review", "seq": 3, "description": "Inspect the increment with stakeholders." },
+        {
+          "kind": "patternView",
+          "name": "Retrospective",
+          "seq": 4,
+          "description": "Inspect the way of working and adapt it.",
+          "loopsBackTo": { "patternViewName": "Plan" }
+        }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Release Train",
+      "description": "Moving an accepted increment into production on a fixed cadence.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Integrate", "seq": 1, "description": "Assemble the increments into one release candidate." },
+        { "kind": "patternView", "name": "Harden", "seq": 2, "description": "Test, fix and freeze the candidate." },
+        { "kind": "patternView", "name": "Deploy", "seq": 3, "description": "Promote to production and verify in place." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Assurance and Governance",
+      "description": "Independent oversight running for the whole life of delivery.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Baseline", "seq": 1, "description": "Agree what good looks like and what will be checked." },
+        { "kind": "patternView", "name": "Stage Gate", "seq": 2, "description": "Review at each phase boundary and decide to continue." },
+        { "kind": "patternView", "name": "Audit", "seq": 3, "description": "Test the evidence independently of the delivery team." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Architecture Runway",
+      "description": "Laying down enough technical foundation to stay ahead of delivery.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Set Direction", "seq": 1, "description": "Choose the architectural approach and its constraints." },
+        { "kind": "patternView", "name": "Prove", "seq": 2, "description": "Demonstrate the approach against the riskiest requirement." },
+        { "kind": "patternView", "name": "Harden", "seq": 3, "description": "Make the foundation production-worthy." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Incident Response",
+      "description": "What the team does when production is hurting.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Detect", "seq": 1, "description": "Recognise and declare the incident." },
+        { "kind": "patternView", "name": "Contain", "seq": 2, "description": "Stop the harm spreading." },
+        { "kind": "patternView", "name": "Recover", "seq": 3, "description": "Restore normal service." },
+        { "kind": "patternView", "name": "Learn", "seq": 4, "description": "Find the cause and remove it." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Scope Change Control",
+      "description": "Handling a change that the agreed plan does not accommodate.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Raise", "seq": 1, "description": "Capture the proposed change and who wants it." },
+        { "kind": "patternView", "name": "Assess", "seq": 2, "description": "Size the impact on cost, time and risk." },
+        { "kind": "patternView", "name": "Decide", "seq": 3, "description": "Accept, reject or defer, and tell everyone affected." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Benefits Realisation",
+      "description": "Finding out whether the programme actually produced what it promised.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Measure", "seq": 1, "description": "Collect the outcome data the business case named." },
+        { "kind": "patternView", "name": "Compare", "seq": 2, "description": "Set actuals against the forecast." },
+        { "kind": "patternView", "name": "Report", "seq": 3, "description": "Tell the sponsor what was and was not achieved." }
+      ]
+    },
+    {
+      "kind": "pattern",
+      "name": "Programme Closure",
+      "description": "Ending the programme deliberately rather than letting it fade.",
+      "patternViews": [
+        { "kind": "patternView", "name": "Handover", "seq": 1, "description": "Transfer ownership to the teams that will run it." },
+        { "kind": "patternView", "name": "Decommission", "seq": 2, "description": "Retire what the programme stood up and no longer needs." },
+        { "kind": "patternView", "name": "Close", "seq": 3, "description": "Release the people and shut the governance down." }
+      ]
+    }
+  ],
+
+  "patternOrchestrations": [
+    {
+      "kind": "patternOrchestration",
+      "name": "Enterprise Delivery Endeavour",
+      "description": "The whole shape of a funded programme: shaping, delivery with assurance alongside and sprints inside, then benefits and closure.",
+      "narrativeTypeName": "STAR",
+      "stages": [
+        {
+          "patternName": "Programme Shaping",
+          "seq": 1,
+          "relationship": "sequential",
+          "exitCriteria": {
+            "name": "Programme is mandated and funded",
+            "description": "Whether the programme has the authority and money to proceed.",
+            "given": ["a business case has been prepared"],
+            "when": ["the investment board reviews it"],
+            "then": ["funding is released and a sponsor is named"]
+          },
+          "narrativeContexts": [
+            { "seq": 1, "narrativeElementName": "Situation", "context": "An intent exists but nothing is funded, staffed or mandated." }
+          ]
+        },
+        {
+          "patternName": "Milestone Plan",
+          "seq": 2,
+          "relationship": "sequential",
+          "entryCriteria": {
+            "description": "A sponsor, a funded business case and a mobilised delivery team are in place before any phase starts."
+          },
+          "exitCriteria": {
+            "name": "Service is live and supported",
+            "description": "Whether the service can be run by the people who will own it.",
+            "given": ["the service has been through a live assessment"],
+            "when": ["the operating team takes the pager"],
+            "then": ["the service runs without the delivery team on standby"]
+          },
+          "narrativeContexts": [
+            { "seq": 1, "narrativeElementName": "Task", "context": "Deliver a service that meets the need the business case identified." },
+            { "seq": 2, "narrativeElementName": "Action", "context": "Four phases of increasing commitment, each one earning the right to the next." }
+          ]
+        },
+        {
+          "patternName": "Benefits Realisation",
+          "seq": 3,
+          "relationship": "sequential",
+          "entryCriteria": {
+            "description": "The service has been live long enough for outcome data to mean something."
+          },
+          "exitCriteria": {
+            "name": "Benefits are evidenced",
+            "description": "Whether the promised outcomes can be shown to have happened.",
+            "given": ["the service has been live for a full reporting period"],
+            "when": ["actuals are compared against the business case forecast"],
+            "then": ["the variance is explained and accepted by the sponsor"]
+          },
+          "narrativeContexts": [
+            { "seq": 1, "narrativeElementName": "Result", "context": "The forecast in the business case is tested against what actually happened." }
+          ]
+        },
+        {
+          "patternName": "Programme Closure",
+          "seq": 4,
+          "relationship": "sequential",
+          "narrativeContexts": [
+            { "seq": 2, "narrativeElementName": "Result", "context": "The programme ends deliberately, with ownership transferred and governance shut down." }
+          ]
+        },
+
+        {
+          "patternName": "Assurance and Governance",
+          "seq": 2,
+          "relationship": "concurrent",
+          "relativeTo": { "patternName": "Milestone Plan" },
+          "recurrence": "once",
+          "exitCriteria": {
+            "name": "Every gate has a recorded decision",
+            "description": "Whether oversight kept up with delivery.",
+            "given": ["the plan has passed its final phase boundary"],
+            "when": ["the assurance record is reviewed"],
+            "then": ["each phase boundary carries a dated continue-or-stop decision"]
+          }
+        },
+        {
+          "patternName": "Architecture Runway",
+          "seq": 2,
+          "relationship": "concurrent",
+          "relativeTo": {
+            "patternName": "Milestone Plan",
+            "viewNames": ["Discovery", "Alpha"]
+          },
+          "recurrence": "once"
+        },
+
+        {
+          "patternName": "Sprint",
+          "seq": 2,
+          "relationship": "nested",
+          "relativeTo": { "patternName": "Milestone Plan" },
+          "recurrence": "perView",
+          "exitCriteria": {
+            "name": "Increment accepted",
+            "description": "Whether the increment met the phase objective it was serving.",
+            "given": ["a sprint has run to its end"],
+            "when": ["the increment is reviewed against the phase objective"],
+            "then": ["the increment is accepted or its shortfall carries into the next sprint"]
+          }
+        },
+        {
+          "patternName": "Release Train",
+          "seq": 2,
+          "relationship": "nested",
+          "relativeTo": {
+            "patternName": "Milestone Plan",
+            "viewNames": ["Beta", "Live"]
+          },
+          "recurrence": "once"
+        },
+
+        {
+          "orchestrationName": "Product Team Operating Rhythm",
+          "seq": 2,
+          "relationship": "nested",
+          "relativeTo": {
+            "patternName": "Milestone Plan",
+            "viewNames": ["Alpha", "Beta"]
+          },
+          "recurrence": "perView",
+          "entryCriteria": {
+            "name": "Standing team available to the phase",
+            "description": "Whether a product team exists to carry the phase rather than the programme staffing it anew.",
+            "given": ["a phase of the milestone plan has been opened"],
+            "when": ["a standing product team is assigned to it"],
+            "then": ["that team's own rhythm runs inside the phase rather than the programme scheduling its sprints"]
+          },
+          "exitCriteria": {
+            "name": "Phase objective met by the team",
+            "description": "Whether the embedded rhythm delivered what the phase asked of it.",
+            "given": ["the embedded rhythm has been running for the phase"],
+            "when": ["the phase objective is reviewed"],
+            "then": ["the phase closes or its shortfall carries into the next one"]
+          }
+        },
+        {
+          "patternName": "Assurance and Governance",
+          "seq": 2,
+          "relationship": "concurrent",
+          "relativeTo": {
+            "orchestrationName": "Product Team Operating Rhythm"
+          },
+          "recurrence": "perView"
+        },
+
+        {
+          "patternName": "Incident Response",
+          "seq": 2,
+          "relationship": "onDemand",
+          "trigger": {
+            "name": "Production impact recognised",
+            "description": "What the team notices that causes the incident pattern to be run.",
+            "given": ["the service is carrying production traffic"],
+            "when": ["a user-visible failure is recognised by anyone on the team"],
+            "then": ["the incident response pattern is entered regardless of the phase in progress"]
+          }
+        },
+        {
+          "patternName": "Scope Change Control",
+          "seq": 1,
+          "relationship": "onDemand",
+          "trigger": {
+            "name": "Change outside the agreed plan",
+            "description": "What causes the change pattern to be run rather than absorbed.",
+            "given": ["a baselined plan exists"],
+            "when": ["a stakeholder asks for something the plan does not accommodate"],
+            "then": ["the change is raised formally rather than absorbed into the next sprint"]
+          }
+        }
+      ]
+    },
+
+    {
+      "kind": "patternOrchestration",
+      "name": "Product Team Operating Rhythm",
+      "description": "The same sprint and incident patterns, reused by a standing product team with no programme around them.",
+      "stages": [
+        {
+          "patternName": "Sprint",
+          "seq": 1,
+          "relationship": "sequential",
+          "exitCriteria": {
+            "name": "Increment released",
+            "description": "Whether the cycle ended with something in users' hands.",
+            "given": ["a sprint has run to its end"],
+            "when": ["the increment is reviewed"],
+            "then": ["it is released or explicitly held with a reason"]
+          }
+        },
+        {
+          "patternName": "Incident Response",
+          "seq": 1,
+          "relationship": "onDemand",
+          "trigger": {
+            "name": "Production impact recognised",
+            "description": "What the team notices that interrupts the rhythm.",
+            "given": ["the product is live"],
+            "when": ["a user-visible failure is recognised"],
+            "then": ["the sprint is interrupted and the incident pattern is entered"]
+          }
+        }
+      ]
+    }
+  ]
+}

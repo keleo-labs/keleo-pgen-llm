@@ -32,6 +32,8 @@ tags = ["pii"]
     '''@example\.(com|org|net)\b''',
     # Reserved test domain used in skill evaluation fixtures.
     '''@example\.invalid\b''',
+    # Reserved GitLab fixture host in cross-repository URL tests.
+    '''@gitlab\.example\.invalid\b''',
     '''@(yourdomain|domain|company|acme)\.''',
     # Package manifest and commit trailer fields, not correspondence.
     '''\bnoreply@''',

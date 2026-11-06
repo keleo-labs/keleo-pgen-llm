@@ -576,16 +576,17 @@ def cmd_dependents(target_name, index):
     }
 
 
-def _load_practices_from_method_dir(method_data, method_path):
-    """Load practice JSON files from a method's directory, matched by name field.
+def _load_practices_from_method_dir(method_data, method_path, search_dirs):
+    """Load method members locally, then resolve any external members by name.
 
     Args:
         method_data: Parsed method JSON dict.
         method_path: Path to the method JSON file.
+        search_dirs: Directories to search for members absent beside the method.
 
     Returns:
         Dict mapping practice name to (data, file_path) tuples.
-        Practices not found in the directory are omitted.
+        Practices not found locally or in search directories are omitted.
     """
     practice_names = set(method_data.get("practiceNames", []))
     method_dir = Path(method_path).parent
@@ -603,10 +604,21 @@ def _load_practices_from_method_dir(method_data, method_path):
         if name and name in practice_names:
             practices[name] = (data, json_file)
 
+    missing = practice_names - practices.keys()
+    if missing:
+        index, _ = build_index(search_dirs)
+        for name in missing:
+            match = resolve_name(name, index, prefer_filesystem=True, prefer_canonical=True)
+            if match["status"] != "found":
+                continue
+            data, err = load_resolved_json(match)
+            if not err and detect_kind(data) == "practice":
+                practices[name] = (data, match["path"])
+
     return practices
 
 
-def cmd_tiers(file_path):
+def cmd_tiers(file_path, search_dirs=DEFAULT_SEARCH_DIRS):
     """Compute dependency tiers for all practices in a method.
 
     Tier 1: practices whose practiceDependencyNames contains no other
@@ -626,7 +638,7 @@ def cmd_tiers(file_path):
     if not practice_names:
         return {"error": "Method has no practiceNames"}
 
-    practices = _load_practices_from_method_dir(data, file_path)
+    practices = _load_practices_from_method_dir(data, file_path, search_dirs)
 
     tier1 = []
     tier2 = []
@@ -1120,7 +1132,7 @@ def main():
             print(json.dumps({"error": f"File not found: {args.tiers}"}) if args.json
                   else f"Error: File not found: {args.tiers}")
             sys.exit(1)
-        result = cmd_tiers(args.tiers)
+        result = cmd_tiers(args.tiers, args.search_dirs)
         print(json.dumps(result, indent=2) if args.json else fmt_tiers(result))
         sys.exit(0)
 

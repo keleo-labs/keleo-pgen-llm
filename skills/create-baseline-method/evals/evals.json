@@ -6,7 +6,7 @@
       "id": 1,
       "name": "horticulture-essentials",
       "prompt": "Create a baseline practice for horticulture management.",
-      "expected_output": "Baseline practice with custom focuses, 8-15 foundational alphas, 6-12 activity spaces, 5-10 competencies.",
+      "expected_output": "Baseline practice with custom focuses, 8-15 foundational alphas, 6-12 activity spaces, 5-10 competencies, and a README linking the model, phase documents, prompt history and parent baseline folder when present, with model and schema versions.",
       "directory": "baselines/horticulture-essentials"
     },
     {

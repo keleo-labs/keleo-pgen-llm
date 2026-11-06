@@ -2,7 +2,7 @@
 name: plan-from-feedback
 description: Publish register issues to project trackers, then resolve keleo-pgen-llm issues — skills, prompts and utilities from the public tracker, practice content from the register
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 triggerPatterns:
   - "plan.*feedback"
   - "feedback.*plan"
@@ -89,8 +89,16 @@ upfront** — read the relevant section when a trigger fires:
 |---|---|---|
 | `gh` | Yes | GitHub issues for the three public projects |
 | `glab` | For cross-project | Internal GitLab issues for keleo-studio-gas and keleo-userskillz |
-| `gws` CLI | Yes | Reads and writes the register; only this project needs it |
-| `config/user-config.json` | Yes | Register spreadsheet id and optional bundle repository credentials |
+| Codex `gws` skill and Google Workspace MCP | Yes | Reads and writes the register through Sheets tools |
+| `config/user-config.json` | Yes | Register spreadsheet ID and optional bundle repository credentials |
+
+Load the global Codex `gws` skill before accessing the register. Use
+`get_spreadsheet_info` to identify the sheet and table, `read_sheet_values` to
+read rows, and the matching Sheets MCP edit tool to write columns P–V. Read
+each row again after a write. `utils/issue-register.py` remains an offline
+draft validator and a legacy CLI client; do not invoke its online modes from
+Codex. If the Workspace tools are missing, follow the `gws` skill's connection
+guidance before treating the register as unavailable.
 
 ---
 

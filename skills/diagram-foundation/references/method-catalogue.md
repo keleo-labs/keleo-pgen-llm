@@ -1,6 +1,6 @@
 # Diagram method catalogue
 
-Version: 1.0.0
+Version: 1.1.0
 
 Which diagram to draw, and how it gets produced here. Read this before
 authoring a spec. Load one `methods/<slug>.md` page afterwards — not all of
@@ -62,6 +62,8 @@ the method still appears because knowing it exists is part of choosing well.
 | Isometric architecture | High | Prospects, keynote audiences | Visual design practice | A launch or keynote needs visual weight more than it needs precision | — Figma, Illustrator |
 
 ### Process and domain
+
+| [Keleo practice diagrams](methods/keleo.md) | Practice graph | Practice authors and reviewers | Keleo Studio | Showing declared dependencies, orchestration, practice patterns, concern or activity hierarchy, alpha states or relationships | A native spec or copied Studio SVG renderer |
 
 | Method | Abstraction | Audience | Origin | Reach for it when | Here |
 |---|---|---|---|---|---|

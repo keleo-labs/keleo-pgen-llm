@@ -1,0 +1,23 @@
+{
+  "skill_name": "content-repos",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a local content git repo named content-core beside this checkout. Set up this project to put a new baselines/example-baseline workspace there. Keep it local; do not create a remote or push.",
+      "expected_output": "Creates a sibling local git repository, installs the content ignore rules, writes a root README that explains Keleo and this repository's content and links to the keleo-language and keleo-pgen-llm GitHub projects, registers it in ignored versioned config, prepares and mounts only example-baseline, checks health, and creates no remote or push.",
+      "contract_scenarios": ["Create a local content repository", "Explain a content repository to readers", "Expose only selected items from an existing repository"]
+    },
+    {
+      "id": 2,
+      "prompt": "I have reports/quarterly-review/quarterly-review.md containing '## Review' and a local content-core git repo beside this checkout. Put that report in the repo but keep a recoverable original. If those named files are absent in this isolated checkout, create them with exactly that content first, then carry out the move. Do not push.",
+      "expected_output": "Uses content-repos.py add after a dry run, verifies the imported copy, retains content-import-backups, checks the mount and owning repo status.",
+      "contract_scenarios": ["Import an existing local item"]
+    },
+    {
+      "id": 3,
+      "prompt": "A content-core git repo beside this checkout contains practices/alpha/alpha.json and practices/beta/beta.json, each with '{}', plus a README.md describing it as an 'Alpha collection'. I want only alpha visible here. If this isolated checkout lacks those files, create that fixture first. Set up the selection and tell me how to detach alpha later without deleting it.",
+      "expected_output": "Registers only alpha, mounts it without copying beta, checks for collisions and broken links, adds the Keleo summary and both primary GitHub links to the README while retaining 'Alpha collection', and explains that unmount removes the link and selection but leaves content.",
+      "contract_scenarios": ["Explain a content repository to readers", "Expose only selected items from an existing repository", "Report a collision without overwriting", "Inspect or detach a repository item"]
+    }
+  ]
+}

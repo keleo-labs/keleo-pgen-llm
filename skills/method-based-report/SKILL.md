@@ -1,7 +1,7 @@
 ---
 name: method-based-report
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Generate plain English reports structured by practice/method narrative frameworks — audience sees domain insight, not Keleo internals
 triggerPatterns:
   - "method.*report"
@@ -62,11 +62,11 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Optional | Google Drive export for PDF output; Google Slides content extraction for source material |
+| Codex `gws` skill and Google Workspace MCP | Optional | Read Workspace source material and export requested output |
 | Playwright MCP | Optional | Content sourcing from web pages when researching the report subject |
 | Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice/method isn't available locally |
 
-Both `gws` and Playwright are content sourcing tools — they help gather subject-matter material during the research phase. The core report generation works without either, as long as the practice context is available locally.
+The `gws` MCP tools and Playwright are content sourcing tools — they help gather subject-matter material during the research phase. The core report generation works without either, as long as the practice context is available locally.
 
 ---
 

@@ -831,8 +831,14 @@ def layout_hub(spec):
     for s in satellites:
         x1, y1 = rect_edge(cx, cy, cw / 2, ch / 2, s["_cx"], s["_cy"])
         x2, y2 = rect_edge(s["_cx"], s["_cy"], s["_w"] / 2, s["_h"] / 2, cx, cy)
-        body.append({"t": "path", "x1": x1, "y1": y1, "cp1x": x1, "cp1y": y1,
-                     "cp2x": x2, "cp2y": y2, "x2": x2, "y2": y2, "straight": True})
+        direction = s.get("direction", "outgoing")
+        if direction == "incoming":
+            x1, y1, x2, y2 = x2, y2, x1, y1
+        path = {"t": "path", "x1": x1, "y1": y1, "cp1x": x1, "cp1y": y1,
+                "cp2x": x2, "cp2y": y2, "x2": x2, "y2": y2, "straight": True}
+        if direction == "mutual":
+            path["startArrow"] = "arrow"
+        body.append(path)
         labels.extend(edge_label((x1 + x2) / 2, (y1 + y2) / 2, s.get("edgeLabel")))
 
     body.extend(node_block(centre, cx - cw / 2, cy - ch / 2, cw, ch))

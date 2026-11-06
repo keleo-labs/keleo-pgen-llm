@@ -1,7 +1,7 @@
 ---
 name: decision-analysis
 metadata:
-  version: "1.1.1"
+  version: "1.1.2"
 description: Structured trade-off analysis for architectural, strategic, or technical decisions — balanced options evaluation with contextual verdicts
 triggerPatterns:
   - "analyze.*question"
@@ -62,7 +62,7 @@ This skill builds on the common reporting infrastructure. Load these **on demand
 
 | Dependency | Required? | Role |
 |---|---|---|
-| `gws` CLI | Optional | Extract context from Google Docs/Sheets containing requirements or constraints |
+| Codex `gws` skill and Google Workspace MCP | Optional | Read Google Docs/Sheets containing requirements or constraints |
 | Playwright MCP | Optional | Load vendor comparison pages, documentation, or technical references |
 | Remote bundle repository | Optional | Downloads `.keleo` bundles when the target practice isn't available locally |
 

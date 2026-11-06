@@ -24,7 +24,7 @@
         "no Keleo-specific terms appear (alpha, state, activitySpace, workProduct, narrativeType, baseline, contributesTo, mapsTo, relatesTo, checklist item, level of detail, practice language)",
         "the report reads as a standalone document requiring no Keleo knowledge"
       ],
-      "line": 609,
+      "line": 618,
       "assess_categories": [],
       "automatable": false
     },
@@ -42,7 +42,7 @@
         "each top-level section maps to a narrative element from the selected type",
         "section headings are plain English (not raw narrative element names unless naturally appropriate)"
       ],
-      "line": 615,
+      "line": 624,
       "assess_categories": [],
       "automatable": false
     },
@@ -60,7 +60,7 @@
         "the analytical framework from the practice shapes the report's dimensions, criteria, and recommendations",
         "practice concepts are translated into plain language appropriate to the audience"
       ],
-      "line": 621,
+      "line": 630,
       "assess_categories": [],
       "automatable": false
     },
@@ -78,7 +78,7 @@
         "at most one brief line at the end attributes the analytical framework",
         "no structural diagrams, schema references, or methodology deep-dives are included"
       ],
-      "line": 627,
+      "line": 636,
       "assess_categories": [],
       "automatable": false
     },
@@ -98,7 +98,7 @@
         "each link is a `?doc=<document name>` deep link on the configured deployment",
         "the line is generated with `studio-client.py --link ... --attribution`, not hand-written"
       ],
-      "line": 633,
+      "line": 642,
       "assess_categories": [],
       "automatable": false
     },
@@ -114,10 +114,10 @@
       ],
       "then": [
         "the report lives at `reports/<report-slug>/<report-slug>.md`",
-        "its diagram specs and rendered SVGs live in `reports/<report-slug>/assets/`",
+        "its diagram specs or copied practice source JSON and rendered SVGs live in `reports/<report-slug>/assets/`",
         "every embedded diagram path is relative to the markdown and resolves"
       ],
-      "line": 643,
+      "line": 652,
       "assess_categories": [],
       "automatable": false
     },
@@ -137,7 +137,26 @@
         "it lists the report as a deliverable",
         "the session is finalized"
       ],
-      "line": 650,
+      "line": 659,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "report-731",
+      "name": "The report workspace has a navigable README",
+      "feature": "Report Workspace",
+      "given": [
+        "a report and its supporting files have been written"
+      ],
+      "when": [
+        "the reporting run is finalized"
+      ],
+      "then": [
+        "`reports/<report-slug>/README.md` links the report and prompt history where present",
+        "it links additional authored files that exist",
+        "an existing hand-written README is preserved"
+      ],
+      "line": 667,
       "assess_categories": [],
       "automatable": false
     },
@@ -158,7 +177,7 @@
         "the verdict is recorded in `00-prompt-history.md` as a decision",
         "both ran before any PDF export or Google Doc publish"
       ],
-      "line": 658,
+      "line": 674,
       "assess_categories": [],
       "automatable": false
     },
@@ -176,7 +195,7 @@
         "it connects evidence to the mechanism affecting the outcome and the affected participants",
         "it distinguishes sourced facts from inferred consequences"
       ],
-      "line": 669,
+      "line": 685,
       "assess_categories": [],
       "automatable": false
     },
@@ -194,7 +213,7 @@
         "it identifies the buyer, outcome, participant benefits and costs, and contracting, billing, delivery and support responsibilities",
         "missing evidence is explicit rather than replaced by invented economics"
       ],
-      "line": 675,
+      "line": 691,
       "assess_categories": [],
       "automatable": false
     },
@@ -212,7 +231,7 @@
         "priority actions trace to findings and specify a role, prerequisite and success evidence",
         "blockers precede dependent activities and proposed commitments are labelled"
       ],
-      "line": 681,
+      "line": 697,
       "assess_categories": [],
       "automatable": false
     },
@@ -230,7 +249,7 @@
         "causal analysis remains within that scope without an unsolicited execution plan",
         "prose explains the argument while tables support comparison or execution detail"
       ],
-      "line": 687,
+      "line": 703,
       "assess_categories": [],
       "automatable": false
     },
@@ -249,7 +268,7 @@
         "it names a successor model early only when the sources establish that relationship",
         "predecessor names and acronym expansions agree with the sources"
       ],
-      "line": 693,
+      "line": 709,
       "assess_categories": [],
       "automatable": false
     },
@@ -268,7 +287,7 @@
         "explanation and connected analysis remain in prose",
         "a passage without a genuine sequence or set of distinct questions is not turned into a list merely for formatting"
       ],
-      "line": 700,
+      "line": 716,
       "assess_categories": [],
       "automatable": false
     },
@@ -287,7 +306,7 @@
         "a quantified claim with no source is reported as an error",
         "the report's own analysis reads as analysis rather than as established fact"
       ],
-      "line": 709,
+      "line": 725,
       "assess_categories": [],
       "automatable": false
     },
@@ -307,7 +326,7 @@
         "the cited work supports what the sentence attributes to it",
         "a citation for a work that does not exist is reported as an error"
       ],
-      "line": 716,
+      "line": 732,
       "assess_categories": [],
       "automatable": false
     },
@@ -327,7 +346,26 @@
         "a framework named in the attribution line but unused in the report is reported as an error",
         "a report that would read identically with no practice at all is reported as an error"
       ],
-      "line": 724,
+      "line": 740,
+      "assess_categories": [],
+      "automatable": false
+    },
+    {
+      "id": "report-730",
+      "name": "Practice pattern figures retain phase decisions",
+      "feature": "Diagrams",
+      "given": [
+        "a report explains a Keleo practice pattern with phase conditions, maturity targets or a guarded return"
+      ],
+      "when": [
+        "the report illustrates that pattern"
+      ],
+      "then": [
+        "it uses the Studio practice pattern renderer from retained practice JSON",
+        "a portrait layout may show consecutive, numbered parts while keeping the full rendered pattern available",
+        "a guarded return to an earlier part remains visible and names its target phase"
+      ],
+      "line": 750,
       "assess_categories": [],
       "automatable": false
     },
@@ -342,11 +380,11 @@
         "the diagram is produced"
       ],
       "then": [
-        "it is generated by `utils/render-diagram.py` from a JSON spec kept beside the output",
+        "it is generated by `utils/render-diagram.py` from a JSON spec kept beside the output, or by a copied Keleo Studio renderer from the practice JSON",
         "no fenced code block in the report contains box-drawing or ASCII box-art characters",
-        "the spec carries content and structure only, never colours, fonts, or sizes"
+        "a native spec carries content and structure only, never colours, fonts, or sizes"
       ],
-      "line": 734,
+      "line": 757,
       "assess_categories": [],
       "automatable": false
     },
@@ -364,7 +402,7 @@
         "the target path resolves relative to the report",
         "the alt text states the diagram's claim rather than listing its boxes"
       ],
-      "line": 741,
+      "line": 764,
       "assess_categories": [],
       "automatable": false
     },
@@ -383,7 +421,7 @@
         "a section whose content is comparative or quantitative carries a table instead of a diagram",
         "no figure merely restates its own caption"
       ],
-      "line": 747,
+      "line": 770,
       "assess_categories": [],
       "automatable": false
     },
@@ -403,7 +441,7 @@
         "problems are framed as prerequisites, integration and trade-offs rather than as failure or naivety",
         "domain terminology is used in place of colloquial shorthand"
       ],
-      "line": 754,
+      "line": 777,
       "assess_categories": [],
       "automatable": false
     },
@@ -422,7 +460,7 @@
         "where the parts are a parallel set, the framing names how many there are and the role of each",
         "the framing neither restates the heading nor merely announces that the section is beginning"
       ],
-      "line": 762,
+      "line": 785,
       "assess_categories": [],
       "automatable": false
     },
@@ -441,7 +479,7 @@
         "the practice concern appears as a sublabel rather than as the node label",
         "relationships between the instances that the practice does not carry are added to the spec"
       ],
-      "line": 769,
+      "line": 792,
       "assess_categories": [],
       "automatable": false
     },
@@ -459,7 +497,7 @@
         "an italic caption follows it, numbered sequentially through the report",
         "the caption names the figure, where the alt text states its claim"
       ],
-      "line": 776,
+      "line": 799,
       "assess_categories": [],
       "automatable": false
     },
@@ -477,7 +515,7 @@
         "the effective context JSON contains the baseline narrative types",
         "the practice/method domain knowledge is accessible"
       ],
-      "line": 784,
+      "line": 807,
       "assess_categories": [],
       "automatable": false
     },
@@ -495,7 +533,7 @@
         "the skill reports the error clearly",
         "suggests how the user can provide valid input (path to .json or .keleo file)"
       ],
-      "line": 790,
+      "line": 813,
       "assess_categories": [],
       "automatable": false
     },
@@ -514,7 +552,7 @@
         "the primary context drives narrative structure and report organization",
         "supplementary contexts provide domain knowledge for specific sections"
       ],
-      "line": 796,
+      "line": 819,
       "assess_categories": [],
       "automatable": false
     },
@@ -535,7 +573,7 @@
         "5\u201315 citations appear in a standard report",
         "citations are placed at the end of the relevant sentence, before the period"
       ],
-      "line": 805,
+      "line": 828,
       "assess_categories": [],
       "automatable": false
     },
@@ -555,7 +593,7 @@
         "entries are in APA 7 format: `Author. (Year). *Title*. Source. URL`",
         "entries are alphabetized by first author surname"
       ],
-      "line": 814,
+      "line": 837,
       "assess_categories": [],
       "automatable": false
     },
@@ -573,18 +611,18 @@
         "citations reference the original source documents (methodology papers, vendor documentation, technical guides)",
         "no citations reference the Keleo practice, method, or baseline itself"
       ],
-      "line": 822,
+      "line": 845,
       "assess_categories": [],
       "automatable": false
     }
   ],
   "stats": {
-    "total_scenarios": 30,
+    "total_scenarios": 32,
     "total_features": 6,
     "automatable": 0,
-    "manual_only": 30,
+    "manual_only": 32,
     "by_category": {
-      "report": 30
+      "report": 32
     }
   }
 }

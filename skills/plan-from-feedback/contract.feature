@@ -112,6 +112,12 @@ Feature: Plan from Feedback — keleo-pgen-llm
     When the resolution workflow begins
     Then the queue is read from the tracker rather than the register
 
+  Scenario: Register access uses Google Workspace MCP
+    Given the global Codex GWS skill is available
+    When a register row is read or updated
+    Then the skill uses the Sheets MCP tools
+    And an updated row is read back before success is reported
+
   Scenario: Register-linked issue pulls its detail
     Given an issue body names a register row
     When it is triaged

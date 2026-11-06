@@ -2,7 +2,7 @@
 name: create-baseline-method
 description: Generate foundational baseline practice JSON from source methodology
 metadata:
-  version: "1.2.1"
+  version: "1.6.0"
 ---
 
 # create-baseline-method Skill
@@ -10,7 +10,7 @@ metadata:
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.2.0
+**Version:** 1.6.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
 
@@ -84,7 +84,9 @@ This skill orchestrates a 4-phase pipeline:
    - Identify potential custom Focuses (vs default Value/Solution/Endeavor)
 4. **Present the plan and stop.** Include affected components, constraints, required validation and unresolved questions. End the turn without writes; continue only after explicit approval.
 
-5. **After approval, initialise prompt history:**
+5. **After approval, choose the content repository:** If this baseline should be versioned, run `python3 utils/content-repos.py add <repo> baselines <baseline-name> --fix` before creating its workspace. If the directory already exists, this imports it and keeps a local backup. See `docs/content-repos.md`.
+
+6. **Initialise prompt history:**
    ```bash
    python3 utils/prompt-history.py baselines/<baseline-name>/ --init \
      --type baseline --name "<Baseline Name>" \
@@ -96,6 +98,15 @@ This skill orchestrates a 4-phase pipeline:
      --source-type <file|url|google-doc|google-slides> \
      --source-path "<path or URL>" --source-desc "<brief description>"
    ```
+
+   For a Google Workspace URL, load the global Codex `gws` skill, read the source
+   through MCP and save its content as a local Markdown snapshot. Add that snapshot
+   to the shared local catalog with `python3 utils/catalog.py add-source
+   "<local-path>"`; retain the original URL in prompt history. For other sources,
+   pass their local path or URL to the catalog directly. Use `toc`, `search` and
+   `show` to find sections, while retaining
+   the full initial source review. Record section IDs with source locations in the
+   analysis and mapping outputs. Catalog any later research source as well.
 
    **`--init` activates the prompt-history hooks.** From this point until `--finalize`, every
    user turn and every `the agent's question tool` exchange in this session is appended to the
@@ -191,6 +202,7 @@ This skill orchestrates a 4-phase pipeline:
 ```
 baselines/
 └── <baseline-name>/
+    ├── README.md                    # Navigable guide to the authored files
     ├── 00-prompt-history.md         # Session provenance (prompt, interactions, sources, decisions, phases)
     ├── 01-analysis-report.md        # Phase 1 output (~30-50K words)
     ├── 01.5-distilled-essentials.md # Phase 1.5 output (~15-25K words)
@@ -210,7 +222,7 @@ These documents must be readable for all phases:
    - `semantics/alphas.md` — alpha-state semantics, references/instances (§6)
    - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
-3. **`deps/language.schema.json`** - JSON Schema definition
+3. **`deps/schemas/`** - Modular JSON Schema source; use `utils/query-schema.py` for individual definitions
 4. **Optional parent baseline(s)** - If this baseline extends other baselines via `baselinePracticeNames` (see Baseline Dependency Resolution below)
 5. **`skills/verification-foundation/`** — Verification protocol shared with the other generation skills. Read `VERIFY-FOUNDATION.md` once per session, then only `verifiers/phase-<N>.md` at the gate you reach
 
@@ -553,7 +565,7 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --start-phase --phase
 1. **Load Resources**
    ```
    Read baselines/<name>/02-mapping-guide.md (PRIMARY SOURCE)
-   Read deps/language.schema.json
+   Read deps/schemas/practice.schema.json and relevant shared definitions in deps/schemas/common.schema.json
    Read references/semantics/composition.md (aliasing, hierarchies)
    Read references/semantics/alphas.md (alpha semantics)
    Read references/semantics/narrative-and-assets.md (narratives, assets)
@@ -670,6 +682,20 @@ python3 utils/prompt-history.py baselines/<baseline-name>/ --end-phase \
 
 **Step 5: Package into .keleo**
 
+After the final JSON passes verification, write `baselines/<name>/catalog-links.json`
+as a JSON object from element JSON Pointers to arrays of supporting source section
+IDs. Link only evidence actually used. Use `python3 utils/catalog.py
+outline-practice baselines/<name>/<name>.json` to list valid pointers, then build
+and validate the local practice catalog:
+
+```bash
+python3 utils/catalog.py build-practice baselines/<name>/<name>.json --links baselines/<name>/catalog-links.json
+python3 ../keleo-language/validate/validate-catalog.py baselines/<name>/practice-catalog.json --practice baselines/<name>/<name>.json --source-workspace source-catalogs --require-fresh
+```
+
+Resolve stale sources before using them for new claims. Keep both catalogs outside
+the `.keleo` package; citations remain in the baseline JSON.
+
 After validation passes, package the baseline JSON into a `.keleo` archive. If the baseline has `baselinePracticeName` (extends a parent baseline), resolve transitive dependencies and include all parent baselines:
 ```bash
 # Resolve dependencies (if baselinePracticeName is set):
@@ -694,9 +720,14 @@ Record deliverables and finalise prompt history:
 python3 utils/prompt-history.py baselines/<baseline-name>/ --add-deliverable \
   --deliverable-path "bundles/<name>.keleo" --deliverable-desc "Packaged baseline bundle"
 python3 utils/prompt-history.py baselines/<baseline-name>/ --finalize
+python3 utils/write-workspace-readmes.py baselines/<baseline-name>/ --fix
 ```
 `--finalize` stands the hooks down — later turns in this session are no longer appended to the
 Interaction Log. If the user reopens the work, run `--activate` before continuing.
+The README links the baseline JSON, phase documents, prompt history and any other
+authored files present. Its Main file section links any parent baseline folders
+declared by the JSON and shows each model's version and schema version. An
+existing hand-written README is preserved.
 
 **Inspection and fix utilities:** See `utils/README.md` for the full, current list of all utilities. Never use `python3 -c`, `bash -c`, or compound bash scripts. Run `python3 utils/<script>.py --help` for detailed usage.
 

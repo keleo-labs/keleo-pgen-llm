@@ -5,6 +5,13 @@
 
 Feature: Practice/Method Update to Latest Guidance
 
+  Scenario: Changed element links use current source evidence
+    Given a practice has a local catalog with earlier source links
+    When a source-based update adds new claims
+    Then new source links resolve to current snapshots
+    And the practice catalog is rebuilt for the updated JSON digest
+    And unchanged source history remains available
+
   Background:
     Given one or more existing practice/method/baseline JSON files are provided
     And the user invokes /update-method
@@ -31,6 +38,13 @@ Feature: Practice/Method Update to Latest Guidance
     And Phase 3 generates updated JSON
     And diff-practice-json.py shows what changed vs original
     And version is bumped (minor)
+
+  Scenario: Structural updates restore child-to-parent state prerequisites
+    Given a practice has a new alpha that contributesTo an existing alpha
+    When the practice is remapped or reanalysed
+    Then the target alpha is redeclared with its original states intact
+    And each child state is referenced by a meaningful parent state background
+    And existing background prerequisites remain present
 
   Scenario: Full reanalysis mode (Phase 1 → 2 → 3)
     Given assess-practice.py recommends suggestedUpdateMode "full-reanalysis"

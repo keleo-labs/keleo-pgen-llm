@@ -117,7 +117,7 @@ If placeholders are found, resume the agent: "Complete all placeholder sections.
 
 **Key reference files (read from generate-method skill):**
 - Phase 3 prompt: `prompts/phase-3-json.md`
-- Schema: `deps/language.schema.json`
+- Schema source: relevant definitions in `deps/schemas/` (use `utils/query-schema.py`); validation uses `deps/language.schema.json`
 - Baseline: Use effective baseline for semantic context; validate against the **original** user-provided baseline (canonical names). **Parent practice mode:** Set `baselinePracticeName` to the value inherited from the parent practice. Set `practiceDependencyNames` per the "Determining practiceDependencyNames" rule in generate-method SKILL.md (declare the owner of any element this practice names — alpha, pattern or orchestration).
 - Process: See generate-method SKILL.md "Step 3: Phase 3 - JSON Generation" section
 

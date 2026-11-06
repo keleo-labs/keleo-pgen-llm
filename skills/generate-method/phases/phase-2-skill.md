@@ -160,7 +160,7 @@ Read these in order:
 
 **Read** `references/semantics/composition.md` SS4.4 (Redeclaration vs Specialization Decision Framework) and `references/semantics/alphas.md` SS6.1-6.2 before starting.
 
-**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclaration (enriching baseline alphas with additional checklists) is appropriate only when the content is genuinely universal — applicable to all practices that touch that alpha, not just this one. If you find yourself redeclaring more than 1-2 baseline alphas, verify each redeclaration passes the combinability test.
+**Specialization is the expected default.** For domain-specific practices extending a baseline, most new alphas should be specializations (`contributesTo`). Domain content typically introduces concerns with their own state progressions that advance parent alphas — this is specialization by definition. Redeclare each `contributesTo` target to map child states through its state Backgrounds; this structural redeclaration is required and is separate from optional checklist enrichment. Apply the combinability test to checklist enrichment, not these required state mappings.
 
 For EACH concern from Phase 1, apply the decision framework:
 
@@ -785,6 +785,7 @@ All PracticeElement names must be unique across ALL element types within the pra
 ### Pre-Output Validation Checklist
 
 - [ ] All new alphas have `contributesTo` or `mapsTo` (may coexist on different targets; no floating alphas)
+- [ ] Each `contributesTo` target is included in the practice; every child state gates a meaningful target state through `background.alphaStates`
 - [ ] All `mapsTo` alphas have exact state name matches with target alpha
 - [ ] All baseline references use exact canonical names (case-sensitive)
 - [ ] Competency names are exact baseline names

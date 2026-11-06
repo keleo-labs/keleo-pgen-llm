@@ -64,8 +64,8 @@ Feature: Shared team meeting briefing
   Scenario: Retrieve Google Workspace signals through GWS
     Given a series uses Google Calendar, Gmail or a linked Google document
     When its briefing sources are collected
-    Then Google Workspace records are retrieved through the global GWS workflow
-    And a source still unreachable after permitted host access is recorded as unavailable rather than replaced with screen scraping
+    Then Google Workspace records are retrieved through the global GWS skill and MCP tools
+    And a source still unreachable after the skill's connection steps is recorded as unavailable
 
   @rule:report-748
   Scenario: Reuse standing decisions
@@ -95,6 +95,33 @@ Feature: Shared team meeting briefing
     And the recurring meeting name is the title and the dated instance is the first heading, followed by Suggested agenda
     And the remaining sections place Acknowledgements before News and News before Reminders
 
+  @rule:report-762
+  Scenario: Publish a requested Google Doc in meeting tabs
+    Given a verified recurring meeting briefing and a request for a Google Doc
+    When the briefing is published
+    Then its title, date, agenda, summary, working guidance, retrospective and acknowledgements appear in the Briefing tab
+    And News, Reminders and Analysis appear in separate tabs in that order
+    And the News and Analysis headings identify the meeting date with their content and links intact
+
+  Scenario: Keep the link when repairing a published meeting Doc
+    Given a published meeting Doc has the briefing in one tab
+    When its layout is repaired
+    Then the existing Doc URL still opens the briefing
+    And the ordered meeting tabs preserve its content and links
+
+  Scenario: Keep the recurring meeting registry current
+    Given configured series with and without existing reports
+    When a new meeting report passes verification
+    Then the registry lists every configured series
+    And its latest report path points to the new report
+    And a series without a report has a null latest report path
+
+  Scenario: Register a series before its first report
+    Given a new recurring meeting has a configured series
+    When its setup is complete
+    Then the registry lists the series and its calendar title
+    And its latest report path is null
+
   @rule:report-752
   Scenario: Celebrate evidenced contributions
     Given shareable positive feedback, rewards and customer or partner successes
@@ -102,6 +129,33 @@ Feature: Shared team meeting briefing
     Then Acknowledgements before News celebrates the people and their evidenced contributions
     And each person is credited only with the contribution attributed to them in the evidence
     And request completion is distinguished from technical success and commercial success
+
+  @rule:report-763
+  Scenario: Keep self-reported activity in progress context
+    Given a member reports their own work without separate praise or a verified outcome
+    When the shared briefing is composed
+    Then the activity may inform News or Analysis as a reported update
+    And it does not become an Acknowledgement by itself
+
+  @rule:report-764
+  Scenario: Thank every shareable newsletter submission
+    Given a configured newsletter log records distinct shareable submissions in the review period
+    When the shared briefing is composed
+    Then each submission receives a sourced thank-you in Acknowledgements even if omitted from News
+    And its publication status is not overstated
+
+  Scenario: Thank a published article without a submission record
+    Given an article was published in the review window but has no matching submission row
+    When the shared briefing is composed
+    Then its author is thanked for the publication
+    And the publication is not counted as a dated submission
+
+  @rule:report-765
+  Scenario: Put related reports in context of evidenced praise
+    Given third-party praise, a newsletter submission and a self-reported result concern one effort
+    When the shared briefing is composed
+    Then Acknowledgements rests on the praise and the contribution of submitting the article
+    And the self-reported result is qualified context rather than proof of success
 
   @rule:report-753
   Scenario: Avoid inventing recognition

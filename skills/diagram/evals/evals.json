@@ -1,0 +1,34 @@
+{
+  "skill_name": "diagram",
+  "version": "1.4.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "baseline-practice-forms",
+      "contract_scenarios": ["The seven Studio diagram forms have reproducible routes"],
+      "prompt": "From deps/platform-adoption-kernel.json, draw a practice dependency diagram, a Value concern overview, and a Value activity overview. Keep what I need to regenerate them.",
+      "expected_output": "Selects the three documented Keleo routes, uses the source practice and retains native specs alongside the rendered SVGs."
+    },
+    {
+      "id": 2,
+      "name": "state-loop-terse",
+      "contract_scenarios": ["State loops and orchestration placement remain visible"],
+      "prompt": "Draw Platform's alpha states from tests/fixtures/merge-constructs/baseline.json, including the return to Built.",
+      "expected_output": "Uses the copied state-flow renderer and shows the guarded Operational-to-Built loop instead of reducing the model to a linear maturity stack."
+    },
+    {
+      "id": 3,
+      "name": "missing-practice-relation",
+      "contract_scenarios": ["The seven Studio diagram forms have reproducible routes"],
+      "prompt": "Please draw an activity overview from a practice with no activitySpaces.",
+      "expected_output": "Reports that the activity overview has no source relation to draw; does not fabricate activities or produce an empty SVG."
+    },
+    {
+      "id": 4,
+      "name": "practice-pattern-briefing",
+      "contract_scenarios": ["Practice pattern phases retain their decisions and maturity targets", "A split practice pattern keeps its cross-panel return visible"],
+      "prompt": "Illustrate the Partner Account Planning Lifecycle pattern in practices/partner-account-planning/partner-account-planning.json for a portrait briefing. I need its phase decisions, maturity targets and return to discovery, with a full figure I can inspect.",
+      "expected_output": "Uses the copied Keleo Studio practice pattern renderer, retains the source JSON and full SVG, and labels portrait excerpts Part 1 and Part 2 while showing the guarded return to Discover and Analyze on Part 2."
+    }
+  ]
+}

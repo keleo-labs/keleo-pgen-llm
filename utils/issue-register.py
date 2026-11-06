@@ -75,6 +75,7 @@ Draft issue file format — a single object or an array of objects:
 """
 
 import argparse
+import csv
 import difflib
 import json
 import os
@@ -229,6 +230,16 @@ def read_rows(spreadsheet_id, sheet_title):
     width = len(ALL_COLUMNS)
     rows = [row + [""] * (width - len(row)) for row in values[1:]]
     return header, rows
+
+
+def read_csv_rows(path):
+    """Read an exported register CSV without contacting Google Workspace."""
+    try:
+        with open(path, newline="", encoding="utf-8-sig") as source:
+            values = list(csv.reader(source))
+    except (OSError, csv.Error) as exc:
+        fail(f"Cannot read register CSV {path}: {exc}")
+    return values[0] if values else [], values[1:]
 
 
 def row_to_issue(row, row_number):
@@ -617,9 +628,12 @@ def cmd_ensure_columns(spreadsheet_id, dry_run, as_json):
         print(f"Table range widened to {len(ALL_COLUMNS)} columns.")
 
 
-def cmd_list(spreadsheet_id, status, as_json, limit):
-    sheet_title, _sheet_id, _table = get_table(spreadsheet_id)
-    _header, rows = read_rows(spreadsheet_id, sheet_title)
+def cmd_list(spreadsheet_id, status, as_json, limit, csv_path=None):
+    if csv_path:
+        _header, rows = read_csv_rows(csv_path)
+    else:
+        sheet_title, _sheet_id, _table = get_table(spreadsheet_id)
+        _header, rows = read_rows(spreadsheet_id, sheet_title)
     issues = [row_to_issue(row, i) for i, row in enumerate(rows, start=2)]
     if status:
         issues = [iss for iss in issues if iss["status"].strip().lower() == status.strip().lower()]
@@ -832,6 +846,8 @@ def main():
 
     parser.add_argument("--spreadsheet", metavar="URL_OR_ID",
                         help="Override the register from config/user-config.json")
+    parser.add_argument("--csv", metavar="FILE",
+                        help="Read --list from an exported register CSV, offline")
     parser.add_argument("--status", metavar="STATUS",
                         help="Filter --list by status (e.g. New, Resolved)")
     parser.add_argument("--limit", type=int, help="Show only the last N rows with --list")
@@ -888,14 +904,16 @@ def main():
         errors = cmd_validate(load_drafts(args.validate), default_email, args.json)
         sys.exit(1 if errors else 0)
 
-    spreadsheet_id = get_spreadsheet_id(args.spreadsheet)
+    if args.csv and not args.list:
+        parser.error("--csv requires --list")
+    spreadsheet_id = None if args.csv else get_spreadsheet_id(args.spreadsheet)
 
     if args.schema:
         cmd_schema(spreadsheet_id, args.json)
     elif args.ensure_columns:
         cmd_ensure_columns(spreadsheet_id, args.dry_run, args.json)
     elif args.list:
-        cmd_list(spreadsheet_id, args.status, args.json, args.limit)
+        cmd_list(spreadsheet_id, args.status, args.json, args.limit, args.csv)
     elif args.check_duplicates:
         cmd_check_duplicates(spreadsheet_id, load_drafts(args.check_duplicates),
                              args.threshold, args.json)

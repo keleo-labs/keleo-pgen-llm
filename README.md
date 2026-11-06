@@ -46,6 +46,9 @@ ls -la deps/ references/
 
 # 3. (Optional) Configure remote bundle repository
 python3 utils/studio-client.py --configure
+
+# 4. Mount selected private content repositories, if configured
+python3 utils/content-repos.py mount --fix
 ```
 
 ### Verify
@@ -54,6 +57,8 @@ python3 utils/studio-client.py --configure
 python3 utils/validate-practice-json.py --help
 python3 utils/assess-practice.py --help
 ```
+
+To version selected practices, baselines, or reports outside this code repo, follow [the content repository guide](docs/content-repos.md). A fresh checkout needs the configured baseline content mounted before commands that read it.
 
 ## Skills
 
@@ -101,7 +106,7 @@ Deck skills author **Slidev** markdown and publish to Google Slides and PDF. The
 | **Pitch Deck** | `/pitch-deck` | Value propositions, partner/GSI pitches, solution proposals, business cases |
 | **Exec Readout** | `/exec-readout` | Status reports, findings, review outcomes, programme updates |
 
-Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` CLI (Drive upload). See `skills/deck-foundation/DECK-FOUNDATION.md`.
+Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the global Codex `gws` skill backed by Google Workspace MCP (Drive import). See `skills/deck-foundation/DECK-FOUNDATION.md`.
 
 ### System Improvement
 
@@ -110,10 +115,29 @@ Requires Node.js 18+ (Slidev), Playwright chromium (pptx export) and the `gws` C
 | **Report Issue** | `/report-issue` | Record issues, enhancements, or questions in the feedback register for later triage |
 | **Plan from Feedback** | `/plan-from-feedback` | Triage issues from a feedback register, plan and execute fixes across practice, skill, and schema layers |
 | **Improve Tooling** | `/improve-tooling` | Create, extend, or consolidate utility scripts; improve skill instructions |
+| **Content Repos** | `/content-repos` | Create and manage separate git repositories for selected practices, baselines, and reports |
 
 `/report-issue` and `/plan-from-feedback` are two ends of the same register: the first files rows (input columns, Status `New`), the second triages them and writes back the resolution. Both share the register configured in `config/user-config.json`.
 
 ## Pipeline Architecture
+
+### Local research catalogs
+
+Generation keeps two local authoring indexes. `source-catalogs/` holds reusable,
+versioned source snapshots with section text and locators. Each generated practice
+or baseline workspace holds `practice-catalog.json`, an index of its elements and
+their supporting source sections. Run `python3 utils/catalog.py --help` to add a
+source, inspect its outline or search sections, then build and check a practice
+catalog. A changed or unreachable source remains available as a stale snapshot;
+verify a current source before using it for a new claim. Both catalogs are ignored
+by Git and excluded from `.keleo` packages. Citations and references remain in
+the practice JSON.
+
+This section-based navigation takes its cue from [Kumar et al., *STAIR:
+STructure Aware Information Retriever* (2026)](https://arxiv.org/html/2609.03874v1).
+Their reported results concern a fine-tuned retriever on the SearchTome benchmark;
+this project uses document structure for local lookup and does not reproduce that
+model or claim its retrieval accuracy.
 
 ### Extension Practices (3-phase)
 
@@ -183,18 +207,19 @@ keleo-pgen-llm/
 ├── practices/                # Extension practice outputs (per-practice subdirectories)
 ├── baselines/                # Baseline practice outputs (per-baseline subdirectories)
 ├── bundles/                  # Packaged .keleo output
-├── reports/                  # Generated reports (git-ignored)
+├── reports/                  # Generated reports (local or mounted from a content repo)
 ├── utils/                    # ~80 Python utility scripts (validation, packaging, transforms)
 └── AGENTS-ALL.md             # Shared project guidance
 ```
 
-### Key Dependencies (symlinked from keleo-language)
+### Key dependencies
 
 | File | Purpose |
 |------|---------|
-| `deps/language.schema.json` | Practice Language JSON Schema |
-| `deps/platform-adoption-kernel.json` | Platform Adoption Essentials baseline |
-| `deps/partner-ecosystem-baseline.json` | Partner Ecosystem Essentials baseline |
+| `deps/schemas/` | Modular Practice Language schema sources and separate catalog schemas |
+| `deps/language.schema.json` | Generated compatibility schema for existing validators |
+| `deps/platform-adoption-kernel.json` | Compatibility link to the mounted Platform Adoption baseline |
+| `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` | Partner Ecosystem Essentials baseline in a mounted content repo |
 | `references/semantics.md` | Semantic guidance hub (indexes sub-documents) |
 | `references/domain-framework.md` | Enterprise architecture analysis framework |
 

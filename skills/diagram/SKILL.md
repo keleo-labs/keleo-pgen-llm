@@ -1,12 +1,12 @@
 ---
 name: diagram
-description: Choose the right kind of diagram for a job and produce it — architecture, strategy, process, data or behaviour. Use when asked to draw, diagram, visualise, map or sketch a system, architecture, process, workflow, domain, schema, roadmap, capability landscape or org capability; when asked for a C4, UML, sequence, ERD, flowchart, swimlane, BPMN, Wardley map, capability map, Event Storming canvas or architecture diagram; when asked which diagram type suits an audience; or when a report, article or deck needs a figure. Not for charts of quantitative data — that is dataviz.
+description: Choose the right kind of diagram for a job and produce it — architecture, strategy, process, data or behaviour. Use when asked to draw, diagram, visualise, map or sketch a system, architecture, process, workflow, domain, schema, roadmap, capability landscape or org capability; when asked for a C4, UML, sequence, ERD, flowchart, swimlane, BPMN, Wardley map, capability map, Event Storming canvas, Keleo practice dependency, orchestration, practice pattern, alpha, concern, activity, state or relationship diagram; when asked which diagram type suits an audience; or when a report, article or deck needs a figure. Not for charts of quantitative data — that is dataviz.
 compatibility: >-
   Requires Python 3.9+ and, for Mermaid-backed diagram types, the npx CLI at
   npx (Node.js 18+), which fetches mermaid-cli on demand.
   The native layouts need Python only.
 metadata:
-  version: "1.1.1"
+  version: "1.4.0"
 ---
 
 # Diagram
@@ -58,6 +58,10 @@ anyone who knows it and misleads everyone who does not.
 rules, the spec shape, a worked example, the mistakes that method invites.
 Read the one you chose, not the set.
 
+For a Keleo practice diagram, read `references/methods/keleo.md`. Its seven
+routes use the practice language directly; choosing a generic method first
+would lose the meaning of dependencies, pattern phases, state loops or orchestration stages.
+
 ## 4. Author the spec
 
 Two forms, and the method page says which:
@@ -73,6 +77,9 @@ Run it rather than guessing; do not paste its output into a prompt.
 Keep the spec beside its output and under version control. The spec is the
 artifact — an SVG or PNG is a build product. You cannot un-draw an SVG, and
 everything beyond "show the picture" needs the structure.
+
+For a copied Keleo Studio renderer, the practice JSON is the source artifact;
+its method page gives the command and explains the SVG-only output.
 
 Four rules that apply whatever the method:
 

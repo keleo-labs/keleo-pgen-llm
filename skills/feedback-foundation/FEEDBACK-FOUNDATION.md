@@ -1,6 +1,6 @@
 # Feedback Foundation
 
-**Version:** 2.1.0
+**Version:** 2.1.1
 
 Common workflow, rules, and conventions shared by every project's
 `plan-from-feedback` skill. **Load lazily** — read only the section you need at the
@@ -40,7 +40,7 @@ report → register row (full detail, internal)
 ```
 
 **Publishing is centralised.** Only keleo-pgen-llm reads the register — it alone has
-the `gws` dependency and the credentials, and it is the single place unredacted content
+the Google Workspace MCP connection, and it is the single place unredacted content
 is handled. Every other project only ever reads its own tracker.
 
 ---
@@ -137,6 +137,12 @@ For each register row with Status `New` and no Issue URL:
 5. **Comment or create.** On a match, add a comment naming the new register row rather
    than filing again. Otherwise create.
 6. **Write back** Issue URL and Issue State to columns U and V.
+
+For register access in Codex, load the global `gws` skill. Inspect the spreadsheet
+with `get_spreadsheet_info`, read the relevant rows with `read_sheet_values`,
+write through the Sheets MCP edit tool and verify with a second read. Use the
+register URL from `config/user-config.json` or the user-provided Sheet. Do not
+invoke `issue-register.py` online modes or the retired `gws` CLI.
 
 Rows that must not be published get Issue State `Not Published` and a reason in
 Resolution Summary. Two cases reach this: practice content, which is never published,

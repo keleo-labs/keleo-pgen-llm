@@ -29,10 +29,9 @@ You have access to the following resources via the Read tool:
    - Complete mapping specification
    - Read this as primary source for JSON generation
 
-2. **deps/language.schema.json** (JSON Schema)
-   - Authoritative schema definition
-   - Defines structure, required fields, types
-   - READ THIS to understand exact JSON structure
+2. **deps/schemas/** (modular JSON Schema source)
+   - `language.schema.json` defines root dispatch; `practice.schema.json` defines practices and methods; `common.schema.json` defines shared elements
+   - Read the relevant module or use `python3 utils/query-schema.py <TypeName>` for exact properties and required fields
 
 3. **Semantic Guidance** (sub-documents in `references/semantics/`)
    - `references/semantics/practice-elements.md` — PracticeElement foundations, tags, checklists (§5)
@@ -60,8 +59,8 @@ When running Bash commands, use **simple single-command calls** that match auto-
    - This is your PRIMARY source for content
    - Review all mapped elements completely
 
-2. **Read `deps/language.schema.json`**
-   - Understand exact schema structure
+2. **Read the relevant module in `deps/schemas/`**
+   - Start with `practice.schema.json`; consult `common.schema.json` for shared definitions
    - Note required vs optional properties
    - Understand property types (string, array, object)
    - Understand symbolic references vs embedded objects
@@ -436,6 +435,7 @@ Add alphas array:
 **CRITICAL:**
 
 - New alphas MUST have `contributesTo` OR `mapsTo` (NO FLOATING ALPHAS). Both may coexist on the same alpha but must reference different targets.
+- For each new `contributesTo` alpha, include its target alpha in this practice's `alphas`. Redeclare inherited targets with all original states and Background prerequisites intact. Add every child state as an `{alphaName, stateName}` prerequisite in a meaningful target state `background.alphaStates`, merging with existing prerequisites. A child-side `contributesToState` alone does not satisfy this rule.
 - **`mapsTo` alphas**: States MUST exactly match the target alpha (same names, same sequence). Use for IS-A variants.
 - **relatesTo ONLY on new alphas**: Do NOT add relatesTo to baseline alpha redeclarations
   - Redeclarations inherit baseline relationships automatically

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Resolve, prepare, migrate and check team-meeting workspaces. Version 5.0.0.
+"""Resolve, prepare, index and check team-meeting workspaces. Version 5.2.0.
 
 Examples:
   team-meeting.py resolve reports/service-weekly/series.json
   team-meeting.py prepare reports/service-weekly/series.json --at 2026-10-26T09:00:00Z --fix
   team-meeting.py migrate --workspace /path/to/legacy/workspace --fix
   team-meeting.py check-report reports/service-weekly/2026-10-26-0900/report.md
+  team-meeting.py doc-tabs reports/service-weekly/2026-10-26-0900/report.md
+  team-meeting.py sync-registry --fix
 
 Writes default to dry-run. No source service is contacted by this utility.
 """
@@ -23,7 +25,7 @@ import tempfile
 import unittest
 from zoneinfo import ZoneInfo
 
-VERSION = "5.0.0"
+VERSION = "5.2.0"
 CONFIG_VERSION = "1.0.0"
 ROOT = Path(__file__).resolve().parents[1]
 HEADINGS = ["Suggested agenda", "Introductory summary", "How we work",
@@ -134,6 +136,27 @@ def prepare(series_path, at, fix=False, project_root=ROOT):
     return {"directory": str(destination), "configuration": str(destination / "effective-config.json")}
 
 
+def sync_registry(project_root=ROOT, fix=False):
+    """Index configured series and their latest verified local report."""
+    root = Path(project_root).resolve()
+    destination = root / "config/team-meeting/recurring-meetings.json"
+    meetings = []
+    for series in sorted((root / "reports").glob("*/series.json")):
+        config = read_json(series)
+        latest = sorted(report for report in series.parent.glob("????-??-??-????/report.md")
+                        if (verdict := report.parent / "_verification/report-verdict.json").is_file()
+                        and read_json(verdict)["gate"] in ("pass", "pass-with-warnings"))
+        meetings.append({"name": config["calendars"][0]["title"],
+                         "seriesPath": series.relative_to(root).as_posix(),
+                         "latestReportPath": latest[-1].relative_to(root).as_posix() if latest else None})
+    result = {"version": "1.0.0", "meetings": meetings}
+    validate(result, "recurring-meetings.schema.json", root)
+    changed = not destination.exists() or read_json(destination) != result
+    if fix and changed:
+        write_json(destination, result)
+    return {"path": str(destination), "changed": changed, "dryRun": not fix, **result}
+
+
 def report_errors(path):
     lines = Path(path).read_text(encoding="utf-8").splitlines()
     # Ignore fenced examples rather than counting their headings as report sections.
@@ -178,6 +201,25 @@ def report_errors(path):
                     if heading == "Suggested agenda" and not any(re.match(r"^[-*] \S", line) for line in section[start + 1:stop]):
                         errors.append(f"Suggested agenda detail needs briefing bullets: {section[start][4:]}")
     return errors
+
+
+def doc_tabs(path):
+    """Split a checked report into the four ordered Google Doc tab bodies."""
+    errors = report_errors(path)
+    if errors:
+        raise ValueError("; ".join(errors))
+    source = Path(path).read_text(encoding="utf-8")
+    markers = [re.search(rf"^## {re.escape(heading)}$", source, re.MULTILINE) for heading in HEADINGS]
+    starts = [match.start() for match in markers]
+    date = source.splitlines()[1][3:].split(" · ", 1)[0].strip()
+    sections = {heading: source[starts[i]:starts[i + 1] if i + 1 < len(starts) else len(source)]
+                for i, heading in enumerate(HEADINGS)}
+    return {
+        "Briefing": (source[:starts[0]] + "".join(sections[h] for h in HEADINGS[:5])).strip() + "\n",
+        "News": sections["News"].replace("## News\n", f"## News — {date}\n", 1).strip() + "\n",
+        "Reminders": sections["Reminders"].strip() + "\n",
+        "Analysis": sections["Analysis"].replace("## Analysis\n", f"## Analysis — {date}\n", 1).strip() + "\n",
+    }
 
 
 def markdown_fields(text, section):
@@ -343,6 +385,22 @@ class WorkspaceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare(self.series, "2026-10-27T09:00:00", project_root=self.root)
 
+    def test_registry_adds_series_and_updates_latest_report(self):
+        first = sync_registry(self.root)
+        self.assertEqual(first["meetings"][0]["latestReportPath"], None)
+        self.assertFalse(Path(first["path"]).exists())
+        sync_registry(self.root, True)
+        for date in ("2026-10-26-0900", "2026-11-02-0900"):
+            report = self.series.parent / date / "report.md"
+            report.parent.mkdir()
+            report.write_text("# Service operations\n", encoding="utf-8")
+        self.assertIsNone(sync_registry(self.root)["meetings"][0]["latestReportPath"])
+        write_json(report.parent / "_verification/report-verdict.json", {"gate": "pass"})
+        updated = sync_registry(self.root, True)
+        self.assertEqual(updated["meetings"][0]["latestReportPath"],
+                         "reports/service/2026-11-02-0900/report.md")
+        self.assertFalse(sync_registry(self.root)["changed"])
+
     def test_report_shape(self):
         report = self.root / "report.md"
         bodies = {"Acknowledgements": "- No suitable evidence was found.",
@@ -418,6 +476,16 @@ class WorkspaceTests(unittest.TestCase):
         write_json(first, copied)
         self.assertEqual(read_json(second)["records"], [])
 
+    def test_doc_tabs_preserve_sections_and_date_news_analysis(self):
+        report = ROOT / "skills/team-meeting/evals/files/meeting-doc.md"
+        tabs = doc_tabs(report)
+        self.assertEqual(list(tabs), ["Briefing", "News", "Reminders", "Analysis"])
+        self.assertTrue(tabs["Briefing"].startswith("# Sample team sync\n"))
+        self.assertIn("## Acknowledgements", tabs["Briefing"])
+        self.assertTrue(tabs["News"].startswith("## News — 26 October 2026\n"))
+        self.assertTrue(tabs["Analysis"].startswith("## Analysis — 26 October 2026\n"))
+        self.assertEqual(sum(part.count("https://example.com/source") for part in tabs.values()), 2)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -436,21 +504,31 @@ def main():
             sub.add_argument("--fix", action="store_true")
     check = subparsers.add_parser("check-report")
     check.add_argument("report", type=Path)
+    doc = subparsers.add_parser("doc-tabs")
+    doc.add_argument("report", type=Path)
+    registry = subparsers.add_parser("sync-registry")
+    registry.add_argument("--project-root", type=Path, default=ROOT)
+    registry.add_argument("--fix", action="store_true")
     subparsers.add_parser("self-test")
     args = parser.parse_args()
     try:
-        if args.command in ("resolve", "prepare", "migrate", "self-test"):
+        if args.command in ("resolve", "prepare", "migrate", "sync-registry", "self-test"):
             from skill_venv import reexec_into_venv
             reexec_into_venv("keleo-validate", ["jsonschema"])
         if args.command == "resolve":
             result = resolve(args.series, args.project_root)
         elif args.command == "prepare":
             result = prepare(args.series, args.at, args.fix, args.project_root)
+        elif args.command == "sync-registry":
+            result = sync_registry(args.project_root, args.fix)
         elif args.command == "migrate":
             result = migrate(args.workspace, args.fix, args.project_root)
         elif args.command == "self-test":
             suite = unittest.defaultTestLoader.loadTestsFromTestCase(WorkspaceTests)
             return 0 if unittest.TextTestRunner().run(suite).wasSuccessful() else 1
+        elif args.command == "doc-tabs":
+            print(json.dumps(doc_tabs(args.report), ensure_ascii=False))
+            return 0
         else:
             errors = report_errors(args.report)
             print("\n".join(errors) if errors else "Team-meeting report structure: OK")

@@ -47,7 +47,7 @@ Understand the mapping guide structure:
 
 ### Step 2: Read Schema and Extract Versions
 
-1. Read `deps/language.schema.json` — this is the **authoritative source** for ALL JSON structure questions. When uncertain about property names, types, or required fields, consult the schema directly.
+1. Read `deps/schemas/language.schema.json` for root dispatch and its referenced modules for the definitions you need: `practice.schema.json` for practices and methods, `common.schema.json` for shared elements, `manifest.schema.json` for package metadata. Use `python3 utils/query-schema.py <TypeName>` to inspect a definition across modules. `deps/language.schema.json` is generated for existing validators; do not use it as the authoring source.
 
 2. Extract schema version and baseline version:
    ```bash
@@ -182,6 +182,8 @@ Translate each alpha from the mapping guide.
 - Copy baseline state `name` and `description` VERBATIM — do not rephrase
 - Add checklists ONLY to states the mapping guide explicitly enriches
 - Unenriched states: include with empty `"checklist": []`
+
+For each new `contributesTo` alpha, include its target alpha in this practice's `alphas` (redeclaration if inherited). Preserve all target states and existing `background` content; add each child state as `{ "alphaName": "<child>", "stateName": "<state>" }` in the `background.alphaStates` of the target state whose progress it gates. Merge references into existing arrays instead of replacing them. `contributesToState` on the child remains optional and does not replace this parent-side mapping.
 
 **Checklist items** (on alpha states AND work product LODs — same schema type):
 - Objects `{name, description, seq}`, NEVER strings
