@@ -99,6 +99,17 @@ def checks(effective, report):
         any(d["target"] == "Multi-Cluster Federation" for d in dangling),
         dangling,
     )
+    groups = [group["name"] for group in effective.get("patternGroups", [])]
+    yield (
+        "a suppressed inherited pattern group is removed",
+        "Inherited Journey Group" not in groups,
+        groups,
+    )
+    yield (
+        "a suppressed outcome does not invalidate a same-named state reference",
+        not any(d["target"] == "Operational" for d in dangling),
+        [d for d in dangling if d["target"] == "Operational"],
+    )
 
     # merge.md §6.15a — orchestration merging.
     orchestration = named(effective.get("patternOrchestrations"), "Platform Endeavour")
