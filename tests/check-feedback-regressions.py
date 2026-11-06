@@ -174,6 +174,44 @@ with patch.object(grader, "_load_mutations", return_value=[mutation]), \
     assert grader.selftest() == 1
 assert grade.call_count == 1
 assert "planted value is valid" in output.getvalue() and "not caught by" not in output.getvalue()
+
+# Given a derived baseline, when an alpha targets its declared parent, local
+# assessment accepts the relationship and passes the parent to the validator.
+parent = {"kind": "practiceBaseline", "name": "Parent", "alphas": [
+    {"name": "Deliverable", "states": [{"name": "Done"}]}]}
+derived = {"kind": "practiceBaseline", "name": "Derived", "baselinePracticeNames": ["Parent"],
+           "alphas": [{"name": "Capability", "contributesTo": "Deliverable",
+                       "relatesTo": [{"alphaName": "Deliverable", "direction": "outgoing"}],
+                       "states": [{"name": "Done"}]}]}
+assert not assess.check_alpha_relationships(derived, "practiceBaseline", {"Deliverable"})
+assert not assess.check_contributes_to_backgrounds(derived, parent, "practiceBaseline")
+invalid = copy.deepcopy(derived)
+invalid["alphas"][0]["contributesTo"] = "Missing"
+assert any(i["category"] == "baseline-alpha" for i in
+           assess.check_alpha_relationships(invalid, "practiceBaseline", {"Deliverable"}))
+with patch.object(assess.subprocess, "run", return_value=subprocess.CompletedProcess(
+        [], 0, stdout='{"errors": [], "warnings": []}')) as process:
+    report, error = assess.run_schema_validation(
+        Path("derived.json"), Path("schema.json"), "practiceBaseline",
+        dependency_paths=[Path("parent.json")])
+    assert error is None and report["errors"] == []
+    assert process.call_args.args[0] == [
+        "python3", "utils/validate-baseline-json.py", "derived.json", "parent.json", "schema.json"]
+
+# Given two method constituents redeclare one inherited activity space, the
+# composition is valid. A new shared name or duplicate in one member is not.
+shared_space = {"name": "Support the Team"}
+method = {"practices": [
+    {"name": "Structure", "activitySpaces": [shared_space]},
+    {"name": "Evolution", "activitySpaces": [shared_space]},
+]}
+assert assess.check_uniqueness(method, "method", {"Support the Team"}) == []
+assert assess.check_uniqueness(method, "method") == [
+    {"name": "Support the Team", "count": 2}]
+repeated = copy.deepcopy(method)
+repeated["practices"][0]["activitySpaces"].append(shared_space)
+assert assess.check_uniqueness(repeated, "method", {"Support the Team"}) == [
+    {"name": "Support the Team", "count": 3}]
 print("PASS: mixed documents, scan failures, content drift, version constraints and orchestration outcomes")
 
 # Optional kept agent runs: grade only the scoped contract, not unrelated practice minimums.

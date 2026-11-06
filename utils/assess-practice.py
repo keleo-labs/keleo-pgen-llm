@@ -44,7 +44,7 @@ from utils._shared import (load_json_pair, _context_is_stale,
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 BASELINE_REQUIRED_SECTIONS = [
     "focuses", "activitySpaces", "competencies", "narrativeTypes", "alphas"
@@ -164,9 +164,10 @@ def count_elements(data, kind):
     return counts
 
 
-def check_uniqueness(data, kind):
+def check_uniqueness(data, kind, inherited_activity_spaces=None):
     names = Counter()
     cross_practice_allowed = set()
+    occurrences = {}
     sources = [("root", data)]
     if kind == "method":
         for i, p in enumerate(data.get("practices", [])):
@@ -182,14 +183,25 @@ def check_uniqueness(data, kind):
     # can legitimately appear in multiple practices.
     cross_practice_types = {"alphas", "personas", "personaGroups", "assets"}
 
-    for source_name, source in sources:
+    for source_index, (source_name, source) in enumerate(sources):
         for etype in element_types:
             for elem in source.get(etype, []):
                 name = elem.get("name")
                 if name:
                     names[name] += 1
+                    occurrences.setdefault(name, []).append((etype, source_index))
                     if kind == "method" and etype in cross_practice_types and source_name != "root":
                         cross_practice_allowed.add(name)
+
+    if kind == "method":
+        for name in inherited_activity_spaces or ():
+            uses = occurrences.get(name, [])
+            if len(uses) > 1 and all(etype == "activitySpaces" and source_index > 0
+                                     for etype, source_index in uses):
+                # One redeclaration per constituent is valid composition.
+                # A duplicate within one constituent remains an error.
+                if len({source_index for _, source_index in uses}) == len(uses):
+                    cross_practice_allowed.add(name)
 
     duplicates = [
         {"name": name, "count": count}
@@ -341,12 +353,12 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
         if is_baseline:
             contributes_to = alpha.get("contributesTo")
-            if contributes_to:
+            if contributes_to and contributes_to not in known_alpha_names:
                 issues.append({
                     "severity": "error",
                     "category": "baseline-alpha",
                     "path": f"{prefix}.contributesTo",
-                    "message": f"Baseline alpha '{alpha_name}' has contributesTo (baseline alphas are root-level)",
+                    "message": f"Baseline alpha '{alpha_name}' contributesTo unknown alpha '{contributes_to}'",
                     "autoFixable": False,
                 })
 
@@ -362,7 +374,7 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
             for rel_idx, rel in enumerate(relates_to):
                 target = rel.get("alphaName")
-                if target and target not in alpha_names:
+                if target and target not in known_alpha_names:
                     issues.append({
                         "severity": "error",
                         "category": "integrity",
@@ -3625,6 +3637,8 @@ def check_redeclaration_compliance(data, baseline_data, kind):
 
 def check_contributes_to_backgrounds(data, baseline_data, kind):
     """Require each specialization state to gate a state of its declared parent."""
+    if kind == "practiceBaseline":
+        return []
     issues = []
     inherited = {a.get("name"): a for a in (baseline_data or {}).get("alphas", [])}
     sources = data.get("practices", []) if kind == "method" else [data]
@@ -4196,8 +4210,9 @@ def run_schema_validation(file_path, schema_path, kind, baseline_path=None,
     """
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
-        if baseline_path:
-            cmd.append(str(baseline_path))
+        parent = baseline_path or next(iter(dependency_paths or []), None)
+        if parent:
+            cmd.append(str(parent))
         cmd.append(str(schema_path))
     else:
         if not baseline_path:
@@ -4943,16 +4958,6 @@ def main():
 
     counts = count_elements(data, kind)
 
-    duplicates = check_uniqueness(data, kind)
-    if duplicates:
-        all_issues.append({
-            "severity": "error",
-            "category": "uniqueness",
-            "path": "PracticeElement names",
-            "message": f"{len(duplicates)} duplicate name(s): {', '.join(d['name'] for d in duplicates)}",
-            "autoFixable": False,
-        })
-
     if kind == "practiceBaseline":
         structure, struct_issues = check_baseline_structure(data)
     else:
@@ -5119,6 +5124,19 @@ def main():
     merged_bl_alpha_names = None
     if baseline_data:
         merged_bl_alpha_names = {a["name"] for a in baseline_data.get("alphas", []) if a.get("name")}
+    inherited_activity_spaces = {
+        space["name"] for space in (baseline_data or {}).get("activitySpaces", [])
+        if space.get("name")
+    }
+    duplicates = check_uniqueness(data, kind, inherited_activity_spaces)
+    if duplicates:
+        all_issues.append({
+            "severity": "error",
+            "category": "uniqueness",
+            "path": "PracticeElement names",
+            "message": f"{len(duplicates)} duplicate name(s): {', '.join(d['name'] for d in duplicates)}",
+            "autoFixable": False,
+        })
     all_issues.extend(check_alpha_relationships(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     all_issues.extend(check_contributesto_concentration(data, kind, baseline_alpha_names=merged_bl_alpha_names))
     all_issues.extend(check_contributesto_bypass(data, kind, baseline_data))

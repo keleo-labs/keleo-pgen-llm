@@ -90,6 +90,12 @@ do not replace mechanical tests or report verification.
 ## Assessment & Validation
 
 `assess-practice.py` also reports missing `contributesTo` target redeclarations, unmapped child states, and Background prerequisites lost from inherited target states.
+For derived baselines, it resolves declared parent alphas for `relatesTo` and
+`contributesTo`, passes the parent to `validate-baseline-json.py`, and leaves
+parent-state Background validation to that baseline validator.
+For methods, the uniqueness check permits one redeclaration of the same
+inherited activity space in each constituent practice; new duplicate names and
+duplicates inside a constituent still fail.
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
