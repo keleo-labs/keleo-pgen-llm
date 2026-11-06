@@ -619,8 +619,6 @@ def merge_by_name(base_list, overlay_list, base_source=None, overlay_source=None
             if item["name"] in merged:
                 existing = merged[item["name"]]
                 combined = merge_element(existing, item, overlay_source, tracking)
-                if item.get("inheritedStatePolicy") == "replace" and "states" in item:
-                    combined["states"] = copy.deepcopy(item["states"])
                 if stamp_contributors:
                     _stamp_contributor(combined, overlay_source)
                 _track_layer(combined, item, overlay_source, tracking)
@@ -881,27 +879,24 @@ def _visit_elements(container, fn, path=""):
                 _visit_elements(item, fn, path)
 
 
-def _index_descriptions(node, index, path="", overwrite=False):
+def _index_descriptions(node, index, path=""):
     """Collect name-path → description for every element and part in a document."""
     if isinstance(node, dict):
         for key, value in node.items():
-            _index_descriptions(value, index, f"{path}/{key}" if path else key, overwrite)
+            _index_descriptions(value, index, f"{path}/{key}" if path else key)
     elif isinstance(node, list):
         for item in node:
             if not isinstance(item, dict):
                 continue
             name = item.get("name")
             if not isinstance(name, str) or not name:
-                _index_descriptions(item, index, path, overwrite)
+                _index_descriptions(item, index, path)
                 continue
             item_path = f"{path}/{name}"
             description = item.get("description")
             if isinstance(description, str) and description.strip():
-                if overwrite:
-                    index[item_path] = description
-                else:
-                    index.setdefault(item_path, description)
-            _index_descriptions(item, index, item_path, overwrite)
+                index.setdefault(item_path, description)
+            _index_descriptions(item, index, item_path)
 
 
 def finalize_baseline_descriptions(effective, baseline_documents):
@@ -914,20 +909,14 @@ def finalize_baseline_descriptions(effective, baseline_documents):
     this is the enforcement that does not depend on every path having been
     careful.
 
-    Baselines are applied in the order given, earliest winning, except that a
-    derived baseline explicitly replacing inherited states owns the descriptions
-    within that state array.
+    Baselines are applied in the order given, earliest winning, which is the
+    same precedence the merge itself uses.
     """
     index = {}
     for _name, document in baseline_documents:
         for key in MERGEABLE_ARRAYS:
             if key in document:
                 _index_descriptions({key: document[key]}, index)
-        for alpha in document.get("alphas", []):
-            if alpha.get("inheritedStatePolicy") == "replace":
-                _index_descriptions({"alphas": [{
-                    "name": alpha["name"], "states": alpha["states"],
-                }]}, index, overwrite=True)
 
     if not index:
         return 0
