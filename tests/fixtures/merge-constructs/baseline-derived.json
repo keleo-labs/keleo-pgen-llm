@@ -1,0 +1,31 @@
+{
+  "kind": "practiceBaseline",
+  "name": "Derived Merge Baseline",
+  "description": "Fixture for declared parent relationships and state replacement.",
+  "version": "1.0.0",
+  "baselinePracticeNames": ["Merge Constructs Baseline"],
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "The same concern with a derived progression.",
+      "focusName": "Solution",
+      "inheritedStatePolicy": "replace",
+      "states": [
+        {"name": "Identified", "seq": 1, "description": "The derived need is named.", "checklist": []},
+        {"name": "Implemented", "seq": 2, "description": "The platform is implemented.", "checklist": []},
+        {"name": "Measured", "seq": 3, "description": "The platform is measured.", "checklist": []}
+      ]
+    },
+    {
+      "name": "Derived Capability",
+      "description": "A capability that contributes to the parent baseline.",
+      "focusName": "Solution",
+      "contributesTo": "Operational Automation",
+      "states": [
+        {"name": "Identified", "seq": 1, "description": "Identified.", "checklist": []},
+        {"name": "Built", "seq": 2, "description": "Built.", "checklist": []},
+        {"name": "Used", "seq": 3, "description": "Used.", "checklist": []}
+      ]
+    }
+  ]
+}
