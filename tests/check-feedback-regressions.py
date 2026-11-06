@@ -197,6 +197,21 @@ with patch.object(assess.subprocess, "run", return_value=subprocess.CompletedPro
     assert error is None and report["errors"] == []
     assert process.call_args.args[0] == [
         "python3", "utils/validate-baseline-json.py", "derived.json", "parent.json", "schema.json"]
+
+# Given two method constituents redeclare one inherited activity space, the
+# composition is valid. A new shared name or duplicate in one member is not.
+shared_space = {"name": "Support the Team"}
+method = {"practices": [
+    {"name": "Structure", "activitySpaces": [shared_space]},
+    {"name": "Evolution", "activitySpaces": [shared_space]},
+]}
+assert assess.check_uniqueness(method, "method", {"Support the Team"}) == []
+assert assess.check_uniqueness(method, "method") == [
+    {"name": "Support the Team", "count": 2}]
+repeated = copy.deepcopy(method)
+repeated["practices"][0]["activitySpaces"].append(shared_space)
+assert assess.check_uniqueness(repeated, "method", {"Support the Team"}) == [
+    {"name": "Support the Team", "count": 3}]
 print("PASS: mixed documents, scan failures, content drift, version constraints and orchestration outcomes")
 
 # Optional kept agent runs: grade only the scoped contract, not unrelated practice minimums.
