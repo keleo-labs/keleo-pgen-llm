@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """Report which root $defs type the schema's dispatcher selects for a document.
 
-The schema's root is a chain of if/then/else branches that routes on the
-*presence of properties*, not on `kind`. A document whose property set and
-whose `kind` disagree is therefore validated against the wrong shape and
-reports `valid: true` while every constraint of its declared type goes
-unenforced. The known case is a PracticeBaseline that declares the singular
-`baselinePracticeName` instead of the array `baselinePracticeNames`: it routes
-to #/$defs/Practice whatever its `kind` says.
+The schema's root is a chain of if/then/else branches. Standalone practices
+share the Practice definition, whose kind distinguishes baselines from
+extensions. Other document families still route by discriminating properties.
 
 This tool resolves the dispatcher the same way a validator does, reports the
 branch each document lands on, and flags any document where that branch
@@ -32,7 +28,7 @@ DEFAULT_SCHEMA = Path(__file__).resolve().parent.parent / "deps" / "language.sch
 
 # Root `kind` values and the $defs branch each one must route to.
 KIND_TO_DEF = {
-    "practiceBaseline": "PracticeBaseline",
+    "practiceBaseline": "Practice",
     "practice": "Practice",
     "method": "Method",
     "project": "Project",
@@ -65,6 +61,9 @@ def resolve_branch(document, schema):
     while True:
         if "$ref" in node:
             return node["$ref"].rsplit("/", 1)[-1], trail
+        if "allOf" in node:
+            node = next((branch for branch in node["allOf"] if "$ref" in branch), {})
+            continue
         if "if" not in node:
             return None, trail
         condition = node["if"]
