@@ -659,7 +659,8 @@ def merge_assets(base_list, overlay_list, base_source=None, overlay_source=None)
     return list(merged.values())
 
 
-def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_source=None):
+def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_source=None,
+                         tracking=None):
     """Merge PatternGroup lists with entry-level merge by patternName.
 
     Groups merge by canonical name per merge spec §6.15. Within same-name
@@ -695,11 +696,13 @@ def merge_pattern_groups(base_list, overlay_list, base_source=None, overlay_sour
 
                 if overlay_source is not None:
                     combined["_contributingPracticeName"] = overlay_source
+                _track_layer(combined, item, overlay_source, tracking)
                 merged[item["name"]] = combined
             else:
                 entry = copy.deepcopy(item)
                 if overlay_source is not None:
                     entry["_contributingPracticeName"] = overlay_source
+                _track_subtree(entry, overlay_source, tracking)
                 merged[item["name"]] = entry
     return list(merged.values())
 
@@ -1069,17 +1072,50 @@ def finalize_suppression(effective, layer_order):
 
 def _find_dangling_references(effective, removed):
     """Report symbolic references left pointing at a suppressed element."""
-    targets = {entry["name"] for entry in removed if entry.get("name")}
+    def target_kind(path):
+        root = path.split("/", 1)[0]
+        if root == "alphas":
+            return "state" if "/states/" in path else "alpha"
+        if root == "workProducts":
+            return "levelOfDetail" if "/levelsOfDetail/" in path else "workProduct"
+        if root == "patterns":
+            return "patternView" if "/patternViews/" in path else "pattern"
+        return {
+            "outcomes": "outcome",
+            "patternGroups": "patternGroup",
+            "references": "reference",
+        }.get(root, root.removesuffix("s"))
+
+    targets = {}
+    for entry in removed:
+        if entry.get("name"):
+            targets.setdefault(entry["name"], set()).add(target_kind(entry["path"]))
     if not targets:
         return []
     findings = []
+
+    field_kinds = {
+        "contributesToState": "state",
+        "stateName": "state",
+        "recognizedAtStateName": "state",
+        "alphaName": "alpha",
+        "workProductName": "workProduct",
+        "levelOfDetailName": "levelOfDetail",
+        "patternName": "pattern",
+        "patternViewName": "patternView",
+        "recognizedAtPatternViewName": "patternView",
+        "outcomeName": "outcome",
+        "referenceName": "reference",
+    }
 
     def scan(node, path):
         if isinstance(node, dict):
             for key, value in node.items():
                 if key == "name":
                     continue
-                if isinstance(value, str) and value in targets:
+                if isinstance(value, str) and value in targets \
+                        and (key not in field_kinds
+                             or field_kinds[key] in targets[value]):
                     findings.append({"path": path, "property": key, "target": value})
                 else:
                     scan(value, f"{path}/{key}" if path else key)

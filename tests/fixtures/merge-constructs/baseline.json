@@ -81,7 +81,21 @@
       "name": "Build the Platform",
       "description": "Work that brings a platform into existence.",
       "focusName": "Solution",
-      "contributesTo": [{ "alphaName": "Platform", "stateName": "Built" }]
+      "contributesTo": [{ "alphaName": "Platform", "stateName": "Built" }, { "alphaName": "Platform", "stateName": "Operational" }]
+    }
+  ],
+  "outcomes": [
+    {
+      "name": "Operational",
+      "description": "An outcome with the same name as a valid alpha state.",
+      "measureDescription": "Observe whether the outcome was achieved."
+    }
+  ],
+  "patternGroups": [
+    {
+      "name": "Inherited Journey Group",
+      "description": "An inherited group removed by a restricted variant.",
+      "entries": [{ "patternName": "Platform Bootstrap", "seq": 1 }]
     }
   ]
 }

@@ -62,5 +62,21 @@
         { "orchestrationName": "Rollout Endeavour", "seq": 4, "relationship": "nested", "relativeTo": { "patternName": "Steady State" } }
       ]
     }
+  ],
+  "patternGroups": [
+    {
+      "name": "Inherited Journey Group",
+      "description": "An inherited group removed by a restricted variant.",
+      "entries": [],
+      "suppressed": true
+    }
+  ],
+  "outcomes": [
+    {
+      "name": "Operational",
+      "description": "An outcome with the same name as a valid alpha state.",
+      "measureDescription": "Observe whether the outcome was achieved.",
+      "suppressed": true
+    }
   ]
 }
