@@ -44,7 +44,7 @@ from utils._shared import (load_json_pair, _context_is_stale,
 
 
 STANDARD_RELATIONSHIP_TYPES = {"produces", "governed by", "uses"}
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 BASELINE_REQUIRED_SECTIONS = [
     "focuses", "activitySpaces", "competencies", "narrativeTypes", "alphas"
@@ -341,12 +341,12 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
         if is_baseline:
             contributes_to = alpha.get("contributesTo")
-            if contributes_to:
+            if contributes_to and contributes_to not in known_alpha_names:
                 issues.append({
                     "severity": "error",
                     "category": "baseline-alpha",
                     "path": f"{prefix}.contributesTo",
-                    "message": f"Baseline alpha '{alpha_name}' has contributesTo (baseline alphas are root-level)",
+                    "message": f"Baseline alpha '{alpha_name}' contributesTo unknown alpha '{contributes_to}'",
                     "autoFixable": False,
                 })
 
@@ -362,7 +362,7 @@ def check_alpha_relationships(data, kind, baseline_alpha_names=None):
 
             for rel_idx, rel in enumerate(relates_to):
                 target = rel.get("alphaName")
-                if target and target not in alpha_names:
+                if target and target not in known_alpha_names:
                     issues.append({
                         "severity": "error",
                         "category": "integrity",
@@ -3625,6 +3625,8 @@ def check_redeclaration_compliance(data, baseline_data, kind):
 
 def check_contributes_to_backgrounds(data, baseline_data, kind):
     """Require each specialization state to gate a state of its declared parent."""
+    if kind == "practiceBaseline":
+        return []
     issues = []
     inherited = {a.get("name"): a for a in (baseline_data or {}).get("alphas", [])}
     sources = data.get("practices", []) if kind == "method" else [data]
@@ -4196,8 +4198,9 @@ def run_schema_validation(file_path, schema_path, kind, baseline_path=None,
     """
     if kind == "practiceBaseline":
         cmd = ["python3", "utils/validate-baseline-json.py", str(file_path)]
-        if baseline_path:
-            cmd.append(str(baseline_path))
+        parent = baseline_path or next(iter(dependency_paths or []), None)
+        if parent:
+            cmd.append(str(parent))
         cmd.append(str(schema_path))
     else:
         if not baseline_path:
