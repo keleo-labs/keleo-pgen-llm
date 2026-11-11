@@ -2,7 +2,7 @@
 name: exec-readout
 description: Create an executive readout deck — status report, findings, review outcome, programme update — and publish it to Google Slides and PDF.
 metadata:
-  version: "3.0.1"
+  version: "3.1.0"
 ---
 
 # Exec Readout

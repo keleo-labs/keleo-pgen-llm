@@ -1,0 +1,27 @@
+{
+  "skill_name": "writing-style",
+  "version": "1.0.0",
+  "evals": [
+    {
+      "id": 1,
+      "name": "dense-report-paragraph",
+      "contract_scenarios": ["Reader-facing prose uses the shared clarity rules"],
+      "prompt": "Revise this report paragraph for clarity without changing its facts: 'The cross-functional platform service dependency inventory reconciliation activity, which is currently performed by the operations group after each quarterly release, enables the identification of ownership discrepancies, and those discrepancies are then escalated to the service owners for remediation.'",
+      "expected_output": "Keeps quarterly timing, operations ownership, discrepancy identification and escalation; uses shorter noun groups and clear verbs."
+    },
+    {
+      "id": 2,
+      "name": "terse-diagram-labels",
+      "contract_scenarios": ["Reader-facing strings in structured artifacts use the shared rules"],
+      "prompt": "Improve these diagram labels for a reader: 'Enterprise service lifecycle ownership accountability alignment' and 'Service owner approves the release'. Keep 'Service owner' as the official role name.",
+      "expected_output": "Produces readable labels while preserving the official Service owner name and intended relationship."
+    },
+    {
+      "id": 3,
+      "name": "formal-conformance-boundary",
+      "contract_scenarios": ["General clarity does not claim formal conformance"],
+      "prompt": "Rewrite this maintenance instruction clearly and say whether your rewrite is formally ASD-STE100 compliant: 'Following completion of the pre-start checks and verification of the isolation indicator, the operator should proceed with initiation of the pump.'",
+      "expected_output": "States the condition before the action, uses a direct verb, and does not claim formal conformance from a clarity rewrite alone."
+    }
+  ]
+}

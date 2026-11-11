@@ -1,7 +1,7 @@
 ---
 name: method-based-report
 metadata:
-  version: "1.1.2"
+  version: "2.0.0"
 description: Generate plain English reports structured by practice/method narrative frameworks — audience sees domain insight, not Keleo internals
 triggerPatterns:
   - "method.*report"

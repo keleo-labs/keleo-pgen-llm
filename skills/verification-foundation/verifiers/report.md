@@ -208,10 +208,10 @@ Run at **low effort**.
 > You are a REGISTER AND STYLE VERIFIER for a prose deliverable written for a human
 > audience.
 >
-> **First, load the house style.** Read the available writing-style skill.
-> **If it is not present, do not fail and do not skip this check** — that skill is
-> deliberately not vendored into this repository, so its absence is expected in a
-> clone. Fall back to the non-negotiables below, which hold either way.
+> **First, load the project style.** Read `skills/writing-style/SKILL.md` and
+> check its ASD-STE100-derived clarity rules. Apply an available house writing-style
+> skill for additional editorial guidance. The project skill is vendored, so a
+> clone can run this check without the house skill.
 >
 > **Read:** `{REPORT}`, and the output of
 > `python3 utils/lint-report.py {REPORT} --json` so you do not repeat its findings.

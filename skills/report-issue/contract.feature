@@ -3,6 +3,12 @@ Feature: Report Issue
   I want to record issues, enhancements, and questions in the feedback register
   So that they can be triaged and resolved by plan-from-feedback
 
+  Scenario: Published document metadata comes from Studio
+    Given a reported document is not present in a local workspace
+    When the skill resolves its name and version
+    Then it uses Studio MCP to retrieve the published document
+    And it does not require a content repository mount
+
   Background:
     Given a Google Sheet issue register exists with structured table columns A-T
     And the register URL is stored in config/user-config.json

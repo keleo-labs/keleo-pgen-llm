@@ -28,15 +28,13 @@ subject matter.
 
 ## Where credentials live
 
-`.claude/user-config.json` holds the bundle repository deployment URL and its
-bearer token, along with the issue register URL and reporter email. It is
-gitignored and must stay that way. `utils/studio-client.py --configure` writes
-it; nothing else should.
+`config/user-config.json` holds issue register settings and is gitignored.
+Studio MCP keeps its access token in the MCP process, not in this repository.
+Local `.mcp.json` is also gitignored; it can hold the Studio deployment URL.
 
 A credential written anywhere inside the tracked tree is one `git add` away
-from a public commit. If you add tooling that authenticates, write its state
-to `.claude/user-config.json` or to `~/.config/`, and commit an example with
-empty values rather than the real file.
+from a public commit. Keep authentication state outside the tracked tree and
+commit only examples with empty values.
 
 ## Four layers, each catching what the one before cannot
 

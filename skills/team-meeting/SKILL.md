@@ -5,7 +5,7 @@ description: >-
   historical meetings, objectives and team and individual roles. Use for recurring
   team meetings, weekly syncs and team progress calls with a persistent series folder.
 metadata:
-  version: "6.0.0"
+  version: "7.0.0"
 ---
 
 ## Team meeting
@@ -94,7 +94,8 @@ not booked attainment, and overlapping quota views must not be added. Keep sourc
 captures in the requested instance, with restricted material outside its shared
 deliverable. Teams without this configuration do not acquire a quota workflow.
 
-Load the available **writing-style** skill. Apply **red-hat-article-writing** to the
+Read `skills/writing-style/SKILL.md`. Load the available house **writing-style**
+skill for additional editorial guidance. Apply **red-hat-article-writing** to the
 introductory summary and **red-hat-hot-take** to News: read their instructions and
 only the narrative guidance needed for the confirmed choices. This specialization
 embeds their methods in the report; it replaces separate article canvases,

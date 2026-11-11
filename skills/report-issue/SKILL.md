@@ -2,7 +2,7 @@
 name: report-issue
 description: Capture one or more issues, enhancements, or questions from the user and record them in the feedback/issue register for later triage
 metadata:
-  version: "1.0.2"
+  version: "2.0.0"
 triggerPatterns:
   - "report.*issue"
   - "raise.*issue"
@@ -103,7 +103,7 @@ Do not emit any other commentary in this mode. The calling skill owns the conver
 |---|---|---|
 | Codex `gws` skill and Google Workspace MCP | Yes | Reads and writes the Google Sheets register |
 | `config/user-config.json` | Yes | Stores the register spreadsheet ID and the reporter's email (git-ignored, per-user) |
-| Remote bundle repository | Optional | Resolves document version/kind when the reported document isn't available locally |
+| `keleo-studio-mcp` | Yes for published documents | Resolves document version and kind without content mounts |
 
 Load the global Codex **`gws` skill** for Workspace operations. Use its MCP
 tools for sheet metadata, row reads and writes. `utils/issue-register.py`
@@ -231,7 +231,7 @@ python3 utils/discover-dependencies.py --resolve "<Document Name>"
     wastes triage time and invites a wrong "already fixed" closure. Re-check that the issue
     still exists in that version before drafting.
   - **Genuinely different documents** — ask the user which they meant via the agent's question tool.
-- **Not found** — try `python3 utils/studio-client.py --pull "<Document Name>"` and re-resolve. If it still can't be found, record the document name as the user gave it and leave version and kind blank rather than inventing them.
+- **Not found** — search Studio MCP `list_documents`, then use `get_document` for the selected published entry as specified in `skills/SKILL-STANDARD.md` §12. If Studio does not list it, record the user's name and leave version and kind blank rather than inventing them.
 
 Use the document's canonical `name` from the JSON, not a slug or filename — `/plan-from-feedback` resolves rows by that name.
 

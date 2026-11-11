@@ -6,10 +6,13 @@ compatibility: >-
   npx (Node.js 18+), which fetches mermaid-cli on demand.
   The native layouts need Python only.
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # Diagram
+
+Read `skills/writing-style/SKILL.md` before writing labels, captions or
+explanatory prose. Keep official element and relationship names unchanged.
 
 Picking the method is the first decision and the one most often skipped. A
 BPMN model with boundary events shown to a CFO fails; so does a box-and-arrow

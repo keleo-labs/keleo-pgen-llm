@@ -2,7 +2,7 @@
 name: slide-deck
 description: Create a presentation deck and publish it to Google Slides and PDF. Use for any deck request not covered by pitch-deck or exec-readout — talks, training, overviews, workshops, conference sessions.
 metadata:
-  version: "3.0.1"
+  version: "3.1.0"
 ---
 
 # Slide Deck

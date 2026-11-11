@@ -405,7 +405,7 @@ def merge_tier(accumulated, entries, tracking=None):
                 acc_source = accumulated.get("_merge_source", "")
                 if key == "patternGroups":
                     accumulated[key] = merge_pattern_groups(
-                        acc_items, items, acc_source, source_name
+                        acc_items, items, acc_source, source_name, tracking=tracking
                     )
                 elif key == "patternOrchestrations":
                     accumulated[key] = merge_pattern_orchestrations(

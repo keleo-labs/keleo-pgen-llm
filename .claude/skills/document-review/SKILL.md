@@ -1,7 +1,7 @@
 ---
 name: document-review
 metadata:
-  version: "1.1.2"
+  version: "2.0.0"
 description: Review a provided document against practice domain knowledge — what's strong, what could be improved, what isn't needed
 triggerPatterns:
   - "review.*document"

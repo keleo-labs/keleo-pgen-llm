@@ -40,4 +40,4 @@ git -C ../keleo-content-core status --short
 
 The command never stages, commits, pushes, or creates a remote. Review and commit in the owning content repo when you are ready. To stop exposing an item without deleting it, run `python3 utils/content-repos.py unmount practices example-practice --fix`.
 
-The default Platform Adoption baseline is an external content item. Mount it before using `deps/platform-adoption-kernel.json`, which remains a compatibility link. The older Partner Ecosystem baseline formerly under `deps/` has been retired; use `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` after mounting it.
+The `deps/platform-adoption-kernel.json` compatibility link resolves only when you mount or create its local baseline. Project skills use Studio MCP for published baselines without a mount. The older Partner Ecosystem baseline formerly under `deps/` has been retired; Studio MCP supplies its published version, while a mounted local copy remains optional.

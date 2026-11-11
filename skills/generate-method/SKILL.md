@@ -1,8 +1,8 @@
 ---
 name: generate-method
-version: 1.9.0
+version: 2.0.0
 metadata:
-  version: "1.9.0"
+  version: "2.0.0"
 description: Generate Practice Language JSON from methodology documentation using clean 3-phase workflow (Analysis → Mapping → JSON)
 triggerPatterns:
   - "generate.*method"
@@ -15,6 +15,10 @@ triggerPatterns:
 # Method Generation Skill (3-Phase)
 
 This skill transforms enterprise methodology documentation into schema-compliant Practice Language JSON using a clean three-phase workflow that delegates to reference documents rather than embedding knowledge.
+
+Read `skills/writing-style/SKILL.md` before drafting phase documents or
+reader-facing descriptions and narratives in JSON. Pass that path to phase
+subagents so they apply the same clarity rules.
 
 ## Workflow Overview
 
@@ -49,11 +53,11 @@ Each phase is delegated to a subagent that reads a **phase skill document** in `
 
 | Dependency | Required? | Role |
 |---|---|---|
-| Baseline practice JSON | Yes | Target framework that the generated practice extends (e.g., `deps/platform-adoption-kernel.json`) |
+| Baseline practice JSON | Yes, obtained through Studio MCP | Target framework that the generated practice extends |
 | Playwright MCP | Optional | Content sourcing from web-based methodology documentation when `a web fetch tool` fails |
-| Remote bundle repository | Optional | Downloads dependency `.keleo` bundles not available locally (via `studio-client.py`) |
+| `keleo-studio-mcp` | Yes | Finds published baselines, practices and methods without content mounts |
 
-The baseline JSON is the only hard requirement — it defines the alphas, competencies, and activity spaces that the generated practice maps to. Playwright is a content sourcing fallback for JavaScript-heavy methodology sites. Remote bundle access is used during dependency resolution when referenced practices aren't found locally.
+The baseline JSON defines the alphas, competencies, and activity spaces that the generated practice maps to. Obtain published baselines and their dependencies through Studio MCP using `skills/SKILL-STANDARD.md` §12. Playwright is a content sourcing fallback for JavaScript-heavy methodology sites.
 
 ---
 
@@ -122,7 +126,7 @@ This skill relies on reference documents (READ via Read tool, NOT embedded):
    - `semantics/execution-and-patterns.md` — patterns, outcomes, activities (§8-9)
    - `semantics/narrative-and-assets.md` — narrative management, assets (§10-11)
 3. **deps/schemas/** - Modular JSON Schema source; use `utils/query-schema.py` for individual definitions
-4. **Baseline Practice JSON** - User-provided (e.g., `deps/platform-adoption-kernel.json`)
+4. **Baseline Practice JSON** - Retrieved from Studio MCP, or an explicit unpublished local file
 
 ### Phase Skill Documents
 
@@ -172,15 +176,15 @@ During read-only planning:
    - Keep comprehensive notes in the conversation
 
 2. **Identify context sources (baselines, practices, methods, .keleo bundles):**
-   - Ask user which baseline, parent practice/method, or `.keleo` bundle(s) to use
-   - User can provide **file paths** (`.json` or `.keleo`), **names**, or a mix
-   - **Auto-discover by name:** If user provides a name (no `/`, doesn't end in `.json`/`.keleo`), resolve it:
+   - If no baseline is named, list Studio baselines, infer a candidate from the task, and confirm the choice with the user. Do not require a user-provided file.
+   - User can still provide unpublished local **file paths** (`.json` or `.keleo`), **names**, or a mix.
+   - **Resolve published names through Studio MCP first:** follow `skills/SKILL-STANDARD.md` §12 and fetch the transitive dependencies. For local drafts, resolve by name with:
      ```bash
      python3 utils/discover-dependencies.py --resolve "Name Provided By User"
      ```
-     - `found` → use the resolved path
-     - `ambiguous` → present candidates to user, let them choose (filesystem entries preferred over bundle copies)
-     - `not_found` → list the missing dependency and proposed `studio-client.py --pull` operation in the plan. Download and re-resolve only after approval; if the pull then fails, ask for a local path.
+     - `found` → use the resolved path for unpublished work
+     - `ambiguous` → present candidates to the user
+     - `not_found` → look up the document through Studio MCP; report a genuine Studio miss or access error
    - **`.keleo` bundles:** Accepted directly — all documents inside are extracted and classified
    - **Classify all inputs:**
      ```bash
@@ -743,9 +747,9 @@ This skill does NOT embed domain knowledge. Instead:
 
 Phase skills point to reference documents — they don't duplicate them. If a reference document changes, phase skills pick up the change automatically.
 
-### User-Provided Baseline
+### Baseline selection
 
-The skill does NOT assume a specific baseline practice. Auto-discovery scans `baselines/`, `practices/`, and `deps/` directories to resolve names to paths.
+The skill does not assume a specific baseline. List published baselines through Studio MCP, infer a candidate from the task and confirm it with the user. Local discovery remains available for unpublished work.
 
 ---
 

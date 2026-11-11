@@ -5,6 +5,13 @@
 
 Feature: Baseline Practice Creation from Foundational Framework
 
+  Scenario: Parent baseline comes from Studio
+    Given no content repository is mounted
+    And the new baseline extends a published baseline
+    When the skill resolves parent context
+    Then it retrieves the parent and transitive ancestors through Studio MCP
+    And it does not require a user supplied baseline file
+
   Scenario: Selected baseline lives in its content repository
     Given a content repository is configured for the new baseline
     When the approved baseline workspace is created

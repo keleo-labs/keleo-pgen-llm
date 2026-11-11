@@ -50,7 +50,7 @@ Usage:
     python3 utils/patch-practice-json.py target.json --batch-file enrichments.json
     python3 utils/patch-practice-json.py target.json --batch-file enrichments.json --dry-run
 
-    # Batch spec format (array of {path, merge} operations):
+    # Batch spec format (array of {path, merge} or {path, append} operations):
     # [
     #   {"path": "activities[Gather Intelligence]", "merge": {"ledBy": "Analyst"}},
     #   {"path": "alphas[Plan].states[Approved]", "merge": {"background": {"workProductLevels": [...]}}}
@@ -64,6 +64,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from utils._shared import load_json
+
+__version__ = "1.0.0"
 
 
 def resolve_element_path(data, path):
@@ -187,6 +189,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Patch a practice/baseline JSON file by merging content"
     )
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("target", help="Target JSON file to patch")
     parser.add_argument("--patch-file", "-p",
                         help="JSON file containing patch content (default: read from stdin)")
@@ -213,7 +216,7 @@ def main():
     parser.add_argument("--rename-focus", nargs=2, metavar=("OLD", "NEW"),
                         help="Rename a focus and update all focusName references (targeted, no deep replace)")
     parser.add_argument("--batch-file", "-b", metavar="FILE",
-                        help="JSON file with array of {path, merge} operations to apply in sequence")
+                        help="JSON file with array of {path, merge}, {path, append}, {path, removeNamed}, or {path, removeField} operations")
     parser.add_argument("--value", metavar="JSON_STRING",
                         help="Inline JSON value to use as patch (alternative to --patch-file or stdin)")
     parser.add_argument("--create", action="store_true",
@@ -338,15 +341,46 @@ def main():
         applied = 0
         errors = 0
         for i, op in enumerate(batch_ops):
-            if not isinstance(op, dict) or "path" not in op or "merge" not in op:
-                print(f"Error: batch operation [{i}] must have 'path' and 'merge' keys",
+            actions = [key for key in ("merge", "append", "removeNamed", "removeField") if key in op] if isinstance(op, dict) else []
+            if not isinstance(op, dict) or "path" not in op or len(actions) != 1:
+                print(f"Error: batch operation [{i}] needs 'path' and exactly one of 'merge', 'append', 'removeNamed', or 'removeField'",
                       file=sys.stderr)
                 sys.exit(1)
             op_path = op["path"]
-            op_merge = op["merge"]
             try:
                 parent, final_key = resolve_element_path(data, op_path)
+                if "removeField" in op:
+                    if op["removeField"] is not True or not isinstance(parent, dict) or final_key not in parent:
+                        raise KeyError(f"{op_path} is not an existing object field")
+                    del parent[final_key]
+                    changes.append(f"  {op_path}: removed field")
+                    applied += 1
+                    continue
                 target_obj = _navigate(parent, final_key)
+                if "append" in op:
+                    values = op["append"]
+                    if not isinstance(target_obj, list) or not isinstance(values, list):
+                        raise TypeError(f"{op_path} and append value must be arrays")
+                    target_obj.extend(values)
+                    changes.append(f"  {op_path}: appended {len(values)} item(s)")
+                    applied += 1
+                    continue
+                if "removeNamed" in op:
+                    if not isinstance(target_obj, list):
+                        raise TypeError(f"{op_path} is not an array")
+                    name = op["removeNamed"]
+                    matches = [entry for entry in target_obj
+                               if isinstance(entry, dict) and entry.get("name") == name]
+                    if len(matches) != 1:
+                        raise KeyError(f"expected one item named {name!r}, found {len(matches)}")
+                    target_obj.remove(matches[0])
+                    for seq, entry in enumerate(target_obj, 1):
+                        if isinstance(entry, dict) and "seq" in entry:
+                            entry["seq"] = seq
+                    changes.append(f"  {op_path}: removed {name!r}; renumbered seq")
+                    applied += 1
+                    continue
+                op_merge = op["merge"]
                 if isinstance(op_merge, dict) and isinstance(target_obj, dict):
                     for k, v in op_merge.items():
                         target_obj[k] = v

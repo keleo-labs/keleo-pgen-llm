@@ -1,6 +1,6 @@
 ---
 name: update-method
-version: 1.4.0
+version: 2.0.0
 description: Update existing Practice/Method JSON files to align with latest generate-method guidance and baseline practice
 triggerPatterns:
   - "update.*method"
@@ -17,6 +17,10 @@ triggerPatterns:
 # Update Method/Practice Skill
 
 This skill updates existing Practice or Method JSON files to align with the latest generate-method skill guidance, baseline practice updates, and schema changes.
+
+Read `skills/writing-style/SKILL.md` when revising reader-facing descriptions,
+narratives or phase documents. Carry this path into any generate-method phase
+subagent used for the update.
 
 In remap and reanalysis modes, apply generate-method's child-to-parent state Background rule to every `contributesTo` alpha. Preserve existing target-state prerequisites while adding child-state references. Reference-only and auto-fix modes do not remap alpha structure.
 
@@ -175,14 +179,9 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
 
 1. **Auto-discover and resolve all dependencies:**
    ```bash
-   python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive --remote
+   python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive
    ```
-   This scans `baselines/`, `practices/`, `deps/`, and `bundles/` directories, plus the cached remote index. Extracts `baselinePracticeName` and `practiceDependencyNames` from the existing JSON, and recursively resolves all baseline dependencies.
-   - If any dependencies are `not_found`: attempt remote download:
-     ```bash
-     python3 utils/studio-client.py --pull "<dependency-name>"
-     ```
-     If pull succeeds, re-resolve. If pull fails, ask user for the file paths.
+   This scans local workspaces and bundles. For each published dependency, use Studio MCP `list_documents` and `get_document` as specified in `skills/SKILL-STANDARD.md` §12, then re-resolve using the MCP cache paths. Do not require the user to supply a file or mount.
    - If any are `ambiguous`: present candidates to user
 
 1b. **Check for new related practices (since last generation):**
@@ -194,18 +193,7 @@ python3 utils/assess-practice.py <file.json> --schema deps/language.schema.json 
    "Since this practice was last generated, these related practices are now available: ..."
    User decides whether to include them in the update (adds to `practiceDependencyNames` and effective context).
 
-1c. **Check for newer remote versions:**
-   ```bash
-   python3 utils/studio-client.py --check "<practice-name>"
-   ```
-   If remote has a newer version than local:
-   - Show version comparison to user
-   - Offer: (a) use local version, (b) pull remote and use that, (c) pull remote and diff:
-     ```bash
-     python3 utils/studio-client.py --pull "<name>"
-     python3 utils/diff-practice-json.py <local.json> <remote.json> --changes-only
-     ```
-   - User decides which version to work from
+1c. **Check the published version:** Use Studio MCP `list_documents` to find the current published document. If its version differs from the local draft, fetch it with `get_document` into the ignored MCP cache and compare with `python3 utils/diff-practice-json.py <local.json> <studio.json> --changes-only`. Show the difference before choosing an update base. Never overwrite the local draft during the fetch.
 
 2. **Confirm resolved dependencies with user:**
    Present all resolved dependencies before proceeding:

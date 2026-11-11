@@ -5,6 +5,14 @@
 
 Feature: Practice Generation from Methodology Documentation
 
+  Scenario: Fresh checkout selects a published baseline
+    Given no content repository is mounted and the user provides no baseline file
+    And Studio MCP lists published baselines
+    When the skill plans a new practice
+    Then it infers a baseline from the task and confirms the choice with the user
+    And it retrieves the selected baseline and transitive dependencies through Studio MCP
+    And it does not overwrite local work in progress
+
   Scenario: Selected practice lives in its content repository
     Given a content repository is configured for the new practice
     When the approved practice workspace is created

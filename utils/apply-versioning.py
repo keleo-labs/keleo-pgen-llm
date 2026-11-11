@@ -28,6 +28,9 @@ Usage:
     # Update multiple files:
     python3 utils/apply-versioning.py deps/*.json baselines/*/*.json practices/*/*.json --fix
 
+    # Read a dependency-ordered file list:
+    python3 utils/apply-versioning.py --files-from files.txt --refresh-deps --fix
+
     # Process all documents in dependency order:
     python3 utils/apply-versioning.py --all --fix
 """
@@ -49,7 +52,7 @@ from utils._shared import (
     version_sort_key,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 
 def normalize_version(version_str):
@@ -362,6 +365,10 @@ def main():
         help="Process all JSON files in the specified directory"
     )
     parser.add_argument(
+        "--files-from", metavar="PATH",
+        help="Read one JSON file path per line from PATH"
+    )
+    parser.add_argument(
         "--all", action="store_true",
         help="Process all JSON files in deps/, baselines/, practices/"
     )
@@ -413,6 +420,9 @@ def main():
     if args.set_version and not re.match(r"^\d+\.\d+\.\d+$", args.set_version):
         parser.error(f"--set-version must match X.Y.Z format, got {args.set_version!r}")
 
+    if args.files_from and (args.files or args.dir or args.all):
+        parser.error("--files-from cannot be combined with file paths, --dir, or --all")
+
     if args.all:
         file_paths = collect_all_files()
     elif args.dir:
@@ -421,10 +431,12 @@ def main():
         file_paths = sorted(glob.glob(f"{dir_path}/*.json"))
         if not file_paths:
             parser.error(f"No JSON files found in {dir_path}/")
+    elif args.files_from:
+        file_paths = [line.strip() for line in Path(args.files_from).read_text(encoding="utf-8").splitlines() if line.strip()]
     elif args.files:
         file_paths = args.files
     else:
-        parser.error("Provide file paths, --dir <directory>, or --all")
+        parser.error("Provide file paths, --files-from, --dir <directory>, or --all")
 
     file_paths = topo_sort_files(file_paths)
 
@@ -442,7 +454,7 @@ def main():
     # Build the copy index for --ahead-of-copies before processing
     copy_index = scan_all_copies() if args.ahead_of_copies else {}
 
-    if (args.bump or args.set_version) and not args.all:
+    if (args.bump or args.set_version or refresh_deps_scope) and not args.all:
         all_files = collect_all_files()
         version_index = build_version_index(all_files)
         for path in all_files:

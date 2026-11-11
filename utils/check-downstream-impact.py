@@ -3,19 +3,13 @@
 
 Orchestrates the change management pipeline:
 1. Generates a ChangeRequest from old vs new JSON (detects nameChanges)
-2. Finds all downstream dependents via discover-dependencies (local + remote)
+2. Finds local downstream dependents via discover-dependencies
 3. Checks each dependent for broken references (dry-run)
 4. Optionally applies fixes and rebuilds affected .keleo bundles
 
 Usage:
     # Check impact of changes (dry-run, local only)
     python3 utils/check-downstream-impact.py <old.json> <new.json>
-
-    # Include remote repository in dependency search
-    python3 utils/check-downstream-impact.py <old.json> <new.json> --remote
-
-    # Auto-pull remote-only dependents so they can be inspected
-    python3 utils/check-downstream-impact.py <old.json> <new.json> --remote --auto-pull
 
     # Check + fix all affected downstream files + rebuild bundles
     python3 utils/check-downstream-impact.py <old.json> <new.json> --fix --rebuild-bundles
@@ -39,6 +33,8 @@ sys.path.insert(0, str(_UTILS_DIR))
 from _shared import (load_json, load_json_from_keleo, load_all_from_keleo,
                      detect_kind, get_project_root)
 
+__version__ = "2.0.0"
+
 
 def _import_from(filename):
     """Import a module from a hyphenated filename."""
@@ -55,32 +51,12 @@ _apply_cr = _import_from("apply-change-request.py")
 _discover = _import_from("discover-dependencies.py")
 
 
-def _find_dependents(practice_name, search_dirs=None, include_remote=False):
+def _find_dependents(practice_name, search_dirs=None):
     """Find all practices/methods that depend on the named practice."""
     dirs = search_dirs or ["baselines", "practices", "deps", "bundles"]
-    if include_remote:
-        _discover._refresh_remote_index_if_stale()
-    index, _ = _discover.build_index(dirs, include_remote=include_remote)
+    index, _ = _discover.build_index(dirs)
     result = _discover.cmd_dependents(practice_name, index)
     return result.get("dependents", [])
-
-
-def _auto_pull_dependent(name):
-    """Pull a remote-only dependent bundle. Returns path if successful."""
-    studio_client = _UTILS_DIR / "studio-client.py"
-    if not studio_client.exists():
-        return None
-    try:
-        proc = subprocess.run(
-            [sys.executable, str(studio_client), "--pull", name, "--json"],
-            capture_output=True, text=True, timeout=60,
-        )
-        if proc.returncode == 0:
-            result = json.loads(proc.stdout)
-            return result.get("path")
-    except (subprocess.TimeoutExpired, OSError, json.JSONDecodeError):
-        pass
-    return None
 
 
 def _load_dependent_data(dep):
@@ -117,8 +93,7 @@ def _find_affected_bundles(affected_names):
 
 
 def check_impact(old_path, new_path, element_types=None, fix=False,
-                 rebuild_bundles=False, search_dirs=None, json_output=False,
-                 include_remote=False, auto_pull=False):
+                 rebuild_bundles=False, search_dirs=None, json_output=False):
     old_data = load_json(old_path)
     new_data = load_json(new_path)
 
@@ -153,23 +128,7 @@ def check_impact(old_path, new_path, element_types=None, fix=False,
 
     type_filter = set(element_types) if element_types else None
 
-    dependents = _find_dependents(practice_name, search_dirs,
-                                  include_remote=include_remote)
-
-    # Auto-pull remote-only dependents that are only in .keleo bundles
-    pulled = []
-    if auto_pull:
-        for dep in dependents:
-            if dep.get("source") == "keleo" and not Path(dep["path"]).exists():
-                pulled_path = _auto_pull_dependent(dep["name"])
-                if pulled_path:
-                    dep["path"] = pulled_path
-                    pulled.append(dep["name"])
-                    print(f"Auto-pulled: {dep['name']}", file=sys.stderr)
-
-        if pulled:
-            dependents = _find_dependents(practice_name, search_dirs,
-                                          include_remote=include_remote)
+    dependents = _find_dependents(practice_name, search_dirs)
 
     if not dependents:
         result = {
@@ -350,6 +309,7 @@ def main():
         description="Check downstream impact of element renames/removals "
                     "in a practice or baseline"
     )
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("old", help="Original (pre-change) JSON file")
     parser.add_argument("new", help="Updated (post-change) JSON file")
     parser.add_argument("--fix", action="store_true",
@@ -358,11 +318,6 @@ def main():
     parser.add_argument("--rebuild-bundles", action="store_true",
                         help="Rebuild .keleo bundles containing affected "
                              "files (requires --fix)")
-    parser.add_argument("--remote", action="store_true",
-                        help="Include remote repository in dependency search")
-    parser.add_argument("--auto-pull", action="store_true",
-                        help="Auto-pull remote-only dependents for inspection "
-                             "(requires --remote)")
     parser.add_argument("--element-types", nargs="*", metavar="TYPE",
                         help="Only check specific element types "
                              "(e.g., WorkProduct State Alpha)")
@@ -374,8 +329,6 @@ def main():
 
     if args.rebuild_bundles and not args.fix:
         parser.error("--rebuild-bundles requires --fix")
-    if args.auto_pull and not args.remote:
-        parser.error("--auto-pull requires --remote")
 
     check_impact(
         args.old, args.new,
@@ -384,8 +337,6 @@ def main():
         rebuild_bundles=args.rebuild_bundles,
         search_dirs=args.search_dirs,
         json_output=args.json_output,
-        include_remote=args.remote,
-        auto_pull=args.auto_pull,
     )
 
 

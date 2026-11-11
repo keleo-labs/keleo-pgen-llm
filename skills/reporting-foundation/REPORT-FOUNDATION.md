@@ -1,6 +1,6 @@
 # Report Foundation
 
-**Version:** 4.5.0
+**Version:** 5.0.0
 
 Common workflow, rules, and conventions shared by all reporting skills. **Load lazily** — read only the section you need at the step that needs it.
 
@@ -91,7 +91,7 @@ Record the dependency version from the resolved document's `version` field — `
 
 ## Context Resolution (Step 1)
 
-Use `resolve-context.py` to load the effective context. The `--transitive` flag resolves both practice dependencies (`practiceDependencyNames`) and baseline dependencies automatically.
+Use Studio MCP `list_documents` and `get_document` to retrieve the published practice, its baseline and every declared dependency before calling `resolve-context.py`. Follow `skills/SKILL-STANDARD.md` §12 and keep the JSON in the ignored MCP cache. Use an explicit local file only for unpublished work. The `--transitive` flag resolves dependencies already present in the search directories.
 
 **Baseline-aware resolution:** When multiple practices are involved, check whether they share the same root baseline before resolving:
 
@@ -100,17 +100,17 @@ Use `resolve-context.py` to load the effective context. The `--transitive` flag 
 
 ```bash
 # Single practice (resolves its dependencies and baseline transitively)
-python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive -o /tmp/report-context.json
+python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug> -o /tmp/report-context.json
 
 # Multiple practices sharing the same baseline — single call
-python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" --transitive -o /tmp/report-context.json
+python3 utils/resolve-context.py --by-name "CRM Foundations" "MEDDPICC Qualification" --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug> -o /tmp/report-context.json
 
 # Multiple practices with different baselines — separate calls
-python3 utils/resolve-context.py --by-name "Practice A" --transitive -o /tmp/primary-context.json
-python3 utils/resolve-context.py --by-name "Practice B" --transitive -o /tmp/supplementary-context.json
+python3 utils/resolve-context.py --by-name "Practice A" --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug> -o /tmp/primary-context.json
+python3 utils/resolve-context.py --by-name "Practice B" --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug> -o /tmp/supplementary-context.json
 
 # To see only specific element types (reduces output size for targeted extraction)
-python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive --extract personas alphas patterns -o /tmp/report-context.json
+python3 utils/resolve-context.py --by-name "CRM Foundations" --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug> --extract personas alphas patterns -o /tmp/report-context.json
 
 # To understand the output JSON structure
 python3 utils/resolve-context.py --describe-output
@@ -121,13 +121,7 @@ python3 utils/resolve-context.py --describe-output
 python3 utils/discover-dependencies.py --resolve-from <practice>.json
 ```
 
-**Name resolution:** `--by-name` uses the dependency index to find documents by their `name` field (not directory name). This eliminates trial-and-error path lookups — e.g., the user may type "CRM-Foundations" but the directory is `crm-foundations/` and the document name is "CRM Foundations".
-
-**If a document is not found locally:** Download it from the remote bundle library:
-```bash
-python3 utils/studio-client.py --pull "<Document Name>"
-```
-Then re-run the `resolve-context.py` command. If `studio-client.py` reports an auth error, guide the user to run `python3 utils/studio-client.py --configure` to set or refresh their keleo-studio-gas credentials.
+**Name resolution:** `--by-name` finds documents by their JSON `name` in the selected bundle cache. Replace `<selected-bundle-slug>` in the examples with the bundle chosen through Studio MCP. If dependencies come from other bundles, add only those selected bundle directories to `--search-dirs`. Searching the whole cache can create duplicate-name ambiguity. If a name is missing from Studio, report that fact or the access error; do not ask for a mounted content repository.
 
 Read the output effective context JSON to extract:
 - **Baseline**: The foundational framework (narrative types, focuses, alphas, competencies)
@@ -264,6 +258,9 @@ Organization Name. (Year). *Title of work*. URL
 
 ## Voice and Tone (Step 3)
 
+- Read `skills/writing-style/SKILL.md` before drafting or revising the report;
+  apply its ASD-STE100-derived clarity rules alongside this report's voice,
+  citation and register requirements.
 - Write in clear, professional English appropriate to the audience
 - Use active voice and concrete language
 - Distinguish sourced facts, analytical judgement and proposed actions at the point of use. Own material inferences with natural phrasing such as "I assess" or "This suggests", without repeating a disclaimer in every paragraph. Cite the premises and qualify uncertainty; a documented eligibility rule does not by itself prove a future capacity loss. Label proposed owners, dates and targets as proposals rather than approved commitments.
@@ -435,12 +432,12 @@ Verify with `python3 utils/lint-report.py <report>.md --checks sections`.
 
 ## Framework Attribution (Step 3)
 
-The report closes with a single italic line naming every practice, method, or baseline that shaped it. **Each name is a hyperlink into keleo-studio-gas** so a reader can open the framework itself — a bare name is a dead end for anyone who wants to look it up.
+The report closes with a single italic line naming every practice, method, or baseline that shaped it. Link each published name to Studio so readers can open the framework.
 
-Generate the line rather than writing it by hand. Pass the document names in the order they should read — primary context first, supplementary contexts after:
+Confirm each name with Studio MCP `list_documents`, then call `get_openapi` and use its current deployment `servers[0].url`. Pass the verified document names in reading order — primary context first, supplementary contexts after:
 
 ```bash
-python3 utils/studio-client.py --link "Platform Operations" "HPE OpenShift" --attribution
+python3 utils/studio-links.py --url "<Studio /exec URL>" "Platform Operations" "HPE OpenShift"
 ```
 
 This emits the finished line, ready to paste as the last line of the report:
@@ -451,10 +448,9 @@ This emits the finished line, ready to paste as the last line of the report:
 
 Notes:
 - Use the **document `name`** (the `name` field of the practice/method/baseline JSON), not the directory or bundle slug. Deep links resolve on exact document name.
-- Names are checked against the remote document index. A name reported as `NOT PUBLISHED` has no page to link to — either push the bundle (`--push`) or drop that name from the attribution.
-- If the remote is unreachable or the API token has expired, the links are still generated and marked `unverified`; that is fine for the report, but the warning is worth repeating to the user. A refreshed token goes in with `python3 utils/studio-client.py --configure --token <token>`.
-- If keleo-studio-gas is not configured, fall back to plain names and tell the user that `python3 utils/studio-client.py --configure` would make the attribution clickable.
-- Verify with `python3 utils/lint-report.py <report>.md --checks attribution`, which fails on any framework name left unlinked.
+- Confirm each name exists with Studio MCP `list_documents` before building the line. The link utility performs URL encoding; it does not verify publication.
+- If Studio MCP is unavailable or unauthenticated, reauthenticate with `start_auth`. If the deployment remains unavailable, use plain names and tell the user why the links could not be verified.
+- Verify with `python3 utils/lint-report.py <report>.md --checks attribution --studio-url "<Studio /exec URL>"`, which fails on any framework name left unlinked.
 
 ---
 
@@ -639,13 +635,13 @@ These rules apply to **all** reporting skills. Each skill references them by ID 
 - Then: at most one brief line at the end attributes the analytical framework
 - And: no structural diagrams, schema references, or methodology deep-dives are included
 
-#### Scenario: Framework attribution links to keleo-studio-gas (@rule:report-610)
+#### Scenario: Framework attribution links to published Studio documents (@rule:report-610)
 - Given: a report closes with a framework attribution line
-- And: keleo-studio-gas is configured in `config/user-config.json`
+- And: Studio MCP lists the named documents as published
 - When: the attribution line is written
 - Then: every practice, method, or baseline named in it is a markdown hyperlink
 - And: each link is a `?doc=<document name>` deep link on the configured deployment
-- And: the line is generated with `studio-client.py --link ... --attribution`, not hand-written
+- And: the line is generated with `studio-links.py`, using the verified document names
 
 ### Feature: Report Workspace
 

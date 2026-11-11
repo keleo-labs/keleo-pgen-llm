@@ -4,6 +4,12 @@ Feature: Plan from Feedback — keleo-pgen-llm
   issues triaged and resolved from its tracker
   So that defects are visible to their maintainers and every change traces to an issue
 
+  Scenario: Published practice content comes from Studio
+    Given a register row names a published practice absent from local workspaces
+    When the skill resolves that document
+    Then it retrieves the published version through Studio MCP
+    And it does not require a content repository mount
+
   Background:
     Given a Google Sheet register holds reports with full internal detail in columns A-V
     And keleo-labs/keleo-pgen-llm is a public GitHub repository with issues enabled

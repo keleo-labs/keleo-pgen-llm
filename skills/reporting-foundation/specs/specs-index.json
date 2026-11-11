@@ -24,7 +24,7 @@
         "no Keleo-specific terms appear (alpha, state, activitySpace, workProduct, narrativeType, baseline, contributesTo, mapsTo, relatesTo, checklist item, level of detail, practice language)",
         "the report reads as a standalone document requiring no Keleo knowledge"
       ],
-      "line": 618,
+      "line": 614,
       "assess_categories": [],
       "automatable": false
     },
@@ -42,7 +42,7 @@
         "each top-level section maps to a narrative element from the selected type",
         "section headings are plain English (not raw narrative element names unless naturally appropriate)"
       ],
-      "line": 624,
+      "line": 620,
       "assess_categories": [],
       "automatable": false
     },
@@ -60,7 +60,7 @@
         "the analytical framework from the practice shapes the report's dimensions, criteria, and recommendations",
         "practice concepts are translated into plain language appropriate to the audience"
       ],
-      "line": 630,
+      "line": 626,
       "assess_categories": [],
       "automatable": false
     },
@@ -78,17 +78,17 @@
         "at most one brief line at the end attributes the analytical framework",
         "no structural diagrams, schema references, or methodology deep-dives are included"
       ],
-      "line": 636,
+      "line": 632,
       "assess_categories": [],
       "automatable": false
     },
     {
       "id": "report-610",
-      "name": "Framework attribution links to keleo-studio-gas",
+      "name": "Framework attribution links to published Studio documents",
       "feature": "Narrative Structure Transparency",
       "given": [
         "a report closes with a framework attribution line",
-        "keleo-studio-gas is configured in `config/user-config.json`"
+        "Studio MCP lists the named documents as published"
       ],
       "when": [
         "the attribution line is written"
@@ -96,9 +96,9 @@
       "then": [
         "every practice, method, or baseline named in it is a markdown hyperlink",
         "each link is a `?doc=<document name>` deep link on the configured deployment",
-        "the line is generated with `studio-client.py --link ... --attribution`, not hand-written"
+        "the line is generated with `studio-links.py`, using the verified document names"
       ],
-      "line": 642,
+      "line": 638,
       "assess_categories": [],
       "automatable": false
     },
@@ -117,7 +117,7 @@
         "its diagram specs or copied practice source JSON and rendered SVGs live in `reports/<report-slug>/assets/`",
         "every embedded diagram path is relative to the markdown and resolves"
       ],
-      "line": 652,
+      "line": 648,
       "assess_categories": [],
       "automatable": false
     },
@@ -137,7 +137,7 @@
         "it lists the report as a deliverable",
         "the session is finalized"
       ],
-      "line": 659,
+      "line": 655,
       "assess_categories": [],
       "automatable": false
     },
@@ -156,7 +156,7 @@
         "it links additional authored files that exist",
         "an existing hand-written README is preserved"
       ],
-      "line": 667,
+      "line": 663,
       "assess_categories": [],
       "automatable": false
     },
@@ -177,7 +177,7 @@
         "the verdict is recorded in `00-prompt-history.md` as a decision",
         "both ran before any PDF export or Google Doc publish"
       ],
-      "line": 674,
+      "line": 670,
       "assess_categories": [],
       "automatable": false
     },
@@ -195,7 +195,7 @@
         "it connects evidence to the mechanism affecting the outcome and the affected participants",
         "it distinguishes sourced facts from inferred consequences"
       ],
-      "line": 685,
+      "line": 681,
       "assess_categories": [],
       "automatable": false
     },
@@ -213,7 +213,7 @@
         "it identifies the buyer, outcome, participant benefits and costs, and contracting, billing, delivery and support responsibilities",
         "missing evidence is explicit rather than replaced by invented economics"
       ],
-      "line": 691,
+      "line": 687,
       "assess_categories": [],
       "automatable": false
     },
@@ -231,7 +231,7 @@
         "priority actions trace to findings and specify a role, prerequisite and success evidence",
         "blockers precede dependent activities and proposed commitments are labelled"
       ],
-      "line": 697,
+      "line": 693,
       "assess_categories": [],
       "automatable": false
     },
@@ -249,7 +249,7 @@
         "causal analysis remains within that scope without an unsolicited execution plan",
         "prose explains the argument while tables support comparison or execution detail"
       ],
-      "line": 703,
+      "line": 699,
       "assess_categories": [],
       "automatable": false
     },
@@ -268,7 +268,7 @@
         "it names a successor model early only when the sources establish that relationship",
         "predecessor names and acronym expansions agree with the sources"
       ],
-      "line": 709,
+      "line": 705,
       "assess_categories": [],
       "automatable": false
     },
@@ -287,7 +287,7 @@
         "explanation and connected analysis remain in prose",
         "a passage without a genuine sequence or set of distinct questions is not turned into a list merely for formatting"
       ],
-      "line": 716,
+      "line": 712,
       "assess_categories": [],
       "automatable": false
     },
@@ -306,7 +306,7 @@
         "a quantified claim with no source is reported as an error",
         "the report's own analysis reads as analysis rather than as established fact"
       ],
-      "line": 725,
+      "line": 721,
       "assess_categories": [],
       "automatable": false
     },
@@ -326,7 +326,7 @@
         "the cited work supports what the sentence attributes to it",
         "a citation for a work that does not exist is reported as an error"
       ],
-      "line": 732,
+      "line": 728,
       "assess_categories": [],
       "automatable": false
     },
@@ -346,7 +346,7 @@
         "a framework named in the attribution line but unused in the report is reported as an error",
         "a report that would read identically with no practice at all is reported as an error"
       ],
-      "line": 740,
+      "line": 736,
       "assess_categories": [],
       "automatable": false
     },
@@ -365,7 +365,7 @@
         "a portrait layout may show consecutive, numbered parts while keeping the full rendered pattern available",
         "a guarded return to an earlier part remains visible and names its target phase"
       ],
-      "line": 750,
+      "line": 746,
       "assess_categories": [],
       "automatable": false
     },
@@ -384,7 +384,7 @@
         "no fenced code block in the report contains box-drawing or ASCII box-art characters",
         "a native spec carries content and structure only, never colours, fonts, or sizes"
       ],
-      "line": 757,
+      "line": 753,
       "assess_categories": [],
       "automatable": false
     },
@@ -402,7 +402,7 @@
         "the target path resolves relative to the report",
         "the alt text states the diagram's claim rather than listing its boxes"
       ],
-      "line": 764,
+      "line": 760,
       "assess_categories": [],
       "automatable": false
     },
@@ -421,7 +421,7 @@
         "a section whose content is comparative or quantitative carries a table instead of a diagram",
         "no figure merely restates its own caption"
       ],
-      "line": 770,
+      "line": 766,
       "assess_categories": [],
       "automatable": false
     },
@@ -441,7 +441,7 @@
         "problems are framed as prerequisites, integration and trade-offs rather than as failure or naivety",
         "domain terminology is used in place of colloquial shorthand"
       ],
-      "line": 777,
+      "line": 773,
       "assess_categories": [],
       "automatable": false
     },
@@ -460,7 +460,7 @@
         "where the parts are a parallel set, the framing names how many there are and the role of each",
         "the framing neither restates the heading nor merely announces that the section is beginning"
       ],
-      "line": 785,
+      "line": 781,
       "assess_categories": [],
       "automatable": false
     },
@@ -479,7 +479,7 @@
         "the practice concern appears as a sublabel rather than as the node label",
         "relationships between the instances that the practice does not carry are added to the spec"
       ],
-      "line": 792,
+      "line": 788,
       "assess_categories": [],
       "automatable": false
     },
@@ -497,7 +497,7 @@
         "an italic caption follows it, numbered sequentially through the report",
         "the caption names the figure, where the alt text states its claim"
       ],
-      "line": 799,
+      "line": 795,
       "assess_categories": [],
       "automatable": false
     },
@@ -515,7 +515,7 @@
         "the effective context JSON contains the baseline narrative types",
         "the practice/method domain knowledge is accessible"
       ],
-      "line": 807,
+      "line": 803,
       "assess_categories": [],
       "automatable": false
     },
@@ -533,7 +533,7 @@
         "the skill reports the error clearly",
         "suggests how the user can provide valid input (path to .json or .keleo file)"
       ],
-      "line": 813,
+      "line": 809,
       "assess_categories": [],
       "automatable": false
     },
@@ -552,7 +552,7 @@
         "the primary context drives narrative structure and report organization",
         "supplementary contexts provide domain knowledge for specific sections"
       ],
-      "line": 819,
+      "line": 815,
       "assess_categories": [],
       "automatable": false
     },
@@ -573,7 +573,7 @@
         "5\u201315 citations appear in a standard report",
         "citations are placed at the end of the relevant sentence, before the period"
       ],
-      "line": 828,
+      "line": 824,
       "assess_categories": [],
       "automatable": false
     },
@@ -593,7 +593,7 @@
         "entries are in APA 7 format: `Author. (Year). *Title*. Source. URL`",
         "entries are alphabetized by first author surname"
       ],
-      "line": 837,
+      "line": 833,
       "assess_categories": [],
       "automatable": false
     },
@@ -611,7 +611,7 @@
         "citations reference the original source documents (methodology papers, vendor documentation, technical guides)",
         "no citations reference the Keleo practice, method, or baseline itself"
       ],
-      "line": 845,
+      "line": 841,
       "assess_categories": [],
       "automatable": false
     }

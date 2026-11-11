@@ -1,6 +1,6 @@
 # Feedback Foundation
 
-**Version:** 2.1.1
+**Version:** 2.2.0
 
 Common workflow, rules, and conventions shared by every project's
 `plan-from-feedback` skill. **Load lazily** — read only the section you need at the

@@ -99,6 +99,17 @@ def checks(effective, report):
         any(d["target"] == "Multi-Cluster Federation" for d in dangling),
         dangling,
     )
+    groups = [group["name"] for group in effective.get("patternGroups", [])]
+    yield (
+        "a suppressed inherited pattern group is removed",
+        "Inherited Journey Group" not in groups,
+        groups,
+    )
+    yield (
+        "a suppressed outcome does not invalidate a same-named state reference",
+        not any(d["target"] == "Operational" for d in dangling),
+        [d for d in dangling if d["target"] == "Operational"],
+    )
 
     # merge.md §6.15a — orchestration merging.
     orchestration = named(effective.get("patternOrchestrations"), "Platform Endeavour")
@@ -226,6 +237,34 @@ def main():
                     print(f"PASS [{label}] {description}")
             else:
                 failures.append(f"FAIL [{label}] {description}: {detail!r}")
+
+    parent = str(FIXTURES / "baseline.json")
+    derived = str(FIXTURES / "baseline-derived.json")
+    for order in ((parent, derived), (derived, parent)):
+        effective, _ = resolve(list(order))
+        platform = named(effective.get("alphas"), "Platform")
+        states = [state["name"] for state in platform.get("states", [])]
+        if states == ["Identified", "Built", "Operational", "Measured"]:
+            passes += 1
+        else:
+            failures.append(f"FAIL [layered {order}] state merge: {states!r}")
+        derived_identified = named(platform.get("states"), "Identified")
+        if derived_identified and derived_identified.get("description") == "The platform need is named.":
+            passes += 1
+        else:
+            failures.append(f"FAIL [layered {order}] state description: {derived_identified!r}")
+        capability = named(effective.get("alphas"), "Derived Capability")
+        if capability and capability.get("contributesTo") == "Operational Automation":
+            passes += 1
+        else:
+            failures.append(f"FAIL [layered {order}] parent contribution: {capability!r}")
+
+    original, _ = resolve([parent])
+    parent_states = [state["name"] for state in named(original["alphas"], "Platform")["states"]]
+    if parent_states == ["Identified", "Built", "Operational"]:
+        passes += 1
+    else:
+        failures.append(f"FAIL parent progression mutated: {parent_states!r}")
 
     for failure in failures:
         print(failure)

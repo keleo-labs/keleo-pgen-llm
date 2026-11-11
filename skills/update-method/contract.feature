@@ -5,6 +5,12 @@
 
 Feature: Practice/Method Update to Latest Guidance
 
+  Scenario: Published comparison preserves local work
+    Given a local draft and a published document share a name
+    When the skill checks Studio MCP for the published version
+    Then it compares the documents without overwriting the local draft
+    And it retrieves published dependencies through Studio MCP
+
   Scenario: Changed element links use current source evidence
     Given a practice has a local catalog with earlier source links
     When a source-based update adds new claims

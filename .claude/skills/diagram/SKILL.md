@@ -6,7 +6,7 @@ compatibility: >-
   npx (Node.js 18+), which fetches mermaid-cli on demand.
   The native layouts need Python only.
 metadata:
-  version: "1.4.0"
+  version: "1.5.0"
 ---
 
 # diagram agent entrypoint

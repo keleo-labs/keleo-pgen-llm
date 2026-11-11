@@ -26,6 +26,7 @@ import zipfile
 from pathlib import Path
 
 
+__version__ = "1.0.0"
 _SOURCE_CACHE = None
 
 
@@ -50,7 +51,7 @@ def _build_source_index():
                     name = data.get("name")
                     if name:
                         _SOURCE_CACHE[name] = str(f)
-                except (json.JSONDecodeError, KeyError):
+                except (OSError, json.JSONDecodeError, KeyError):
                     pass
 
     for f in Path("deps").glob("*.json"):
@@ -59,7 +60,7 @@ def _build_source_index():
             name = data.get("name")
             if name:
                 _SOURCE_CACHE[name] = str(f)
-        except (json.JSONDecodeError, KeyError):
+        except (OSError, json.JSONDecodeError, KeyError):
             pass
 
     return _SOURCE_CACHE
@@ -125,21 +126,22 @@ def rebuild_keleo(keleo_path, dry_run=False, if_changed=False):
             "sources": source_files,
         }
 
-    entry_doc = None
-    for doc in documents:
-        if doc.get("entryPoint") or doc.get("entry"):
-            entry_doc = doc
-            break
-    if not entry_doc:
-        entry_doc = documents[-1]
-
-    entry_name = entry_doc.get("name", "")
-    entry_kind = entry_doc.get("kind", "")
-
-    pkg_name = manifest.get("name", keleo_path.stem)
-    pkg_version = manifest.get("version", "1.0.0")
-    pkg_description = manifest.get("description", "")
-    pkg_authors = manifest.get("authors", ["Keleo"])
+    package = manifest.get("package", manifest)
+    pkg_name = package.get("name", keleo_path.stem)
+    entry_doc = next((doc for doc in documents
+                      if doc.get("documentName", "").lower().replace(" ", "-") == pkg_name), None)
+    if entry_doc is None:
+        marked = [doc for doc in documents if doc.get("entryPoint") or doc.get("entry")]
+        entry_doc = marked[-1] if marked else documents[-1]
+    pkg_version = package.get("version", "1.0.0")
+    entry_source = find_source_file(entry_doc.get("documentName", entry_doc.get("name", "")),
+                                    entry_doc.get("documentType", entry_doc.get("kind", "")))
+    if entry_source:
+        pkg_version = json.loads(Path(entry_source).read_text())["version"]
+        source_files = [source for source in source_files if source != entry_source]
+        source_files.append(entry_source)
+    pkg_description = package.get("description", "")
+    pkg_authors = package.get("authors", ["Keleo"])
 
     cmd_parts = [
         sys.executable, "utils/package-keleo.py",
@@ -173,6 +175,7 @@ def rebuild_keleo(keleo_path, dry_run=False, if_changed=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Rebuild .keleo packages from manifests")
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("files", nargs="*", help=".keleo files to rebuild")
     parser.add_argument("--all", action="store_true", help="Rebuild all bundles in bundles/")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be rebuilt")
