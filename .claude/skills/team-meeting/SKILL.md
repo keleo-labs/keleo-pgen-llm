@@ -5,7 +5,7 @@ description: >-
   historical meetings, objectives and team and individual roles. Use for recurring
   team meetings, weekly syncs and team progress calls with a persistent series folder.
 metadata:
-  version: "6.0.0"
+  version: "7.0.0"
 ---
 
 # team-meeting agent entrypoint

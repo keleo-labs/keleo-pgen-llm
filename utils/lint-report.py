@@ -43,7 +43,6 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _shared import load_user_config
 
 __version__ = "1.1.1"
 
@@ -397,8 +396,8 @@ def check_attribution(lines, studio_url):
             "line": line_number,
             "message": (f"framework {name!r} in the attribution line is not a "
                         f"hyperlink — build one with "
-                        f"'python3 utils/studio-client.py --link \"{name}\" "
-                        f"--markdown'"),
+                        f"'python3 utils/studio-links.py --url <Studio-URL> \"{name}\"' "
+                        f"after verifying publication through Studio MCP"),
         })
     return findings
 
@@ -768,6 +767,7 @@ def check_consistency(docs, terms):
 def main():
     parser = argparse.ArgumentParser(
         description="Lint generated markdown reports against reporting rules")
+    parser.add_argument("--version", action="version", version="2.0.0")
     parser.add_argument("report", nargs="*",
                         help="Path to the markdown report(s)")
     parser.add_argument("--consistent-terms", nargs="+", metavar="TERM",
@@ -782,9 +782,7 @@ def main():
                                  "sections", "tone", "cadence"],
                         help="Which checks to run (default: all)")
     parser.add_argument("--studio-url", metavar="URL",
-                        help="keleo-studio-gas deployment URL attribution links "
-                             "must point at (default: keleoStudioGasUrl from "
-                             "config/user-config.json)")
+                        help="Studio deployment URL attribution links must point at")
     parser.add_argument("--min-words", type=int,
                         help="Lower bound of the target word band")
     parser.add_argument("--max-words", type=int,
@@ -808,7 +806,7 @@ def main():
         return 1 if cadence_selftest() else 0
     if not args.report:
         parser.error("the following arguments are required: report")
-    studio_url = args.studio_url or load_user_config().get("keleoStudioGasUrl")
+    studio_url = args.studio_url
 
     results, bodies = [], []
     for path in args.report:

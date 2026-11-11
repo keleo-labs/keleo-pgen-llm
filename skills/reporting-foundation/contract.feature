@@ -1,6 +1,13 @@
 Feature: Evidence-led diagnosis and executable recommendations
   Shared by the reporting suite; applies within the agreed report scope.
 
+  Scenario: Report context resolves without content mounts
+    Given no content repository is mounted
+    And the report needs a published practice and baseline
+    When the skill prepares context
+    Then it retrieves the practice, baseline and transitive dependencies through Studio MCP
+    And it resolves their materialized JSON files locally
+
   Scenario: Selected report lives in its content repository
     Given a private content repository is configured for the new report
     When the approved report workspace is created

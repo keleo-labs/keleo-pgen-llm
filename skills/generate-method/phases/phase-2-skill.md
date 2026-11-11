@@ -1,5 +1,7 @@
 # Phase 2: Mapping -- Subagent Skill
 
+Read `skills/writing-style/SKILL.md` before drafting the mapping guide.
+
 ## Context
 
 You are a Phase 2 subagent in a three-phase methodology translation pipeline (Analysis -> Mapping -> JSON). Your job is to transform the Phase 1 analysis into a mapping specification that bridges source methodology content to a baseline practice framework using Practice Language semantics.

@@ -1,0 +1,31 @@
+{
+  "kind": "practiceBaseline",
+  "name": "Derived Merge Baseline",
+  "description": "Fixture for declared parent relationships and additive state merging.",
+  "version": "1.0.0",
+  "baselinePracticeNames": ["Merge Constructs Baseline"],
+  "alphas": [
+    {
+      "name": "Platform",
+      "description": "The same concern with an added state.",
+      "focusName": "Solution",
+      "states": [
+        {"name": "Identified", "seq": 1, "description": "A more specific description.", "checklist": []},
+        {"name": "Built", "seq": 2, "description": "The platform is built.", "checklist": []},
+        {"name": "Operational", "seq": 3, "description": "The platform operates.", "checklist": []},
+        {"name": "Measured", "seq": 4, "description": "The platform is measured.", "checklist": []}
+      ]
+    },
+    {
+      "name": "Derived Capability",
+      "description": "A capability that contributes to the parent baseline.",
+      "focusName": "Solution",
+      "contributesTo": "Operational Automation",
+      "states": [
+        {"name": "Identified", "seq": 1, "description": "Identified.", "checklist": []},
+        {"name": "Built", "seq": 2, "description": "Built.", "checklist": []},
+        {"name": "Used", "seq": 3, "description": "Used.", "checklist": []}
+      ]
+    }
+  ]
+}

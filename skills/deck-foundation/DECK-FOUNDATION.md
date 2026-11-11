@@ -1,6 +1,6 @@
 # Deck Foundation
 
-Version: 3.1.1
+Version: 3.2.0
 
 > **3.0.0 changes the voice.** A slide now carries complete sentences and
 > stands on its own without a speaker; notes add depth rather than supplying
@@ -15,6 +15,10 @@ Version: 3.1.1
 Shared workflow for every deck-producing skill. Not a skill itself — the
 `slide-deck`, `pitch-deck` and `exec-readout` skills each read this, then add
 their own narrative shape and content rules on top.
+
+Before writing slide copy or speaker notes, read `skills/writing-style/SKILL.md`.
+Apply its ASD-STE100-derived clarity rules within the slide budgets and
+complete-sentence rules in `slide-grammar.md`.
 
 Decks are authored as **Slidev markdown** and published to **Google Slides**
 and **PDF**. Slidev is the design layer: it gives typographic control a

@@ -2,7 +2,7 @@
 name: plan-from-feedback
 description: Publish register issues to project trackers, then resolve keleo-pgen-llm issues — skills, prompts and utilities from the public tracker, practice content from the register
 metadata:
-  version: "1.0.1"
+  version: "2.0.0"
 triggerPatterns:
   - "plan.*feedback"
   - "feedback.*plan"
@@ -143,8 +143,9 @@ candidates are one document at several versions, take the newest and say which.
 A resolved path may be a `bundles/<name>.keleo::documents/<doc>.json` reference; pass it
 through unchanged, since the utilities read package members directly.
 
-Not found locally: `python3 utils/studio-client.py --pull "<Document Name>"`, then
-re-resolve. Still missing: comment on the issue saying the document could not be
+For published content, search Studio MCP first with `list_documents`, then retrieve
+the selected entry with `get_document` as specified in `skills/SKILL-STANDARD.md`
+§12. Still missing: comment on the issue saying the document could not be
 located, and leave it open.
 
 ---

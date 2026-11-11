@@ -1,8 +1,8 @@
-# Keleo Practice Generation System
+## Keleo Practice Generation System
 
 An AI-powered system for converting enterprise methodology documentation into standardized, schema-compliant Practice Language JSON — and for generating domain-informed reports, project plans, reference architectures, and decision analyses from the resulting knowledge base.
 
-## What It Does
+## What it does
 
 The system operates across two capability areas:
 
@@ -10,55 +10,93 @@ The system operates across two capability areas:
 
 **Knowledge-Driven Reporting** — Use the domain knowledge encoded in practices and baselines to generate professional reports, reference architectures, project plans, decision analyses, and document reviews — all in plain English with no framework jargon.
 
-## Quick Start
+## Get started
 
 ### Prerequisites
 
-- **An agent with this local checkout** — Claude Code, Cursor or Codex/ChatGPT
-- **Python 3.9+** — Validation and utility scripts (standard library only, no pip packages)
-- **keleo-language repo** — Cloned at `../../keleo-language/` relative to this project root
-
-### Setup
-
-Shared workflows live in `skills/`. Claude Code discovers thin adapters in
-`.claude/skills/`; Codex discovers them in `.agents/skills/`. Cursor uses the
-`.agents/skills/` adapters and `.cursor/rules/`. In Cursor Settings → Rules,
-Skills and Subagents, turn off third-party skill discovery so Claude's adapters
-do not appear again. Project prompt-history hooks are tracked for all three
-agents. Keep private configuration in `config/user-config.json` and local agent
-settings; both are ignored by Git. Run `python3 utils/vendor-skills.py --check`
-after changing a skill.
-
-To migrate an older checkout, edit canonical skills in `skills/`, then run
-`python3 utils/vendor-skills.py --fix`. The utility now generates adapters from
-the repository; its former home-directory sync and `--target`/`--only` options
-have been removed. Existing private `.claude/user-config.json` is still read
-when `config/user-config.json` is absent; subsequent saves use the shared path.
-Use `/add-agent-vendor` to add another runtime. Vendor-specific per-skill
-instructions belong in `adapter.md` beside its generated entrypoint.
+Use Codex, Claude Code, or Cursor with this checkout. Install Git and Python 3.9 or later. To run the local Studio MCP server, install Node.js 20 or later and obtain access to the [Keleo Studio MCP repository](https://gitlab.cee.redhat.com/planify/keleo-studio-mcp) and a Studio deployment. No content repository or baseline file is required.
 
 ```bash
-# 1. Clone keleo-language alongside this repo
-git clone <repo-url> ../../keleo-language
-
-# 2. Verify symlinks resolve
-ls -la deps/ references/
-
-# 3. (Optional) Configure remote bundle repository
-python3 utils/studio-client.py --configure
-
-# 4. Mount selected private content repositories, if configured
-python3 utils/content-repos.py mount --fix
+git clone https://github.com/keleo-labs/keleo-pgen-llm.git
+cd keleo-pgen-llm
+python3 --version
+node --version
 ```
 
-### Verify
+### 1. Connect the language specification
+
+Clone `keleo-language` beside this project. The tracked links in `deps/`, `references/`, and `utils/` resolve to that exact location.
 
 ```bash
+# Run from the keleo-pgen-llm project root.
+git clone https://github.com/keleo-labs/keleo-language.git ../keleo-language
+test -f deps/language.schema.json
+test -f deps/schemas/language.schema.json
+test -f references/semantics.md
 python3 utils/validate-practice-json.py --help
-python3 utils/assess-practice.py --help
+python3 utils/validate-baseline-json.py --help
 ```
 
-To version selected practices, baselines, or reports outside this code repo, follow [the content repository guide](docs/content-repos.md). A fresh checkout needs the configured baseline content mounted before commands that read it.
+If you already have `keleo-language`, place it at `../keleo-language` or point the tracked links to its location in your own checkout. The validators create their own virtual environment when needed; do not install packages into the system Python.
+
+### 2. Install and connect Studio MCP
+
+If `keleo-studio-mcp` is already connected, continue to authentication. Otherwise, clone the [MCP server](https://gitlab.cee.redhat.com/planify/keleo-studio-mcp) to any directory and install its Node dependencies. The example below uses `~/tools`; GitLab access is required. Set `KELEO_STUDIO_URL` to your Studio Apps Script deployment URL ending in `/exec`.
+
+```bash
+mkdir -p "$HOME/tools"
+git clone https://gitlab.cee.redhat.com/planify/keleo-studio-mcp.git "$HOME/tools/keleo-studio-mcp"
+cd "$HOME/tools/keleo-studio-mcp"
+npm install
+pwd -P  # Use this absolute directory in the client configuration below.
+```
+
+In **Codex**, run the command below, then restart or reload its MCP connection. Confirm the server appears with `codex mcp list`. The [official Codex MCP guidance](https://developers.openai.com/learn/docs-mcp) also describes configuration and verification.
+
+```bash
+codex mcp add keleo-studio --env KELEO_STUDIO_URL=YOUR_STUDIO_EXEC_URL -- node /absolute/path/to/keleo-studio-mcp/src/server.js
+codex mcp list
+```
+
+In **Claude Code**, put the following in a local `.mcp.json` for this project. In **Cursor**, put the same server entry under `mcpServers` in `~/.cursor/mcp.json`. Replace the path and URL, then restart the client. Keep any existing server entries when you edit either file.
+
+```json
+{
+  "mcpServers": {
+    "keleo-studio": {
+      "command": "node",
+      "args": ["/absolute/path/to/keleo-studio-mcp/src/server.js"],
+      "env": {
+        "KELEO_STUDIO_URL": "YOUR_STUDIO_EXEC_URL"
+      }
+    }
+  }
+}
+```
+
+### 3. Authenticate and verify access
+
+Ask your agent to call `keleo-studio` `start_auth`. Complete Google sign-in in the browser it opens. Ask it to call `auth_status` until it reports `authenticated`, then call `list_documents` with `kind: baseline` and retrieve one listed document with `get_document` using that entry's bundle slug and path. This confirms both authentication and document access without a local baseline file.
+
+If the Studio deployment has no browser token bridge, ask the agent to call `start_auth_manual`. The token stays in the MCP process and expires after about 50 minutes. Repeat authentication after the MCP server restarts or the token expires.
+
+### 4. Run a skill
+
+Try: “Use `/generate-method` to turn this methodology into a practice. Find the relevant published baseline in Studio, confirm your choice with me, and plan the work.” Provide the methodology source, but no baseline path. The skill reads published content through Studio MCP and uses local files only for working output and validation.
+
+Shared workflows live in `skills/`. Claude Code discovers `.claude/skills/`; Codex and Cursor discover `.agents/skills/`. Cursor may need third-party skill discovery disabled to avoid duplicate Claude adapters. Project hooks are tracked, while personal settings belong in your agent configuration. After editing a canonical skill, run `python3 utils/vendor-skills.py --fix` and then `python3 utils/vendor-skills.py --check`.
+
+### Troubleshooting
+
+If a language link is broken, check that `../keleo-language` exists and rerun the `test -f` commands above. If MCP tools are missing, check `node --version`, the absolute server path, `KELEO_STUDIO_URL`, and the client connection after a restart. If `auth_status` is unauthenticated, call `start_auth` again. If a document is missing or access is denied, confirm that your Google account can open the Studio deployment and that `list_documents` includes the expected name. Do not substitute a sibling content repository for missing Studio access.
+
+### Optional content repositories
+
+You may mount selected practices, baselines, or reports from separate repositories to manage private authorship and versioning. Follow the [content repository guide](docs/content-repos.md). Mounts are optional; a fresh checkout uses Studio MCP for published content.
+
+### Migrating from the REST client
+
+Replace `utils/studio-client.py` and the `--remote` or `--auto-pull` discovery flags with the Studio MCP steps above. Published documents now come from `list_documents` and `get_document`; the agent converts them for local validation with `utils/materialize-studio-document.py`. Publish bundles with `upload_package`. Remove any old `keleoStudioGasToken` from your ignored `config/user-config.json`; MCP keeps its token in process memory. Existing local and mounted workspaces stay in place.
 
 ## Skills
 
@@ -191,7 +229,7 @@ The protocol and the per-phase agent briefs live in [`skills/verification-founda
 
 ### Output Packaging
 
-All skills produce `.keleo` packages — ZIP archives containing a manifest, Practice Language JSON documents, and optional assets. Packages can be uploaded to a remote bundle repository for consumption by Keleo Studio.
+Practice engineering skills produce `.keleo` packages: ZIP archives containing a manifest, Practice Language JSON documents and optional assets. Publish an approved package through Studio MCP.
 
 ## Project Structure
 
@@ -201,13 +239,13 @@ keleo-pgen-llm/
 ├── .agents/skills/           # Codex and Cursor skill entrypoints
 ├── .claude/skills/           # Claude Code skill entrypoints
 ├── .cursor/                  # Cursor instructions and hooks
-├── deps/                     # Symlinks to keleo-language (schema, baseline JSONs)
+├── deps/                     # Symlinks to keleo-language; legacy local baseline link
 ├── references/               # Domain framework, semantic guidance, assessment rubrics
 ├── prompts/                  # Phase-specific prompt templates
 ├── practices/                # Extension practice outputs (per-practice subdirectories)
 ├── baselines/                # Baseline practice outputs (per-baseline subdirectories)
 ├── bundles/                  # Packaged .keleo output
-├── reports/                  # Generated reports (local or mounted from a content repo)
+├── reports/                  # Generated reports (optional content repo mounts)
 ├── utils/                    # ~80 Python utility scripts (validation, packaging, transforms)
 └── AGENTS-ALL.md             # Shared project guidance
 ```
@@ -218,19 +256,18 @@ keleo-pgen-llm/
 |------|---------|
 | `deps/schemas/` | Modular Practice Language schema sources and separate catalog schemas |
 | `deps/language.schema.json` | Generated compatibility schema for existing validators |
-| `deps/platform-adoption-kernel.json` | Compatibility link to the mounted Platform Adoption baseline |
-| `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` | Partner Ecosystem Essentials baseline in a mounted content repo |
+| `deps/platform-adoption-kernel.json` | Legacy link to an optional local Platform Adoption baseline; fresh checkouts resolve it through Studio MCP |
 | `references/semantics.md` | Semantic guidance hub (indexes sub-documents) |
 | `references/domain-framework.md` | Enterprise architecture analysis framework |
 
 ## Validation
 
 ```bash
-# Validate an extension practice
-python3 utils/validate-practice-json.py practices/<name>/<name>.json
+# Validate an extension practice against its selected baseline
+python3 utils/validate-practice-json.py practices/<name>/<name>.json <baseline.json> deps/language.schema.json --brief
 
 # Validate a baseline
-python3 utils/validate-baseline-json.py baselines/<name>/<name>.json
+python3 utils/validate-baseline-json.py baselines/<name>/<name>.json deps/language.schema.json
 
 # Inspect a .keleo package
 python3 utils/inspect-keleo.py bundles/<name>.keleo
@@ -239,20 +276,9 @@ python3 utils/inspect-keleo.py bundles/<name>.keleo
 python3 utils/assess-practice.py practices/<name>/<name>.json
 ```
 
-## Remote Bundle Repository
+## Publish a bundle
 
-Packaged `.keleo` bundles can be uploaded to a remote repository for use in Keleo Studio:
-
-```bash
-# Configure credentials
-python3 utils/studio-client.py --configure
-
-# List remote packages
-python3 utils/studio-client.py --list
-
-# Upload a bundle
-python3 utils/studio-client.py --upload bundles/<name>.keleo
-```
+Validate and package the documents locally. To publish an approved `.keleo` bundle, ask your agent to call Studio MCP `upload_package` with its absolute file path. Studio checks your account's create permission. Use `list_packages` to confirm the upload.
 
 ## Learn More
 

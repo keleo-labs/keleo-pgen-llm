@@ -1,7 +1,7 @@
 ---
 name: reference-architecture
 metadata:
-  version: "1.1.2"
+  version: "2.0.0"
 description: Create reference architecture documents — topology, component selection, evaluation frameworks, sizing guidance, and deployment recommendations
 triggerPatterns:
   - "reference.*architecture"

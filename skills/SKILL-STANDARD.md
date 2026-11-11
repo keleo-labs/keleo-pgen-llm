@@ -1,6 +1,6 @@
 # Skill Specification Standard
 
-**Version:** 1.3.1
+**Version:** 2.0.0
 
 This document defines the design principles and structural requirements for all skills in keleo-pgen-llm. Any new skill or modification to an existing skill must conform to these standards.
 
@@ -269,48 +269,20 @@ Identify commands that triggered permission prompts but could be auto-allowed. P
 
 Identify patterns that indicate skill instruction gaps (repeated manual corrections, ambiguous guidance that led to wrong output). Propose specific SKILL.md edits — do not apply unilaterally since skill changes affect all future runs.
 
-## 12. Remote Bundle Resolution
+## 12. Studio MCP document resolution
 
-When a skill cannot resolve a dependency locally (via `discover-dependencies.py`), use the `studio-client.py` utility to download from the keleo-studio-gas remote library.
+Use `keleo-studio-mcp` for published baselines, practices and methods. A sibling content repository is never a prerequisite. Local or mounted files remain valid for unpublished work. Studio is the first source for a published document even when a local copy exists.
 
-During a planning stage awaiting approval, report missing dependencies in the plan and defer downloads and cache refreshes until approval.
+1. Call `auth_status`; if unauthenticated, call `start_auth` and then `auth_status`. Use `start_auth_manual` only when the deployed token bridge is unavailable. If authentication fails, explain the failure and stop the dependent operation.
+2. Call `list_documents`, using its `kind` filter for baseline selection. Match the document's exact `name` and compare document versions. Prefer the highest version in a standalone bundle named for that document. When the document is embedded in many bundles, prefer the bundle already selected for the consuming practice or method. If neither identifies one copy, show the version and candidate bundles to the user before choosing. Record the selected bundle slug and path; a display name alone is not a unique Studio identifier.
+3. Call `get_document` with the chosen `bundle` slug and `path` from `list_documents`. Check that the returned JSON name, kind and version match the selected entry. Studio calls baselines `baseline`; the language calls them `practiceBaseline`. For each declared baseline or practice dependency, repeat these calls until the transitive set is complete. Report missing or cyclic dependencies before generation.
+4. When a local utility needs a file path, save each raw `get_document` JSON response to an ignored temporary file, then run `python3 utils/materialize-studio-document.py <raw.json>`. The utility converts Studio metadata and baseline fields to language JSON under ignored `bundles/.studio-documents/<bundle-slug>/`; remove the temporary file after conversion. Confirm the output filename matches the selected `list_documents` path: Studio's `documentPath` response field has sometimes named another bundle member, so the utility uses the response `id`. This is a disposable MCP cache. Never fetch into `practices/`, `baselines/` or a mounted content repository. Pass cache paths explicitly or search the selected bundle directory with `--search-dirs bundles/.studio-documents/<bundle-slug>`. Do not search the entire cache: different bundles often embed duplicate names and make resolution ambiguous.
+5. Validate materialized documents with the matching language validator before using them as a validation baseline. If a published document declares an older schema version and fails the current schema, report the incompatibility and use it as source context only; do not silently rewrite published content or describe it as valid under the current schema.
+6. If the task needs a baseline but names none, infer a candidate from the request and Studio's baseline list. Confirm the candidate with the user before generation. The user need not supply a baseline file. During a read-only planning stage, inspect Studio through MCP but defer writing cache files until execution is approved.
 
-### 12.1 Download a Missing Bundle
+For a published document and a local work-in-progress copy, keep both files. Show their names and versions before updating the local copy; never replace it as a side effect of a Studio fetch. Package uploads use `upload_package` after local validation and the normal publication approval.
 
-```bash
-python3 utils/studio-client.py --pull "<Document Name>"
-```
-
-This handles authentication, download URL resolution, and bundle verification. The downloaded `.keleo` is saved to `bundles/` and will be found by subsequent `discover-dependencies.py` calls.
-
-### 12.2 Check for Newer Versions
-
-```bash
-python3 utils/studio-client.py --check "<Document Name>"
-```
-
-Compares local vs remote versions. When remote is newer, offer the user a choice: keep local, pull remote, or diff.
-
-### 12.3 Authentication
-
-Credentials (`keleoStudioGasUrl`, `keleoStudioGasToken`) are stored in `config/user-config.json`. If not configured or if the token has expired:
-
-```bash
-python3 utils/studio-client.py --configure
-```
-
-Tokens are Google OAuth bearer tokens that expire after ~1 hour. On 401 errors, `studio-client.py` reports the expiry and guides the user to refresh.
-
-### 12.4 Integrated Resolution
-
-`discover-dependencies.py` supports a `--remote` flag that checks the cached remote index when local resolution fails:
-
-```bash
-python3 utils/discover-dependencies.py --resolve "<Name>" --remote
-python3 utils/discover-dependencies.py --resolve-from <file.json> --transitive --remote --auto-pull
-```
-
-With `--auto-pull`, remote-only dependencies are downloaded automatically before re-resolving.
+The former REST client and its `--remote` / `--auto-pull` discovery flags were removed in version 2.0.0. Replace those calls with the MCP sequence above. For a local-only CLI run, pass explicit local document paths or `.keleo` bundles.
 
 ---
 

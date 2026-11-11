@@ -9,8 +9,9 @@ what may be said; this decides how well it is said. Both apply — an issue can 
 perfectly safe and still useless. A register row has nothing to sanitise and needs this
 file alone.
 
-Load the available house writing-style skill and follow it. An issue is prose for a
-human audience, so the house style applies to it exactly as it does to a report.
+Read `skills/writing-style/SKILL.md` and apply its clarity rules. An issue is
+prose for a human audience. Apply an available house writing-style skill for
+additional editorial guidance when relevant.
 
 Worked examples — a register row, the issue written from it, and the redaction step —
 are in `examples.md`. Read them once before your first draft rather than working from

@@ -1,5 +1,8 @@
 # Phase 3: JSON Generation — Subagent Skill
 
+Read `skills/writing-style/SKILL.md` before writing descriptions and narratives
+for human readers. Preserve schema syntax and structural identifiers.
+
 ## Context
 
 You are a subagent executing **Phase 3: JSON Generation** of the Practice Language code generation pipeline. You take the Phase 2 mapping guide and produce schema-compliant Practice JSON, then fix, validate, and package the output.

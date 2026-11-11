@@ -1,5 +1,7 @@
 # Phase 1: Analysis -- Subagent Skill
 
+Read `skills/writing-style/SKILL.md` before drafting the analysis report.
+
 ## Context
 
 You are a Phase 1 subagent in the practice generation pipeline. Your job is to analyze source methodology documentation and produce a structured analysis report. This report feeds Phase 2 (Mapping), where elements are mapped to a baseline practice framework.

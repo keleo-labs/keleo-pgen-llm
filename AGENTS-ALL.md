@@ -1,6 +1,16 @@
 # AGENTS-ALL.md
 
-Version: 2.2.0. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
+Version: 3.0.0. Shared guidance for any agent working in this repository. Agent-specific entrypoints add only their runtime details.
+
+Version 3 replaces the Studio REST client and required content mounts with Studio
+MCP. Migrate REST calls to the MCP operations in `skills/SKILL-STANDARD.md` §12;
+keep local files only for unpublished work and optional content versioning.
+
+Before any project skill drafts or revises reader-facing natural language, read
+`skills/writing-style/SKILL.md`. Apply it to prose, slide copy, issue text,
+diagram labels and reader-facing strings in structured artifacts. This local
+skill vendors the ASD-STE100-derived clarity rules; other available writing
+skills may add audience or editorial rules.
 
 Version 2 replaces Codex `gws` CLI instructions with the global Codex `gws`
 skill and Google Workspace MCP. Existing standalone CLI utilities remain
@@ -20,8 +30,9 @@ Extension practices analyze source methodologies (e.g., AWS Well-Architected, SA
 
 ### Required
 
-- **Python 3.9+** — All utility scripts, validation, and the code generation pipeline are Python-based. No third-party pip packages are needed — the project uses only the Python standard library.
+- **Python 3.9+** — Project utilities use the standard library. The linked language validators create their own virtual environment for `jsonschema` when needed.
 - **`keleo-language` repo** — The Practice Language specification provides modular JSON Schema sources, a generated compatibility schema, validation scripts and semantic reference documentation. Symlinks in `deps/`, `references/` and `utils/` point into this repo. Clone it at `../keleo-language/` relative to this project root.
+- **Authenticated `keleo-studio-mcp` connection** — Skills use Studio for published baselines, practices and methods. The MCP server may be installed anywhere. See the README for client setup and authentication.
 
 ### Optional — Content Sourcing
 
@@ -30,20 +41,9 @@ These tools support the research and content extraction phases of the pipeline, 
 - **Codex `gws` skill and Google Workspace MCP** — Use the global Codex skill for Google Sheets, Docs, Slides, Drive, Gmail and Calendar. Read and write through its MCP tools. If they are unavailable, follow the skill's connection guidance; do not substitute the retired `gws` CLI in a Codex workflow.
 - **Playwright MCP server** — Browser automation for extracting content from JavaScript-heavy web pages. When `WebFetch` fails (auth walls, client-side rendering), Playwright loads the page in a real browser. Configured at user level, not project level.
 
-### Optional — Remote Bundle Repository
+### Optional — Content repositories
 
-A remote bundle repository provides centralised storage for `.keleo` packages, enabling skills to automatically discover, download, and upload practice bundles. The `studio-client.py` utility works with any service that implements the bundle repository REST API:
-
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `?api=packages` | GET | List all available bundles (name, version, slug) |
-| `?api=package&name=X` | GET | Get a specific package manifest |
-| `?api=download&name=X` | GET | Get a download URL for a .keleo file |
-| `?api=index&kind=Y` | GET | List documents, optionally filtered by kind |
-| `?api=document&bundle=X&path=Y` | GET | Get a single document's JSON |
-| `?api=upload` | POST | Upload a .keleo package (base64-encoded body) |
-
-Authentication is via bearer token (`Authorization: Bearer <token>`). Credentials are stored in `config/user-config.json`. Setup: `python3 utils/studio-client.py --configure`
+Selected authored workspaces may be mounted from separate repositories. Mounts are for ownership and versioning; skills resolve published content through Studio MCP without them. See `docs/content-repos.md`.
 
 ### Optional — Extended Validation
 
@@ -66,7 +66,7 @@ Required only by the deck skills (`/slide-deck`, `/pitch-deck`, `/exec-readout`)
 
 ```bash
 # 1. Clone keleo-language alongside this repo
-git clone <repo-url> ../keleo-language
+git clone https://github.com/keleo-labs/keleo-language.git ../keleo-language
 
 # 2. Verify symlinks resolve
 ls -la deps/ references/
@@ -74,13 +74,9 @@ ls -la deps/ references/
 # 3. Verify Python
 python3 --version   # 3.9+
 
-# 4. (Optional) Configure remote bundle repository access
-python3 utils/studio-client.py --configure
+# 4. Connect and authenticate keleo-studio-mcp as shown in README.md
 
-# 5. Mount selected private content repositories, if configured
-python3 utils/content-repos.py mount --fix
-
-# 6. Test the toolchain
+# 5. Test the toolchain
 python3 utils/validate-practice-json.py --help
 python3 utils/assess-practice.py --help
 ```
@@ -91,6 +87,9 @@ python3 utils/assess-practice.py --help
 keleo-pgen-llm/
 ├── .                             # Canonical project resources
 │   └── skills/
+│       ├── writing-style/                # Shared ASD-STE100-derived clarity rules
+│       │   ├── SKILL.md
+│       │   └── contract.feature
 │       ├── generate-method/              # Extension practice creation skill
 │       │   └── SKILL.md
 │       ├── create-baseline-method/       # Baseline practice creation skill
@@ -149,7 +148,7 @@ keleo-pgen-llm/
 ├── deps/                                   # Consumed dependencies (tracked)
 │   ├── language.schema.json               # JSON Schema definition (symlink to keleo-language)
 │   ├── schemas/                           # Modular schema sources (symlink to keleo-language)
-│   └── platform-adoption-kernel.json      # Symlink to mounted baselines/platform-adoption-essentials/
+│   └── platform-adoption-kernel.json      # Legacy link; requires an optional local Platform Adoption baseline
 ├── references/                             # Analysis framework documentation
 │   ├── domain-framework.md
 │   ├── semantics.md                       # Hub document (index to sub-documents)
@@ -333,19 +332,11 @@ Inputs the library resolves against.
 
 - `deps/schemas/language.schema.json` - Modular entry point; inspect the relevant sibling module for definitions
 - `deps/language.schema.json` - Generated compatibility schema for existing validators and `$defs` consumers
-- `deps/platform-adoption-kernel.json` - Platform Adoption Essentials (symlink to `baselines/platform-adoption-essentials/`)
-- `baselines/partner-ecosystem-essentials/partner-ecosystem-essentials.json` - Current Partner Ecosystem Essentials baseline in a content repository
+- Published baselines are resolved through Studio MCP, with local files used for unpublished work.
 
-**Where the definitive Platform Adoption Essentials lives.** The document
-itself is `baselines/platform-adoption-essentials/platform-adoption-essentials.json`;
-`deps/platform-adoption-kernel.json` is a symlink to it, kept so existing
-references to the `deps/` path continue to resolve. The baseline itself lives
-in a separate content repository and must be mounted before use. Configure
-selected content repositories as described in `docs/content-repos.md`.
-
-Other copies of this baseline exist outside the project (keleo-studio serves
-one from `web/public/examples/` for its practice-author page). Those are
-allowed to drift; this one is definitive for code generation.
+`deps/platform-adoption-kernel.json` is a legacy link to a local baseline. It
+resolves only when that optional baseline is present; new skills fetch the
+published baseline through Studio MCP instead.
 
 ## Baseline Practices (Foundational Frameworks)
 
@@ -636,8 +627,6 @@ Gitignored per-user config file. Created automatically by skills on first use.
 | `issueRegisterUrl` | Google Sheets URL for feedback register | `/plan-from-feedback` or `/report-issue` first run |
 | `issueRegisterSpreadsheetId` | Extracted spreadsheet ID | `/plan-from-feedback` or `/report-issue` first run |
 | `issueReporterEmail` | Email recorded against issues you file | `/report-issue` first run |
-| `keleoStudioGasUrl` | Remote bundle repository deployment URL | `studio-client.py --configure` |
-| `keleoStudioGasToken` | Bearer token for bundle repository API | `studio-client.py --configure` |
 
 ## Git Safety
 
@@ -835,7 +824,9 @@ All three skills follow the same workflow:
 
 **Source of truth**: Project skills and foundations live in `skills/`. Agent discovery files are thin wrappers around these canonical resources.
 
-Two skills the project references are **deliberately not vendored**. `git-guardrails` governs how this repository's git is managed rather than anything the project produces, and `writing-style` is a user preference. A clone without them loses the pre-push scan workflow and the house prose style, neither of which affects generated artifacts.
+The project vendors its ASD-STE100-derived writing rules in `skills/writing-style/`.
+The personal house writing-style skill can add editorial guidance when available.
+`git-guardrails` remains a user-level skill for remote git work.
 
 ### Reporting Issues
 

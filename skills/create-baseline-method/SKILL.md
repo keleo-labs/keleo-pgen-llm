@@ -2,7 +2,7 @@
 name: create-baseline-method
 description: Generate foundational baseline practice JSON from source methodology
 metadata:
-  version: "1.6.0"
+  version: "2.0.0"
 ---
 
 # create-baseline-method Skill
@@ -10,9 +10,13 @@ metadata:
 ## Metadata
 
 **Name:** create-baseline-method
-**Version:** 1.6.0
+**Version:** 2.0.0
 **Description:** Generate foundational baseline practice JSON from source methodology
 **Trigger:** When user provides source methodology for baseline practice creation
+
+Read `skills/writing-style/SKILL.md` before drafting phase documents or
+reader-facing descriptions and narratives in JSON. Give the same path to
+phase subagents.
 
 ## Supporting Standards
 
@@ -38,7 +42,7 @@ metadata:
 | Dependency | Required? | Role |
 |---|---|---|
 | Playwright MCP | Optional | Content sourcing from web-based methodology documentation when `a web fetch tool` fails |
-| Remote bundle repository | Optional | Downloads dependency `.keleo` bundles not available locally (via `studio-client.py`) |
+| `keleo-studio-mcp` | Yes | Finds published parent baselines and dependencies without content mounts |
 
 Baselines are foundational — they typically have no upstream practice dependencies. Playwright is only needed when source methodology documentation is on JavaScript-heavy web pages that `a web fetch tool` cannot render.
 
@@ -133,26 +137,9 @@ This skill orchestrates a 4-phase pipeline:
 
 **Process:**
 
-1. **Auto-discover parent baselines by name:**
-   If the user indicates this baseline extends other baseline(s) (by providing a name or path):
-   - If user provides a **name** (no `/`, doesn't end in `.json`), resolve it:
-     ```bash
-     python3 utils/discover-dependencies.py --resolve "Parent Baseline Name"
-     ```
-     - `found` → use the resolved path
-     - `not_found` → attempt remote download:
-       ```bash
-       python3 utils/studio-client.py --pull "Parent Baseline Name"
-       ```
-       If pull succeeds, re-resolve. If pull fails (auth error, not found remotely), ask user for the file path.
-     - `ambiguous` → present candidates to user
+1. **Discover parent baselines:** If the task implies a parent but names none, infer a candidate from Studio MCP's baseline list and confirm it with the user. Resolve published parent names with `list_documents` and `get_document` as specified in `skills/SKILL-STANDARD.md` §12. Use an explicit local path only for unpublished work.
 
-2. **Resolve transitive dependencies in a single step:**
-   For each resolved parent baseline, check for transitive dependencies:
-   ```bash
-   python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive --remote
-   ```
-   This scans `baselines/`, `practices/`, `deps/`, and `bundles/` directories plus the cached remote index, recursively resolving all `baselinePracticeNames` in the chain. For any `not_found` dependencies, attempt `python3 utils/studio-client.py --pull "<name>"` before asking the user.
+2. **Resolve transitive dependencies:** Read each fetched parent's `baselineDependencyNames` (called `baselinePracticeNames` after materialization) and obtain each published ancestor through Studio MCP. After materializing documents in the ignored MCP cache, check the chain locally with `python3 utils/discover-dependencies.py --resolve-from <parent-baseline.json> --transitive --search-dirs bundles/.studio-documents/<selected-bundle-slug>`. Report an unavailable or ambiguous ancestor rather than asking for a content repository mount.
 
 3. **Confirm all resolved dependencies with user:**
    Present ALL parent baselines and their transitive deps in a single summary:

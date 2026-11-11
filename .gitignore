@@ -39,6 +39,7 @@ runs/*/*
 .claude/settings.previous.json
 config/user-config.json
 config/content-repos.json
+.mcp.json
 content-import-backups/
 # Share skills and hooks, but keep agent credentials, preferences and sessions local.
 .agents/*

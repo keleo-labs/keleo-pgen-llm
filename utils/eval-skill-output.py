@@ -328,7 +328,7 @@ def discover_files(directory):
         name = f.name
         if name.startswith("_") or name.startswith("backup-"):
             continue
-        if name in ("grading.json", "benchmark.json", "timing.json"):
+        if name in ("grading.json", "benchmark.json", "timing.json", "catalog-links.json", "practice-catalog.json"):
             continue
         if _is_proposal_document(f):
             continue

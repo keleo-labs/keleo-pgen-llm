@@ -8,6 +8,9 @@ then the newer version wins regardless of directory traversal order.
 import importlib.util
 import itertools
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -17,6 +20,18 @@ SPEC.loader.exec_module(VERSIONING)
 
 
 class DependencyVersionTests(unittest.TestCase):
+    def test_files_from_selects_exact_files(self):
+        fixture = ROOT / "tests/fixtures/version-collision-new.json"
+        with tempfile.TemporaryDirectory() as directory:
+            listing = Path(directory) / "files.txt"
+            listing.write_text(f"{fixture}\n", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "utils/apply-versioning.py"),
+                 "--files-from", str(listing), "--show"],
+                capture_output=True, text=True, check=True,
+            )
+            self.assertIn("Version Collision Probe", result.stdout)
+
     def test_newest_copy_wins_in_both_orders(self):
         fixtures = [ROOT / "tests/fixtures/version-collision-old.json",
                     ROOT / "tests/fixtures/version-collision-new.json"]

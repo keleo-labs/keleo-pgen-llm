@@ -2,7 +2,7 @@
 name: pitch-deck
 description: Create a persuasive pitch deck — value proposition, partner or GSI pitch, solution proposal, business case — and publish it to Google Slides and PDF.
 metadata:
-  version: "3.0.1"
+  version: "3.1.0"
 ---
 
 # pitch-deck agent entrypoint
