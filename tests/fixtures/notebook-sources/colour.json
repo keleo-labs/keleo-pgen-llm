@@ -1,0 +1,23 @@
+{
+  "kind": "practice",
+  "name": "Colour Verification",
+  "version": "1.0.0",
+  "description": "Verify the colour that the lantern emits.",
+  "baselinePracticeName": "Colour Trial Kernel",
+  "alphas": [
+    {
+      "name": "Colour Check",
+      "description": "Inspection of the projected light.",
+      "states": [
+        {
+          "name": "Verified",
+          "description": "A reviewer has recorded the projected colour.",
+          "checklist": [
+            {"name": "Cobalt reflection", "description": "The light makes a cobalt reflection on the third tile."}
+          ]
+        }
+      ]
+    },
+    {"name": "Spare Wicks", "description": "An inventory unrelated to the lighting practice."}
+  ]
+}

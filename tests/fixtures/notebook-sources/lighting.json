@@ -1,0 +1,22 @@
+{
+  "kind": "practice",
+  "name": "Lantern Lighting",
+  "version": "1.0.0",
+  "description": "Light the lantern after its colour check passes.",
+  "baselinePracticeName": "Lantern Trial Kernel",
+  "practiceDependencyNames": ["Colour Verification", "Weather Calibration"],
+  "futureField": {"notes": ["Preserve the cobalt dial.", false, null, {}]},
+  "alphas": [
+    {
+      "name": "Lantern",
+      "description": "Authored lantern definition for the lighting practice.",
+      "states": [
+        {
+          "name": "Ready",
+          "contributesTo": [{"alphaName": "Colour Check", "stateName": "Verified"}]
+        }
+      ]
+    }
+  ],
+  "assets": [{"name": "Colour chart", "url": "https://example.invalid/colour-chart"}]
+}

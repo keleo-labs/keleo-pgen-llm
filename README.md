@@ -10,6 +10,22 @@ The system operates across two capability areas:
 
 **Knowledge-Driven Reporting** — Use the domain knowledge encoded in practices and baselines to generate professional reports, reference architectures, project plans, decision analyses, and document reviews — all in plain English with no framework jargon.
 
+## Export sources for notebook Q&A
+
+Ask Codex to run `/export-notebook-sources` for a published practice, method or list of practices. For local files, run the exporter from this checkout with Python 3.9 or later and Node.js with npm. It uses a sibling `keleo-studio-gas` checkout by default. Use `--studio-gas-dir` to point to another trusted checkout.
+
+```bash
+python3 utils/export-notebook-sources.py method.keleo \
+  --dependency supporting-practices.keleo \
+  --output-dir bundles/notebook-sources/example
+```
+
+The export contains one Markdown file per selected practice or baseline. A method also produces a method file and one file for each member. Each practice file includes authored content and the inherited context selected by Studio GAS. To export a supporting document as a separate file, pass it as a positional input. Use `bundle.keleo::documents/name.json` to select one exact archive member.
+
+In Gemini Notebook, add the generated `.md` files as sources. Review **Dependencies and gaps** for any missing context and **External sources and assets** for materials you may want to add separately. See [Gemini Notebook source help](https://support.google.com/gemininotebook/answer/16215270?hl=en).
+
+Run `/export-notebook-semantics` to prepare three companion Markdown sources for the same notebook. They explain how to read the export, interpret Practice Language elements and evidence, and follow composition and workflow. The guides are reusable across practice and method exports.
+
 ## Get started
 
 ### Prerequisites

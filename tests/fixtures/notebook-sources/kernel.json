@@ -1,0 +1,15 @@
+{
+  "kind": "practiceBaseline",
+  "name": "Lantern Trial Kernel",
+  "version": "1.0.0",
+  "description": "Fictional test baseline for a lantern inspection.",
+  "alphas": [
+    {
+      "name": "Lantern",
+      "description": "A lantern that guides visitors along a test path.",
+      "states": [
+        {"name": "Ready", "description": "The lantern can guide visitors."}
+      ]
+    }
+  ]
+}

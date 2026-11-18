@@ -1,0 +1,43 @@
+{
+  "skill_name": "export-notebook-sources",
+  "evals": [
+    {
+      "id": 1,
+      "name": "practice-with-a-gap",
+      "directory": "notebook-eval/practice",
+      "prompt": "Make a Markdown source for notebook Q&A from tests/fixtures/notebook-sources/lighting.json. The other JSON files in that folder provide any available dependencies. The trusted Studio GAS checkout is ./studio-gas. Save the result in notebook-eval/practice.",
+      "files": [
+        "tests/fixtures/notebook-sources/lighting.json",
+        "tests/fixtures/notebook-sources/kernel.json",
+        "tests/fixtures/notebook-sources/colour.json",
+        "tests/fixtures/notebook-sources/colour-kernel.json"
+      ],
+      "expected_output": "One practice Markdown file preserves the unfamiliar authored field, repeats the referenced state checklist and identifies the unavailable supporting practice.",
+      "assertions": [
+        "The output contains exactly one practice file.",
+        "The authored content includes futureField and its cobalt dial note.",
+        "The Colour Check / Verified reference includes the third-tile checklist criterion.",
+        "The export names Weather Calibration and marks the Studio view incomplete."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "method-with-members",
+      "directory": "notebook-eval/method",
+      "prompt": "Can I get NotebookLM sources for Lantern Trial? Use tests/fixtures/notebook-sources/method.json and the other JSON files in that folder. The trusted Studio GAS checkout is ./studio-gas. Write the source files to notebook-eval/method.",
+      "files": [
+        "tests/fixtures/notebook-sources/method.json",
+        "tests/fixtures/notebook-sources/kernel.json",
+        "tests/fixtures/notebook-sources/colour.json",
+        "tests/fixtures/notebook-sources/lighting.json",
+        "tests/fixtures/notebook-sources/colour-kernel.json"
+      ],
+      "expected_output": "One method file and two member practice files. The method file preserves the authored member order and the alpha binding.",
+      "assertions": [
+        "The output contains exactly one method and two member files.",
+        "Colour Verification appears before Lantern Lighting in the method file.",
+        "The cross-baseline binding names both baselines and repeats the Colour Check definition."
+      ]
+    }
+  ]
+}

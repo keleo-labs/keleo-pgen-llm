@@ -1,0 +1,8 @@
+## Retrieve published bundles
+
+1. Follow Studio MCP authentication in [the skill standard](../../SKILL-STANDARD.md#12-studio-mcp-document-resolution). Use `list_documents` to match the name, kind and version. Record the exact bundle slug and member path. Ask the user to resolve ties that the standard cannot resolve.
+2. Call `get_package` to verify the manifest and `get_download_url` with the exact slug. Use authorised Drive access to save the archive in a temporary workspace. Prefer a connected Drive tool that can obtain the file bytes. If the connector lacks that capability, open the exact Drive file in an authenticated browser and use its Download control. If access fails, name the affected bundle and ask for its exact `.keleo` file.
+3. Verify the archive manifest's package name and version and the selected member's path, kind, name and version against Studio. Use the selected member path explicitly on the CLI. The archive is the source of authored JSON. Studio's `get_document` returns a composed view and may add metadata or omit authored values.
+4. Inspect the authored JSON and manifest for method members, baseline chains, practice dependencies and version constraints. Resolve those recursively. Start with embedded definitions and the consuming archive. For missing or incompatible documents, match Studio's index and retrieve the exact supporting bundles. Pass exact members with `--dependency` to disambiguate. Treat inaccessible supporting bundles as gaps and inaccessible roots or method members as blockers.
+
+Use the current chat's authenticated tools or browser. Keep download links, raw archives and exports local to the task when possible.
