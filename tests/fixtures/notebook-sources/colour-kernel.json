@@ -1,0 +1,13 @@
+{
+  "kind": "practiceBaseline",
+  "name": "Colour Trial Kernel",
+  "version": "1.0.0",
+  "description": "Fictional baseline for colour verification.",
+  "alphas": [
+    {
+      "name": "Colour Check",
+      "description": "Inspection of the projected light.",
+      "states": [{"name": "Projected", "description": "The light reaches the test tile."}]
+    }
+  ]
+}

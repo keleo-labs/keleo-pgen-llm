@@ -1,0 +1,34 @@
+{
+  "skill_name": "export-notebook-semantics",
+  "evals": [
+    {
+      "id": 1,
+      "name": "general-guides",
+      "directory": "general-guides",
+      "prompt": "Create the three Keleo notebook companion Markdown guides in general-guides/. The guides should cover reading exports, elements and evidence, and composition and workflow. No specific practice is selected. Use the committed Practice Language schema 5.1.0 semantics and the repository's notebook renderer as the source material.",
+      "expected_output": "Three standalone Markdown files with versioned provenance. They explain authored versus Studio content, criteria versus project evidence, and how to interpret composition and an on-demand stage.",
+      "assertions": [
+        "One directory contains exactly three Markdown guides and each identifies schema 5.1.0.",
+        "The reading guide explains how changed and omitted Studio fields relate to authored content.",
+        "The elements guide distinguishes checklist criteria from evidence in a project's current assessment.",
+        "The composition guide explains how a trigger governs an onDemand stage."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "existing-export",
+      "directory": "existing-export",
+      "prompt": "Add the three Keleo notebook companion guides alongside the fictional export in existing-export/. Preserve anything already there, including the custom reading guide. Include guidance on what the notebook can answer if Weather Calibration is missing. Use the committed Practice Language schema 5.1.0 semantics and the repository's notebook renderer.",
+      "expected_output": "Both existing Markdown files stay intact. A fresh subdirectory holds three companion guides that explain missing targets and the difference between a checklist requirement and recorded completion.",
+      "files": [
+        "evals/files/existing-export/fictional-lantern-practice.md",
+        "evals/files/existing-export/keleo-notebook-reading-v1.0.0.md"
+      ],
+      "assertions": [
+        "The two original Markdown files match their fixtures byte for byte.",
+        "One new subdirectory contains exactly three schema 5.1.0 guides.",
+        "The guides explain the limits of placeholder references, unresolved dependencies and practice checklist evidence."
+      ]
+    }
+  ]
+}

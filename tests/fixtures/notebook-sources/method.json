@@ -1,0 +1,19 @@
+{
+  "kind": "method",
+  "name": "Lantern Trial",
+  "version": "1.0.0",
+  "description": "Fictional test method for checking a lantern before lighting it.",
+  "baselinePracticeName": "Lantern Trial Kernel",
+  "practiceNames": ["Colour Verification", "Lantern Lighting"],
+  "bindings": {
+    "alphaBindings": [{
+      "relationship": "contribution",
+      "sourceAlphas": [{
+        "baselineName": "Colour Trial Kernel",
+        "alphaName": "Colour Check",
+        "stateContributions": [{"fromState": "Projected", "toState": "Ready"}]
+      }],
+      "targetAlpha": {"baselineName": "Lantern Trial Kernel", "alphaName": "Lantern"}
+    }]
+  }
+}
